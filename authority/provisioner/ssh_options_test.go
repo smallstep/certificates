@@ -147,6 +147,7 @@ func TestCustomSSHTemplateOptions(t *testing.T) {
 						err := json.NewEncoder(w).Encode(tt.webhookResponses[i])
 						assert.FatalError(t, err)
 					}))
+					// nolint:gocritic // defer in loop isn't a resource leak
 					defer ts.Close()
 					wh.URL = ts.URL
 				}

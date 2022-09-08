@@ -23,14 +23,14 @@ func TestWebhooksAddressPolicy_IsIPMatch(t *testing.T) {
 		expect bool
 	}
 	tests := map[string]test{
-		"true/public-ipv4": test{
+		"true/public-ipv4": {
 			policy: WebhookAddressPolicy{
 				Public: true,
 			},
 			ip:     pubIPv4,
 			expect: true,
 		},
-		"false/public-ipv4": test{
+		"false/public-ipv4": {
 			policy: WebhookAddressPolicy{
 				Private:   true,
 				Loopback:  true,
@@ -39,14 +39,14 @@ func TestWebhooksAddressPolicy_IsIPMatch(t *testing.T) {
 			ip:     pubIPv4,
 			expect: false,
 		},
-		"true/public-ipv6": test{
+		"true/public-ipv6": {
 			policy: WebhookAddressPolicy{
 				Public: true,
 			},
 			ip:     pubIPv6,
 			expect: true,
 		},
-		"false/public-ipv6": test{
+		"false/public-ipv6": {
 			policy: WebhookAddressPolicy{
 				Private:   true,
 				Loopback:  true,
@@ -55,35 +55,35 @@ func TestWebhooksAddressPolicy_IsIPMatch(t *testing.T) {
 			ip:     pubIPv6,
 			expect: false,
 		},
-		"false/public-ipv4-multicast": test{
+		"false/public-ipv4-multicast": {
 			policy: WebhookAddressPolicy{
 				Public: true,
 			},
 			ip:     netip.MustParseAddr("224.0.1.0"),
 			expect: false,
 		},
-		"false/public-ipv6-multicast": test{
+		"false/public-ipv6-multicast": {
 			policy: WebhookAddressPolicy{
 				Public: true,
 			},
 			ip:     netip.MustParseAddr("ff00::1"),
 			expect: false,
 		},
-		"true/loopback-ipv4": test{
+		"true/loopback-ipv4": {
 			policy: WebhookAddressPolicy{
 				Loopback: true,
 			},
 			ip:     loopbackIPv4,
 			expect: true,
 		},
-		"true/loopback-ipv6": test{
+		"true/loopback-ipv6": {
 			policy: WebhookAddressPolicy{
 				Loopback: true,
 			},
 			ip:     loopbackIPv6,
 			expect: true,
 		},
-		"false/loopback-ipv4": test{
+		"false/loopback-ipv4": {
 			policy: WebhookAddressPolicy{
 				Private:   true,
 				Public:    true,
@@ -92,7 +92,7 @@ func TestWebhooksAddressPolicy_IsIPMatch(t *testing.T) {
 			ip:     loopbackIPv4,
 			expect: false,
 		},
-		"false/loopback-ipv6": test{
+		"false/loopback-ipv6": {
 			policy: WebhookAddressPolicy{
 				Private:   true,
 				Public:    true,
@@ -101,21 +101,21 @@ func TestWebhooksAddressPolicy_IsIPMatch(t *testing.T) {
 			ip:     loopbackIPv6,
 			expect: false,
 		},
-		"true/private-ipv4": test{
+		"true/private-ipv4": {
 			policy: WebhookAddressPolicy{
 				Private: true,
 			},
 			ip:     privateIPv4,
 			expect: true,
 		},
-		"true/private-ipv6": test{
+		"true/private-ipv6": {
 			policy: WebhookAddressPolicy{
 				Private: true,
 			},
 			ip:     privateIPv6,
 			expect: true,
 		},
-		"false/private-ipv4": test{
+		"false/private-ipv4": {
 			policy: WebhookAddressPolicy{
 				Loopback:  true,
 				Public:    true,
@@ -124,7 +124,7 @@ func TestWebhooksAddressPolicy_IsIPMatch(t *testing.T) {
 			ip:     privateIPv4,
 			expect: false,
 		},
-		"false/private-ipv6": test{
+		"false/private-ipv6": {
 			policy: WebhookAddressPolicy{
 				Loopback:  true,
 				Public:    true,
@@ -133,21 +133,21 @@ func TestWebhooksAddressPolicy_IsIPMatch(t *testing.T) {
 			ip:     privateIPv6,
 			expect: false,
 		},
-		"true/link-local-ipv4": test{
+		"true/link-local-ipv4": {
 			policy: WebhookAddressPolicy{
 				LinkLocal: true,
 			},
 			ip:     linkLocalIPv4,
 			expect: true,
 		},
-		"true/link-local-ipv6": test{
+		"true/link-local-ipv6": {
 			policy: WebhookAddressPolicy{
 				LinkLocal: true,
 			},
 			ip:     linkLocalIPv6,
 			expect: true,
 		},
-		"false/link-local-ipv4": test{
+		"false/link-local-ipv4": {
 			policy: WebhookAddressPolicy{
 				Loopback: true,
 				Public:   true,
@@ -156,7 +156,7 @@ func TestWebhooksAddressPolicy_IsIPMatch(t *testing.T) {
 			ip:     linkLocalIPv6,
 			expect: false,
 		},
-		"false/link-local-ipv6": test{
+		"false/link-local-ipv6": {
 			policy: WebhookAddressPolicy{
 				Loopback: true,
 				Public:   true,
@@ -184,7 +184,7 @@ func TestWebhookClient_ControlFunc(t *testing.T) {
 		deny         WebhookAddressPolicy
 	}
 	tests := map[string]test{
-		"ok/ipv4-public": test{
+		"ok/ipv4-public": {
 			serverAddr:   "example.com:443",
 			resolvedAddr: "93.184.216.34:443",
 			allow: WebhookAddressPolicy{
@@ -192,7 +192,7 @@ func TestWebhookClient_ControlFunc(t *testing.T) {
 			},
 			expectErr: nil,
 		},
-		"ok/ipv6-public": test{
+		"ok/ipv6-public": {
 			serverAddr:   "example.com:443",
 			resolvedAddr: "[2606:2800:220:1:248:1893:25c8:1946]:443",
 			allow: WebhookAddressPolicy{
@@ -200,15 +200,15 @@ func TestWebhookClient_ControlFunc(t *testing.T) {
 			},
 			expectErr: nil,
 		},
-		"err/ipv4-private": test{
+		"err/ipv4-private": {
 			serverAddr:   "example.com:443",
 			resolvedAddr: "10.32.0.1:443",
 			allow: WebhookAddressPolicy{
 				Public: true,
 			},
-			expectErr: WebhookAddressErr,
+			expectErr: ErrWebhookAddress,
 		},
-		"ok/loopback-ipv6": test{
+		"ok/loopback-ipv6": {
 			serverAddr:   "localhost:9443",
 			resolvedAddr: "[::1]:9443",
 			allow: WebhookAddressPolicy{
@@ -216,7 +216,7 @@ func TestWebhookClient_ControlFunc(t *testing.T) {
 			},
 			expectErr: nil,
 		},
-		"ok/allowed-hostname": test{
+		"ok/allowed-hostname": {
 			serverAddr:   "example.com:443",
 			resolvedAddr: "10.32.0.1:443",
 			allow: WebhookAddressPolicy{
@@ -224,7 +224,7 @@ func TestWebhookClient_ControlFunc(t *testing.T) {
 			},
 			expectErr: nil,
 		},
-		"err/denied-hostname": test{
+		"err/denied-hostname": {
 			serverAddr:   "example.com:443",
 			resolvedAddr: "93.184.216.34:443",
 			allow: WebhookAddressPolicy{
@@ -233,9 +233,9 @@ func TestWebhookClient_ControlFunc(t *testing.T) {
 			deny: WebhookAddressPolicy{
 				Hostnames: []string{"example.com"},
 			},
-			expectErr: WebhookAddressErr,
+			expectErr: ErrWebhookAddress,
 		},
-		"err/denied-ipv4": test{
+		"err/denied-ipv4": {
 			serverAddr:   "example.com:443",
 			resolvedAddr: "93.184.216.34:443",
 			allow: WebhookAddressPolicy{
@@ -245,9 +245,9 @@ func TestWebhookClient_ControlFunc(t *testing.T) {
 			deny: WebhookAddressPolicy{
 				IPs: []string{"93.184.216.34"},
 			},
-			expectErr: WebhookAddressErr,
+			expectErr: ErrWebhookAddress,
 		},
-		"err/denied-ipv6": test{
+		"err/denied-ipv6": {
 			serverAddr:   "example.com:443",
 			resolvedAddr: "[2606:2800:220::1946]:443",
 			allow: WebhookAddressPolicy{
@@ -257,7 +257,7 @@ func TestWebhookClient_ControlFunc(t *testing.T) {
 			deny: WebhookAddressPolicy{
 				IPs: []string{"2606:2800:220:0:0:0:0:1946"},
 			},
-			expectErr: WebhookAddressErr,
+			expectErr: ErrWebhookAddress,
 		},
 	}
 	for name, tc := range tests {

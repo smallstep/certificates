@@ -177,18 +177,19 @@ func (war *webhookAdminResponder) UpdateProvisionerWebhook(w http.ResponseWriter
 
 	found := false
 	for i, wh := range prov.Webhooks {
-		if wh.Name == newWebhook.Name {
-			if newWebhook.Secret != "" && newWebhook.Secret != wh.Secret {
-				err := admin.NewError(admin.ErrorBadRequestType, "webhook secret cannot be updated")
-				render.Error(w, err)
-				return
-			}
-			newWebhook.Secret = wh.Secret
-			newWebhook.Id = wh.Id
-			prov.Webhooks[i] = newWebhook
-			found = true
-			break
+		if wh.Name != newWebhook.Name {
+			continue
 		}
+		if newWebhook.Secret != "" && newWebhook.Secret != wh.Secret {
+			err := admin.NewError(admin.ErrorBadRequestType, "webhook secret cannot be updated")
+			render.Error(w, err)
+			return
+		}
+		newWebhook.Secret = wh.Secret
+		newWebhook.Id = wh.Id
+		prov.Webhooks[i] = newWebhook
+		found = true
+		break
 	}
 	if !found {
 		msg := fmt.Sprintf("provisioner %s has no webhook with the name %s", prov.Name, newWebhook.Name)
@@ -208,10 +209,16 @@ func (war *webhookAdminResponder) UpdateProvisionerWebhook(w http.ResponseWriter
 		return
 	}
 
-	whResponse := *newWebhook
-	// Not removing client-supplied auth secrets since those may have been
-	// updated in this request and we should show in the response that they
-	// changed
-	whResponse.Secret = ""
-	render.ProtoJSONStatus(w, &whResponse, http.StatusCreated)
+	// Return a copy without the signing secret. Include the client-supplied
+	// auth secrets since those may have been updated in this request and we
+	// should show in the response that they changed
+	whResponse := &linkedca.Webhook{
+		Id:                   newWebhook.Id,
+		Name:                 newWebhook.Name,
+		Url:                  newWebhook.Url,
+		Kind:                 newWebhook.Kind,
+		Auth:                 newWebhook.Auth,
+		DisableTlsClientAuth: newWebhook.DisableTlsClientAuth,
+	}
+	render.ProtoJSONStatus(w, whResponse, http.StatusCreated)
 }

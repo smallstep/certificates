@@ -600,7 +600,7 @@ func (wa *webhooksAuthorizerSSH) Authorize(cert *ssh.Certificate, signOpts SignS
 		if err != nil {
 			return err
 		}
-		if resp.Allow != true {
+		if !resp.Allow {
 			return fmt.Errorf("authorization denied by webhook %s", wh.Name)
 		}
 	}

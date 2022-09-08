@@ -558,14 +558,14 @@ func dumpRoutes(mux chi.Routes) {
 
 // getWebhookTransport builds a transport that checks policy before connecting
 // to any remote address
-func getWebhookTransport(config *config.WebhookClient) *http.Transport {
+func getWebhookTransport(cfg *config.WebhookClient) *http.Transport {
 	t := http.DefaultTransport.(*http.Transport).Clone()
 
 	// If no policy is supplied all webhook server requests are allowed
-	if config != nil {
+	if cfg != nil {
 		t.DialContext = func(ctx context.Context, network string, addr string) (net.Conn, error) {
 			d := net.Dialer{
-				Control: config.ControlFunc(addr),
+				Control: cfg.ControlFunc(addr),
 			}
 			return d.DialContext(ctx, network, addr)
 		}

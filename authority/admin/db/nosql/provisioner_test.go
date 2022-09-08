@@ -1241,15 +1241,15 @@ func Test_linkedcaWebhooksToDB(t *testing.T) {
 		want []dbWebhook
 	}
 	var tests = map[string]test{
-		"nil": test{
+		"nil": {
 			in:   nil,
 			want: nil,
 		},
-		"zero": test{
+		"zero": {
 			in:   []*linkedca.Webhook{},
 			want: nil,
 		},
-		"bearer": test{
+		"bearer": {
 			in: []*linkedca.Webhook{
 				{
 					Name:   "bearer",
@@ -1275,7 +1275,7 @@ func Test_linkedcaWebhooksToDB(t *testing.T) {
 				},
 			},
 		},
-		"basic": test{
+		"basic": {
 			in: []*linkedca.Webhook{
 				{
 					Name:   "basic",
@@ -1318,15 +1318,15 @@ func Test_dbWebhooksToLinkedca(t *testing.T) {
 		want []*linkedca.Webhook
 	}
 	var tests = map[string]test{
-		"nil": test{
+		"nil": {
 			in:   nil,
 			want: nil,
 		},
-		"zero": test{
+		"zero": {
 			in:   []dbWebhook{},
 			want: nil,
 		},
-		"bearer": test{
+		"bearer": {
 			in: []dbWebhook{
 				{
 					Name:                 "bearer",
@@ -1354,7 +1354,7 @@ func Test_dbWebhooksToLinkedca(t *testing.T) {
 				},
 			},
 		},
-		"basic": test{
+		"basic": {
 			in: []dbWebhook{
 				{
 					Name:          "basic",

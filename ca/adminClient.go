@@ -1171,14 +1171,14 @@ retry:
 	return webhook, nil
 }
 
-func (c *AdminClient) DeleteProvisionerWebhook(provisionerName string, webhookName string) error {
+func (c *AdminClient) DeleteProvisionerWebhook(provisionerName, webhookName string) error {
 	var retried bool
 	u := c.endpoint.ResolveReference(&url.URL{Path: path.Join(adminURLPrefix, "provisioners", provisionerName, "webhooks", webhookName)})
 	tok, err := c.generateAdminToken(u)
 	if err != nil {
 		return fmt.Errorf("error generating admin token: %w", err)
 	}
-	req, err := http.NewRequest(http.MethodDelete, u.String(), nil)
+	req, err := http.NewRequest(http.MethodDelete, u.String(), http.NoBody)
 	if err != nil {
 		return fmt.Errorf("creating DELETE %s request failed: %w", u, err)
 	}

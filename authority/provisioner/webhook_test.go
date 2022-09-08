@@ -117,16 +117,17 @@ func TestWebhook_Do(t *testing.T) {
 				mac := hmac.New(sha256.New, secret).Sum(body)
 				assert.True(t, hmac.Equal(sig, mac))
 
-				if tc.webhook.BearerToken != "" {
+				switch {
+				case tc.webhook.BearerToken != "":
 					ah := fmt.Sprintf("Bearer %s", tc.webhook.BearerToken)
 					assert.Equals(t, ah, r.Header.Get("Authorization"))
-				} else if tc.webhook.BasicAuth.Username != "" || tc.webhook.BasicAuth.Password != "" {
-					r, err := http.NewRequest("", "", nil)
+				case tc.webhook.BasicAuth.Username != "" || tc.webhook.BasicAuth.Password != "":
+					whReq, err := http.NewRequest("", "", http.NoBody)
 					assert.FatalError(t, err)
-					r.SetBasicAuth(tc.webhook.BasicAuth.Username, tc.webhook.BasicAuth.Password)
-					ah := r.Header.Get("Authorization")
-					assert.Equals(t, ah, r.Header.Get("Authorization"))
-				} else {
+					whReq.SetBasicAuth(tc.webhook.BasicAuth.Username, tc.webhook.BasicAuth.Password)
+					ah := whReq.Header.Get("Authorization")
+					assert.Equals(t, ah, whReq.Header.Get("Authorization"))
+				default:
 					assert.Equals(t, "", r.Header.Get("Authorization"))
 				}
 
@@ -166,6 +167,7 @@ func TestWebhook_Do(t *testing.T) {
 			URL: ts.URL,
 		}
 		cert, err := tls.LoadX509KeyPair("testdata/certs/foo.crt", "testdata/secrets/foo.key")
+		assert.FatalError(t, err)
 		transport := http.DefaultTransport.(*http.Transport).Clone()
 		transport.TLSClientConfig = &tls.Config{
 			InsecureSkipVerify: true,

@@ -467,7 +467,7 @@ func (wa *webhooksAuthorizer) Authorize(cert *x509.Certificate, signOpts SignOpt
 		if err != nil {
 			return err
 		}
-		if resp.Allow != true {
+		if !resp.Allow {
 			return fmt.Errorf("authorization denied by webhook %s", wh.Name)
 		}
 	}

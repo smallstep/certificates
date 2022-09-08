@@ -44,10 +44,11 @@ type sshRequest struct {
 
 // ssh.Certificate but the Key and SignatureKey are marshaled
 type sshCert struct {
-	Nonce           []byte
-	Key             []byte
-	Serial          uint64
-	CertType        uint32
+	Nonce    []byte
+	Key      []byte
+	Serial   uint64
+	CertType uint32
+	//nolint:revive // field name matches ssh.Certificate
 	KeyId           string
 	ValidPrincipals []string
 	ValidAfter      uint64
@@ -59,8 +60,10 @@ type sshCert struct {
 }
 
 type webhookRequestBody struct {
-	Timestamp      string            `json:"timestamp"`
-	X509_CSR       []byte            `json:"csr,omitempty"`
+	Timestamp string `json:"timestamp"`
+	//nolint:revive // acronyms can use all caps
+	X509_CSR []byte `json:"csr,omitempty"`
+	//nolint:revive // acronyms can use all caps
 	SSH_CR         *sshRequest       `json:"ssh_cr,omitempty"`
 	Certificate    *x509.Certificate `json:"certificate,omitempty"`
 	SSHCertificate *sshCert          `json:"ssh_certificate,omitempty"`

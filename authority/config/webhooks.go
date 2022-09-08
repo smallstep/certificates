@@ -8,7 +8,7 @@ import (
 	"github.com/pkg/errors"
 )
 
-var WebhookAddressErr = errors.New("Webhook remote address not allowed")
+var ErrWebhookAddress = errors.New("Webhook remote address not allowed")
 
 type WebhookClient struct {
 	Allow WebhookAddressPolicy `json:"allow,omitempty"`
@@ -116,7 +116,7 @@ func (wc WebhookClient) ControlFunc(serverAddr string) func(string, string, sysc
 			isServerHostname = true
 		}
 		if isServerHostname && wc.Deny.IsHostnameMatch(serverHost) {
-			return WebhookAddressErr
+			return ErrWebhookAddress
 		}
 
 		// Check if the resolved IP is a denied IP
@@ -129,7 +129,7 @@ func (wc WebhookClient) ControlFunc(serverAddr string) func(string, string, sysc
 			return err
 		}
 		if wc.Deny.IsIPMatch(resolvedIP) {
-			return WebhookAddressErr
+			return ErrWebhookAddress
 		}
 
 		// Check if the server address is an allowed hostname
@@ -142,6 +142,6 @@ func (wc WebhookClient) ControlFunc(serverAddr string) func(string, string, sysc
 			return nil
 		}
 
-		return WebhookAddressErr
+		return ErrWebhookAddress
 	}
 }
