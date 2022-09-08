@@ -89,7 +89,7 @@ func (a *Authority) Export() (c *linkedca.Configuration, err error) {
 		if v.Type == "" {
 			typ = int32(linkedca.KMS_SOFTKMS)
 		} else {
-			typ, ok = linkedca.KMS_Type_value[strings.ToUpper(v.Type)]
+			typ, ok = linkedca.KMS_Type_value[strings.ToUpper(string(v.Type))]
 			if !ok {
 				return nil, errors.Errorf("unsupported kms type %s", v.Type)
 			}

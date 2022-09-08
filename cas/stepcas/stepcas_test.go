@@ -10,7 +10,6 @@ import (
 	"encoding/json"
 	"encoding/pem"
 	"fmt"
-	"io/ioutil"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
@@ -291,7 +290,7 @@ func TestMain(m *testing.M) {
 	}
 
 	// Create test files.
-	path, err := ioutil.TempDir(os.TempDir(), "stepcas")
+	path, err := os.MkdirTemp(os.TempDir(), "stepcas")
 	if err != nil {
 		panic(err)
 	}
@@ -665,6 +664,22 @@ func TestStepCAS_CreateCertificate(t *testing.T) {
 			Certificate:      testCrt,
 			CertificateChain: []*x509.Certificate{testIssCrt},
 		}, false},
+		{"ok with provisioner", fields{jwk, client, testRootFingerprint}, args{&apiv1.CreateCertificateRequest{
+			CSR:         testCR,
+			Lifetime:    time.Hour,
+			Provisioner: &apiv1.ProvisionerInfo{ID: "provisioner-id", Type: "ACME"},
+		}}, &apiv1.CreateCertificateResponse{
+			Certificate:      testCrt,
+			CertificateChain: []*x509.Certificate{testIssCrt},
+		}, false},
+		{"ok with server cert", fields{jwk, client, testRootFingerprint}, args{&apiv1.CreateCertificateRequest{
+			CSR:            testCR,
+			Lifetime:       time.Hour,
+			IsCAServerCert: true,
+		}}, &apiv1.CreateCertificateResponse{
+			Certificate:      testCrt,
+			CertificateChain: []*x509.Certificate{testIssCrt},
+		}, false},
 		{"fail CSR", fields{x5c, client, testRootFingerprint}, args{&apiv1.CreateCertificateRequest{
 			CSR:      nil,
 			Lifetime: time.Hour,
@@ -691,6 +706,7 @@ func TestStepCAS_CreateCertificate(t *testing.T) {
 			s := &StepCAS{
 				iss:         tt.fields.iss,
 				client:      tt.fields.client,
+				authorityID: "authority-id",
 				fingerprint: tt.fields.fingerprint,
 			}
 			got, err := s.CreateCertificate(tt.args.req)

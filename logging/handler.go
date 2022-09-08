@@ -5,6 +5,7 @@ import (
 	"net/http"
 	"os"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/sirupsen/logrus"
@@ -78,7 +79,7 @@ func (l *LoggerHandler) writeEntry(w ResponseLogger, r *http.Request, t time.Tim
 		uri = r.Host
 	}
 	if uri == "" {
-		uri = r.URL.RequestURI()
+		uri = sanitizeLogEntry(r.URL.RequestURI())
 	}
 
 	status := w.StatusCode()
@@ -96,8 +97,8 @@ func (l *LoggerHandler) writeEntry(w ResponseLogger, r *http.Request, t time.Tim
 		"protocol":       r.Proto,
 		"status":         status,
 		"size":           w.Size(),
-		"referer":        r.Referer(),
-		"user-agent":     r.UserAgent(),
+		"referer":        sanitizeLogEntry(r.Referer()),
+		"user-agent":     sanitizeLogEntry(r.UserAgent()),
 	}
 
 	for k, v := range w.Fields() {
@@ -116,4 +117,9 @@ func (l *LoggerHandler) writeEntry(w ResponseLogger, r *http.Request, t time.Tim
 	default:
 		l.logger.WithFields(fields).Error()
 	}
+}
+
+func sanitizeLogEntry(s string) string {
+	escaped := strings.ReplaceAll(s, "\n", "")
+	return strings.ReplaceAll(escaped, "\r", "")
 }

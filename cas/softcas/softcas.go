@@ -9,10 +9,12 @@ import (
 	"time"
 
 	"github.com/pkg/errors"
-	"github.com/smallstep/certificates/cas/apiv1"
-	"github.com/smallstep/certificates/kms"
-	kmsapi "github.com/smallstep/certificates/kms/apiv1"
+
+	"go.step.sm/crypto/kms"
+	kmsapi "go.step.sm/crypto/kms/apiv1"
 	"go.step.sm/crypto/x509util"
+
+	"github.com/smallstep/certificates/cas/apiv1"
 )
 
 func init() {
@@ -217,7 +219,7 @@ func (c *SoftCAS) CreateCertificateAuthority(req *apiv1.CreateCertificateAuthori
 func (c *SoftCAS) initializeKeyManager() (err error) {
 	if c.KeyManager == nil {
 		c.KeyManager, err = kms.New(context.Background(), kmsapi.Options{
-			Type: string(kmsapi.DefaultKMS),
+			Type: kmsapi.DefaultKMS,
 		})
 	}
 	return
@@ -262,8 +264,23 @@ func createCertificate(template, parent *x509.Certificate, pub crypto.PublicKey,
 		if sa, ok := signer.(apiv1.SignatureAlgorithmGetter); ok {
 			template.SignatureAlgorithm = sa.SignatureAlgorithm()
 		} else if _, ok := parent.PublicKey.(*rsa.PublicKey); ok {
-			template.SignatureAlgorithm = parent.SignatureAlgorithm
+			// For RSA issuers, only overwrite the default algorithm is the
+			// intermediate is signed with an RSA signature scheme.
+			if isRSA(parent.SignatureAlgorithm) {
+				template.SignatureAlgorithm = parent.SignatureAlgorithm
+			}
 		}
 	}
 	return x509util.CreateCertificate(template, parent, pub, signer)
+}
+
+func isRSA(sa x509.SignatureAlgorithm) bool {
+	switch sa {
+	case x509.SHA256WithRSA, x509.SHA384WithRSA, x509.SHA512WithRSA:
+		return true
+	case x509.SHA256WithRSAPSS, x509.SHA384WithRSAPSS, x509.SHA512WithRSAPSS:
+		return true
+	default:
+		return false
+	}
 }

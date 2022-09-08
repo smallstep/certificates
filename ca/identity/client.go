@@ -62,6 +62,7 @@ func LoadClient() (*Client, error) {
 	// Prepare transport with information in defaults.json and identity.json
 	tr := http.DefaultTransport.(*http.Transport).Clone()
 	tr.TLSClientConfig = &tls.Config{
+		MinVersion:           tls.VersionTLS12,
 		GetClientCertificate: identity.GetClientCertificateFunc(),
 	}
 

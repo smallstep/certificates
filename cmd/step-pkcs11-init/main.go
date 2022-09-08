@@ -6,7 +6,7 @@ import (
 	"crypto/ecdsa"
 	"crypto/elliptic"
 	"crypto/rand"
-	"crypto/sha1"
+	"crypto/sha1" // nolint:gosec // used to create the Subject Key Identifier by RFC 5280
 	"crypto/x509"
 	"crypto/x509/pkix"
 	"encoding/pem"
@@ -18,15 +18,15 @@ import (
 	"time"
 
 	"github.com/pkg/errors"
-	"github.com/smallstep/certificates/kms"
-	"github.com/smallstep/certificates/kms/apiv1"
-	"github.com/smallstep/certificates/kms/uri"
 	"go.step.sm/cli-utils/fileutil"
 	"go.step.sm/cli-utils/ui"
+	"go.step.sm/crypto/kms"
+	"go.step.sm/crypto/kms/apiv1"
+	"go.step.sm/crypto/kms/uri"
 	"go.step.sm/crypto/pemutil"
 
 	// Enable pkcs11.
-	_ "github.com/smallstep/certificates/kms/pkcs11"
+	_ "go.step.sm/crypto/kms/pkcs11"
 )
 
 // Config is a mapping of the cli flags.
@@ -151,6 +151,9 @@ func main() {
 	// Initialize windows terminal
 	ui.Init()
 
+	ui.Println("⚠️  This command is deprecated and will be removed in future releases.")
+	ui.Println("⚠️  Please use https://github.com/smallstep/step-kms-plugin instead.")
+
 	switch {
 	case u.Get("pin-value") != "":
 	case u.Get("pin-source") != "":
@@ -171,7 +174,7 @@ func main() {
 	}
 
 	k, err := kms.New(context.Background(), apiv1.Options{
-		Type: string(apiv1.PKCS11),
+		Type: apiv1.PKCS11,
 		URI:  c.KMS,
 		Pin:  c.Pin,
 	})
@@ -544,6 +547,7 @@ func mustSubjectKeyID(key crypto.PublicKey) []byte {
 	if err != nil {
 		panic(err)
 	}
+	// nolint:gosec // used to create the Subject Key Identifier by RFC 5280
 	hash := sha1.Sum(b)
 	return hash[:]
 }

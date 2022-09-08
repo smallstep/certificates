@@ -4,6 +4,8 @@ import (
 	"bytes"
 	"context"
 	"crypto"
+	"crypto/ecdsa"
+	"crypto/elliptic"
 	"crypto/rand"
 	"crypto/rsa"
 	"crypto/x509"
@@ -17,8 +19,8 @@ import (
 
 	"github.com/pkg/errors"
 	"github.com/smallstep/certificates/cas/apiv1"
-	"github.com/smallstep/certificates/kms"
-	kmsapi "github.com/smallstep/certificates/kms/apiv1"
+	"go.step.sm/crypto/kms"
+	kmsapi "go.step.sm/crypto/kms/apiv1"
 	"go.step.sm/crypto/pemutil"
 	"go.step.sm/crypto/x509util"
 )
@@ -412,6 +414,95 @@ func TestSoftCAS_CreateCertificate_pss(t *testing.T) {
 	}
 }
 
+func TestSoftCAS_CreateCertificate_ec_rsa(t *testing.T) {
+	rootSigner, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	intSigner, err := rsa.GenerateKey(rand.Reader, 2048)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	now := time.Now()
+
+	// Root template
+	template := &x509.Certificate{
+		Subject:               pkix.Name{CommonName: "Test Root CA"},
+		KeyUsage:              x509.KeyUsageCRLSign | x509.KeyUsageCertSign,
+		PublicKey:             rootSigner.Public(),
+		BasicConstraintsValid: true,
+		IsCA:                  true,
+		MaxPathLen:            0,
+		SerialNumber:          big.NewInt(1234),
+		NotBefore:             now,
+		NotAfter:              now.Add(24 * time.Hour),
+	}
+
+	root, err := x509util.CreateCertificate(template, template, rootSigner.Public(), rootSigner)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Intermediate template
+	template = &x509.Certificate{
+		Subject:               pkix.Name{CommonName: "Test Intermediate CA"},
+		KeyUsage:              x509.KeyUsageCRLSign | x509.KeyUsageCertSign,
+		PublicKey:             intSigner.Public(),
+		BasicConstraintsValid: true,
+		IsCA:                  true,
+		MaxPathLen:            0,
+		SerialNumber:          big.NewInt(1234),
+		NotBefore:             now,
+		NotAfter:              now.Add(24 * time.Hour),
+	}
+
+	iss, err := x509util.CreateCertificate(template, root, intSigner.Public(), rootSigner)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if iss.SignatureAlgorithm != x509.ECDSAWithSHA256 {
+		t.Errorf("Certificate.SignatureAlgorithm = %v, want %v", iss.SignatureAlgorithm, x509.ECDSAWithSHA256)
+	}
+
+	c := &SoftCAS{
+		CertificateChain: []*x509.Certificate{iss},
+		Signer:           intSigner,
+	}
+	cert, err := c.CreateCertificate(&apiv1.CreateCertificateRequest{
+		Template: &x509.Certificate{
+			Subject:      pkix.Name{CommonName: "test.smallstep.com"},
+			DNSNames:     []string{"test.smallstep.com"},
+			KeyUsage:     x509.KeyUsageDigitalSignature,
+			ExtKeyUsage:  []x509.ExtKeyUsage{x509.ExtKeyUsageServerAuth, x509.ExtKeyUsageClientAuth},
+			PublicKey:    testSigner.Public(),
+			SerialNumber: big.NewInt(1234),
+		},
+		Lifetime: time.Hour, Backdate: time.Minute,
+	})
+	if err != nil {
+		t.Fatalf("SoftCAS.CreateCertificate() error = %v", err)
+	}
+	if cert.Certificate.SignatureAlgorithm != x509.SHA256WithRSA {
+		t.Errorf("Certificate.SignatureAlgorithm = %v, want %v", iss.SignatureAlgorithm, x509.SHA256WithRSAPSS)
+	}
+
+	roots := x509.NewCertPool()
+	roots.AddCert(root)
+	intermediates := x509.NewCertPool()
+	intermediates.AddCert(iss)
+	if _, err = cert.Certificate.Verify(x509.VerifyOptions{
+		CurrentTime:   time.Now(),
+		Roots:         roots,
+		Intermediates: intermediates,
+		KeyUsages:     []x509.ExtKeyUsage{x509.ExtKeyUsageClientAuth, x509.ExtKeyUsageServerAuth},
+	}); err != nil {
+		t.Errorf("Certificate.Verify() error = %v", err)
+	}
+}
+
 func TestSoftCAS_RenewCertificate(t *testing.T) {
 	mockNow(t)
 
@@ -768,6 +859,35 @@ func TestSoftCAS_defaultKeyManager(t *testing.T) {
 			if (err != nil) != tt.wantErr {
 				t.Errorf("SoftCAS.CreateCertificateAuthority() error = %v, wantErr %v", err, tt.wantErr)
 				return
+			}
+		})
+	}
+}
+
+func Test_isRSA(t *testing.T) {
+	type args struct {
+		sa x509.SignatureAlgorithm
+	}
+	tests := []struct {
+		name string
+		args args
+		want bool
+	}{
+		{"SHA256WithRSA", args{x509.SHA256WithRSA}, true},
+		{"SHA384WithRSA", args{x509.SHA384WithRSA}, true},
+		{"SHA512WithRSA", args{x509.SHA512WithRSA}, true},
+		{"SHA256WithRSAPSS", args{x509.SHA256WithRSAPSS}, true},
+		{"SHA384WithRSAPSS", args{x509.SHA384WithRSAPSS}, true},
+		{"SHA512WithRSAPSS", args{x509.SHA512WithRSAPSS}, true},
+		{"ECDSAWithSHA256", args{x509.ECDSAWithSHA256}, false},
+		{"ECDSAWithSHA384", args{x509.ECDSAWithSHA384}, false},
+		{"ECDSAWithSHA512", args{x509.ECDSAWithSHA512}, false},
+		{"PureEd25519", args{x509.PureEd25519}, false},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := isRSA(tt.args.sa); got != tt.want {
+				t.Errorf("isRSA() = %v, want %v", got, tt.want)
 			}
 		})
 	}

@@ -85,14 +85,14 @@ func (ks *keyStore) reload() {
 // 0 it will randomly rotate between 0-12 hours, but every time we call to Get
 // it will automatically rotate.
 func (ks *keyStore) nextReloadDuration(age time.Duration) time.Duration {
-	n := rand.Int63n(int64(ks.jitter))
+	n := rand.Int63n(int64(ks.jitter)) // nolint:gosec // not used for cryptographic security
 	age -= time.Duration(n)
 	return abs(age)
 }
 
 func getKeysFromJWKsURI(uri string) (jose.JSONWebKeySet, time.Duration, error) {
 	var keys jose.JSONWebKeySet
-	resp, err := http.Get(uri)
+	resp, err := http.Get(uri) // nolint:gosec // openid-configuration jwks_uri
 	if err != nil {
 		return keys, 0, errors.Wrapf(err, "failed to connect to %s", uri)
 	}

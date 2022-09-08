@@ -14,7 +14,7 @@ import (
 	"reflect"
 	"testing"
 
-	kmsapi "github.com/smallstep/certificates/kms/apiv1"
+	kmsapi "go.step.sm/crypto/kms/apiv1"
 	pb "google.golang.org/genproto/googleapis/cloud/security/privateca/v1"
 )
 
