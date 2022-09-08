@@ -758,9 +758,6 @@ func TestHandler_newAuthorization(t *testing.T) {
 	}
 	for name, run := range tests {
 		t.Run(name, func(t *testing.T) {
-			if name == "ok/permanent-identifier-enabled" {
-				println(1)
-			}
 			tc := run(t)
 			ctx := newBaseContext(context.Background(), tc.db)
 			ctx = acme.NewProvisionerContext(ctx, tc.prov)
