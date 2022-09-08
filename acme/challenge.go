@@ -359,7 +359,7 @@ func deviceAttest01Validate(ctx context.Context, ch *Challenge, db DB, jwk *jose
 		if len(data.Nonce) != 0 {
 			sum := sha256.Sum256([]byte(ch.Token))
 			if subtle.ConstantTimeCompare(data.Nonce, sum[:]) != 1 {
-				return storeError(ctx, db, ch, true, NewError(ErrorBadAttestationStatement, "challenge token does not match"))
+				return storeError(ctx, db, ch, true, NewError(ErrorBadAttestationStatementType, "challenge token does not match"))
 			}
 		}
 
@@ -368,7 +368,7 @@ func deviceAttest01Validate(ctx context.Context, ch *Challenge, db DB, jwk *jose
 		//
 		// Note: We might want to use an external service for this.
 		if data.UDID != ch.Value && data.SerialNumber != ch.Value {
-			return storeError(ctx, db, ch, true, NewError(ErrorBadAttestationStatement, "permanent identifier does not match"))
+			return storeError(ctx, db, ch, true, NewError(ErrorBadAttestationStatementType, "permanent identifier does not match"))
 		}
 	case "step":
 		data, err := doStepAttestationFormat(ctx, ch, jwk, &att)
@@ -388,10 +388,10 @@ func deviceAttest01Validate(ctx context.Context, ch *Challenge, db DB, jwk *jose
 		//
 		// Note: We might want to use an external service for this.
 		if data.SerialNumber != ch.Value {
-			return storeError(ctx, db, ch, true, NewError(ErrorBadAttestationStatement, "permanent identifier does not match"))
+			return storeError(ctx, db, ch, true, NewError(ErrorBadAttestationStatementType, "permanent identifier does not match"))
 		}
 	default:
-		return storeError(ctx, db, ch, true, NewError(ErrorBadAttestationStatement, "unexpected attestation object format"))
+		return storeError(ctx, db, ch, true, NewError(ErrorBadAttestationStatementType, "unexpected attestation object format"))
 	}
 
 	// Update and store the challenge.
@@ -447,7 +447,7 @@ func doAppleAttestationFormat(ctx context.Context, ch *Challenge, db DB, att *At
 
 	x5c, ok := att.AttStatement["x5c"].([]interface{})
 	if !ok {
-		return nil, NewError(ErrorBadAttestationStatement, "x5c not present")
+		return nil, NewError(ErrorBadAttestationStatementType, "x5c not present")
 	}
 	if len(x5c) == 0 {
 		return nil, NewError(ErrorRejectedIdentifierType, "x5c is empty")
@@ -455,22 +455,22 @@ func doAppleAttestationFormat(ctx context.Context, ch *Challenge, db DB, att *At
 
 	der, ok := x5c[0].([]byte)
 	if !ok {
-		return nil, NewError(ErrorBadAttestationStatement, "x5c is malformed")
+		return nil, NewError(ErrorBadAttestationStatementType, "x5c is malformed")
 	}
 	leaf, err := x509.ParseCertificate(der)
 	if err != nil {
-		return nil, WrapError(ErrorBadAttestationStatement, err, "x5c is malformed")
+		return nil, WrapError(ErrorBadAttestationStatementType, err, "x5c is malformed")
 	}
 
 	intermediates := x509.NewCertPool()
 	for _, v := range x5c[1:] {
 		der, ok = v.([]byte)
 		if !ok {
-			return nil, NewError(ErrorBadAttestationStatement, "x5c is malformed")
+			return nil, NewError(ErrorBadAttestationStatementType, "x5c is malformed")
 		}
 		cert, err := x509.ParseCertificate(der)
 		if err != nil {
-			return nil, WrapError(ErrorBadAttestationStatement, err, "x5c is malformed")
+			return nil, WrapError(ErrorBadAttestationStatementType, err, "x5c is malformed")
 		}
 		intermediates.AddCert(cert)
 	}
@@ -481,7 +481,7 @@ func doAppleAttestationFormat(ctx context.Context, ch *Challenge, db DB, att *At
 		CurrentTime:   time.Now().Truncate(time.Second),
 		KeyUsages:     []x509.ExtKeyUsage{x509.ExtKeyUsageAny},
 	}); err != nil {
-		return nil, WrapError(ErrorBadAttestationStatement, err, "x5c is not valid")
+		return nil, WrapError(ErrorBadAttestationStatementType, err, "x5c is not valid")
 	}
 
 	data := &appleAttestationData{
@@ -545,28 +545,28 @@ func doStepAttestationFormat(ctx context.Context, ch *Challenge, jwk *jose.JSONW
 	// Extract x5c and verify certificate
 	x5c, ok := att.AttStatement["x5c"].([]interface{})
 	if !ok {
-		return nil, NewError(ErrorBadAttestationStatement, "x5c not present")
+		return nil, NewError(ErrorBadAttestationStatementType, "x5c not present")
 	}
 	if len(x5c) == 0 {
 		return nil, NewError(ErrorRejectedIdentifierType, "x5c is empty")
 	}
 	der, ok := x5c[0].([]byte)
 	if !ok {
-		return nil, NewError(ErrorBadAttestationStatement, "x5c is malformed")
+		return nil, NewError(ErrorBadAttestationStatementType, "x5c is malformed")
 	}
 	leaf, err := x509.ParseCertificate(der)
 	if err != nil {
-		return nil, WrapError(ErrorBadAttestationStatement, err, "x5c is malformed")
+		return nil, WrapError(ErrorBadAttestationStatementType, err, "x5c is malformed")
 	}
 	intermediates := x509.NewCertPool()
 	for _, v := range x5c[1:] {
 		der, ok = v.([]byte)
 		if !ok {
-			return nil, NewError(ErrorBadAttestationStatement, "x5c is malformed")
+			return nil, NewError(ErrorBadAttestationStatementType, "x5c is malformed")
 		}
 		cert, err := x509.ParseCertificate(der)
 		if err != nil {
-			return nil, WrapError(ErrorBadAttestationStatement, err, "x5c is malformed")
+			return nil, WrapError(ErrorBadAttestationStatementType, err, "x5c is malformed")
 		}
 		intermediates.AddCert(cert)
 	}
@@ -576,7 +576,7 @@ func doStepAttestationFormat(ctx context.Context, ch *Challenge, jwk *jose.JSONW
 		CurrentTime:   time.Now().Truncate(time.Second),
 		KeyUsages:     []x509.ExtKeyUsage{x509.ExtKeyUsageAny},
 	}); err != nil {
-		return nil, WrapError(ErrorBadAttestationStatement, err, "x5c is not valid")
+		return nil, WrapError(ErrorBadAttestationStatementType, err, "x5c is not valid")
 	}
 
 	// Verify proof of possession of private key validating the key
@@ -586,10 +586,10 @@ func doStepAttestationFormat(ctx context.Context, ch *Challenge, jwk *jose.JSONW
 	var sig []byte
 	csig, ok := att.AttStatement["sig"].([]byte)
 	if !ok {
-		return nil, NewError(ErrorBadAttestationStatement, "sig not present")
+		return nil, NewError(ErrorBadAttestationStatementType, "sig not present")
 	}
 	if err := cbor.Unmarshal(csig, &sig); err != nil {
-		return nil, NewError(ErrorBadAttestationStatement, "sig is malformed")
+		return nil, NewError(ErrorBadAttestationStatementType, "sig is malformed")
 	}
 	keyAuth, err := KeyAuthorization(ch.Token, jwk)
 	if err != nil {
@@ -599,23 +599,23 @@ func doStepAttestationFormat(ctx context.Context, ch *Challenge, jwk *jose.JSONW
 	switch pub := leaf.PublicKey.(type) {
 	case *ecdsa.PublicKey:
 		if pub.Curve != elliptic.P256() {
-			return nil, WrapError(ErrorBadAttestationStatement, err, "unsupported elliptic curve %s", pub.Curve)
+			return nil, WrapError(ErrorBadAttestationStatementType, err, "unsupported elliptic curve %s", pub.Curve)
 		}
 		sum := sha256.Sum256([]byte(keyAuth))
 		if !ecdsa.VerifyASN1(pub, sum[:], sig) {
-			return nil, NewError(ErrorBadAttestationStatement, "failed to validate signature")
+			return nil, NewError(ErrorBadAttestationStatementType, "failed to validate signature")
 		}
 	case *rsa.PublicKey:
 		sum := sha256.Sum256([]byte(keyAuth))
 		if err := rsa.VerifyPKCS1v15(pub, crypto.SHA256, sum[:], sig); err != nil {
-			return nil, NewError(ErrorBadAttestationStatement, "failed to validate signature")
+			return nil, NewError(ErrorBadAttestationStatementType, "failed to validate signature")
 		}
 	case ed25519.PublicKey:
 		if !ed25519.Verify(pub, []byte(keyAuth), sig) {
-			return nil, NewError(ErrorBadAttestationStatement, "failed to validate signature")
+			return nil, NewError(ErrorBadAttestationStatementType, "failed to validate signature")
 		}
 	default:
-		return nil, NewError(ErrorBadAttestationStatement, "unsupported public key type %T", pub)
+		return nil, NewError(ErrorBadAttestationStatementType, "unsupported public key type %T", pub)
 	}
 
 	// Parse attestation data:
@@ -630,7 +630,7 @@ func doStepAttestationFormat(ctx context.Context, ch *Challenge, jwk *jose.JSONW
 		var serialNumber int
 		rest, err := asn1.Unmarshal(ext.Value, &serialNumber)
 		if err != nil || len(rest) > 0 {
-			return nil, WrapError(ErrorBadAttestationStatement, err, "error parsing serial number")
+			return nil, WrapError(ErrorBadAttestationStatementType, err, "error parsing serial number")
 		}
 		data.SerialNumber = strconv.Itoa(serialNumber)
 		break
