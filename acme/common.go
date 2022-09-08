@@ -71,7 +71,7 @@ type Provisioner interface {
 	AuthorizeOrderIdentifier(ctx context.Context, identifier provisioner.ACMEIdentifier) error
 	AuthorizeSign(ctx context.Context, token string) ([]provisioner.SignOption, error)
 	AuthorizeRevoke(ctx context.Context, token string) error
-	AuthorizeChallenge(ctx context.Context, challenge string) error
+	AuthorizeChallenge(ctx context.Context, challenge provisioner.ACMEChallenge) error
 	GetID() string
 	GetName() string
 	DefaultTLSCertDuration() time.Duration

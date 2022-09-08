@@ -11,6 +11,35 @@ import (
 	"github.com/pkg/errors"
 )
 
+// ACMEChallenge represents the supported acme challenges.
+type ACMEChallenge string
+
+const (
+	// HTTP_01 is the http-01 ACME challenge.
+	HTTP_01 ACMEChallenge = "http-01"
+	// DNS_01 is the dns-01 ACME challenge.
+	DNS_01 ACMEChallenge = "dns-01"
+	// TLS_ALPN_01 is the tls-alpn-01 ACME challenge.
+	TLS_ALPN_01 ACMEChallenge = "tls-alpn-01"
+	// DEVICE_ATTEST_01 is the device-attest-01 ACME challenge.
+	DEVICE_ATTEST_01 ACMEChallenge = "device-attest-01"
+)
+
+// String returns a normalized version of the challenge.
+func (c ACMEChallenge) String() string {
+	return strings.ToLower(string(c))
+}
+
+// Validate returns an error if the acme challenge is not a valid one.
+func (c ACMEChallenge) Validate() error {
+	switch ACMEChallenge(c.String()) {
+	case HTTP_01, DNS_01, TLS_ALPN_01, DEVICE_ATTEST_01:
+		return nil
+	default:
+		return fmt.Errorf("acme challenge %q is not supported", c)
+	}
+}
+
 // ACME is the acme provisioner type, an entity that can authorize the ACME
 // provisioning flow.
 type ACME struct {
@@ -27,9 +56,9 @@ type ACME struct {
 	// Challenges contains the enabled challenges for this provisioner. If this
 	// value is not set the default http-01, dns-01 and tls-alpn-01 challenges
 	// will be enabled, device-attest-01 will be disabled.
-	Challenges []string `json:"challenges,omitempty"`
-	Claims     *Claims  `json:"claims,omitempty"`
-	Options    *Options `json:"options,omitempty"`
+	Challenges []ACMEChallenge `json:"challenges,omitempty"`
+	Claims     *Claims         `json:"claims,omitempty"`
+	Options    *Options        `json:"options,omitempty"`
 
 	ctl *Controller
 }
@@ -86,6 +115,12 @@ func (p *ACME) Init(config Config) (err error) {
 		return errors.New("provisioner type cannot be empty")
 	case p.Name == "":
 		return errors.New("provisioner name cannot be empty")
+	}
+
+	for _, c := range p.Challenges {
+		if err := c.Validate(); err != nil {
+			return err
+		}
 	}
 
 	p.ctl, err = NewController(p, p.Claims, config, p.Options)
@@ -172,15 +207,15 @@ func (p *ACME) AuthorizeRenew(ctx context.Context, cert *x509.Certificate) error
 // AuthorizeChallenge checks if the given challenge is enabled. By default
 // http-01, dns-01 and tls-alpn-01 are enabled, to disable any of them the
 // Challenge provisioner property should have at least one element.
-func (p *ACME) AuthorizeChallenge(ctx context.Context, challenge string) error {
-	enabledChallenges := []string{
-		"http-01", "dns-01", "tls-alpn-01",
+func (p *ACME) AuthorizeChallenge(ctx context.Context, challenge ACMEChallenge) error {
+	enabledChallenges := []ACMEChallenge{
+		HTTP_01, DNS_01, TLS_ALPN_01,
 	}
 	if len(p.Challenges) > 0 {
 		enabledChallenges = p.Challenges
 	}
 	for _, ch := range enabledChallenges {
-		if strings.EqualFold(ch, challenge) {
+		if strings.EqualFold(string(ch), string(challenge)) {
 			return nil
 		}
 	}
