@@ -1125,39 +1125,39 @@ func parseInstanceAge(age string) (provisioner.Duration, error) {
 	return instanceAge, nil
 }
 
-func challengesToCertificates(challenges []linkedca.ACMEProvisioner_ChallengeType) []string {
-	ret := make([]string, len(challenges))
-	for i, ch := range challenges {
+// challengesToCertificates converts linkedca challenges to provisioner ones
+// skipping the unknown ones.
+func challengesToCertificates(challenges []linkedca.ACMEProvisioner_ChallengeType) []provisioner.ACMEChallenge {
+	ret := make([]provisioner.ACMEChallenge, 0, len(challenges))
+	for _, ch := range challenges {
 		switch ch {
 		case linkedca.ACMEProvisioner_HTTP_01:
-			ret[i] = "http-01"
+			ret = append(ret, provisioner.HTTP_01)
 		case linkedca.ACMEProvisioner_DNS_01:
-			ret[i] = "dns-01"
+			ret = append(ret, provisioner.DNS_01)
 		case linkedca.ACMEProvisioner_TLS_ALPN_O1:
-			ret[i] = "tls-alpn-01"
+			ret = append(ret, provisioner.TLS_ALPN_01)
 		case linkedca.ACMEProvisioner_DEVICE_ATTEST_01:
-			ret[i] = "device-attest-01"
-		default:
-			ret[i] = "unknown"
+			ret = append(ret, provisioner.DEVICE_ATTEST_01)
 		}
 	}
 	return ret
 }
 
-func challengesToLinkedca(challenges []string) []linkedca.ACMEProvisioner_ChallengeType {
-	ret := make([]linkedca.ACMEProvisioner_ChallengeType, len(challenges))
-	for i, ch := range challenges {
-		switch ch {
-		case "http-01":
-			ret[i] = linkedca.ACMEProvisioner_HTTP_01
-		case "dns-01":
-			ret[i] = linkedca.ACMEProvisioner_DNS_01
-		case "tls-alpn-01":
-			ret[i] = linkedca.ACMEProvisioner_TLS_ALPN_O1
-		case "device-attest-01":
-			ret[i] = linkedca.ACMEProvisioner_DEVICE_ATTEST_01
-		default:
-			ret[i] = linkedca.ACMEProvisioner_UNKNOWN
+// challengesToLinkedca converts provisioner challenges to linkedca ones
+// skipping the unknown ones.
+func challengesToLinkedca(challenges []provisioner.ACMEChallenge) []linkedca.ACMEProvisioner_ChallengeType {
+	ret := make([]linkedca.ACMEProvisioner_ChallengeType, 0, len(challenges))
+	for _, ch := range challenges {
+		switch provisioner.ACMEChallenge(ch.String()) {
+		case provisioner.HTTP_01:
+			ret = append(ret, linkedca.ACMEProvisioner_HTTP_01)
+		case provisioner.DNS_01:
+			ret = append(ret, linkedca.ACMEProvisioner_DNS_01)
+		case provisioner.TLS_ALPN_01:
+			ret = append(ret, linkedca.ACMEProvisioner_TLS_ALPN_O1)
+		case provisioner.DEVICE_ATTEST_01:
+			ret = append(ret, linkedca.ACMEProvisioner_DEVICE_ATTEST_01)
 		}
 	}
 	return ret

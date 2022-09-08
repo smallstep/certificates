@@ -13,6 +13,28 @@ import (
 	"github.com/smallstep/certificates/api/render"
 )
 
+func TestACMEChallenge_Validate(t *testing.T) {
+	tests := []struct {
+		name    string
+		c       ACMEChallenge
+		wantErr bool
+	}{
+		{"http-01", HTTP_01, false},
+		{"dns-01", DNS_01, false},
+		{"tls-alpn-01", TLS_ALPN_01, false},
+		{"device-attest-01", DEVICE_ATTEST_01, false},
+		{"uppercase", "HTTP-01", false},
+		{"fail", "http-02", true},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if err := tt.c.Validate(); (err != nil) != tt.wantErr {
+				t.Errorf("ACMEChallenge.Validate() error = %v, wantErr %v", err, tt.wantErr)
+			}
+		})
+	}
+}
+
 func TestACME_Getters(t *testing.T) {
 	p, err := generateACME()
 	assert.FatalError(t, err)
@@ -65,9 +87,24 @@ func TestACME_Init(t *testing.T) {
 				err: errors.New("claims: MinTLSCertDuration must be greater than 0"),
 			}
 		},
+		"fail-bad-challenge": func(t *testing.T) ProvisionerValidateTest {
+			return ProvisionerValidateTest{
+				p:   &ACME{Name: "foo", Type: "bar", Challenges: []ACMEChallenge{HTTP_01, "zar"}},
+				err: errors.New("acme challenge \"zar\" is not supported"),
+			}
+		},
 		"ok": func(t *testing.T) ProvisionerValidateTest {
 			return ProvisionerValidateTest{
 				p: &ACME{Name: "foo", Type: "bar"},
+			}
+		},
+		"ok with challenges": func(t *testing.T) ProvisionerValidateTest {
+			return ProvisionerValidateTest{
+				p: &ACME{
+					Name:       "foo",
+					Type:       "bar",
+					Challenges: []ACMEChallenge{DNS_01, DEVICE_ATTEST_01},
+				},
 			}
 		},
 	}
@@ -208,11 +245,11 @@ func TestACME_AuthorizeSign(t *testing.T) {
 func TestACME_AuthorizeChallenge(t *testing.T) {
 	ctx := context.Background()
 	type fields struct {
-		Challenges []string
+		Challenges []ACMEChallenge
 	}
 	type args struct {
 		ctx       context.Context
-		challenge string
+		challenge ACMEChallenge
 	}
 	tests := []struct {
 		name    string
@@ -220,19 +257,19 @@ func TestACME_AuthorizeChallenge(t *testing.T) {
 		args    args
 		wantErr bool
 	}{
-		{"ok http-01", fields{nil}, args{ctx, "http-01"}, false},
-		{"ok dns-01", fields{nil}, args{ctx, "dns-01"}, false},
-		{"ok tls-alpn-01", fields{[]string{}}, args{ctx, "tls-alpn-01"}, false},
-		{"fail device-attest-01", fields{[]string{}}, args{ctx, "device-attest-01"}, true},
-		{"ok http-01 enabled", fields{[]string{"http-01"}}, args{ctx, "http-01"}, false},
-		{"ok dns-01 enabled", fields{[]string{"http-01", "dns-01"}}, args{ctx, "dns-01"}, false},
-		{"ok tls-alpn-01 enabled", fields{[]string{"http-01", "dns-01", "tls-alpn-01"}}, args{ctx, "tls-alpn-01"}, false},
-		{"ok device-attest-01 enabled", fields{[]string{"device-attest-01", "dns-01"}}, args{ctx, "device-attest-01"}, false},
-		{"fail http-01", fields{[]string{"dns-01"}}, args{ctx, "http-01"}, true},
-		{"fail dns-01", fields{[]string{"http-01", "tls-alpn-01"}}, args{ctx, "dns-01"}, true},
-		{"fail tls-alpn-01", fields{[]string{"http-01", "dns-01", "device-attest-01"}}, args{ctx, "tls-alpn-01"}, true},
-		{"fail device-attest-01", fields{[]string{"http-01", "dns-01"}}, args{ctx, "device-attest-01"}, true},
-		{"fail unknown", fields{[]string{"http-01", "dns-01", "tls-alpn-01", "device-attest-01"}}, args{ctx, "unknown"}, true},
+		{"ok http-01", fields{nil}, args{ctx, HTTP_01}, false},
+		{"ok dns-01", fields{nil}, args{ctx, DNS_01}, false},
+		{"ok tls-alpn-01", fields{[]ACMEChallenge{}}, args{ctx, TLS_ALPN_01}, false},
+		{"fail device-attest-01", fields{[]ACMEChallenge{}}, args{ctx, "device-attest-01"}, true},
+		{"ok http-01 enabled", fields{[]ACMEChallenge{"http-01"}}, args{ctx, "HTTP-01"}, false},
+		{"ok dns-01 enabled", fields{[]ACMEChallenge{"http-01", "dns-01"}}, args{ctx, DNS_01}, false},
+		{"ok tls-alpn-01 enabled", fields{[]ACMEChallenge{"http-01", "dns-01", "tls-alpn-01"}}, args{ctx, TLS_ALPN_01}, false},
+		{"ok device-attest-01 enabled", fields{[]ACMEChallenge{"device-attest-01", "dns-01"}}, args{ctx, DEVICE_ATTEST_01}, false},
+		{"fail http-01", fields{[]ACMEChallenge{"dns-01"}}, args{ctx, "http-01"}, true},
+		{"fail dns-01", fields{[]ACMEChallenge{"http-01", "tls-alpn-01"}}, args{ctx, "dns-01"}, true},
+		{"fail tls-alpn-01", fields{[]ACMEChallenge{"http-01", "dns-01", "device-attest-01"}}, args{ctx, "tls-alpn-01"}, true},
+		{"fail device-attest-01", fields{[]ACMEChallenge{"http-01", "dns-01"}}, args{ctx, "device-attest-01"}, true},
+		{"fail unknown", fields{[]ACMEChallenge{"http-01", "dns-01", "tls-alpn-01", "device-attest-01"}}, args{ctx, "unknown"}, true},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {

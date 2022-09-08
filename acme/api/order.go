@@ -259,7 +259,7 @@ func newAuthorization(ctx context.Context, az *acme.Authorization) error {
 	az.Challenges = make([]*acme.Challenge, 0, len(chTypes))
 	for _, typ := range chTypes {
 		// Make sure the challenge is enabled
-		if err := prov.AuthorizeChallenge(ctx, string(typ)); err != nil {
+		if err := prov.AuthorizeChallenge(ctx, provisioner.ACMEChallenge(typ)); err != nil {
 			continue
 		}
 
