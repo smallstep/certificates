@@ -175,7 +175,7 @@ var (
 			status:  400,
 		},
 		ErrorBadAttestationStatementType: {
-			typ:     officialACMEPrefix + ErrorBadNonceType.String(),
+			typ:     officialACMEPrefix + ErrorBadAttestationStatementType.String(),
 			details: "Attestation statement cannot be verified",
 			status:  400,
 		},
