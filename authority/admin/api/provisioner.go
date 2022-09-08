@@ -1,10 +1,13 @@
 package api
 
 import (
+	"fmt"
 	"net/http"
 
 	"github.com/go-chi/chi"
 
+	"go.step.sm/crypto/sshutil"
+	"go.step.sm/crypto/x509util"
 	"go.step.sm/linkedca"
 
 	"github.com/smallstep/certificates/api"
@@ -86,6 +89,12 @@ func CreateProvisioner(w http.ResponseWriter, r *http.Request) {
 	// TODO: Validate inputs
 	if err := authority.ValidateClaims(prov.Claims); err != nil {
 		render.Error(w, err)
+		return
+	}
+
+	// validate the templates and template data
+	if err := validateTemplates(prov.X509Template, prov.SshTemplate); err != nil {
+		render.Error(w, admin.WrapError(admin.ErrorBadRequestType, err, "invalid template"))
 		return
 	}
 
@@ -179,9 +188,47 @@ func UpdateProvisioner(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// validate the templates and template data
+	if err := validateTemplates(nu.X509Template, nu.SshTemplate); err != nil {
+		render.Error(w, admin.WrapError(admin.ErrorBadRequestType, err, "invalid template"))
+		return
+	}
+
 	if err := auth.UpdateProvisioner(r.Context(), nu); err != nil {
 		render.Error(w, err)
 		return
 	}
 	render.ProtoJSON(w, nu)
+}
+
+// validateTemplates validates the X.509 and SSH templates and template data if set.
+func validateTemplates(x509, ssh *linkedca.Template) error {
+	if x509 != nil {
+		if len(x509.Template) > 0 {
+			if err := x509util.ValidateTemplate(x509.Template); err != nil {
+				return fmt.Errorf("invalid X.509 template: %w", err)
+			}
+		}
+		if len(x509.Data) > 0 {
+			if err := x509util.ValidateTemplateData(x509.Data); err != nil {
+				return fmt.Errorf("invalid X.509 template data: %w", err)
+			}
+		}
+	}
+
+	if ssh != nil {
+		if len(ssh.Template) > 0 {
+			if err := sshutil.ValidateTemplate(ssh.Template); err != nil {
+				return fmt.Errorf("invalid SSH template: %w", err)
+			}
+		}
+
+		if len(ssh.Data) > 0 {
+			if err := sshutil.ValidateTemplateData(ssh.Data); err != nil {
+				return fmt.Errorf("invalid SSH template data: %w", err)
+			}
+		}
+	}
+
+	return nil
 }

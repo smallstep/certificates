@@ -725,7 +725,7 @@ func TestHandler_newAuthorization(t *testing.T) {
 				ExpiresAt: clock.Now(),
 			}
 			deviceAttestProv := newProv()
-			deviceAttestProv.(*provisioner.ACME).Challenges = []string{string(acme.DEVICEATTEST01)}
+			deviceAttestProv.(*provisioner.ACME).Challenges = []provisioner.ACMEChallenge{provisioner.DEVICE_ATTEST_01}
 			return test{
 				prov: deviceAttestProv,
 				db: &acme.MockDB{
@@ -756,9 +756,6 @@ func TestHandler_newAuthorization(t *testing.T) {
 	}
 	for name, run := range tests {
 		t.Run(name, func(t *testing.T) {
-			if name == "ok/permanent-identifier-enabled" {
-				println(1)
-			}
 			tc := run(t)
 			ctx := newBaseContext(context.Background(), tc.db)
 			ctx = acme.NewProvisionerContext(ctx, tc.prov)

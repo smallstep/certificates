@@ -151,6 +151,9 @@ func main() {
 	// Initialize windows terminal
 	ui.Init()
 
+	ui.Println("⚠️  This command is deprecated and will be removed in future releases.")
+	ui.Println("⚠️  Please use https://github.com/smallstep/step-kms-plugin instead.")
+
 	switch {
 	case u.Get("pin-value") != "":
 	case u.Get("pin-source") != "":

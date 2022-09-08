@@ -34,6 +34,9 @@ func main() {
 	// Initialize windows terminal
 	ui.Init()
 
+	ui.Println("⚠️  This command is deprecated and will be removed in future releases.")
+	ui.Println("⚠️  Please use https://github.com/smallstep/step-kms-plugin instead.")
+
 	c, err := awskms.New(context.Background(), apiv1.Options{
 		Type:            apiv1.AmazonKMS,
 		Region:          region,

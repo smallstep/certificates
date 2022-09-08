@@ -23,6 +23,8 @@ require (
 	github.com/hashicorp/vault/api v1.3.1
 	github.com/hashicorp/vault/api/auth/approle v0.1.1
 	github.com/hashicorp/vault/api/auth/kubernetes v0.1.0
+	github.com/jhump/protoreflect v1.9.0 // indirect
+	github.com/kr/pretty v0.3.0 // indirect
 	github.com/mattn/go-colorable v0.1.8 // indirect
 	github.com/mattn/go-isatty v0.0.13 // indirect
 	github.com/micromdm/scep/v2 v2.1.0
@@ -36,16 +38,22 @@ require (
 	github.com/stretchr/testify v1.7.1
 	github.com/urfave/cli v1.22.4
 	go.mozilla.org/pkcs7 v0.0.0-20210826202110-33d05740a352
-	go.step.sm/cli-utils v0.7.3
+	go.step.sm/cli-utils v0.7.4
 	go.step.sm/crypto v0.19.0
 	go.step.sm/linkedca v0.18.1-0.20220824000236-47827c8eb300
 	golang.org/x/crypto v0.0.0-20211215153901-e495a2d5b3d3
 	golang.org/x/net v0.0.0-20220607020251-c690dde0001d
+	golang.org/x/time v0.0.0-20210220033141-f8bda1e9f3ba // indirect
 	google.golang.org/api v0.84.0
 	google.golang.org/genproto v0.0.0-20220617124728-180714bec0ad
 	google.golang.org/grpc v1.47.0
 	google.golang.org/protobuf v1.28.0
 	gopkg.in/square/go-jose.v2 v2.6.0
+)
+
+require (
+	github.com/google/go-tpm v0.3.3
+	github.com/ryboe/q v1.0.17
 )
 
 require (
@@ -75,15 +83,14 @@ require (
 	github.com/dgryski/go-farm v0.0.0-20200201041132-a6ae2369ad13 // indirect
 	github.com/dimchansky/utfbom v1.1.1 // indirect
 	github.com/dustin/go-humanize v1.0.0 // indirect
-	github.com/fatih/color v1.9.0 // indirect
-	github.com/go-kit/kit v0.10.0 // indirect
+	github.com/fatih/color v1.7.0 // indirect
+	github.com/go-kit/kit v0.9.0 // indirect
 	github.com/go-logfmt/logfmt v0.5.0 // indirect
-	github.com/go-sql-driver/mysql v1.6.0 // indirect
+	github.com/go-sql-driver/mysql v1.5.0 // indirect
 	github.com/golang-jwt/jwt/v4 v4.2.0 // indirect
 	github.com/golang/groupcache v0.0.0-20210331224755-41bb18bfe9da // indirect
 	github.com/golang/protobuf v1.5.2 // indirect
 	github.com/golang/snappy v0.0.4 // indirect
-	github.com/google/go-tpm v0.3.3 // indirect
 	github.com/googleapis/enterprise-certificate-proxy v0.0.0-20220520183353-fd19c99a87aa // indirect
 	github.com/hashicorp/errwrap v1.1.0 // indirect
 	github.com/hashicorp/go-cleanhttp v0.5.2 // indirect
@@ -113,10 +120,8 @@ require (
 	github.com/jackc/pgservicefile v0.0.0-20200714003250-2b9c44734f2b // indirect
 	github.com/jackc/pgtype v1.9.0 // indirect
 	github.com/jackc/pgx/v4 v4.14.0 // indirect
-	github.com/jhump/protoreflect v1.9.0 // indirect
 	github.com/jmespath/go-jmespath v0.4.0 // indirect
 	github.com/klauspost/compress v1.12.3 // indirect
-	github.com/kr/pretty v0.3.0 // indirect
 	github.com/kr/text v0.2.0 // indirect
 	github.com/manifoldco/promptui v0.9.0 // indirect
 	github.com/mgutz/ansi v0.0.0-20200706080929-d51e80ef957d // indirect
@@ -132,7 +137,6 @@ require (
 	github.com/rogpeppe/go-internal v1.6.1 // indirect
 	github.com/russross/blackfriday/v2 v2.0.1 // indirect
 	github.com/ryanuber/go-glob v1.0.0 // indirect
-	github.com/ryboe/q v1.0.17 // indirect
 	github.com/shopspring/decimal v1.2.0 // indirect
 	github.com/shurcooL/sanitized_anchor_name v1.0.0 // indirect
 	github.com/spf13/cast v1.4.1 // indirect
@@ -144,7 +148,6 @@ require (
 	golang.org/x/oauth2 v0.0.0-20220608161450-d0670ef3b1eb // indirect
 	golang.org/x/sys v0.0.0-20220610221304-9f5ed59c137d // indirect
 	golang.org/x/text v0.3.8-0.20211004125949-5bd84dd9b33b // indirect
-	golang.org/x/time v0.0.0-20210220033141-f8bda1e9f3ba // indirect
 	google.golang.org/appengine v1.6.7 // indirect
 	gopkg.in/yaml.v3 v3.0.0 // indirect
 )

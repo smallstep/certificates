@@ -18,9 +18,9 @@ import (
 	"google.golang.org/protobuf/encoding/protojson"
 	"google.golang.org/protobuf/types/known/timestamppb"
 
+	"github.com/smallstep/assert"
 	"go.step.sm/linkedca"
 
-	"github.com/smallstep/assert"
 	"github.com/smallstep/certificates/authority/admin"
 	"github.com/smallstep/certificates/authority/provisioner"
 )
@@ -349,6 +349,29 @@ func TestHandler_CreateProvisioner(t *testing.T) {
 		// "fail/authority.ValidateClaims": func(t *testing.T) test {
 		// 	return test{}
 		// },
+		"fail/validateTemplates": func(t *testing.T) test {
+			prov := &linkedca.Provisioner{
+				Id:   "provID",
+				Type: linkedca.Provisioner_OIDC,
+				Name: "provName",
+				X509Template: &linkedca.Template{
+					Template: []byte(`{ {{missingFunction "foo"}} }`),
+				},
+			}
+			body, err := protojson.Marshal(prov)
+			assert.FatalError(t, err)
+			return test{
+				ctx:        context.Background(),
+				body:       body,
+				statusCode: 400,
+				err: &admin.Error{
+					Type:    "badRequest",
+					Status:  400,
+					Detail:  "bad request",
+					Message: "invalid template: invalid X.509 template: error parsing template: template: template:1: function \"missingFunction\" not defined",
+				},
+			}
+		},
 		"fail/auth.StoreProvisioner": func(t *testing.T) test {
 			prov := &linkedca.Provisioner{
 				Id:   "provID",
@@ -936,6 +959,61 @@ func TestHandler_UpdateProvisioner(t *testing.T) {
 		},
 		// TODO(hs): ValidateClaims can't be mocked atm
 		//"fail/ValidateClaims": func(t *testing.T) test { return test{} },
+		"fail/validateTemplates": func(t *testing.T) test {
+			chiCtx := chi.NewRouteContext()
+			chiCtx.URLParams.Add("name", "provName")
+			ctx := context.WithValue(context.Background(), chi.RouteCtxKey, chiCtx)
+			createdAt := time.Now()
+			var deletedAt time.Time
+			prov := &linkedca.Provisioner{
+				Id:          "provID",
+				Type:        linkedca.Provisioner_OIDC,
+				Name:        "provName",
+				AuthorityId: "authorityID",
+				CreatedAt:   timestamppb.New(createdAt),
+				DeletedAt:   timestamppb.New(deletedAt),
+				X509Template: &linkedca.Template{
+					Template: []byte("{ {{ missingFunction }} }"),
+				},
+			}
+			body, err := protojson.Marshal(prov)
+			assert.FatalError(t, err)
+			auth := &mockAdminAuthority{
+				MockLoadProvisionerByName: func(name string) (provisioner.Interface, error) {
+					assert.Equals(t, "provName", name)
+					return &provisioner.OIDC{
+						ID:   "provID",
+						Name: "provName",
+					}, nil
+				},
+			}
+			db := &admin.MockDB{
+				MockGetProvisioner: func(ctx context.Context, id string) (*linkedca.Provisioner, error) {
+					assert.Equals(t, "provID", id)
+					return &linkedca.Provisioner{
+						Id:          "provID",
+						Name:        "provName",
+						Type:        linkedca.Provisioner_OIDC,
+						AuthorityId: "authorityID",
+						CreatedAt:   timestamppb.New(createdAt),
+						DeletedAt:   timestamppb.New(deletedAt),
+					}, nil
+				},
+			}
+			return test{
+				ctx:        ctx,
+				body:       body,
+				auth:       auth,
+				adminDB:    db,
+				statusCode: 400,
+				err: &admin.Error{
+					Type:    "badRequest",
+					Status:  400,
+					Detail:  "bad request",
+					Message: "invalid template: invalid X.509 template: error parsing template: template: template:1: function \"missingFunction\" not defined",
+				},
+			}
+		},
 		"fail/auth.UpdateProvisioner": func(t *testing.T) test {
 			chiCtx := chi.NewRouteContext()
 			chiCtx.URLParams.Add("name", "provName")
@@ -1104,6 +1182,90 @@ func TestHandler_UpdateProvisioner(t *testing.T) {
 			if !cmp.Equal(tc.prov, prov, opts...) {
 				t.Errorf("linkedca.Admin diff =\n%s", cmp.Diff(tc.prov, prov, opts...))
 			}
+		})
+	}
+}
+
+func Test_validateTemplates(t *testing.T) {
+	type args struct {
+		x509 *linkedca.Template
+		ssh  *linkedca.Template
+	}
+	tests := []struct {
+		name string
+		args args
+		err  error
+	}{
+		{
+			name: "ok",
+			args: args{},
+			err:  nil,
+		},
+		{
+			name: "ok/x509",
+			args: args{
+				x509: &linkedca.Template{
+					Template: []byte(`{"x": 1}`),
+				},
+			},
+			err: nil,
+		},
+		{
+			name: "ok/ssh",
+			args: args{
+				ssh: &linkedca.Template{
+					Template: []byte(`{"x": 1}`),
+				},
+			},
+			err: nil,
+		},
+		{
+			name: "fail/x509-template-missing-quote",
+			args: args{
+				x509: &linkedca.Template{
+					Template: []byte(`{ {{printf "%q" "quoted}} }`),
+				},
+			},
+			err: errors.New("invalid X.509 template: error parsing template: template: template:1: unterminated quoted string"),
+		},
+		{
+			name: "fail/x509-template-data",
+			args: args{
+				x509: &linkedca.Template{
+					Data: []byte(`{!?}`),
+				},
+			},
+			err: errors.New("invalid X.509 template data: error validating json template data"),
+		},
+		{
+			name: "fail/ssh-template-unknown-function",
+			args: args{
+				ssh: &linkedca.Template{
+					Template: []byte(`{ {{unknownFunction "foo"}} }`),
+				},
+			},
+			err: errors.New("invalid SSH template: error parsing template: template: template:1: function \"unknownFunction\" not defined"),
+		},
+		{
+			name: "fail/ssh-template-data",
+			args: args{
+				ssh: &linkedca.Template{
+					Data: []byte(`{!?}`),
+				},
+			},
+			err: errors.New("invalid SSH template data: error validating json template data"),
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			err := validateTemplates(tt.args.x509, tt.args.ssh)
+			if tt.err != nil {
+				assert.Error(t, err)
+				assert.Equals(t, tt.err.Error(), err.Error())
+				return
+			}
+
+			assert.Nil(t, err)
 		})
 	}
 }
