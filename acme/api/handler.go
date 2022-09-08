@@ -289,19 +289,18 @@ func GetChallenge(w http.ResponseWriter, r *http.Request) {
 		render.Error(w, err)
 		return
 	}
-	// Just verify that the payload was set, since we're not strictly adhering
-	// to ACME V2 spec for reasons specified below.
+
 	payload, err := payloadFromContext(ctx)
 	if err != nil {
 		render.Error(w, err)
 		return
 	}
 
-	// NOTE: We should be checking ^^^ that the request is either a POST-as-GET, or
-	// that the payload is an empty JSON block ({}). However, older ACME clients
-	// still send a vestigial body (rather than an empty JSON block) and
-	// strict enforcement would render these clients broken. For the time being
-	// we'll just ignore the body.
+	// NOTE: We should be checking that the request is either a POST-as-GET, or
+	// that the payload is an empty JSON block ({}) for non device attestation
+	// challenges. However, older ACME clients still send a vestigial body
+	// (rather than an empty JSON block) and strict enforcement would render
+	// these clients broken.
 
 	azID := chi.URLParam(r, "authzID")
 	ch, err := db.GetChallenge(ctx, chi.URLParam(r, "chID"), azID)
