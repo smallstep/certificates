@@ -3,6 +3,7 @@ package provisioner
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"strings"
 
 	"github.com/pkg/errors"
@@ -136,6 +137,9 @@ func CustomSSHTemplateOptions(o *Options, data sshutil.TemplateData, defaultTemp
 						resp, err := wh.Do(context.Background(), so.WebhookClient, cr, data)
 						if err != nil {
 							return err
+						}
+						if !resp.Allow {
+							return fmt.Errorf("not allowed by webhook %s", wh.Name)
 						}
 						data.SetWebhook(wh.Name, resp.Data)
 					}
