@@ -18,6 +18,7 @@ import (
 	"github.com/pkg/errors"
 	"github.com/smallstep/certificates/templates"
 	"go.step.sm/crypto/sshutil"
+	"go.step.sm/crypto/x509util"
 	"golang.org/x/crypto/ssh"
 )
 
@@ -64,9 +65,9 @@ type webhookRequestBody struct {
 	//nolint:revive // acronyms can use all caps
 	X509_CSR []byte `json:"csr,omitempty"`
 	//nolint:revive // acronyms can use all caps
-	SSH_CR         *sshRequest       `json:"ssh_cr,omitempty"`
-	Certificate    *x509.Certificate `json:"certificate,omitempty"`
-	SSHCertificate *sshCert          `json:"ssh_certificate,omitempty"`
+	SSH_CR         *sshRequest           `json:"ssh_cr,omitempty"`
+	Certificate    *x509util.Certificate `json:"certificate,omitempty"`
+	SSHCertificate *sshCert              `json:"ssh_certificate,omitempty"`
 }
 
 type WebhookResponseBody struct {
@@ -107,7 +108,7 @@ retry:
 			reqBody.SSH_CR.Key = r.Key.Marshal()
 		}
 	case *x509.Certificate:
-		reqBody.Certificate = r
+		reqBody.Certificate = x509util.FromX509Certificate(r)
 	case *ssh.Certificate:
 		reqBody.SSHCertificate = &sshCert{
 			Nonce:           r.Nonce,
