@@ -12,35 +12,35 @@ var mustAuthority = func(ctx context.Context) adminAuthority {
 	return authority.MustFromContext(ctx)
 }
 
-type Router struct {
+type router struct {
 	acmeResponder    ACMEAdminResponder
 	policyResponder  PolicyAdminResponder
 	webhookResponder WebhookAdminResponder
 }
 
-type RouterOption func(*Router)
+type RouterOption func(*router)
 
 func WithACMEResponder(acmeResponder ACMEAdminResponder) RouterOption {
-	return func(r *Router) {
+	return func(r *router) {
 		r.acmeResponder = acmeResponder
 	}
 }
 
 func WithPolicyResponder(policyResponder PolicyAdminResponder) RouterOption {
-	return func(r *Router) {
+	return func(r *router) {
 		r.policyResponder = policyResponder
 	}
 }
 
 func WithWebhookResponder(webhookResponder WebhookAdminResponder) RouterOption {
-	return func(r *Router) {
+	return func(r *router) {
 		r.webhookResponder = webhookResponder
 	}
 }
 
 // Route traffic and implement the Router interface.
 func Route(r api.Router, options ...RouterOption) {
-	router := &Router{}
+	router := &router{}
 	for _, fn := range options {
 		fn(router)
 	}
