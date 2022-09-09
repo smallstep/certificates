@@ -41,7 +41,8 @@ func (c ACMEChallenge) Validate() error {
 	}
 }
 
-// ACMEPlatform represents the format used on a device-attest-01 challenge.
+// ACMEAttestationFormat represents the format used on a device-attest-01
+// challenge.
 type ACMEAttestationFormat string
 
 const (
