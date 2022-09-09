@@ -85,6 +85,11 @@ func (war *webhookAdminResponder) CreateProvisionerWebhook(w http.ResponseWriter
 		render.Error(w, err)
 		return
 	}
+	if newWebhook.Id != "" {
+		err := admin.NewError(admin.ErrorBadRequestType, "webhook ID must not be set")
+		render.Error(w, err)
+		return
+	}
 
 	id, err := randutil.UUIDv4()
 	if err != nil {
@@ -186,6 +191,11 @@ func (war *webhookAdminResponder) UpdateProvisionerWebhook(w http.ResponseWriter
 			return
 		}
 		newWebhook.Secret = wh.Secret
+		if newWebhook.Id != "" && newWebhook.Id != wh.Id {
+			err := admin.NewError(admin.ErrorBadRequestType, "webhook ID cannot be updated")
+			render.Error(w, err)
+			return
+		}
 		newWebhook.Id = wh.Id
 		prov.Webhooks[i] = newWebhook
 		found = true
