@@ -35,6 +35,27 @@ func TestACMEChallenge_Validate(t *testing.T) {
 	}
 }
 
+func TestACMEAttestationFormat_Validate(t *testing.T) {
+	tests := []struct {
+		name    string
+		f       ACMEAttestationFormat
+		wantErr bool
+	}{
+		{"apple", APPLE, false},
+		{"step", STEP, false},
+		{"tpm", TPM, false},
+		{"uppercase", "APPLE", false},
+		{"fail", "FOO", true},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if err := tt.f.Validate(); (err != nil) != tt.wantErr {
+				t.Errorf("ACMEAttestationFormat.Validate() error = %v, wantErr %v", err, tt.wantErr)
+			}
+		})
+	}
+}
+
 func TestACME_Getters(t *testing.T) {
 	p, err := generateACME()
 	assert.FatalError(t, err)
@@ -93,17 +114,24 @@ func TestACME_Init(t *testing.T) {
 				err: errors.New("acme challenge \"zar\" is not supported"),
 			}
 		},
+		"fail-bad-attestation-format": func(t *testing.T) ProvisionerValidateTest {
+			return ProvisionerValidateTest{
+				p:   &ACME{Name: "foo", Type: "bar", AttestationFormats: []ACMEAttestationFormat{APPLE, "zar"}},
+				err: errors.New("acme attestation format \"zar\" is not supported"),
+			}
+		},
 		"ok": func(t *testing.T) ProvisionerValidateTest {
 			return ProvisionerValidateTest{
 				p: &ACME{Name: "foo", Type: "bar"},
 			}
 		},
-		"ok with challenges": func(t *testing.T) ProvisionerValidateTest {
+		"ok attestation": func(t *testing.T) ProvisionerValidateTest {
 			return ProvisionerValidateTest{
 				p: &ACME{
-					Name:       "foo",
-					Type:       "bar",
-					Challenges: []ACMEChallenge{DNS_01, DEVICE_ATTEST_01},
+					Name:               "foo",
+					Type:               "bar",
+					Challenges:         []ACMEChallenge{DNS_01, DEVICE_ATTEST_01},
+					AttestationFormats: []ACMEAttestationFormat{APPLE, STEP},
 				},
 			}
 		},
@@ -278,6 +306,42 @@ func TestACME_IsChallengeEnabled(t *testing.T) {
 			}
 			if got := p.IsChallengeEnabled(tt.args.ctx, tt.args.challenge); got != tt.want {
 				t.Errorf("ACME.AuthorizeChallenge() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
+func TestACME_IsAttestationFormatEnabled(t *testing.T) {
+	ctx := context.Background()
+	type fields struct {
+		AttestationFormats []ACMEAttestationFormat
+	}
+	type args struct {
+		ctx    context.Context
+		format ACMEAttestationFormat
+	}
+	tests := []struct {
+		name   string
+		fields fields
+		args   args
+		want   bool
+	}{
+		{"ok", fields{[]ACMEAttestationFormat{APPLE, STEP, TPM}}, args{ctx, TPM}, true},
+		{"ok empty apple", fields{nil}, args{ctx, APPLE}, true},
+		{"ok empty step", fields{nil}, args{ctx, STEP}, true},
+		{"ok empty tpm", fields{[]ACMEAttestationFormat{}}, args{ctx, "tpm"}, true},
+		{"ok uppercase", fields{[]ACMEAttestationFormat{APPLE, STEP, TPM}}, args{ctx, "STEP"}, true},
+		{"fail apple", fields{[]ACMEAttestationFormat{STEP, TPM}}, args{ctx, APPLE}, false},
+		{"fail step", fields{[]ACMEAttestationFormat{APPLE, TPM}}, args{ctx, STEP}, false},
+		{"fail step", fields{[]ACMEAttestationFormat{APPLE, STEP}}, args{ctx, TPM}, false},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			p := &ACME{
+				AttestationFormats: tt.fields.AttestationFormats,
+			}
+			if got := p.IsAttestationFormatEnabled(tt.args.ctx, tt.args.format); got != tt.want {
+				t.Errorf("ACME.IsAttestationFormatEnabled() = %v, want %v", got, tt.want)
 			}
 		})
 	}
