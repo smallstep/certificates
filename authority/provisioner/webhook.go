@@ -45,19 +45,18 @@ type sshRequest struct {
 
 // ssh.Certificate but the Key and SignatureKey are marshaled
 type sshCert struct {
-	Nonce    []byte
-	Key      []byte
-	Serial   uint64
-	CertType uint32
-	//nolint:revive // field name matches ssh.Certificate
-	KeyId           string
-	ValidPrincipals []string
-	ValidAfter      uint64
-	ValidBefore     uint64
-	Permissions     ssh.Permissions
-	Reserved        []byte
-	SignatureKey    []byte
-	Signature       *ssh.Signature
+	Nonce           []byte          `json:"nonce"`
+	Key             []byte          `json:"key"`
+	Serial          uint64          `json:"serial"`
+	CertType        uint32          `json:"certType"`
+	KeyID           string          `json:"keyID"`
+	ValidPrincipals []string        `json:"validPrincipals"`
+	ValidAfter      uint64          `json:"validAfter"`
+	ValidBefore     uint64          `json:"validBefore"`
+	Permissions     ssh.Permissions `json:"permissions"`
+	Reserved        []byte          `json:"reserved"`
+	SignatureKey    []byte          `json:"signatureKey"`
+	Signature       *ssh.Signature  `json:"Signature"`
 }
 
 type webhookRequestBody struct {
@@ -115,13 +114,12 @@ retry:
 			Key:             r.Key.Marshal(),
 			Serial:          r.Serial,
 			CertType:        r.CertType,
-			KeyId:           r.KeyId,
+			KeyID:           r.KeyId,
 			ValidPrincipals: r.ValidPrincipals,
 			ValidAfter:      r.ValidAfter,
 			ValidBefore:     r.ValidBefore,
 			Permissions:     r.Permissions,
 			Reserved:        r.Reserved,
-			Signature:       r.Signature,
 		}
 		if r.Key != nil {
 			reqBody.SSHCertificate.Key = r.Key.Marshal()
