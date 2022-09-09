@@ -47,8 +47,8 @@ func TestWebhookAdminResponder_CreateProvisionerWebhook(t *testing.T) {
 				Webhooks: []*linkedca.Webhook{webhook},
 			}
 			ctx := linkedca.NewContextWithProvisioner(context.Background(), prov)
-			err := admin.NewError(admin.ErrorConflictType, "provisioner provName already has a webhook with the name already-exists")
-			err.Message = "provisioner provName already has a webhook with the name already-exists"
+			err := admin.NewError(admin.ErrorConflictType, `provisioner "provName" already has a webhook with the name "already-exists"`)
+			err.Message = `provisioner "provName" already has a webhook with the name "already-exists"`
 			body := []byte(`
 			{
 				"name": "already-exists",
@@ -416,8 +416,8 @@ func TestWebhookAdminResponder_UpdateProvisionerWebhook(t *testing.T) {
 				Webhooks: []*linkedca.Webhook{{Name: "exists", Url: "https://example.com", Kind: linkedca.Webhook_ENRICHING}},
 			}
 			ctx := linkedca.NewContextWithProvisioner(context.Background(), prov)
-			err := admin.NewError(admin.ErrorNotFoundType, "provisioner provName has no webhook with the name no-exists")
-			err.Message = "provisioner provName has no webhook with the name no-exists"
+			err := admin.NewError(admin.ErrorNotFoundType, `provisioner "provName" has no webhook with the name "no-exists"`)
+			err.Message = `provisioner "provName" has no webhook with the name "no-exists"`
 			body := []byte(`
 			{
 				"name": "no-exists",

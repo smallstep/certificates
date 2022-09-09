@@ -101,7 +101,7 @@ func (war *webhookAdminResponder) CreateProvisionerWebhook(w http.ResponseWriter
 	// verify the name is unique
 	for _, wh := range prov.Webhooks {
 		if wh.Name == newWebhook.Name {
-			err := admin.NewError(admin.ErrorConflictType, "provisioner %s already has a webhook with the name %s", prov.Name, newWebhook.Name)
+			err := admin.NewError(admin.ErrorConflictType, "provisioner %q already has a webhook with the name %q", prov.Name, newWebhook.Name)
 			render.Error(w, err)
 			return
 		}
@@ -202,7 +202,7 @@ func (war *webhookAdminResponder) UpdateProvisionerWebhook(w http.ResponseWriter
 		break
 	}
 	if !found {
-		msg := fmt.Sprintf("provisioner %s has no webhook with the name %s", prov.Name, newWebhook.Name)
+		msg := fmt.Sprintf("provisioner %q has no webhook with the name %q", prov.Name, newWebhook.Name)
 		err := admin.NewError(admin.ErrorNotFoundType, msg)
 		render.Error(w, err)
 		return
