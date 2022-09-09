@@ -1137,7 +1137,7 @@ func challengesToCertificates(challenges []linkedca.ACMEProvisioner_ChallengeTyp
 			ret = append(ret, provisioner.HTTP_01)
 		case linkedca.ACMEProvisioner_DNS_01:
 			ret = append(ret, provisioner.DNS_01)
-		case linkedca.ACMEProvisioner_TLS_ALPN_O1:
+		case linkedca.ACMEProvisioner_TLS_ALPN_01:
 			ret = append(ret, provisioner.TLS_ALPN_01)
 		case linkedca.ACMEProvisioner_DEVICE_ATTEST_01:
 			ret = append(ret, provisioner.DEVICE_ATTEST_01)
@@ -1157,7 +1157,7 @@ func challengesToLinkedca(challenges []provisioner.ACMEChallenge) []linkedca.ACM
 		case provisioner.DNS_01:
 			ret = append(ret, linkedca.ACMEProvisioner_DNS_01)
 		case provisioner.TLS_ALPN_01:
-			ret = append(ret, linkedca.ACMEProvisioner_TLS_ALPN_O1)
+			ret = append(ret, linkedca.ACMEProvisioner_TLS_ALPN_01)
 		case provisioner.DEVICE_ATTEST_01:
 			ret = append(ret, linkedca.ACMEProvisioner_DEVICE_ATTEST_01)
 		}
