@@ -61,7 +61,7 @@ type sshCert struct {
 }
 
 type webhookRequestBody struct {
-	Timestamp string `json:"timestamp"`
+	Timestamp time.Time `json:"timestamp"`
 	//nolint:revive // acronyms can use all caps
 	X509_CSR []byte `json:"csr,omitempty"`
 	//nolint:revive // acronyms can use all caps
@@ -91,7 +91,7 @@ func (w *Webhook) Do(ctx context.Context, client *http.Client, certReq interface
 	retries := 1
 retry:
 	reqBody := &webhookRequestBody{
-		Timestamp: time.Now().Format(time.RFC3339Nano),
+		Timestamp: time.Now(),
 	}
 	switch r := certReq.(type) {
 	case *x509.CertificateRequest:
