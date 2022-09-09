@@ -41,6 +41,38 @@ func (c ACMEChallenge) Validate() error {
 	}
 }
 
+// ACMEPlatform represents the format used on a device-attest-01 challenge.
+type ACMEAttestationFormat string
+
+const (
+	// APPLE is the format used to enable device-attest-01 on apple devices.
+	APPLE ACMEAttestationFormat = "apple"
+
+	// STEP is the format used to enable device-attest-01 on devices that
+	// provide attestation certificates like the PIV interface on YubiKeys.
+	//
+	// TODO(mariano): should we rename this to something else.
+	STEP ACMEAttestationFormat = "step"
+
+	// TPM is the format used to enable device-attest-01 on TPMs.
+	TPM ACMEAttestationFormat = "tpm"
+)
+
+// String returns a normalized version of the attestation format.
+func (f ACMEAttestationFormat) String() string {
+	return strings.ToLower(string(f))
+}
+
+// Validate returns an error if the attestation format is not a valid one.
+func (f ACMEAttestationFormat) Validate() error {
+	switch ACMEAttestationFormat(f.String()) {
+	case APPLE, STEP, TPM:
+		return nil
+	default:
+		return fmt.Errorf("acme attestation format %q is not supported", f)
+	}
+}
+
 // ACME is the acme provisioner type, an entity that can authorize the ACME
 // provisioning flow.
 type ACME struct {
@@ -58,8 +90,12 @@ type ACME struct {
 	// value is not set the default http-01, dns-01 and tls-alpn-01 challenges
 	// will be enabled, device-attest-01 will be disabled.
 	Challenges []ACMEChallenge `json:"challenges,omitempty"`
-	Claims     *Claims         `json:"claims,omitempty"`
-	Options    *Options        `json:"options,omitempty"`
+	// AttestationFormats contains the enabled attestation formats for this
+	// provisioner. If this value is not set the default apple, step and tpm
+	// will be used.
+	AttestationFormats []ACMEAttestationFormat `json:"attestationFormats,omitempty"`
+	Claims             *Claims                 `json:"claims,omitempty"`
+	Options            *Options                `json:"options,omitempty"`
 
 	ctl *Controller
 }
@@ -120,6 +156,11 @@ func (p *ACME) Init(config Config) (err error) {
 
 	for _, c := range p.Challenges {
 		if err := c.Validate(); err != nil {
+			return err
+		}
+	}
+	for _, f := range p.AttestationFormats {
+		if err := f.Validate(); err != nil {
 			return err
 		}
 	}
@@ -217,6 +258,24 @@ func (p *ACME) IsChallengeEnabled(ctx context.Context, challenge ACMEChallenge) 
 	}
 	for _, ch := range enabledChallenges {
 		if strings.EqualFold(string(ch), string(challenge)) {
+			return true
+		}
+	}
+	return false
+}
+
+// IsAttestationFormatEnabled checks if the given attestation format is enabled.
+// By default apple, step and tpm are enabled, to disable any of them the
+// AttestationFormat provisioner property should have at least one element.
+func (p *ACME) IsAttestationFormatEnabled(ctx context.Context, format ACMEAttestationFormat) bool {
+	enabledFormats := []ACMEAttestationFormat{
+		APPLE, STEP, TPM,
+	}
+	if len(p.AttestationFormats) > 0 {
+		enabledFormats = p.AttestationFormats
+	}
+	for _, f := range enabledFormats {
+		if strings.EqualFold(string(f), string(format)) {
 			return true
 		}
 	}
