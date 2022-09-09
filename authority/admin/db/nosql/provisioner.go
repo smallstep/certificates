@@ -231,9 +231,12 @@ func (db *DB) DeleteProvisioner(ctx context.Context, id string) error {
 }
 
 func dbWebhooksToLinkedca(dbwhs []dbWebhook) []*linkedca.Webhook {
-	var lwhs []*linkedca.Webhook
+	if len(dbwhs) == 0 {
+		return nil
+	}
+	lwhs := make([]*linkedca.Webhook, len(dbwhs))
 
-	for _, dbwh := range dbwhs {
+	for i, dbwh := range dbwhs {
 		lwh := &linkedca.Webhook{
 			Name:                 dbwh.Name,
 			Id:                   dbwh.ID,
@@ -256,16 +259,19 @@ func dbWebhooksToLinkedca(dbwhs []dbWebhook) []*linkedca.Webhook {
 				},
 			}
 		}
-		lwhs = append(lwhs, lwh)
+		lwhs[i] = lwh
 	}
 
 	return lwhs
 }
 
 func linkedcaWebhooksToDB(lwhs []*linkedca.Webhook) []dbWebhook {
-	var dbwhs []dbWebhook
+	if len(lwhs) == 0 {
+		return nil
+	}
+	dbwhs := make([]dbWebhook, len(lwhs))
 
-	for _, lwh := range lwhs {
+	for i, lwh := range lwhs {
 		dbwh := dbWebhook{
 			Name:                 lwh.Name,
 			ID:                   lwh.Id,
@@ -281,7 +287,7 @@ func linkedcaWebhooksToDB(lwhs []*linkedca.Webhook) []dbWebhook {
 			dbwh.BasicAuth.Username = a.BasicAuth.Username
 			dbwh.BasicAuth.Password = a.BasicAuth.Password
 		}
-		dbwhs = append(dbwhs, dbwh)
+		dbwhs[i] = dbwh
 	}
 
 	return dbwhs
