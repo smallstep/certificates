@@ -45,6 +45,10 @@ func (*fakeProvisioner) IsChallengeEnabled(ctx context.Context, challenge provis
 	return true
 }
 
+func (*fakeProvisioner) IsAttestationFormatEnabled(ctx context.Context, format provisioner.ACMEAttestationFormat) bool {
+	return true
+}
+
 func (*fakeProvisioner) AuthorizeRevoke(ctx context.Context, token string) error { return nil }
 func (*fakeProvisioner) GetID() string                                           { return "" }
 func (*fakeProvisioner) GetName() string                                         { return "" }
