@@ -6,6 +6,10 @@
 *.so
 *.dylib
 
+# Go Workspaces
+go.work
+go.work.sum
+
 # Test binary, build with `go test -c`
 *.test
 

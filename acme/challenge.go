@@ -26,6 +26,7 @@ import (
 	"time"
 
 	"github.com/fxamacker/cbor/v2"
+	"github.com/smallstep/certificates/authority/provisioner"
 	"go.step.sm/crypto/jose"
 	"go.step.sm/crypto/pemutil"
 )
@@ -339,6 +340,12 @@ func deviceAttest01Validate(ctx context.Context, ch *Challenge, db DB, jwk *jose
 	att := AttestationObject{}
 	if err := cbor.Unmarshal(attObj, &att); err != nil {
 		return WrapErrorISE(err, "error unmarshalling CBOR")
+	}
+
+	prov := MustProvisionerFromContext(ctx)
+	if !prov.IsAttestationFormatEnabled(ctx, provisioner.ACMEAttestationFormat(att.Format)) {
+		return storeError(ctx, db, ch, true,
+			NewError(ErrorBadAttestationStatementType, "attestation format %q is not enabled", att.Format))
 	}
 
 	switch att.Format {
