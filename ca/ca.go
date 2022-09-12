@@ -510,11 +510,16 @@ func (ca *CA) getTLSConfig(auth *authority.Authority) (*tls.Config, error) {
 	tlsConfig.GetClientCertificate = ca.renewer.GetClientCertificate
 
 	// initialize a certificate pool with root CA certificates to trust when doing mTLS.
-	// This pool is only used to verify clients. The default host pool is used to
-	// verify webhook servers.
 	certPool := x509.NewCertPool()
+	// initialize a certificate pool with root CA certificates to trust when connecting
+	// to webhook servers
+	rootCAsPool, err := x509.SystemCertPool()
+	if err != nil {
+		return nil, err
+	}
 	for _, crt := range auth.GetRootCertificates() {
 		certPool.AddCert(crt)
+		rootCAsPool.AddCert(crt)
 	}
 
 	// adding the intermediate CA certificates to the pool will allow clients that
@@ -527,11 +532,14 @@ func (ca *CA) getTLSConfig(auth *authority.Authority) (*tls.Config, error) {
 			return nil, err
 		}
 		certPool.AddCert(cert)
+		rootCAsPool.AddCert(cert)
 	}
 
 	// Add support for mutual tls to renew certificates
 	tlsConfig.ClientAuth = tls.VerifyClientCertIfGiven
 	tlsConfig.ClientCAs = certPool
+
+	tlsConfig.RootCAs = rootCAsPool
 
 	return tlsConfig, nil
 }
