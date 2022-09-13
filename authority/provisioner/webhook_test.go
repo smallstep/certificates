@@ -16,6 +16,7 @@ import (
 
 	"github.com/pkg/errors"
 	"github.com/smallstep/assert"
+	"github.com/smallstep/certificates/webhook"
 )
 
 func TestWebhook_Do(t *testing.T) {
@@ -23,7 +24,7 @@ func TestWebhook_Do(t *testing.T) {
 	type test struct {
 		webhook         Webhook
 		dataArg         map[string]interface{}
-		webhookResponse WebhookResponseBody
+		webhookResponse webhook.ResponseBody
 		expectPath      string
 		errStatusCode   int
 		serverErrMsg    string
@@ -35,7 +36,7 @@ func TestWebhook_Do(t *testing.T) {
 				ID:            "abc123",
 				SigningSecret: "c2VjcmV0Cg==",
 			},
-			webhookResponse: WebhookResponseBody{
+			webhookResponse: webhook.ResponseBody{
 				Data: map[string]interface{}{"role": "dba"},
 			},
 		},
@@ -45,7 +46,7 @@ func TestWebhook_Do(t *testing.T) {
 				SigningSecret: "c2VjcmV0Cg==",
 				BearerToken:   "mytoken",
 			},
-			webhookResponse: WebhookResponseBody{
+			webhookResponse: webhook.ResponseBody{
 				Data: map[string]interface{}{"role": "dba"},
 			},
 		},
@@ -61,7 +62,7 @@ func TestWebhook_Do(t *testing.T) {
 					Password: "mypass",
 				},
 			},
-			webhookResponse: WebhookResponseBody{
+			webhookResponse: webhook.ResponseBody{
 				Data: map[string]interface{}{"role": "dba"},
 			},
 		},
@@ -73,7 +74,7 @@ func TestWebhook_Do(t *testing.T) {
 				SigningSecret: "c2VjcmV0Cg==",
 			},
 			dataArg: map[string]interface{}{"username": "areed", "region": "central"},
-			webhookResponse: WebhookResponseBody{
+			webhookResponse: webhook.ResponseBody{
 				Data: map[string]interface{}{"role": "dba"},
 			},
 			expectPath: "/users/areed?region=central",
@@ -83,7 +84,7 @@ func TestWebhook_Do(t *testing.T) {
 				ID:            "abc123",
 				SigningSecret: "c2VjcmV0Cg==",
 			},
-			webhookResponse: WebhookResponseBody{
+			webhookResponse: webhook.ResponseBody{
 				Allow: true,
 			},
 		},
@@ -92,7 +93,7 @@ func TestWebhook_Do(t *testing.T) {
 				ID:            "abc123",
 				SigningSecret: "c2VjcmV0Cg==",
 			},
-			webhookResponse: WebhookResponseBody{
+			webhookResponse: webhook.ResponseBody{
 				Data: map[string]interface{}{"role": "dba"},
 			},
 			errStatusCode: 404,
@@ -147,7 +148,9 @@ func TestWebhook_Do(t *testing.T) {
 
 			tc.webhook.URL = ts.URL + tc.webhook.URL
 
-			got, err := tc.webhook.Do(context.Background(), http.DefaultClient, csr, tc.dataArg)
+			reqBody, err := webhook.NewRequestBody(webhook.WithX509CertificateRequest(csr))
+			assert.FatalError(t, err)
+			got, err := tc.webhook.Do(context.Background(), http.DefaultClient, reqBody, tc.dataArg)
 			if tc.expectErr != nil {
 				assert.Equals(t, tc.expectErr.Error(), err.Error())
 				return
@@ -176,11 +179,13 @@ func TestWebhook_Do(t *testing.T) {
 		client := &http.Client{
 			Transport: transport,
 		}
-		_, err = wh.Do(context.Background(), client, csr, nil)
+		reqBody, err := webhook.NewRequestBody(webhook.WithX509CertificateRequest(csr))
+		assert.FatalError(t, err)
+		_, err = wh.Do(context.Background(), client, reqBody, nil)
 		assert.FatalError(t, err)
 
 		wh.DisableTLSClientAuth = true
-		_, err = wh.Do(context.Background(), client, csr, nil)
+		_, err = wh.Do(context.Background(), client, reqBody, nil)
 		assert.Error(t, err)
 	})
 }

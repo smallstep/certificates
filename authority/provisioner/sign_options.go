@@ -20,6 +20,7 @@ import (
 
 	"github.com/smallstep/certificates/authority/policy"
 	"github.com/smallstep/certificates/errs"
+	"github.com/smallstep/certificates/webhook"
 )
 
 // DefaultCertValidity is the default validity for a certificate if none is specified.
@@ -33,6 +34,8 @@ type SignOptions struct {
 	TemplateData  json.RawMessage `json:"templateData"`
 	Backdate      time.Duration   `json:"-"`
 	WebhookClient *http.Client    `json:"-"`
+	// PermanentIdentifier is an ID verified by acme device-attest-01 challenge
+	PermanentIdentifier string `json:"permanentIdentifier"`
 }
 
 // SignOption is the interface used to collect all extra options used in the
@@ -46,7 +49,7 @@ type CertificateValidator interface {
 
 // CertificateAuthorizer is an interface used to authorize a given X.509 certificate.
 type CertificateAuthorizer interface {
-	Authorize(req *x509.Certificate, opts SignOptions) error
+	Authorize(req *x509util.Certificate, leaf *x509.Certificate, opts SignOptions) error
 }
 
 // CertificateRequestValidator is an interface used to validate a given X.509 certificate request.
@@ -461,9 +464,16 @@ func newWebhooksAuthorizer(webhooks []*Webhook, data x509util.TemplateData) *web
 
 // Authorize calls each webhook and returns an error if any fails to respond
 // with "{allow: true}"
-func (wa *webhooksAuthorizer) Authorize(cert *x509.Certificate, signOpts SignOptions) error {
+func (wa *webhooksAuthorizer) Authorize(cert *x509util.Certificate, leaf *x509.Certificate, signOpts SignOptions) error {
 	for _, wh := range wa.webhooks {
-		resp, err := wh.Do(context.Background(), signOpts.WebhookClient, cert, wa.data)
+		req, err := webhook.NewRequestBody(
+			webhook.WithX509Certificate(cert, leaf),
+			webhook.WithPermanentIdentifier(signOpts.PermanentIdentifier),
+		)
+		if err != nil {
+			return err
+		}
+		resp, err := wh.Do(context.Background(), signOpts.WebhookClient, req, wa.data)
 		if err != nil {
 			return err
 		}

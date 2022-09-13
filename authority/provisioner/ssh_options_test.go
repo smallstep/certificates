@@ -9,6 +9,7 @@ import (
 	"testing"
 
 	"github.com/smallstep/assert"
+	"github.com/smallstep/certificates/webhook"
 	"go.step.sm/crypto/sshutil"
 )
 
@@ -31,7 +32,7 @@ func TestCustomSSHTemplateOptions(t *testing.T) {
 		args             args
 		want             sshutil.Options
 		wantErr          bool
-		webhookResponses []WebhookResponseBody
+		webhookResponses []webhook.ResponseBody
 		wantOptionsErr   bool
 	}{
 		{"ok", args{nil, data, sshutil.DefaultTemplate, SignSSHOptions{}}, sshutil.Options{
@@ -104,7 +105,7 @@ func TestCustomSSHTemplateOptions(t *testing.T) {
 				CertBuffer: bytes.NewBufferString(`{"foo": "dba"}`),
 			},
 			false,
-			[]WebhookResponseBody{
+			[]webhook.ResponseBody{
 				{
 					Data: map[string]interface{}{
 						"role": "dba",
@@ -131,7 +132,7 @@ func TestCustomSSHTemplateOptions(t *testing.T) {
 				CertBuffer: nil,
 			},
 			false,
-			[]WebhookResponseBody{
+			[]webhook.ResponseBody{
 				{
 					Allow: false,
 				},

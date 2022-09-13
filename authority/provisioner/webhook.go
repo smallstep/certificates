@@ -5,7 +5,6 @@ import (
 	"context"
 	"crypto/hmac"
 	"crypto/sha256"
-	"crypto/x509"
 	"encoding/base64"
 	"encoding/hex"
 	"encoding/json"
@@ -17,9 +16,7 @@ import (
 
 	"github.com/pkg/errors"
 	"github.com/smallstep/certificates/templates"
-	"go.step.sm/crypto/sshutil"
-	"go.step.sm/crypto/x509util"
-	"golang.org/x/crypto/ssh"
+	"github.com/smallstep/certificates/webhook"
 )
 
 type Webhook struct {
@@ -43,38 +40,7 @@ type sshRequest struct {
 	Principals []string
 }
 
-// ssh.Certificate but the Key and SignatureKey are marshaled
-type sshCert struct {
-	Nonce           []byte          `json:"nonce"`
-	Key             []byte          `json:"key"`
-	Serial          uint64          `json:"serial"`
-	CertType        uint32          `json:"certType"`
-	KeyID           string          `json:"keyID"`
-	ValidPrincipals []string        `json:"validPrincipals"`
-	ValidAfter      uint64          `json:"validAfter"`
-	ValidBefore     uint64          `json:"validBefore"`
-	Permissions     ssh.Permissions `json:"permissions"`
-	Reserved        []byte          `json:"reserved"`
-	SignatureKey    []byte          `json:"signatureKey"`
-	Signature       *ssh.Signature  `json:"Signature"`
-}
-
-type webhookRequestBody struct {
-	Timestamp time.Time `json:"timestamp"`
-	//nolint:revive // acronyms can use all caps
-	X509_CSR []byte `json:"csr,omitempty"`
-	//nolint:revive // acronyms can use all caps
-	SSH_CR         *sshRequest           `json:"ssh_cr,omitempty"`
-	Certificate    *x509util.Certificate `json:"certificate,omitempty"`
-	SSHCertificate *sshCert              `json:"ssh_certificate,omitempty"`
-}
-
-type WebhookResponseBody struct {
-	Data  map[string]interface{} `json:"data"`
-	Allow bool                   `json:"allow"`
-}
-
-func (w *Webhook) Do(ctx context.Context, client *http.Client, certReq interface{}, data map[string]interface{}) (*WebhookResponseBody, error) {
+func (w *Webhook) Do(ctx context.Context, client *http.Client, reqBody *webhook.RequestBody, data map[string]interface{}) (*webhook.ResponseBody, error) {
 	tmpl, err := template.New("url").Funcs(templates.StepFuncMap()).Parse(w.URL)
 	if err != nil {
 		return nil, err
@@ -87,47 +53,10 @@ func (w *Webhook) Do(ctx context.Context, client *http.Client, certReq interface
 
 	ctx, cancel := context.WithTimeout(ctx, time.Second*10)
 	defer cancel()
+
 	retries := 1
 retry:
-	reqBody := &webhookRequestBody{
-		Timestamp: time.Now(),
-	}
-	switch r := certReq.(type) {
-	case *x509.CertificateRequest:
-		if r != nil {
-			reqBody.X509_CSR = r.Raw
-		}
-	case sshutil.CertificateRequest:
-		reqBody.SSH_CR = &sshRequest{
-			Type:       r.Type,
-			KeyID:      r.KeyID,
-			Principals: r.Principals,
-		}
-		if r.Key != nil {
-			reqBody.SSH_CR.Key = r.Key.Marshal()
-		}
-	case *x509.Certificate:
-		reqBody.Certificate = x509util.FromX509Certificate(r)
-	case *ssh.Certificate:
-		reqBody.SSHCertificate = &sshCert{
-			Nonce:           r.Nonce,
-			Key:             r.Key.Marshal(),
-			Serial:          r.Serial,
-			CertType:        r.CertType,
-			KeyID:           r.KeyId,
-			ValidPrincipals: r.ValidPrincipals,
-			ValidAfter:      r.ValidAfter,
-			ValidBefore:     r.ValidBefore,
-			Permissions:     r.Permissions,
-			Reserved:        r.Reserved,
-		}
-		if r.Key != nil {
-			reqBody.SSHCertificate.Key = r.Key.Marshal()
-		}
-		if r.SignatureKey != nil {
-			reqBody.SSHCertificate.SignatureKey = r.SignatureKey.Marshal()
-		}
-	}
+	reqBody.Timestamp = time.Now()
 
 	reqBytes, err := json.Marshal(reqBody)
 	if err != nil {
@@ -192,9 +121,7 @@ retry:
 		return nil, fmt.Errorf("Webhook server responded with %d", resp.StatusCode)
 	}
 
-	respBody := &WebhookResponseBody{
-		Data: map[string]interface{}{},
-	}
+	respBody := &webhook.ResponseBody{}
 	if err := json.NewDecoder(resp.Body).Decode(respBody); err != nil {
 		return nil, err
 	}

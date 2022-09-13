@@ -10,6 +10,7 @@ import (
 	"testing"
 
 	"github.com/smallstep/assert"
+	"github.com/smallstep/certificates/webhook"
 	"go.step.sm/crypto/pemutil"
 	"go.step.sm/crypto/x509util"
 )
@@ -182,7 +183,7 @@ func TestCustomTemplateOptions(t *testing.T) {
 		args             args
 		want             x509util.Options
 		wantErr          bool
-		webhookResponses []WebhookResponseBody
+		webhookResponses []webhook.ResponseBody
 		wantOptionErr    bool
 	}{
 		{"ok", args{nil, data, x509util.DefaultLeafTemplate, SignOptions{}}, x509util.Options{
@@ -253,7 +254,7 @@ func TestCustomTemplateOptions(t *testing.T) {
 				CertBuffer: bytes.NewBufferString(`{"foo": "dba"}`),
 			},
 			false,
-			[]WebhookResponseBody{
+			[]webhook.ResponseBody{
 				{
 					Data: map[string]interface{}{
 						"role": "dba",
@@ -282,7 +283,7 @@ func TestCustomTemplateOptions(t *testing.T) {
 				CertBuffer: nil,
 			},
 			false,
-			[]WebhookResponseBody{
+			[]webhook.ResponseBody{
 				{
 					Data: map[string]interface{}{
 						"role": "dba",

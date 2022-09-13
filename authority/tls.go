@@ -231,9 +231,9 @@ func (a *Authority) Sign(csr *x509.CertificateRequest, signOpts provisioner.Sign
 		)
 	}
 
-	// Certificate final authorizers
+	// Certificate authorizers
 	for _, a := range certAuthorizers {
-		if err := a.Authorize(leaf, signOpts); err != nil {
+		if err := a.Authorize(cert, leaf, signOpts); err != nil {
 			return nil, errs.ApplyOptions(
 				errs.ForbiddenErr(err, "error creating certificate"),
 				opts...,

@@ -271,7 +271,7 @@ func (a *Authority) SignSSH(ctx context.Context, key ssh.PublicKey, opts provisi
 
 	// Certificate final authorizers
 	for _, a := range authorizers {
-		if err := a.Authorize(certTpl, opts); err != nil {
+		if err := a.Authorize(certificate, certTpl, opts); err != nil {
 			return nil, errs.ForbiddenErr(err, "request not allowed by webhook server")
 		}
 	}

@@ -1,0 +1,63 @@
+package webhook
+
+import (
+	"time"
+
+	"go.step.sm/crypto/sshutil"
+	"go.step.sm/crypto/x509util"
+)
+
+// ResponseBody is the body returned by webhook servers.
+type ResponseBody struct {
+	Data  any  `json:"data"`
+	Allow bool `json:"allow"`
+}
+
+// X509CertificateRequest is the certificate request sent to webhook servers for
+// enriching webhooks when signing x509 certificates
+type X509CertificateRequest struct {
+	*x509util.CertificateRequest
+	PublicKey          []byte `json:"publicKey"`
+	PublicKeyAlgorithm string `json:"publicKeyAlgorithm"`
+}
+
+// X509Certificate is the certificate sent to webhook servers for authorizing
+// webhooks when signing x509 certificates
+type X509Certificate struct {
+	*x509util.Certificate
+	PublicKey          []byte    `json:"publicKey"`
+	PublicKeyAlgorithm string    `json:"publicKeyAlgorithm"`
+	NotBefore          time.Time `json:"notBefore"`
+	NotAfter           time.Time `json:"notAfter"`
+}
+
+// SSHCertificateRequest is the certificate request sent to webhook servers for
+// enriching webhooks when signing SSH certificates
+type SSHCertificateRequest struct {
+	PublicKey  []byte   `json:publicKey"`
+	Type       string   `json:"type"`
+	KeyID      string   `json:"keyID"`
+	Principals []string `json:"principals"`
+}
+
+// SSHCertificate is the certificate sent to webhook servers for authorizing
+// webhooks when signing SSH certificates
+type SSHCertificate struct {
+	*sshutil.Certificate
+	PublicKey    []byte `json:"publicKey"`
+	SignatureKey []byte `json:"signatureKey"`
+	ValidBefore  uint64 `json:"validBefore"`
+	ValidAfter   uint64 `json:"validAfter"`
+}
+
+// RequestBody is the body sent to webhook servers.
+type RequestBody struct {
+	Timestamp time.Time `json:"timestamp"`
+	// Only set after successfully completing acme device-attest-01 challenge
+	PermanentIdentifier string `json:"permanentIdentifier,omitempty"`
+	// Exactly one of the remaining fields should be set
+	X509CertificateRequest *X509CertificateRequest `json:"x509CertificateRequest,omitempty"`
+	X509Certificate        *X509Certificate        `json:"x509Certificate,omitempty"`
+	SSHCertificateRequest  *SSHCertificateRequest  `json:"sshCertificateRequest,omitempty"`
+	SSHCertificate         *SSHCertificate         `json:"sshCertificate,omitempty"`
+}

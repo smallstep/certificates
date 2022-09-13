@@ -14,6 +14,7 @@ import (
 	"github.com/pkg/errors"
 	"github.com/smallstep/certificates/authority/policy"
 	"github.com/smallstep/certificates/errs"
+	"github.com/smallstep/certificates/webhook"
 	"go.step.sm/crypto/keyutil"
 	"go.step.sm/crypto/sshutil"
 	"go.step.sm/linkedca"
@@ -43,7 +44,7 @@ type SSHCertValidator interface {
 
 // SSHCertAuthorizer is an interface used to authorize an SSH certificate.
 type SSHCertAuthorizer interface {
-	Authorize(req *ssh.Certificate, opts SignSSHOptions) error
+	Authorize(cert *sshutil.Certificate, certTpl *ssh.Certificate, opts SignSSHOptions) error
 }
 
 // SSHCertOptionsValidator is the interface used to validate the custom
@@ -594,9 +595,13 @@ func newWebhooksAuthorizerSSH(webhooks []*Webhook, data sshutil.TemplateData) *w
 
 // Authorize calls each webhook and returns an error if any fails to respond
 // with "{allow: true}"
-func (wa *webhooksAuthorizerSSH) Authorize(cert *ssh.Certificate, signOpts SignSSHOptions) error {
+func (wa *webhooksAuthorizerSSH) Authorize(cert *sshutil.Certificate, certTpl *ssh.Certificate, signOpts SignSSHOptions) error {
 	for _, wh := range wa.webhooks {
-		resp, err := wh.Do(context.Background(), signOpts.WebhookClient, cert, wa.data)
+		req, err := webhook.NewRequestBody(webhook.WithSSHCertificate(cert, certTpl))
+		if err != nil {
+			return err
+		}
+		resp, err := wh.Do(context.Background(), signOpts.WebhookClient, req, wa.data)
 		if err != nil {
 			return err
 		}

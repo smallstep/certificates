@@ -14,6 +14,7 @@ import (
 	"go.step.sm/linkedca"
 
 	"github.com/smallstep/certificates/authority/policy"
+	"github.com/smallstep/certificates/webhook"
 )
 
 // CertificateOptions is an interface that returns a list of options passed when
@@ -151,7 +152,11 @@ func CustomTemplateOptions(o *Options, data x509util.TemplateData, defaultTempla
 						if wh.Kind != linkedca.Webhook_ENRICHING.String() {
 							continue
 						}
-						resp, err := wh.Do(context.Background(), so.WebhookClient, cr, data)
+						req, err := webhook.NewRequestBody(webhook.WithX509CertificateRequest(cr))
+						if err != nil {
+							return err
+						}
+						resp, err := wh.Do(context.Background(), so.WebhookClient, req, data)
 						if err != nil {
 							return err
 						}

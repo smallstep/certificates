@@ -117,7 +117,7 @@ func signSSHCertificate(key crypto.PublicKey, opts SignSSHOptions, signOpts []Si
 
 	// Authorize
 	for _, a := range authorizers {
-		if err := a.Authorize(cert, opts); err != nil {
+		if err := a.Authorize(certificate, cert, opts); err != nil {
 			return nil, errs.Wrap(http.StatusForbidden, err, "authority.SignSSH")
 		}
 	}
