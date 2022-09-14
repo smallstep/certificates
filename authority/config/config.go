@@ -192,7 +192,7 @@ func (c *Config) Init() {
 	if c.CommonName == "" {
 		c.CommonName = "Step Online CA"
 	}
-	if c.CRL != nil && c.CRL.Generate && c.CRL.CacheDuration == nil {
+	if c.CRL != nil && c.CRL.CacheDuration == nil {
 		c.CRL.CacheDuration = DefaultCRLCacheDuration
 	}
 	c.AuthorityConfig.init()
