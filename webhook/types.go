@@ -34,7 +34,7 @@ type X509Certificate struct {
 // SSHCertificateRequest is the certificate request sent to webhook servers for
 // enriching webhooks when signing SSH certificates
 type SSHCertificateRequest struct {
-	PublicKey  []byte   `json:publicKey"`
+	PublicKey  []byte   `json:"publicKey"`
 	Type       string   `json:"type"`
 	KeyID      string   `json:"keyID"`
 	Principals []string `json:"principals"`

@@ -33,13 +33,6 @@ type Webhook struct {
 	} `json:"-"`
 }
 
-type sshRequest struct {
-	Key        []byte
-	Type       string
-	KeyID      string
-	Principals []string
-}
-
 func (w *Webhook) Do(ctx context.Context, client *http.Client, reqBody *webhook.RequestBody, data map[string]interface{}) (*webhook.ResponseBody, error) {
 	tmpl, err := template.New("url").Funcs(templates.StepFuncMap()).Parse(w.URL)
 	if err != nil {

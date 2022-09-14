@@ -25,7 +25,7 @@ func NewRequestBody(options ...RequestBodyOption) (*RequestBody, error) {
 func WithX509CertificateRequest(cr *x509.CertificateRequest) RequestBodyOption {
 	return func(rb *RequestBody) error {
 		rb.X509CertificateRequest = &X509CertificateRequest{
-			CertificateRequest: x509util.CertificateRequestFromX509(cr),
+			CertificateRequest: x509util.NewCertificateRequestFromX509(cr),
 			PublicKeyAlgorithm: cr.PublicKeyAlgorithm.String(),
 		}
 		if cr.PublicKey != nil {
