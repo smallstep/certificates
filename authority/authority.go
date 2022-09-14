@@ -638,8 +638,8 @@ func (a *Authority) init() error {
 	a.initOnce = true
 
 	// Start the CRL generator
-	if a.config.CRL != nil {
-		if a.config.CRL.Generate && a.config.CRL.CacheDuration.Duration > time.Duration(0) {
+	if a.config.CRL != nil && a.config.CRL.Generate {
+		if v := a.config.CRL.CacheDuration; v != nil && v.Duration > 0 {
 			err := a.startCRLGenerator()
 			if err != nil {
 				return err
