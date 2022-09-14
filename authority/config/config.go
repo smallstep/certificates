@@ -35,6 +35,8 @@ var (
 	// DefaultEnableSSHCA enable SSH CA features per provisioner or globally
 	// for all provisioners.
 	DefaultEnableSSHCA = false
+	// DefaultCRLCacheDuration is the default cache duration for the CRL.
+	DefaultCRLCacheDuration = &provisioner.Duration{Duration: 24 * time.Hour}
 	// GlobalProvisionerClaims default claims for the Authority. Can be overridden
 	// by provisioner specific claims.
 	GlobalProvisionerClaims = provisioner.Claims{
@@ -189,6 +191,9 @@ func (c *Config) Init() {
 	}
 	if c.CommonName == "" {
 		c.CommonName = "Step Online CA"
+	}
+	if c.CRL != nil && c.CRL.Generate && c.CRL.CacheDuration == nil {
+		c.CRL.CacheDuration = DefaultCRLCacheDuration
 	}
 	c.AuthorityConfig.init()
 }
