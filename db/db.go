@@ -255,7 +255,7 @@ func (db *DB) GetRevokedCertificates() (*[]RevokedCertificateInfo, error) {
 			return nil, err
 		}
 
-		if !data.RevokedAt.IsZero() && data.RevokedAt.After(now) {
+		if !data.RevokedAt.IsZero() {
 			revokedCerts = append(revokedCerts, data)
 		} else if data.RevokedAt.IsZero() {
 			cert, err := db.GetCertificate(data.Serial)

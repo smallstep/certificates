@@ -71,6 +71,7 @@ type Authority struct {
 
 	// CRL vars
 	crlTicker *time.Ticker
+	crlMutex  sync.Mutex
 
 	// Do not re-initialize
 	initOnce  bool

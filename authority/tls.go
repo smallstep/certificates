@@ -637,6 +637,9 @@ func (a *Authority) GenerateCertificateRevocationList() error {
 		return errors.Errorf("CA does not support CRL Generation")
 	}
 
+	a.crlMutex.Lock() // use a mutex to ensure only one CRL is generated at a time to avoid concurrency issues
+	defer a.crlMutex.Unlock()
+
 	crlInfo, err := crlDB.GetCRL()
 	if err != nil {
 		return errors.Wrap(err, "could not retrieve CRL from database")
