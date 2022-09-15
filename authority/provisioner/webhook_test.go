@@ -92,6 +92,7 @@ func TestWebhookController_Enrich(t *testing.T) {
 					err := json.NewEncoder(w).Encode(test.responses[j])
 					assert.FatalError(t, err)
 				}))
+				// nolint: gocritic // defer in loop isn't a memory leak
 				defer ts.Close()
 				wh.URL = ts.URL
 			}
@@ -149,6 +150,7 @@ func TestWebhookController_Authorize(t *testing.T) {
 					err := json.NewEncoder(w).Encode(test.responses[j])
 					assert.FatalError(t, err)
 				}))
+				// nolint: gocritic // defer in loop isn't a memory leak
 				defer ts.Close()
 				wh.URL = ts.URL
 			}

@@ -152,6 +152,13 @@ func (a *Authority) Sign(csr *x509.CertificateRequest, signOpts provisioner.Sign
 			webhook.WithX509CertificateRequest(csr),
 			webhook.WithPermanentIdentifier(signOpts.PermanentIdentifier),
 		)
+		if err != nil {
+			return nil, errs.ApplyOptions(
+				errs.InternalServerErr(err),
+				errs.WithKeyVal("csr", csr),
+				errs.WithKeyVal("signOptions", signOpts),
+			)
+		}
 		err = webhookCtl.Enrich(whEnrichReq)
 		if err != nil {
 			return nil, errs.ApplyOptions(

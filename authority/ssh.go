@@ -209,6 +209,12 @@ func (a *Authority) SignSSH(ctx context.Context, key ssh.PublicKey, opts provisi
 		whEnrichReq, err := webhook.NewRequestBody(
 			webhook.WithSSHCertificateRequest(cr),
 		)
+		if err != nil {
+			return nil, errs.ApplyOptions(
+				errs.InternalServerErr(err),
+				errs.WithKeyVal("signOptions", signOpts),
+			)
+		}
 		err = webhookCtl.Enrich(whEnrichReq)
 		if err != nil {
 			return nil, errs.ApplyOptions(
