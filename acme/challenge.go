@@ -1,6 +1,7 @@
 package acme
 
 import (
+	"bytes"
 	"context"
 	"crypto"
 	"crypto/ecdsa"
@@ -13,6 +14,7 @@ import (
 	"crypto/x509"
 	"encoding/asn1"
 	"encoding/base64"
+	"encoding/binary"
 	"encoding/hex"
 	"encoding/json"
 	"errors"
@@ -310,9 +312,22 @@ func dns01Validate(ctx context.Context, ch *Challenge, db DB, jwk *jose.JSONWebK
 	return nil
 }
 
+// Webauthn AuthenticatorData as per https://developer.apple.com/documentation/devicecheck/validating_apps_that_connect_to_your_server
+type AuthenticatorData struct {
+	RPIDHash           [32]byte // Should be the hash of your app's App ID
+	Flags              byte     // Ignored in AppAttest
+	Count              uint32   // Should be 0 when enrolling!
+	AAGUID             [16]byte
+	CredentialIdLength uint16 // Always 32 as per
+	CredentialId       [32]byte
+	// Variable-length COSE credential ignored. Not even sure if it's present!
+}
+
 type Payload struct {
 	AttObj string `json:"attObj"`
-	Error  string `json:"error"`
+	// Provided by Apple AppAttest but is optional
+	AuthData string `json:"authData,omitempty"`
+	Error    string `json:"error"`
 }
 
 type AttestationObject struct {
@@ -323,6 +338,7 @@ type AttestationObject struct {
 // TODO(bweeks): move attestation verification to a shared package.
 // TODO(bweeks): define new error type for failed attestation validation.
 func deviceAttest01Validate(ctx context.Context, ch *Challenge, db DB, jwk *jose.JSONWebKey, payload []byte) error {
+
 	var p Payload
 	if err := json.Unmarshal(payload, &p); err != nil {
 		return WrapErrorISE(err, "error unmarshalling JSON")
@@ -337,6 +353,12 @@ func deviceAttest01Validate(ctx context.Context, ch *Challenge, db DB, jwk *jose
 		return WrapErrorISE(err, "error base64 decoding attObj")
 	}
 
+	authData, err := base64.RawURLEncoding.DecodeString(p.AuthData)
+	if err != nil {
+
+		return WrapErrorISE(err, "error base64 decoding authData")
+	}
+
 	att := AttestationObject{}
 	if err := cbor.Unmarshal(attObj, &att); err != nil {
 		return WrapErrorISE(err, "error unmarshalling CBOR")
@@ -349,6 +371,98 @@ func deviceAttest01Validate(ctx context.Context, ch *Challenge, db DB, jwk *jose
 	}
 
 	switch att.Format {
+
+	// Apple AppAttest is the non-enterprise attestation service. It uses the
+	// same format and same root certificates as enterprise attestation
+	// https://developer.apple.com/documentation/devicecheck/validating_apps_that_connect_to_your_server
+	case "apple-appattest":
+		data, err := doAppleAppAttestAttestationFormat(ctx, ch, db, &att, authData)
+		if err != nil {
+			var acmeError *Error
+			if errors.As(err, &acmeError) {
+				if acmeError.Status == 500 {
+					return acmeError
+				}
+				return storeError(ctx, db, ch, true, acmeError)
+			}
+			return WrapErrorISE(err, "error validating attestation")
+		}
+		if len(data.Nonce) != 0 {
+
+			// Create clientDataHash as the SHA256 hash of the one-time
+			// challenge your server sends to your app before performing the
+			// attestation, and append that hash to the end of the authenticator
+			// data (authData from the decoded object).
+			clientDataHash := sha256.Sum256([]byte(ch.Token))
+
+			// Generate a new SHA256 hash of the composite item to create nonce.
+			nonce := sha256.Sum256(append(authData, clientDataHash[:]...))
+
+			// Obtain the value of the credCert extension with OID 1.2.840.113635.100.8.2,
+			// which is a DER-encoded ASN.1 sequence. Decode the sequence and extract the
+			// single octet string that it contains. Verify that the string equals nonce.
+			if subtle.ConstantTimeCompare(data.Nonce, nonce[:]) != 1 {
+				return storeError(ctx, db, ch, true, NewError(ErrorBadAttestationStatementType, "challenge token does not match"))
+			}
+
+			var authentiatorData AuthenticatorData
+			if err := binary.Read(bytes.NewReader(authData), binary.BigEndian, &authentiatorData); err != nil {
+				return storeError(ctx, db, ch, true, NewError(ErrorBadAttestationStatementType, "authenticator data invalid"))
+			}
+
+			// Create the SHA256 hash of the public key in credCert, and verify
+			// that it matches the key identifier from your app.
+			// TODO(arianvp):
+			publicKey := data.Certificate.PublicKey
+
+			publicKeyBytes, err := x509.MarshalPKIXPublicKey(publicKey)
+			if err != nil {
+				return storeError(ctx, db, ch, true, NewError(ErrorBadAttestationStatementType, "invalid public key"))
+			}
+			expectedKeyID, err := base64.RawURLEncoding.DecodeString(ch.Value)
+			if err != nil {
+				return storeError(ctx, db, ch, true, NewError(ErrorBadAttestationStatementType, "challenge value invalid"))
+			}
+			keyIdFromPublicKey := sha256.Sum256(publicKeyBytes)
+			if !bytes.Equal(keyIdFromPublicKey[:], expectedKeyID) {
+				return storeError(ctx, db, ch, true, NewError(ErrorBadAttestationStatementType, "certificate did not match key id"))
+			}
+
+			// Compute the SHA256 hash of your app’s App ID, and verify that
+			// it’s the same as the authenticator data’s RP ID hash.
+			// TODO(arianvp):
+
+			// Verify that the authenticator data’s counter field equals 0.
+			if authentiatorData.Count != 0 {
+				return storeError(ctx, db, ch, true, NewError(ErrorBadAttestationStatementType, "attestation replay detected"))
+			}
+
+			// Verify that the authenticator data’s aaguid field is either
+			// appattestdevelop if operating in the development environment, or
+			// appattest followed by seven 0x00 bytes if operating in the
+			// production environment.
+			// TODO(arianvp):
+
+			// Verify that the authenticator data’s credentialId field is the
+			// same as the key identifier.
+			if !bytes.Equal(authentiatorData.CredentialId[:], expectedKeyID) {
+				return storeError(ctx, db, ch, true, NewError(ErrorBadAttestationStatementType, "key id does not match"))
+
+			}
+			// Update and store the challenge.
+			ch.Status = StatusValid
+			ch.Error = nil
+			ch.ValidatedAt = clock.Now().Format(time.RFC3339)
+
+			if err := db.UpdateChallenge(ctx, ch); err != nil {
+				return WrapErrorISE(err, "error updating challenge")
+			}
+
+			// Verify the receipt
+			// Will return the https://developer.apple.com/documentation/uikit/uidevice/1620059-identifierforvendor
+			// Equal to identifierForVendor
+
+		}
 	case "apple":
 		data, err := doAppleAttestationFormat(ctx, ch, db, &att)
 		if err != nil {
@@ -412,9 +526,11 @@ func deviceAttest01Validate(ctx context.Context, ch *Challenge, db DB, jwk *jose
 	return nil
 }
 
-// Apple Enterprise Attestation Root CA from
+// Apple Attestation Root CA from
 // https://www.apple.com/certificateauthority/private/
-const appleEnterpriseAttestationRootCA = `-----BEGIN CERTIFICATE-----
+// Used both for Apple Enterprise Attestation and Apple AppAttest as per
+// https://developer.apple.com/documentation/devicecheck/validating_apps_that_connect_to_your_server
+const appleAttestationRootCA = `-----BEGIN CERTIFICATE-----
 MIICJDCCAamgAwIBAgIUQsDCuyxyfFxeq/bxpm8frF15hzcwCgYIKoZIzj0EAwMw
 UTEtMCsGA1UEAwwkQXBwbGUgRW50ZXJwcmlzZSBBdHRlc3RhdGlvbiBSb290IENB
 MRMwEQYDVQQKDApBcHBsZSBJbmMuMQswCQYDVQQGEwJVUzAeFw0yMjAyMTYxOTAx
@@ -430,6 +546,7 @@ ZwFEh9bhKjJ+5VQ9/Do1os0u3LEkgN/r
 -----END CERTIFICATE-----`
 
 var (
+	oidAppleAppAttestNonce                  = asn1.ObjectIdentifier{1, 2, 840, 113635, 100, 8, 2}
 	oidAppleSerialNumber                    = asn1.ObjectIdentifier{1, 2, 840, 113635, 100, 8, 9, 1}
 	oidAppleUniqueDeviceIdentifier          = asn1.ObjectIdentifier{1, 2, 840, 113635, 100, 8, 9, 2}
 	oidAppleSecureEnclaveProcessorOSVersion = asn1.ObjectIdentifier{1, 2, 840, 113635, 100, 8, 10, 2}
@@ -444,8 +561,8 @@ type appleAttestationData struct {
 	Certificate  *x509.Certificate
 }
 
-func doAppleAttestationFormat(ctx context.Context, ch *Challenge, db DB, att *AttestationObject) (*appleAttestationData, error) {
-	root, err := pemutil.ParseCertificate([]byte(appleEnterpriseAttestationRootCA))
+func doAppleCheckCert(att *AttestationObject) (*x509.Certificate, error) {
+	root, err := pemutil.ParseCertificate([]byte(appleAttestationRootCA))
 	if err != nil {
 		return nil, WrapErrorISE(err, "error parsing apple enterprise ca")
 	}
@@ -490,7 +607,41 @@ func doAppleAttestationFormat(ctx context.Context, ch *Challenge, db DB, att *At
 	}); err != nil {
 		return nil, WrapError(ErrorBadAttestationStatementType, err, "x5c is not valid")
 	}
+	return leaf, nil
+}
 
+type appleAppAttestAttestationData struct {
+	Certificate *x509.Certificate
+	Receipt     []byte
+	Nonce       []byte
+}
+
+func doAppleAppAttestAttestationFormat(ctx context.Context, ch *Challenge, db DB, att *AttestationObject, authData []byte) (*appleAppAttestAttestationData, error) {
+	leaf, err := doAppleCheckCert(att)
+	if err != nil {
+		return nil, err
+	}
+	data := &appleAppAttestAttestationData{
+		Certificate: leaf,
+	}
+	// Obtain the value of the credCert extension with OID
+	// 1.2.840.113635.100.8.2, which is a DER-encoded ASN.1 sequence. Decode the
+	// sequence and extract the single octet string that it contains. Verify
+	// that the string equals nonce.
+	for _, ext := range leaf.Extensions {
+		switch {
+		case ext.Id.Equal(oidAppleAppAttestNonce):
+			data.Nonce = ext.Value
+		}
+	}
+	return data, nil
+}
+
+func doAppleAttestationFormat(ctx context.Context, ch *Challenge, db DB, att *AttestationObject) (*appleAttestationData, error) {
+	leaf, err := doAppleCheckCert(att)
+	if err != nil {
+		return nil, err
+	}
 	data := &appleAttestationData{
 		Certificate: leaf,
 	}
