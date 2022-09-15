@@ -3,6 +3,7 @@ package provisioner
 import (
 	"context"
 	"crypto/x509"
+	"encoding/pem"
 	"fmt"
 	"net"
 	"strings"
@@ -98,6 +99,10 @@ type ACME struct {
 	Claims             *Claims                 `json:"claims,omitempty"`
 	Options            *Options                `json:"options,omitempty"`
 
+	// TODO(hs): WIP configuration for ACME Device Attestation
+	AttestationRoots    []byte `json:"attestationRoots"`
+	attestationRootPool *x509.CertPool
+
 	ctl *Controller
 }
 
@@ -155,6 +160,7 @@ func (p *ACME) Init(config Config) (err error) {
 		return errors.New("provisioner name cannot be empty")
 	}
 
+<<<<<<< HEAD
 	for _, c := range p.Challenges {
 		if err := c.Validate(); err != nil {
 			return err
@@ -166,6 +172,29 @@ func (p *ACME) Init(config Config) (err error) {
 		}
 	}
 
+=======
+	// TODO(hs): WIP configuration for ACME Device Attestation
+	p.attestationRootPool = x509.NewCertPool()
+
+	var (
+		block *pem.Block
+		rest  = p.AttestationRoots
+	)
+	for rest != nil {
+		block, rest = pem.Decode(rest)
+		if block == nil {
+			break
+		}
+		cert, err := x509.ParseCertificate(block.Bytes)
+		if err != nil {
+			return errors.Wrap(err, "error parsing x509 certificate from PEM block")
+		}
+		p.attestationRootPool.AddCert(cert)
+	}
+
+	// TODO(hs): need validation for number of certs? The current ones are only for the `tpm` type; not for Apple or Yubico.
+
+>>>>>>> acdfdf34 (Add `tpm` attestation with configurable roots)
 	p.ctl, err = NewController(p, p.Claims, config, p.Options)
 	return
 }
@@ -281,4 +310,10 @@ func (p *ACME) IsAttestationFormatEnabled(ctx context.Context, format ACMEAttest
 		}
 	}
 	return false
+}
+
+// TODO(hs): we may not want to expose the root pool like this;
+// call into an interface function instead to authorize?
+func (p *ACME) GetAttestationRoots() (*x509.CertPool, error) {
+	return p.attestationRootPool, nil
 }
