@@ -23,6 +23,8 @@ type Controller struct {
 	AuthorizeRenewFunc    AuthorizeRenewFunc
 	AuthorizeSSHRenewFunc AuthorizeSSHRenewFunc
 	policy                *policyEngine
+	webhookClient         *http.Client
+	webhooks              []*Webhook
 }
 
 // NewController initializes a new provisioner controller.
@@ -43,6 +45,8 @@ func NewController(p Interface, claims *Claims, config Config, options *Options)
 		AuthorizeRenewFunc:    config.AuthorizeRenewFunc,
 		AuthorizeSSHRenewFunc: config.AuthorizeSSHRenewFunc,
 		policy:                policy,
+		webhookClient:         config.WebhookClient,
+		webhooks:              options.GetWebhooks(),
 	}, nil
 }
 
@@ -70,6 +74,18 @@ func (c *Controller) AuthorizeSSHRenew(ctx context.Context, cert *ssh.Certificat
 		return c.AuthorizeSSHRenewFunc(ctx, c, cert)
 	}
 	return DefaultAuthorizeSSHRenew(ctx, c, cert)
+}
+
+func (c *Controller) newWebhookController(templateData WebhookSetter) *WebhookController {
+	client := c.webhookClient
+	if client == nil {
+		client = http.DefaultClient
+	}
+	return &WebhookController{
+		TemplateData: templateData,
+		client:       client,
+		webhooks:     c.webhooks,
+	}
 }
 
 // Identity is the type representing an externally supplied identity that is used

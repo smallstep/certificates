@@ -17,7 +17,62 @@ import (
 	"github.com/pkg/errors"
 	"github.com/smallstep/certificates/templates"
 	"github.com/smallstep/certificates/webhook"
+	"go.step.sm/linkedca"
 )
+
+var ErrWebhookDenied = errors.New("webhook server did not allow request")
+
+type WebhookSetter interface {
+	SetWebhook(string, any)
+}
+
+type WebhookController struct {
+	client       *http.Client
+	webhooks     []*Webhook
+	TemplateData WebhookSetter
+}
+
+// Enrich fetches data from remote servers and adds returned data to the
+// templateData
+func (wc *WebhookController) Enrich(req *webhook.RequestBody) error {
+	if wc == nil {
+		return nil
+	}
+	for _, wh := range wc.webhooks {
+		if wh.Kind != linkedca.Webhook_ENRICHING.String() {
+			continue
+		}
+		resp, err := wh.Do(wc.client, req, wc.TemplateData)
+		if err != nil {
+			return err
+		}
+		if !resp.Allow {
+			return ErrWebhookDenied
+		}
+		wc.TemplateData.SetWebhook(wh.Name, resp.Data)
+	}
+	return nil
+}
+
+// Authorize checks that all remote servers allow the request
+func (wc *WebhookController) Authorize(req *webhook.RequestBody) error {
+	if wc == nil {
+		return nil
+	}
+	for _, wh := range wc.webhooks {
+		if wh.Kind != linkedca.Webhook_AUTHORIZING.String() {
+			continue
+		}
+		resp, err := wh.Do(wc.client, req, wc.TemplateData)
+		if err != nil {
+			return err
+		}
+		if !resp.Allow {
+			return ErrWebhookDenied
+		}
+	}
+	return nil
+}
 
 type Webhook struct {
 	ID                   string `json:"id"`
@@ -33,7 +88,7 @@ type Webhook struct {
 	} `json:"-"`
 }
 
-func (w *Webhook) Do(ctx context.Context, client *http.Client, reqBody *webhook.RequestBody, data map[string]interface{}) (*webhook.ResponseBody, error) {
+func (w *Webhook) Do(client *http.Client, reqBody *webhook.RequestBody, data any) (*webhook.ResponseBody, error) {
 	tmpl, err := template.New("url").Funcs(templates.StepFuncMap()).Parse(w.URL)
 	if err != nil {
 		return nil, err
@@ -44,7 +99,7 @@ func (w *Webhook) Do(ctx context.Context, client *http.Client, reqBody *webhook.
 	}
 	url := buf.String()
 
-	ctx, cancel := context.WithTimeout(ctx, time.Second*10)
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second*10)
 	defer cancel()
 
 	retries := 1

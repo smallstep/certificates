@@ -288,8 +288,8 @@ func TestACME_AuthorizeSign(t *testing.T) {
 							assert.Equals(t, v.max, tc.p.ctl.Claimer.MaxTLSCertDuration())
 						case *x509NamePolicyValidator:
 							assert.Equals(t, nil, v.policyEngine)
-						case *webhooksAuthorizer:
-							assert.Equals(t, nil, v.webhooks)
+						case *WebhookController:
+							assert.Len(t, 0, v.webhooks)
 						default:
 							assert.FatalError(t, fmt.Errorf("unexpected sign option of type %T", v))
 						}

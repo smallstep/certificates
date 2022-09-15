@@ -1,13 +1,11 @@
 package provisioner
 
 import (
-	"context"
 	"crypto/ecdsa"
 	"crypto/ed25519"
 	"crypto/rsa"
 	"crypto/x509"
 	"encoding/json"
-	"fmt"
 	"net"
 	"net/http"
 	"net/url"
@@ -16,11 +14,9 @@ import (
 
 	"go.step.sm/crypto/keyutil"
 	"go.step.sm/crypto/x509util"
-	"go.step.sm/linkedca"
 
 	"github.com/smallstep/certificates/authority/policy"
 	"github.com/smallstep/certificates/errs"
-	"github.com/smallstep/certificates/webhook"
 )
 
 // DefaultCertValidity is the default validity for a certificate if none is specified.
@@ -29,11 +25,10 @@ const DefaultCertValidity = 24 * time.Hour
 // SignOptions contains the options that can be passed to the Sign method. Backdate
 // is automatically filled and can only be configured in the CA.
 type SignOptions struct {
-	NotAfter      TimeDuration    `json:"notAfter"`
-	NotBefore     TimeDuration    `json:"notBefore"`
-	TemplateData  json.RawMessage `json:"templateData"`
-	Backdate      time.Duration   `json:"-"`
-	WebhookClient *http.Client    `json:"-"`
+	NotAfter     TimeDuration    `json:"notAfter"`
+	NotBefore    TimeDuration    `json:"notBefore"`
+	TemplateData json.RawMessage `json:"templateData"`
+	Backdate     time.Duration   `json:"-"`
 	// PermanentIdentifier is an ID verified by acme device-attest-01 challenge
 	PermanentIdentifier string `json:"permanentIdentifier"`
 }
@@ -45,11 +40,6 @@ type SignOption interface{}
 // CertificateValidator is an interface used to validate a given X.509 certificate.
 type CertificateValidator interface {
 	Valid(cert *x509.Certificate, opts SignOptions) error
-}
-
-// CertificateAuthorizer is an interface used to authorize a given X.509 certificate.
-type CertificateAuthorizer interface {
-	Authorize(req *x509util.Certificate, leaf *x509.Certificate, opts SignOptions) error
 }
 
 // CertificateRequestValidator is an interface used to validate a given X.509 certificate request.
@@ -439,49 +429,6 @@ func (v *x509NamePolicyValidator) Valid(cert *x509.Certificate, _ SignOptions) e
 		return nil
 	}
 	return v.policyEngine.IsX509CertificateAllowed(cert)
-}
-
-// webhooksAuthorizer sends a certificate to a webhook for final authorization
-// before it is signed
-type webhooksAuthorizer struct {
-	webhooks []*Webhook
-	data     x509util.TemplateData
-}
-
-// newWebhooksAuthorizer finds all webhooks with kind AUTHORIZING and builds a
-// webhooksAuthorizer with them
-func newWebhooksAuthorizer(webhooks []*Webhook, data x509util.TemplateData) *webhooksAuthorizer {
-	wa := &webhooksAuthorizer{data: data}
-
-	for _, wh := range webhooks {
-		if wh.Kind == linkedca.Webhook_AUTHORIZING.String() {
-			wa.webhooks = append(wa.webhooks, wh)
-		}
-	}
-
-	return wa
-}
-
-// Authorize calls each webhook and returns an error if any fails to respond
-// with "{allow: true}"
-func (wa *webhooksAuthorizer) Authorize(cert *x509util.Certificate, leaf *x509.Certificate, signOpts SignOptions) error {
-	for _, wh := range wa.webhooks {
-		req, err := webhook.NewRequestBody(
-			webhook.WithX509Certificate(cert, leaf),
-			webhook.WithPermanentIdentifier(signOpts.PermanentIdentifier),
-		)
-		if err != nil {
-			return err
-		}
-		resp, err := wh.Do(context.Background(), signOpts.WebhookClient, req, wa.data)
-		if err != nil {
-			return err
-		}
-		if !resp.Allow {
-			return fmt.Errorf("authorization denied by webhook %s", wh.Name)
-		}
-	}
-	return nil
 }
 
 type forceCNOption struct {

@@ -194,6 +194,11 @@ func (o *Order) Finalize(ctx context.Context, db DB, csr *x509.CertificateReques
 	if err != nil {
 		return WrapErrorISE(err, "error retrieving authorization options from ACME provisioner")
 	}
+	for _, signOp := range signOps {
+		if wc, ok := signOp.(*provisioner.WebhookController); ok {
+			wc.TemplateData = data
+		}
+	}
 
 	templateOptions, err := provisioner.CustomTemplateOptions(p.GetOptions(), data, defaultTemplate)
 	if err != nil {
@@ -206,8 +211,9 @@ func (o *Order) Finalize(ctx context.Context, db DB, csr *x509.CertificateReques
 
 	// Sign a new certificate.
 	certChain, err := auth.Sign(csr, provisioner.SignOptions{
-		NotBefore: provisioner.NewTimeDuration(o.NotBefore),
-		NotAfter:  provisioner.NewTimeDuration(o.NotAfter),
+		NotBefore:           provisioner.NewTimeDuration(o.NotBefore),
+		NotAfter:            provisioner.NewTimeDuration(o.NotAfter),
+		PermanentIdentifier: permanentIdentifier,
 	}, signOps...)
 	if err != nil {
 		return WrapErrorISE(err, "error signing certificate for order %s", o.ID)

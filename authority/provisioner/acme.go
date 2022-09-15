@@ -252,7 +252,7 @@ func (p *ACME) AuthorizeSign(ctx context.Context, token string) ([]SignOption, e
 		defaultPublicKeyValidator{},
 		newValidityValidator(p.ctl.Claimer.MinTLSCertDuration(), p.ctl.Claimer.MaxTLSCertDuration()),
 		newX509NamePolicyValidator(p.ctl.getPolicy().getX509()),
-		newWebhooksAuthorizer(p.Options.GetWebhooks(), nil),
+		p.ctl.newWebhookController(nil),
 	}
 
 	return opts, nil

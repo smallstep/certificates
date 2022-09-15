@@ -28,6 +28,7 @@ import (
 	casapi "github.com/smallstep/certificates/cas/apiv1"
 	"github.com/smallstep/certificates/db"
 	"github.com/smallstep/certificates/errs"
+	"github.com/smallstep/certificates/webhook"
 )
 
 // GetTLSOptions returns the tls options configured.
@@ -74,11 +75,10 @@ func withDefaultASN1DN(def *config.ASN1DN) provisioner.CertificateModifierFunc {
 // Sign creates a signed certificate from a certificate signing request.
 func (a *Authority) Sign(csr *x509.CertificateRequest, signOpts provisioner.SignOptions, extraOpts ...provisioner.SignOption) ([]*x509.Certificate, error) {
 	var (
-		certOptions     []x509util.Option
-		certValidators  []provisioner.CertificateValidator
-		certModifiers   []provisioner.CertificateModifier
-		certEnforcers   []provisioner.CertificateEnforcer
-		certAuthorizers []provisioner.CertificateAuthorizer
+		certOptions    []x509util.Option
+		certValidators []provisioner.CertificateValidator
+		certModifiers  []provisioner.CertificateModifier
+		certEnforcers  []provisioner.CertificateEnforcer
 	)
 
 	opts := []interface{}{errs.WithKeyVal("csr", csr), errs.WithKeyVal("signOptions", signOpts)}
@@ -92,11 +92,10 @@ func (a *Authority) Sign(csr *x509.CertificateRequest, signOpts provisioner.Sign
 	// Set backdate with the configured value
 	signOpts.Backdate = a.config.AuthorityConfig.Backdate.Duration
 
-	signOpts.WebhookClient = a.webhookClient
-
 	var prov provisioner.Interface
 	var pInfo *casapi.ProvisionerInfo
 	var attData provisioner.AttestationData
+	var webhookCtl webhookController
 	for _, op := range extraOpts {
 		switch k := op.(type) {
 		// Capture current provisioner
@@ -138,12 +137,28 @@ func (a *Authority) Sign(csr *x509.CertificateRequest, signOpts provisioner.Sign
 			// TODO(mariano,areed): remove me once attData is used.
 			_ = attData
 
-		// Authorizes the final form of a certificate
-		case provisioner.CertificateAuthorizer:
-			certAuthorizers = append(certAuthorizers, k)
+			// Capture the provisioner's webhook controller
+		case webhookController:
+			webhookCtl = k
 
 		default:
 			return nil, errs.InternalServer("authority.Sign; invalid extra option type %T", append([]interface{}{k}, opts...)...)
+		}
+	}
+
+	// Call enriching webhooks
+	if webhookCtl != nil {
+		whEnrichReq, err := webhook.NewRequestBody(
+			webhook.WithX509CertificateRequest(csr),
+			webhook.WithPermanentIdentifier(signOpts.PermanentIdentifier),
+		)
+		err = webhookCtl.Enrich(whEnrichReq)
+		if err != nil {
+			return nil, errs.ApplyOptions(
+				errs.ForbiddenErr(err, err.Error()),
+				errs.WithKeyVal("csr", csr),
+				errs.WithKeyVal("signOptions", signOpts),
+			)
 		}
 	}
 
@@ -231,9 +246,19 @@ func (a *Authority) Sign(csr *x509.CertificateRequest, signOpts provisioner.Sign
 		)
 	}
 
-	// Certificate authorizers
-	for _, a := range certAuthorizers {
-		if err := a.Authorize(cert, leaf, signOpts); err != nil {
+	// Send certificate to webhooks for authorization
+	if webhookCtl != nil {
+		whAuthBody, err := webhook.NewRequestBody(
+			webhook.WithX509Certificate(cert, leaf),
+		)
+		if err != nil {
+			return nil, errs.ApplyOptions(
+				errs.ForbiddenErr(err, "error creating certificate"),
+				opts...,
+			)
+		}
+		err = webhookCtl.Authorize(whAuthBody)
+		if err != nil {
 			return nil, errs.ApplyOptions(
 				errs.ForbiddenErr(err, "error creating certificate"),
 				opts...,

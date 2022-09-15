@@ -1,20 +1,15 @@
 package provisioner
 
 import (
-	"context"
-	"crypto/x509"
 	"encoding/json"
-	"fmt"
 	"strings"
 
 	"github.com/pkg/errors"
 
 	"go.step.sm/crypto/jose"
 	"go.step.sm/crypto/x509util"
-	"go.step.sm/linkedca"
 
 	"github.com/smallstep/certificates/authority/policy"
-	"github.com/smallstep/certificates/webhook"
 )
 
 // CertificateOptions is an interface that returns a list of options passed when
@@ -145,35 +140,10 @@ func CustomTemplateOptions(o *Options, data x509util.TemplateData, defaultTempla
 	}
 
 	return certificateOptionsFunc(func(so SignOptions) []x509util.Option {
-		var enrich = func(fn func(string, x509util.TemplateData) x509util.Option, arg1 string) x509util.Option {
-			return func(cr *x509.CertificateRequest, xOpts *x509util.Options) error {
-				if opts != nil {
-					for _, wh := range o.Webhooks {
-						if wh.Kind != linkedca.Webhook_ENRICHING.String() {
-							continue
-						}
-						req, err := webhook.NewRequestBody(webhook.WithX509CertificateRequest(cr))
-						if err != nil {
-							return err
-						}
-						resp, err := wh.Do(context.Background(), so.WebhookClient, req, data)
-						if err != nil {
-							return err
-						}
-						if !resp.Allow {
-							return fmt.Errorf("not allowed by webhook %s", wh.Name)
-						}
-						data.SetWebhook(wh.Name, resp.Data)
-					}
-				}
-				return fn(arg1, data)(cr, xOpts)
-			}
-		}
-
 		// We're not provided user data without custom templates.
 		if !opts.HasTemplate() {
 			return []x509util.Option{
-				enrich(x509util.WithTemplate, defaultTemplate),
+				x509util.WithTemplate(defaultTemplate, data),
 			}
 		}
 
@@ -190,7 +160,7 @@ func CustomTemplateOptions(o *Options, data x509util.TemplateData, defaultTempla
 		// Load a template from a file if Template is not defined.
 		if opts.Template == "" && opts.TemplateFile != "" {
 			return []x509util.Option{
-				enrich(x509util.WithTemplateFile, opts.TemplateFile),
+				x509util.WithTemplateFile(opts.TemplateFile, data),
 			}
 		}
 
@@ -199,12 +169,12 @@ func CustomTemplateOptions(o *Options, data x509util.TemplateData, defaultTempla
 		template := strings.TrimSpace(opts.Template)
 		if strings.HasPrefix(template, "{") {
 			return []x509util.Option{
-				enrich(x509util.WithTemplate, template),
+				x509util.WithTemplate(template, data),
 			}
 		}
 		// 2. As a base64 encoded JSON.
 		return []x509util.Option{
-			enrich(x509util.WithTemplateBase64, template),
+			x509util.WithTemplateBase64(template, data),
 		}
 	}), nil
 }

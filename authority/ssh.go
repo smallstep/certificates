@@ -20,6 +20,7 @@ import (
 	"github.com/smallstep/certificates/db"
 	"github.com/smallstep/certificates/errs"
 	"github.com/smallstep/certificates/templates"
+	"github.com/smallstep/certificates/webhook"
 )
 
 const (
@@ -150,7 +151,6 @@ func (a *Authority) SignSSH(ctx context.Context, key ssh.PublicKey, opts provisi
 		certOptions []sshutil.Option
 		mods        []provisioner.SSHCertModifier
 		validators  []provisioner.SSHCertValidator
-		authorizers []provisioner.SSHCertAuthorizer
 	)
 
 	// Validate given options.
@@ -161,9 +161,8 @@ func (a *Authority) SignSSH(ctx context.Context, key ssh.PublicKey, opts provisi
 	// Set backdate with the configured value
 	opts.Backdate = a.config.AuthorityConfig.Backdate.Duration
 
-	opts.WebhookClient = a.webhookClient
-
 	var prov provisioner.Interface
+	var webhookCtl webhookController
 	for _, op := range signOpts {
 		switch o := op.(type) {
 		// Capture current provisioner
@@ -188,9 +187,9 @@ func (a *Authority) SignSSH(ctx context.Context, key ssh.PublicKey, opts provisi
 				return nil, errs.BadRequestErr(err, "error validating ssh certificate options")
 			}
 
-		// authorize the final ssh.Certificate
-		case provisioner.SSHCertAuthorizer:
-			authorizers = append(authorizers, o)
+		// call webhooks
+		case webhookController:
+			webhookCtl = o
 
 		default:
 			return nil, errs.InternalServer("authority.SignSSH: invalid extra option type %T", o)
@@ -203,6 +202,20 @@ func (a *Authority) SignSSH(ctx context.Context, key ssh.PublicKey, opts provisi
 		KeyID:      opts.KeyID,
 		Principals: opts.Principals,
 		Key:        key,
+	}
+
+	// Call enriching webhooks
+	if webhookCtl != nil {
+		whEnrichReq, err := webhook.NewRequestBody(
+			webhook.WithSSHCertificateRequest(cr),
+		)
+		err = webhookCtl.Enrich(whEnrichReq)
+		if err != nil {
+			return nil, errs.ApplyOptions(
+				errs.ForbiddenErr(err, err.Error()),
+				errs.WithKeyVal("signOptions", signOpts),
+			)
+		}
 	}
 
 	// Create certificate from template.
@@ -269,10 +282,21 @@ func (a *Authority) SignSSH(ctx context.Context, key ssh.PublicKey, opts provisi
 		)
 	}
 
-	// Certificate final authorizers
-	for _, a := range authorizers {
-		if err := a.Authorize(certificate, certTpl, opts); err != nil {
-			return nil, errs.ForbiddenErr(err, "request not allowed by webhook server")
+	// Send certificate to webhooks for authorization
+	if webhookCtl != nil {
+		whAuthBody, err := webhook.NewRequestBody(
+			webhook.WithSSHCertificate(certificate, certTpl),
+		)
+		if err != nil {
+			return nil, errs.ApplyOptions(
+				errs.ForbiddenErr(err, "authority.SignSSH: error signing certificate"),
+			)
+		}
+		err = webhookCtl.Authorize(whAuthBody)
+		if err != nil {
+			return nil, errs.ApplyOptions(
+				errs.ForbiddenErr(err, "authority.SignSSH: error signing certificate"),
+			)
 		}
 	}
 

@@ -1,17 +1,13 @@
 package provisioner
 
 import (
-	"context"
 	"encoding/json"
-	"fmt"
 	"strings"
 
 	"github.com/pkg/errors"
 	"go.step.sm/crypto/sshutil"
-	"go.step.sm/linkedca"
 
 	"github.com/smallstep/certificates/authority/policy"
-	"github.com/smallstep/certificates/webhook"
 )
 
 // SSHCertificateOptions is an interface that returns a list of options passed when
@@ -128,35 +124,10 @@ func CustomSSHTemplateOptions(o *Options, data sshutil.TemplateData, defaultTemp
 	}
 
 	return sshCertificateOptionsFunc(func(so SignSSHOptions) []sshutil.Option {
-		var enrich = func(fn func(string, sshutil.TemplateData) sshutil.Option, arg1 string) sshutil.Option {
-			return func(cr sshutil.CertificateRequest, sshOpts *sshutil.Options) error {
-				if opts != nil {
-					for _, wh := range o.Webhooks {
-						if wh.Kind != linkedca.Webhook_ENRICHING.String() {
-							continue
-						}
-						req, err := webhook.NewRequestBody(webhook.WithSSHCertificateRequest(cr))
-						if err != nil {
-							return err
-						}
-						resp, err := wh.Do(context.Background(), so.WebhookClient, req, data)
-						if err != nil {
-							return err
-						}
-						if !resp.Allow {
-							return fmt.Errorf("not allowed by webhook %s", wh.Name)
-						}
-						data.SetWebhook(wh.Name, resp.Data)
-					}
-				}
-				return fn(arg1, data)(cr, sshOpts)
-			}
-		}
-
 		// We're not provided user data without custom templates.
 		if !opts.HasTemplate() {
 			return []sshutil.Option{
-				enrich(sshutil.WithTemplate, defaultTemplate),
+				sshutil.WithTemplate(defaultTemplate, data),
 			}
 		}
 
@@ -173,7 +144,7 @@ func CustomSSHTemplateOptions(o *Options, data sshutil.TemplateData, defaultTemp
 		// Load a template from a file if Template is not defined.
 		if opts.Template == "" && opts.TemplateFile != "" {
 			return []sshutil.Option{
-				enrich(sshutil.WithTemplateFile, opts.TemplateFile),
+				sshutil.WithTemplateFile(opts.TemplateFile, data),
 			}
 		}
 
@@ -182,12 +153,12 @@ func CustomSSHTemplateOptions(o *Options, data sshutil.TemplateData, defaultTemp
 		template := strings.TrimSpace(opts.Template)
 		if strings.HasPrefix(template, "{") {
 			return []sshutil.Option{
-				enrich(sshutil.WithTemplate, template),
+				sshutil.WithTemplate(template, data),
 			}
 		}
 		// 2. As a base64 encoded JSON.
 		return []sshutil.Option{
-			enrich(sshutil.WithTemplateBase64, template),
+			sshutil.WithTemplateBase64(template, data),
 		}
 	}), nil
 }

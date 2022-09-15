@@ -128,7 +128,7 @@ func (s *SCEP) AuthorizeSign(ctx context.Context, token string) ([]SignOption, e
 		newPublicKeyMinimumLengthValidator(s.MinimumPublicKeyLength),
 		newValidityValidator(s.ctl.Claimer.MinTLSCertDuration(), s.ctl.Claimer.MaxTLSCertDuration()),
 		newX509NamePolicyValidator(s.ctl.getPolicy().getX509()),
-		newWebhooksAuthorizer(s.Options.GetWebhooks(), nil),
+		s.ctl.newWebhookController(nil),
 	}, nil
 }
 

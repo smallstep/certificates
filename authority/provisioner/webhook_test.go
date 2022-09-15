@@ -1,7 +1,6 @@
 package provisioner
 
 import (
-	"context"
 	"crypto/hmac"
 	"crypto/sha256"
 	"crypto/tls"
@@ -17,13 +16,156 @@ import (
 	"github.com/pkg/errors"
 	"github.com/smallstep/assert"
 	"github.com/smallstep/certificates/webhook"
+	"go.step.sm/crypto/x509util"
 )
+
+func TestWebhookController_Enrich(t *testing.T) {
+	type test struct {
+		ctl                *WebhookController
+		req                *webhook.RequestBody
+		responses          []*webhook.ResponseBody
+		expectErr          bool
+		expectTemplateData any
+	}
+	tests := map[string]test{
+		"ok/no enriching webhooks": {
+			ctl: &WebhookController{
+				client:       http.DefaultClient,
+				webhooks:     []*Webhook{{Name: "people", Kind: "AUTHORIZING"}},
+				TemplateData: nil,
+			},
+			req:                &webhook.RequestBody{},
+			responses:          nil,
+			expectErr:          false,
+			expectTemplateData: nil,
+		},
+		"ok/one webhook": {
+			ctl: &WebhookController{
+				client:       http.DefaultClient,
+				webhooks:     []*Webhook{{Name: "people", Kind: "ENRICHING"}},
+				TemplateData: x509util.TemplateData{},
+			},
+			req:                &webhook.RequestBody{},
+			responses:          []*webhook.ResponseBody{{Allow: true, Data: map[string]any{"role": "bar"}}},
+			expectErr:          false,
+			expectTemplateData: x509util.TemplateData{"Webhooks": map[string]any{"people": map[string]any{"role": "bar"}}},
+		},
+		"ok/two webhooks": {
+			ctl: &WebhookController{
+				client: http.DefaultClient,
+				webhooks: []*Webhook{
+					{Name: "people", Kind: "ENRICHING"},
+					{Name: "devices", Kind: "ENRICHING"},
+				},
+				TemplateData: x509util.TemplateData{},
+			},
+			req: &webhook.RequestBody{},
+			responses: []*webhook.ResponseBody{
+				{Allow: true, Data: map[string]any{"role": "bar"}},
+				{Allow: true, Data: map[string]any{"serial": "123"}},
+			},
+			expectErr: false,
+			expectTemplateData: x509util.TemplateData{
+				"Webhooks": map[string]any{
+					"devices": map[string]any{"serial": "123"},
+					"people":  map[string]any{"role": "bar"},
+				},
+			},
+		},
+		"deny": {
+			ctl: &WebhookController{
+				client:       http.DefaultClient,
+				webhooks:     []*Webhook{{Name: "people", Kind: "ENRICHING"}},
+				TemplateData: x509util.TemplateData{},
+			},
+			req:                &webhook.RequestBody{},
+			responses:          []*webhook.ResponseBody{{Allow: false}},
+			expectErr:          true,
+			expectTemplateData: x509util.TemplateData{},
+		},
+	}
+	for name, test := range tests {
+		t.Run(name, func(t *testing.T) {
+			for i, wh := range test.ctl.webhooks {
+				var j = i
+				ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+					err := json.NewEncoder(w).Encode(test.responses[j])
+					assert.FatalError(t, err)
+				}))
+				defer ts.Close()
+				wh.URL = ts.URL
+			}
+
+			err := test.ctl.Enrich(test.req)
+			if (err != nil) != test.expectErr {
+				t.Fatalf("Got err %v, want %v", err, test.expectErr)
+			}
+			assert.Equals(t, test.expectTemplateData, test.ctl.TemplateData)
+		})
+	}
+}
+
+func TestWebhookController_Authorize(t *testing.T) {
+	type test struct {
+		ctl       *WebhookController
+		req       *webhook.RequestBody
+		responses []*webhook.ResponseBody
+		expectErr bool
+	}
+	tests := map[string]test{
+		"ok/no enriching webhooks": {
+			ctl: &WebhookController{
+				client:   http.DefaultClient,
+				webhooks: []*Webhook{{Name: "people", Kind: "ENRICHING"}},
+			},
+			req:       &webhook.RequestBody{},
+			responses: nil,
+			expectErr: false,
+		},
+		"ok": {
+			ctl: &WebhookController{
+				client:   http.DefaultClient,
+				webhooks: []*Webhook{{Name: "people", Kind: "AUTHORIZING"}},
+			},
+			req:       &webhook.RequestBody{},
+			responses: []*webhook.ResponseBody{{Allow: true}},
+			expectErr: false,
+		},
+		"deny": {
+			ctl: &WebhookController{
+				client:   http.DefaultClient,
+				webhooks: []*Webhook{{Name: "people", Kind: "AUTHORIZING"}},
+			},
+			req:       &webhook.RequestBody{},
+			responses: []*webhook.ResponseBody{{Allow: false}},
+			expectErr: true,
+		},
+	}
+	for name, test := range tests {
+		t.Run(name, func(t *testing.T) {
+			for i, wh := range test.ctl.webhooks {
+				var j = i
+				ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+					err := json.NewEncoder(w).Encode(test.responses[j])
+					assert.FatalError(t, err)
+				}))
+				defer ts.Close()
+				wh.URL = ts.URL
+			}
+
+			err := test.ctl.Authorize(test.req)
+			if (err != nil) != test.expectErr {
+				t.Fatalf("Got err %v, want %v", err, test.expectErr)
+			}
+		})
+	}
+}
 
 func TestWebhook_Do(t *testing.T) {
 	csr := parseCertificateRequest(t, "testdata/certs/ecdsa.csr")
 	type test struct {
 		webhook         Webhook
-		dataArg         map[string]interface{}
+		dataArg         any
 		webhookResponse webhook.ResponseBody
 		expectPath      string
 		errStatusCode   int
@@ -150,7 +292,7 @@ func TestWebhook_Do(t *testing.T) {
 
 			reqBody, err := webhook.NewRequestBody(webhook.WithX509CertificateRequest(csr))
 			assert.FatalError(t, err)
-			got, err := tc.webhook.Do(context.Background(), http.DefaultClient, reqBody, tc.dataArg)
+			got, err := tc.webhook.Do(http.DefaultClient, reqBody, tc.dataArg)
 			if tc.expectErr != nil {
 				assert.Equals(t, tc.expectErr.Error(), err.Error())
 				return
@@ -181,11 +323,11 @@ func TestWebhook_Do(t *testing.T) {
 		}
 		reqBody, err := webhook.NewRequestBody(webhook.WithX509CertificateRequest(csr))
 		assert.FatalError(t, err)
-		_, err = wh.Do(context.Background(), client, reqBody, nil)
+		_, err = wh.Do(client, reqBody, nil)
 		assert.FatalError(t, err)
 
 		wh.DisableTLSClientAuth = true
-		_, err = wh.Do(context.Background(), client, reqBody, nil)
+		_, err = wh.Do(client, reqBody, nil)
 		assert.Error(t, err)
 	})
 }

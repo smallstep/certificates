@@ -144,6 +144,7 @@ func (a *Authority) generateProvisionerConfig(ctx context.Context) (provisioner.
 		GetIdentityFunc:       a.getIdentityFunc,
 		AuthorizeRenewFunc:    a.authorizeRenewFunc,
 		AuthorizeSSHRenewFunc: a.authorizeSSHRenewFunc,
+		WebhookClient:         a.webhookClient,
 	}, nil
 }
 

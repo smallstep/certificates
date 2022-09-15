@@ -319,8 +319,7 @@ func TestJWK_AuthorizeSign(t *testing.T) {
 							assert.Equals(t, []string(v), tt.sans)
 						case *x509NamePolicyValidator:
 							assert.Equals(t, nil, v.policyEngine)
-						case *webhooksAuthorizer:
-							assert.Equals(t, nil, v.webhooks)
+						case *WebhookController:
 						default:
 							assert.FatalError(t, fmt.Errorf("unexpected sign option of type %T", v))
 						}

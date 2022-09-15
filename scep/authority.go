@@ -281,6 +281,11 @@ func (a *Authority) SignCSR(ctx context.Context, csr *x509.CertificateRequest, m
 	if err != nil {
 		return nil, fmt.Errorf("error retrieving authorization options from SCEP provisioner: %w", err)
 	}
+	for _, signOp := range signOps {
+		if wc, ok := signOp.(*provisioner.WebhookController); ok {
+			wc.TemplateData = data
+		}
+	}
 
 	opts := provisioner.SignOptions{}
 	templateOptions, err := provisioner.TemplateOptions(p.GetOptions(), data)

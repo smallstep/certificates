@@ -573,8 +573,8 @@ func TestGCP_AuthorizeSign(t *testing.T) {
 						assert.Equals(t, []string(v), []string{"instance-name.c.project-id.internal", "instance-name.zone.c.project-id.internal"})
 					case *x509NamePolicyValidator:
 						assert.Equals(t, nil, v.policyEngine)
-					case *webhooksAuthorizer:
-						assert.Equals(t, nil, v.webhooks)
+					case *WebhookController:
+						assert.Len(t, 0, v.webhooks)
 					default:
 						assert.FatalError(t, fmt.Errorf("unexpected sign option of type %T", v))
 					}

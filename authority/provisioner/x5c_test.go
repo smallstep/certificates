@@ -493,8 +493,8 @@ func TestX5C_AuthorizeSign(t *testing.T) {
 								assert.Equals(t, v.max, tc.p.ctl.Claimer.MaxTLSCertDuration())
 							case *x509NamePolicyValidator:
 								assert.Equals(t, nil, v.policyEngine)
-							case *webhooksAuthorizer:
-								assert.Equals(t, nil, v.webhooks)
+							case *WebhookController:
+								assert.Len(t, 0, v.webhooks)
 							default:
 								assert.FatalError(t, fmt.Errorf("unexpected sign option of type %T", v))
 							}
@@ -796,8 +796,8 @@ func TestX5C_AuthorizeSSHSign(t *testing.T) {
 								assert.Equals(t, nil, v.userPolicyEngine)
 								assert.Equals(t, nil, v.hostPolicyEngine)
 							case *sshDefaultPublicKeyValidator, *sshCertDefaultValidator, sshCertificateOptionsFunc:
-							case *webhooksAuthorizerSSH:
-								assert.Equals(t, nil, v.webhooks)
+							case *WebhookController:
+								assert.Len(t, 0, v.webhooks)
 							default:
 								assert.FatalError(t, fmt.Errorf("unexpected sign option of type %T", v))
 							}
