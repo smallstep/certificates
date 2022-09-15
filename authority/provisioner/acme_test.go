@@ -1,11 +1,13 @@
 package provisioner
 
 import (
+	"bytes"
 	"context"
 	"crypto/x509"
 	"errors"
 	"fmt"
 	"net/http"
+	"os"
 	"testing"
 	"time"
 
@@ -77,6 +79,15 @@ func TestACME_Getters(t *testing.T) {
 }
 
 func TestACME_Init(t *testing.T) {
+	appleCA, err := os.ReadFile("testdata/certs/apple-att-ca.crt")
+	if err != nil {
+		t.Fatal(err)
+	}
+	yubicoCA, err := os.ReadFile("testdata/certs/yubico-piv-ca.crt")
+	if err != nil {
+		t.Fatal(err)
+	}
+
 	type ProvisionerValidateTest struct {
 		p   *ACME
 		err error
@@ -120,6 +131,18 @@ func TestACME_Init(t *testing.T) {
 				err: errors.New("acme attestation format \"zar\" is not supported"),
 			}
 		},
+		"fail-parse-attestation-roots": func(t *testing.T) ProvisionerValidateTest {
+			return ProvisionerValidateTest{
+				p:   &ACME{Name: "foo", Type: "bar", AttestationRoots: []byte("-----BEGIN CERTIFICATE-----\nZm9v\n-----END CERTIFICATE-----")},
+				err: errors.New("error parsing attestationRoots: malformed certificate"),
+			}
+		},
+		"fail-empty-attestation-roots": func(t *testing.T) ProvisionerValidateTest {
+			return ProvisionerValidateTest{
+				p:   &ACME{Name: "foo", Type: "bar", AttestationRoots: []byte("\n")},
+				err: errors.New("error parsing attestationRoots: no certificates found"),
+			}
+		},
 		"ok": func(t *testing.T) ProvisionerValidateTest {
 			return ProvisionerValidateTest{
 				p: &ACME{Name: "foo", Type: "bar"},
@@ -132,6 +155,7 @@ func TestACME_Init(t *testing.T) {
 					Type:               "bar",
 					Challenges:         []ACMEChallenge{DNS_01, DEVICE_ATTEST_01},
 					AttestationFormats: []ACMEAttestationFormat{APPLE, STEP},
+					AttestationRoots:   bytes.Join([][]byte{appleCA, yubicoCA}, []byte("\n")),
 				},
 			}
 		},
@@ -144,6 +168,7 @@ func TestACME_Init(t *testing.T) {
 	for name, get := range tests {
 		t.Run(name, func(t *testing.T) {
 			tc := get(t)
+			t.Log(string(tc.p.AttestationRoots))
 			err := tc.p.Init(config)
 			if err != nil {
 				if assert.NotNil(t, tc.err) {
@@ -342,6 +367,61 @@ func TestACME_IsAttestationFormatEnabled(t *testing.T) {
 			}
 			if got := p.IsAttestationFormatEnabled(tt.args.ctx, tt.args.format); got != tt.want {
 				t.Errorf("ACME.IsAttestationFormatEnabled() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
+func TestACME_GetAttestationRoots(t *testing.T) {
+	appleCA, err := os.ReadFile("testdata/certs/apple-att-ca.crt")
+	if err != nil {
+		t.Fatal(err)
+	}
+	yubicoCA, err := os.ReadFile("testdata/certs/yubico-piv-ca.crt")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	pool := x509.NewCertPool()
+	pool.AppendCertsFromPEM(appleCA)
+	pool.AppendCertsFromPEM(yubicoCA)
+
+	type fields struct {
+		Type             string
+		Name             string
+		AttestationRoots []byte
+	}
+	tests := []struct {
+		name   string
+		fields fields
+		want   *x509.CertPool
+		want1  bool
+	}{
+		{"ok", fields{"ACME", "acme", bytes.Join([][]byte{appleCA, yubicoCA}, []byte("\n"))}, pool, true},
+		{"nil", fields{"ACME", "acme", nil}, nil, false},
+		{"empty", fields{"ACME", "acme", []byte{}}, nil, false},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			p := &ACME{
+				Type:             tt.fields.Type,
+				Name:             tt.fields.Name,
+				AttestationRoots: tt.fields.AttestationRoots,
+			}
+			if err := p.Init(Config{
+				Claims:    globalProvisionerClaims,
+				Audiences: testAudiences,
+			}); err != nil {
+				t.Fatal(err)
+			}
+			got, got1 := p.GetAttestationRoots()
+			if tt.want == nil && got != nil {
+				t.Errorf("ACME.GetAttestationRoots() got = %v, want %v", got, tt.want)
+			} else if !tt.want.Equal(got) {
+				t.Errorf("ACME.GetAttestationRoots() got = %v, want %v", got, tt.want)
+			}
+			if got1 != tt.want1 {
+				t.Errorf("ACME.GetAttestationRoots() got1 = %v, want %v", got1, tt.want1)
 			}
 		})
 	}

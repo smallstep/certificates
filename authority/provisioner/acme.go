@@ -96,14 +96,14 @@ type ACME struct {
 	// provisioner. If this value is not set the default apple, step and tpm
 	// will be used.
 	AttestationFormats []ACMEAttestationFormat `json:"attestationFormats,omitempty"`
-	Claims             *Claims                 `json:"claims,omitempty"`
-	Options            *Options                `json:"options,omitempty"`
-
-	// TODO(hs): WIP configuration for ACME Device Attestation
-	AttestationRoots    []byte `json:"attestationRoots"`
+	// AttestationRoots contains a bundle of root certificates in PEM format
+	// that will be used to verify the attestation certificates. If provided,
+	// this bundle will be used even for well-known CAs like Apple and Yubico.
+	AttestationRoots    []byte   `json:"attestationRoots,omitempty"`
+	Claims              *Claims  `json:"claims,omitempty"`
+	Options             *Options `json:"options,omitempty"`
 	attestationRootPool *x509.CertPool
-
-	ctl *Controller
+	ctl                 *Controller
 }
 
 // GetID returns the provisioner unique identifier.
@@ -160,7 +160,6 @@ func (p *ACME) Init(config Config) (err error) {
 		return errors.New("provisioner name cannot be empty")
 	}
 
-<<<<<<< HEAD
 	for _, c := range p.Challenges {
 		if err := c.Validate(); err != nil {
 			return err
@@ -172,29 +171,29 @@ func (p *ACME) Init(config Config) (err error) {
 		}
 	}
 
-=======
-	// TODO(hs): WIP configuration for ACME Device Attestation
-	p.attestationRootPool = x509.NewCertPool()
-
-	var (
-		block *pem.Block
-		rest  = p.AttestationRoots
-	)
-	for rest != nil {
-		block, rest = pem.Decode(rest)
-		if block == nil {
-			break
+	// Parse attestation roots.
+	// The pool will be nil if the there are not roots.
+	if rest := p.AttestationRoots; len(rest) > 0 {
+		var block *pem.Block
+		var hasCert bool
+		p.attestationRootPool = x509.NewCertPool()
+		for rest != nil {
+			block, rest = pem.Decode(rest)
+			if block == nil {
+				break
+			}
+			cert, err := x509.ParseCertificate(block.Bytes)
+			if err != nil {
+				return errors.New("error parsing attestationRoots: malformed certificate")
+			}
+			p.attestationRootPool.AddCert(cert)
+			hasCert = true
 		}
-		cert, err := x509.ParseCertificate(block.Bytes)
-		if err != nil {
-			return errors.Wrap(err, "error parsing x509 certificate from PEM block")
+		if !hasCert {
+			return errors.New("error parsing attestationRoots: no certificates found")
 		}
-		p.attestationRootPool.AddCert(cert)
 	}
 
-	// TODO(hs): need validation for number of certs? The current ones are only for the `tpm` type; not for Apple or Yubico.
-
->>>>>>> acdfdf34 (Add `tpm` attestation with configurable roots)
 	p.ctl, err = NewController(p, p.Claims, config, p.Options)
 	return
 }
@@ -312,8 +311,11 @@ func (p *ACME) IsAttestationFormatEnabled(ctx context.Context, format ACMEAttest
 	return false
 }
 
-// TODO(hs): we may not want to expose the root pool like this;
-// call into an interface function instead to authorize?
-func (p *ACME) GetAttestationRoots() (*x509.CertPool, error) {
-	return p.attestationRootPool, nil
+// GetAttestationRoots returns certificate pool with the configured attestation
+// roots and reports if the pool contains at least one certificate.
+//
+// TODO(hs): we may not want to expose the root pool like this; call into an
+// interface function instead to authorize?
+func (p *ACME) GetAttestationRoots() (*x509.CertPool, bool) {
+	return p.attestationRootPool, p.attestationRootPool != nil
 }
