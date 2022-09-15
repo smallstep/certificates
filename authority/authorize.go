@@ -435,7 +435,7 @@ func (a *Authority) AuthorizeRenewToken(ctx context.Context, ott string) (*x509.
 
 	audiences := a.config.GetAudiences().Renew
 	if !matchesAudience(claims.Audience, audiences) {
-		return nil, errs.InternalServerErr(err, errs.WithMessage("error validating renew token: invalid audience claim (aud)"))
+		return nil, errs.InternalServerErr(jose.ErrInvalidAudience, errs.WithMessage("error validating renew token: invalid audience claim (aud)"))
 	}
 
 	// validate issuer: old versions used the provisioner name, new version uses
