@@ -104,7 +104,6 @@ type AuthConfig struct {
 	Backdate             *provisioner.Duration `json:"backdate,omitempty"`
 	EnableAdmin          bool                  `json:"enableAdmin,omitempty"`
 	DisableGetSSHHosts   bool                  `json:"disableGetSSHHosts,omitempty"`
-	WebhookClient        *WebhookClient        `json:"webhookClient,omitempty"`
 }
 
 // init initializes the required fields in the AuthConfig if they are not
@@ -131,10 +130,6 @@ func (c *AuthConfig) Validate(audiences provisioner.Audiences) error {
 
 	// Initialize required fields.
 	c.init()
-
-	if err := c.WebhookClient.init(); err != nil {
-		return err
-	}
 
 	// Check that only one K8sSA is enabled
 	var k8sCount int
@@ -319,15 +314,6 @@ func (c *Config) GetAudiences() provisioner.Audiences {
 	}
 
 	return audiences
-}
-
-// GetWebhookClientConfig returns the webhook client config from the authority
-// config if set.
-func (c *Config) GetWebhookClientConfig() *WebhookClient {
-	if c.AuthorityConfig == nil {
-		return nil
-	}
-	return c.AuthorityConfig.WebhookClient
 }
 
 // Audience returns the list of audiences for a given path.

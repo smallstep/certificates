@@ -156,7 +156,7 @@ func (ca *CA) Init(cfg *config.Config) (*CA, error) {
 		opts = append(opts, authority.WithDatabase(ca.opts.database))
 	}
 
-	webhookTransport := getWebhookTransport(cfg.GetWebhookClientConfig())
+	webhookTransport := http.DefaultTransport.(*http.Transport).Clone()
 	opts = append(opts, authority.WithWebhookClient(&http.Client{Transport: webhookTransport}))
 
 	auth, err := authority.New(cfg, opts...)
@@ -564,22 +564,4 @@ func dumpRoutes(mux chi.Routes) {
 	if err := chi.Walk(mux, walkFunc); err != nil {
 		fmt.Printf("Logging err: %s\n", err.Error())
 	}
-}
-
-// getWebhookTransport builds a transport that checks policy before connecting
-// to any remote address
-func getWebhookTransport(cfg *config.WebhookClient) *http.Transport {
-	t := http.DefaultTransport.(*http.Transport).Clone()
-
-	// If no policy is supplied all webhook server requests are allowed
-	if cfg != nil {
-		t.DialContext = func(ctx context.Context, network string, addr string) (net.Conn, error) {
-			d := net.Dialer{
-				Control: cfg.ControlFunc(addr),
-			}
-			return d.DialContext(ctx, network, addr)
-		}
-	}
-
-	return t
 }
