@@ -77,6 +77,12 @@ func (fn CertificateEnforcerFunc) Enforce(cert *x509.Certificate) error {
 	return fn(cert)
 }
 
+// AttestationData is a SignOption used to pass attestation information to the
+// sign methods.
+type AttestationData struct {
+	PermanentIdentifier string
+}
+
 // emailOnlyIdentity is a CertificateRequestValidator that checks that the only
 // SAN provided is the given email address.
 type emailOnlyIdentity string
