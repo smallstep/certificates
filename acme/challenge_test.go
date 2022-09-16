@@ -49,6 +49,23 @@ func (m *mockClient) TLSDial(network, addr string, tlsConfig *tls.Config) (*tls.
 	return m.tlsDial(network, addr, tlsConfig)
 }
 
+func mustAttestationProvisioner(t *testing.T, roots []byte) Provisioner {
+	t.Helper()
+
+	prov := &provisioner.ACME{
+		Type:             "ACME",
+		Name:             "acme",
+		Challenges:       []provisioner.ACMEChallenge{provisioner.DEVICE_ATTEST_01},
+		AttestationRoots: roots,
+	}
+	if err := prov.Init(provisioner.Config{
+		Claims: config.GlobalProvisionerClaims,
+	}); err != nil {
+		t.Fatal(err)
+	}
+	return prov
+}
+
 func Test_storeError(t *testing.T) {
 	type test struct {
 		ch          *Challenge
@@ -2410,21 +2427,6 @@ func Test_http01ChallengeHost(t *testing.T) {
 }
 
 func Test_doAppleAttestationFormat(t *testing.T) {
-	makeProvisioner := func(roots []byte) Provisioner {
-		prov := &provisioner.ACME{
-			Type:             "ACME",
-			Name:             "acme",
-			Challenges:       []provisioner.ACMEChallenge{provisioner.DEVICE_ATTEST_01},
-			AttestationRoots: roots,
-		}
-		if err := prov.Init(provisioner.Config{
-			Claims: config.GlobalProvisionerClaims,
-		}); err != nil {
-			t.Fatal(err)
-		}
-		return prov
-	}
-
 	ctx := context.Background()
 	ca, err := minica.New()
 	if err != nil {
@@ -2461,7 +2463,7 @@ func Test_doAppleAttestationFormat(t *testing.T) {
 		want    *appleAttestationData
 		wantErr bool
 	}{
-		{"ok", args{ctx, makeProvisioner(caRoot), &Challenge{}, &AttestationObject{
+		{"ok", args{ctx, mustAttestationProvisioner(t, caRoot), &Challenge{}, &AttestationObject{
 			Format: "apple",
 			AttStatement: map[string]interface{}{
 				"x5c": []interface{}{leaf.Raw, ca.Intermediate.Raw},
@@ -2473,49 +2475,49 @@ func Test_doAppleAttestationFormat(t *testing.T) {
 			SEPVersion:   "16.0",
 			Certificate:  leaf,
 		}, false},
-		{"fail apple issuer", args{ctx, makeProvisioner(nil), &Challenge{}, &AttestationObject{
+		{"fail apple issuer", args{ctx, mustAttestationProvisioner(t, nil), &Challenge{}, &AttestationObject{
 			Format: "apple",
 			AttStatement: map[string]interface{}{
 				"x5c": []interface{}{leaf.Raw, ca.Intermediate.Raw},
 			},
 		}}, nil, true},
-		{"fail missing x5c", args{ctx, makeProvisioner(caRoot), &Challenge{}, &AttestationObject{
+		{"fail missing x5c", args{ctx, mustAttestationProvisioner(t, caRoot), &Challenge{}, &AttestationObject{
 			Format: "apple",
 			AttStatement: map[string]interface{}{
 				"foo": "bar",
 			},
 		}}, nil, true},
-		{"fail empty issuer", args{ctx, makeProvisioner(caRoot), &Challenge{}, &AttestationObject{
+		{"fail empty issuer", args{ctx, mustAttestationProvisioner(t, caRoot), &Challenge{}, &AttestationObject{
 			Format: "apple",
 			AttStatement: map[string]interface{}{
 				"x5c": []interface{}{},
 			},
 		}}, nil, true},
-		{"fail leaf type", args{ctx, makeProvisioner(caRoot), &Challenge{}, &AttestationObject{
+		{"fail leaf type", args{ctx, mustAttestationProvisioner(t, caRoot), &Challenge{}, &AttestationObject{
 			Format: "apple",
 			AttStatement: map[string]interface{}{
 				"x5c": []interface{}{"leaf", ca.Intermediate.Raw},
 			},
 		}}, nil, true},
-		{"fail leaf parse", args{ctx, makeProvisioner(caRoot), &Challenge{}, &AttestationObject{
+		{"fail leaf parse", args{ctx, mustAttestationProvisioner(t, caRoot), &Challenge{}, &AttestationObject{
 			Format: "apple",
 			AttStatement: map[string]interface{}{
 				"x5c": []interface{}{leaf.Raw[:100], ca.Intermediate.Raw},
 			},
 		}}, nil, true},
-		{"fail intermediate type", args{ctx, makeProvisioner(caRoot), &Challenge{}, &AttestationObject{
+		{"fail intermediate type", args{ctx, mustAttestationProvisioner(t, caRoot), &Challenge{}, &AttestationObject{
 			Format: "apple",
 			AttStatement: map[string]interface{}{
 				"x5c": []interface{}{leaf.Raw, "intermediate"},
 			},
 		}}, nil, true},
-		{"fail intermediate parse", args{ctx, makeProvisioner(caRoot), &Challenge{}, &AttestationObject{
+		{"fail intermediate parse", args{ctx, mustAttestationProvisioner(t, caRoot), &Challenge{}, &AttestationObject{
 			Format: "apple",
 			AttStatement: map[string]interface{}{
 				"x5c": []interface{}{leaf.Raw, ca.Intermediate.Raw[:100]},
 			},
 		}}, nil, true},
-		{"fail verify", args{ctx, makeProvisioner(caRoot), &Challenge{}, &AttestationObject{
+		{"fail verify", args{ctx, mustAttestationProvisioner(t, caRoot), &Challenge{}, &AttestationObject{
 			Format: "apple",
 			AttStatement: map[string]interface{}{
 				"x5c": []interface{}{leaf.Raw},
@@ -2544,20 +2546,6 @@ func Test_doStepAttestationFormat(t *testing.T) {
 	}
 	caRoot := pem.EncodeToMemory(&pem.Block{Type: "CERTIFICATE", Bytes: ca.Root.Raw})
 
-	makeProvisioner := func(roots []byte) Provisioner {
-		prov := &provisioner.ACME{
-			Type:             "ACME",
-			Name:             "acme",
-			Challenges:       []provisioner.ACMEChallenge{provisioner.DEVICE_ATTEST_01},
-			AttestationRoots: roots,
-		}
-		if err := prov.Init(provisioner.Config{
-			Claims: config.GlobalProvisionerClaims,
-		}); err != nil {
-			t.Fatal(err)
-		}
-		return prov
-	}
 	makeLeaf := func(signer crypto.Signer, serialNumber []byte) *x509.Certificate {
 		leaf, err := ca.Sign(&x509.Certificate{
 			Subject:   pkix.Name{CommonName: "attestation cert"},
@@ -2633,7 +2621,7 @@ func Test_doStepAttestationFormat(t *testing.T) {
 		want    *stepAttestationData
 		wantErr bool
 	}{
-		{"ok", args{ctx, makeProvisioner(caRoot), &Challenge{Token: "token"}, jwk, &AttestationObject{
+		{"ok", args{ctx, mustAttestationProvisioner(t, caRoot), &Challenge{Token: "token"}, jwk, &AttestationObject{
 			Format: "step",
 			AttStatement: map[string]interface{}{
 				"x5c": []interface{}{leaf.Raw, ca.Intermediate.Raw},
@@ -2644,7 +2632,7 @@ func Test_doStepAttestationFormat(t *testing.T) {
 			SerialNumber: "1234",
 			Certificate:  leaf,
 		}, false},
-		{"fail yubico issuer", args{ctx, makeProvisioner(nil), &Challenge{Token: "token"}, jwk, &AttestationObject{
+		{"fail yubico issuer", args{ctx, mustAttestationProvisioner(t, nil), &Challenge{Token: "token"}, jwk, &AttestationObject{
 			Format: "step",
 			AttStatement: map[string]interface{}{
 				"x5c": []interface{}{leaf.Raw, ca.Intermediate.Raw},
@@ -2652,7 +2640,7 @@ func Test_doStepAttestationFormat(t *testing.T) {
 				"sig": cborSig,
 			},
 		}}, nil, true},
-		{"fail x5c type", args{ctx, makeProvisioner(caRoot), &Challenge{Token: "token"}, jwk, &AttestationObject{
+		{"fail x5c type", args{ctx, mustAttestationProvisioner(t, caRoot), &Challenge{Token: "token"}, jwk, &AttestationObject{
 			Format: "step",
 			AttStatement: map[string]interface{}{
 				"x5c": [][]byte{leaf.Raw, ca.Intermediate.Raw},
@@ -2660,7 +2648,7 @@ func Test_doStepAttestationFormat(t *testing.T) {
 				"sig": cborSig,
 			},
 		}}, nil, true},
-		{"fail x5c empty", args{ctx, makeProvisioner(caRoot), &Challenge{Token: "token"}, jwk, &AttestationObject{
+		{"fail x5c empty", args{ctx, mustAttestationProvisioner(t, caRoot), &Challenge{Token: "token"}, jwk, &AttestationObject{
 			Format: "step",
 			AttStatement: map[string]interface{}{
 				"x5c": []interface{}{},
@@ -2668,7 +2656,7 @@ func Test_doStepAttestationFormat(t *testing.T) {
 				"sig": cborSig,
 			},
 		}}, nil, true},
-		{"fail leaf type", args{ctx, makeProvisioner(caRoot), &Challenge{Token: "token"}, jwk, &AttestationObject{
+		{"fail leaf type", args{ctx, mustAttestationProvisioner(t, caRoot), &Challenge{Token: "token"}, jwk, &AttestationObject{
 			Format: "step",
 			AttStatement: map[string]interface{}{
 				"x5c": []interface{}{"leaf", ca.Intermediate.Raw},
@@ -2676,7 +2664,7 @@ func Test_doStepAttestationFormat(t *testing.T) {
 				"sig": cborSig,
 			},
 		}}, nil, true},
-		{"fail leaf parse", args{ctx, makeProvisioner(caRoot), &Challenge{Token: "token"}, jwk, &AttestationObject{
+		{"fail leaf parse", args{ctx, mustAttestationProvisioner(t, caRoot), &Challenge{Token: "token"}, jwk, &AttestationObject{
 			Format: "step",
 			AttStatement: map[string]interface{}{
 				"x5c": []interface{}{leaf.Raw[:100], ca.Intermediate.Raw},
@@ -2684,7 +2672,7 @@ func Test_doStepAttestationFormat(t *testing.T) {
 				"sig": cborSig,
 			},
 		}}, nil, true},
-		{"fail intermediate type", args{ctx, makeProvisioner(caRoot), &Challenge{Token: "token"}, jwk, &AttestationObject{
+		{"fail intermediate type", args{ctx, mustAttestationProvisioner(t, caRoot), &Challenge{Token: "token"}, jwk, &AttestationObject{
 			Format: "step",
 			AttStatement: map[string]interface{}{
 				"x5c": []interface{}{leaf.Raw, "intermediate"},
@@ -2692,7 +2680,7 @@ func Test_doStepAttestationFormat(t *testing.T) {
 				"sig": cborSig,
 			},
 		}}, nil, true},
-		{"fail intermediate parse", args{ctx, makeProvisioner(caRoot), &Challenge{Token: "token"}, jwk, &AttestationObject{
+		{"fail intermediate parse", args{ctx, mustAttestationProvisioner(t, caRoot), &Challenge{Token: "token"}, jwk, &AttestationObject{
 			Format: "step",
 			AttStatement: map[string]interface{}{
 				"x5c": []interface{}{leaf.Raw, ca.Intermediate.Raw[:100]},
@@ -2700,7 +2688,7 @@ func Test_doStepAttestationFormat(t *testing.T) {
 				"sig": cborSig,
 			},
 		}}, nil, true},
-		{"fail verify", args{ctx, makeProvisioner(caRoot), &Challenge{Token: "token"}, jwk, &AttestationObject{
+		{"fail verify", args{ctx, mustAttestationProvisioner(t, caRoot), &Challenge{Token: "token"}, jwk, &AttestationObject{
 			Format: "step",
 			AttStatement: map[string]interface{}{
 				"x5c": []interface{}{leaf.Raw},
@@ -2708,7 +2696,7 @@ func Test_doStepAttestationFormat(t *testing.T) {
 				"sig": cborSig,
 			},
 		}}, nil, true},
-		{"fail sig type", args{ctx, makeProvisioner(caRoot), &Challenge{Token: "token"}, jwk, &AttestationObject{
+		{"fail sig type", args{ctx, mustAttestationProvisioner(t, caRoot), &Challenge{Token: "token"}, jwk, &AttestationObject{
 			Format: "step",
 			AttStatement: map[string]interface{}{
 				"x5c": []interface{}{leaf.Raw, ca.Intermediate.Raw},
@@ -2716,7 +2704,7 @@ func Test_doStepAttestationFormat(t *testing.T) {
 				"sig": string(cborSig),
 			},
 		}}, nil, true},
-		{"fail sig unmarshal", args{ctx, makeProvisioner(caRoot), &Challenge{Token: "token"}, jwk, &AttestationObject{
+		{"fail sig unmarshal", args{ctx, mustAttestationProvisioner(t, caRoot), &Challenge{Token: "token"}, jwk, &AttestationObject{
 			Format: "step",
 			AttStatement: map[string]interface{}{
 				"x5c": []interface{}{leaf.Raw, ca.Intermediate.Raw},
@@ -2724,7 +2712,7 @@ func Test_doStepAttestationFormat(t *testing.T) {
 				"sig": []byte("bad-sig"),
 			},
 		}}, nil, true},
-		{"fail keyAuthorization", args{ctx, makeProvisioner(caRoot), &Challenge{Token: "token"}, &jose.JSONWebKey{Key: []byte("not an asymmetric key")}, &AttestationObject{
+		{"fail keyAuthorization", args{ctx, mustAttestationProvisioner(t, caRoot), &Challenge{Token: "token"}, &jose.JSONWebKey{Key: []byte("not an asymmetric key")}, &AttestationObject{
 			Format: "step",
 			AttStatement: map[string]interface{}{
 				"x5c": []interface{}{leaf.Raw, ca.Intermediate.Raw},
@@ -2732,7 +2720,7 @@ func Test_doStepAttestationFormat(t *testing.T) {
 				"sig": cborSig,
 			},
 		}}, nil, true},
-		{"fail sig verify P-256", args{ctx, makeProvisioner(caRoot), &Challenge{Token: "token"}, jwk, &AttestationObject{
+		{"fail sig verify P-256", args{ctx, mustAttestationProvisioner(t, caRoot), &Challenge{Token: "token"}, jwk, &AttestationObject{
 			Format: "step",
 			AttStatement: map[string]interface{}{
 				"x5c": []interface{}{leaf.Raw, ca.Intermediate.Raw},
@@ -2740,7 +2728,7 @@ func Test_doStepAttestationFormat(t *testing.T) {
 				"sig": otherCBORSig,
 			},
 		}}, nil, true},
-		{"fail sig verify P-384", args{ctx, makeProvisioner(caRoot), &Challenge{Token: "token"}, jwk, &AttestationObject{
+		{"fail sig verify P-384", args{ctx, mustAttestationProvisioner(t, caRoot), &Challenge{Token: "token"}, jwk, &AttestationObject{
 			Format: "step",
 			AttStatement: map[string]interface{}{
 				"x5c": []interface{}{makeLeaf(mustSigner("EC", "P-384", 0), serialNumber).Raw, ca.Intermediate.Raw},
@@ -2748,7 +2736,7 @@ func Test_doStepAttestationFormat(t *testing.T) {
 				"sig": cborSig,
 			},
 		}}, nil, true},
-		{"fail sig verify RSA", args{ctx, makeProvisioner(caRoot), &Challenge{Token: "token"}, jwk, &AttestationObject{
+		{"fail sig verify RSA", args{ctx, mustAttestationProvisioner(t, caRoot), &Challenge{Token: "token"}, jwk, &AttestationObject{
 			Format: "step",
 			AttStatement: map[string]interface{}{
 				"x5c": []interface{}{makeLeaf(mustSigner("RSA", "", 2048), serialNumber).Raw, ca.Intermediate.Raw},
@@ -2756,7 +2744,7 @@ func Test_doStepAttestationFormat(t *testing.T) {
 				"sig": cborSig,
 			},
 		}}, nil, true},
-		{"fail sig verify Ed25519", args{ctx, makeProvisioner(caRoot), &Challenge{Token: "token"}, jwk, &AttestationObject{
+		{"fail sig verify Ed25519", args{ctx, mustAttestationProvisioner(t, caRoot), &Challenge{Token: "token"}, jwk, &AttestationObject{
 			Format: "step",
 			AttStatement: map[string]interface{}{
 				"x5c": []interface{}{makeLeaf(mustSigner("OKP", "Ed25519", 0), serialNumber).Raw, ca.Intermediate.Raw},
@@ -2764,7 +2752,7 @@ func Test_doStepAttestationFormat(t *testing.T) {
 				"sig": cborSig,
 			},
 		}}, nil, true},
-		{"fail unmarshal serial number", args{ctx, makeProvisioner(caRoot), &Challenge{Token: "token"}, jwk, &AttestationObject{
+		{"fail unmarshal serial number", args{ctx, mustAttestationProvisioner(t, caRoot), &Challenge{Token: "token"}, jwk, &AttestationObject{
 			Format: "step",
 			AttStatement: map[string]interface{}{
 				"x5c": []interface{}{makeLeaf(signer, []byte("bad-serial")).Raw, ca.Intermediate.Raw},
