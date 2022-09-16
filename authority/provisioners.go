@@ -507,7 +507,7 @@ func webhookToCertificates(wh *linkedca.Webhook) *provisioner.Webhook {
 		Name:                 wh.Name,
 		URL:                  wh.Url,
 		Kind:                 wh.Kind.String(),
-		SigningSecret:        wh.Secret,
+		Secret:               wh.Secret,
 		DisableTLSClientAuth: wh.DisableTlsClientAuth,
 	}
 

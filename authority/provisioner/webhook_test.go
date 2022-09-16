@@ -177,8 +177,8 @@ func TestWebhook_Do(t *testing.T) {
 	tests := map[string]test{
 		"ok": {
 			webhook: Webhook{
-				ID:            "abc123",
-				SigningSecret: "c2VjcmV0Cg==",
+				ID:     "abc123",
+				Secret: "c2VjcmV0Cg==",
 			},
 			webhookResponse: webhook.ResponseBody{
 				Data: map[string]interface{}{"role": "dba"},
@@ -186,9 +186,9 @@ func TestWebhook_Do(t *testing.T) {
 		},
 		"ok/bearer": {
 			webhook: Webhook{
-				ID:            "abc123",
-				SigningSecret: "c2VjcmV0Cg==",
-				BearerToken:   "mytoken",
+				ID:          "abc123",
+				Secret:      "c2VjcmV0Cg==",
+				BearerToken: "mytoken",
 			},
 			webhookResponse: webhook.ResponseBody{
 				Data: map[string]interface{}{"role": "dba"},
@@ -196,8 +196,8 @@ func TestWebhook_Do(t *testing.T) {
 		},
 		"ok/basic": {
 			webhook: Webhook{
-				ID:            "abc123",
-				SigningSecret: "c2VjcmV0Cg==",
+				ID:     "abc123",
+				Secret: "c2VjcmV0Cg==",
 				BasicAuth: struct {
 					Username string
 					Password string
@@ -214,8 +214,8 @@ func TestWebhook_Do(t *testing.T) {
 			webhook: Webhook{
 				ID: "abc123",
 				// scheme, host, port will come from test server
-				URL:           "/users/{{ .username }}?region={{ .region }}",
-				SigningSecret: "c2VjcmV0Cg==",
+				URL:    "/users/{{ .username }}?region={{ .region }}",
+				Secret: "c2VjcmV0Cg==",
 			},
 			dataArg: map[string]interface{}{"username": "areed", "region": "central"},
 			webhookResponse: webhook.ResponseBody{
@@ -225,8 +225,8 @@ func TestWebhook_Do(t *testing.T) {
 		},
 		"ok/allow": {
 			webhook: Webhook{
-				ID:            "abc123",
-				SigningSecret: "c2VjcmV0Cg==",
+				ID:     "abc123",
+				Secret: "c2VjcmV0Cg==",
 			},
 			webhookResponse: webhook.ResponseBody{
 				Allow: true,
@@ -234,8 +234,8 @@ func TestWebhook_Do(t *testing.T) {
 		},
 		"fail/404": {
 			webhook: Webhook{
-				ID:            "abc123",
-				SigningSecret: "c2VjcmV0Cg==",
+				ID:     "abc123",
+				Secret: "c2VjcmV0Cg==",
 			},
 			webhookResponse: webhook.ResponseBody{
 				Data: map[string]interface{}{"role": "dba"},
@@ -257,7 +257,7 @@ func TestWebhook_Do(t *testing.T) {
 				body, err := io.ReadAll(r.Body)
 				assert.FatalError(t, err)
 
-				secret, err := base64.StdEncoding.DecodeString(tc.webhook.SigningSecret)
+				secret, err := base64.StdEncoding.DecodeString(tc.webhook.Secret)
 				assert.FatalError(t, err)
 				mac := hmac.New(sha256.New, secret).Sum(body)
 				assert.True(t, hmac.Equal(sig, mac))

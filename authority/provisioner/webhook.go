@@ -80,7 +80,7 @@ type Webhook struct {
 	URL                  string `json:"url"`
 	Kind                 string `json:"kind"`
 	DisableTLSClientAuth bool   `json:"disableTLSClientAuth,omitempty"`
-	SigningSecret        string `json:"-"`
+	Secret               string `json:"-"`
 	BearerToken          string `json:"-"`
 	BasicAuth            struct {
 		Username string
@@ -116,7 +116,7 @@ retry:
 		return nil, err
 	}
 
-	secret, err := base64.StdEncoding.DecodeString(w.SigningSecret)
+	secret, err := base64.StdEncoding.DecodeString(w.Secret)
 	if err != nil {
 		return nil, err
 	}
