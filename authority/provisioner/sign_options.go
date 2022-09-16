@@ -29,8 +29,6 @@ type SignOptions struct {
 	NotBefore    TimeDuration    `json:"notBefore"`
 	TemplateData json.RawMessage `json:"templateData"`
 	Backdate     time.Duration   `json:"-"`
-	// PermanentIdentifier is an ID verified by acme device-attest-01 challenge
-	PermanentIdentifier string `json:"permanentIdentifier"`
 }
 
 // SignOption is the interface used to collect all extra options used in the

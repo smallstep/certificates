@@ -94,7 +94,7 @@ func (a *Authority) Sign(csr *x509.CertificateRequest, signOpts provisioner.Sign
 
 	var prov provisioner.Interface
 	var pInfo *casapi.ProvisionerInfo
-	var attData provisioner.AttestationData
+	var attData *provisioner.AttestationData
 	var webhookCtl webhookController
 	for _, op := range extraOpts {
 		switch k := op.(type) {
@@ -133,9 +133,7 @@ func (a *Authority) Sign(csr *x509.CertificateRequest, signOpts provisioner.Sign
 
 		// Extra information from ACME attestations.
 		case provisioner.AttestationData:
-			attData = k
-			// TODO(mariano,areed): remove me once attData is used.
-			_ = attData
+			attData = &k
 
 		// Capture the provisioner's webhook controller
 		case webhookController:
@@ -148,9 +146,15 @@ func (a *Authority) Sign(csr *x509.CertificateRequest, signOpts provisioner.Sign
 
 	// Call enriching webhooks
 	if webhookCtl != nil {
+		var attested *webhook.AttestationData
+		if attData != nil {
+			attested = &webhook.AttestationData{
+				PermanentIdentifier: attData.PermanentIdentifier,
+			}
+		}
 		whEnrichReq, err := webhook.NewRequestBody(
 			webhook.WithX509CertificateRequest(csr),
-			webhook.WithPermanentIdentifier(signOpts.PermanentIdentifier),
+			webhook.WithAttestationData(attested),
 		)
 		if err != nil {
 			return nil, errs.ApplyOptions(

@@ -50,11 +50,16 @@ type SSHCertificate struct {
 	ValidAfter   uint64 `json:"validAfter"`
 }
 
+// AttestationData is data validated by acme device-attest-01 challenge
+type AttestationData struct {
+	PermanentIdentifier string `json:"permanentIdentifier"`
+}
+
 // RequestBody is the body sent to webhook servers.
 type RequestBody struct {
 	Timestamp time.Time `json:"timestamp"`
 	// Only set after successfully completing acme device-attest-01 challenge
-	PermanentIdentifier string `json:"permanentIdentifier,omitempty"`
+	AttestationData *AttestationData `json:"attestationData"`
 	// Exactly one of the remaining fields should be set
 	X509CertificateRequest *X509CertificateRequest `json:"x509CertificateRequest,omitempty"`
 	X509Certificate        *X509Certificate        `json:"x509Certificate,omitempty"`

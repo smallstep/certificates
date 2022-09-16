@@ -60,10 +60,9 @@ func WithX509Certificate(cert *x509util.Certificate, leaf *x509.Certificate) Req
 	}
 }
 
-func WithPermanentIdentifier(pi string) RequestBodyOption {
+func WithAttestationData(data *AttestationData) RequestBodyOption {
 	return func(rb *RequestBody) error {
-		rb.PermanentIdentifier = pi
-
+		rb.AttestationData = data
 		return nil
 	}
 }

@@ -23,9 +23,11 @@ func TestNewRequestBody(t *testing.T) {
 	}
 	tests := map[string]test{
 		"Permanent Identifier": {
-			options: []RequestBodyOption{WithPermanentIdentifier("mydevice123")},
+			options: []RequestBodyOption{WithAttestationData(&AttestationData{PermanentIdentifier: "mydevice123"})},
 			want: &RequestBody{
-				PermanentIdentifier: "mydevice123",
+				AttestationData: &AttestationData{
+					PermanentIdentifier: "mydevice123",
+				},
 			},
 			wantErr: false,
 		},

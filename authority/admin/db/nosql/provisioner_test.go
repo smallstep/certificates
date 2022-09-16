@@ -1302,6 +1302,7 @@ func Test_linkedcaWebhooksToDB(t *testing.T) {
 						Username: "user",
 						Password: "pass",
 					},
+					CertType: linkedca.Webhook_ALL.String(),
 				},
 			},
 		},

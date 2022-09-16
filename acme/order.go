@@ -211,9 +211,8 @@ func (o *Order) Finalize(ctx context.Context, db DB, csr *x509.CertificateReques
 
 	// Sign a new certificate.
 	certChain, err := auth.Sign(csr, provisioner.SignOptions{
-		NotBefore:           provisioner.NewTimeDuration(o.NotBefore),
-		NotAfter:            provisioner.NewTimeDuration(o.NotAfter),
-		PermanentIdentifier: permanentIdentifier,
+		NotBefore: provisioner.NewTimeDuration(o.NotBefore),
+		NotAfter:  provisioner.NewTimeDuration(o.NotAfter),
 	}, signOps...)
 	if err != nil {
 		return WrapErrorISE(err, "error signing certificate for order %s", o.ID)
