@@ -14,6 +14,7 @@ import (
 	"io"
 	"net"
 	"os"
+	"path/filepath"
 	"reflect"
 	"testing"
 	"time"
@@ -402,6 +403,14 @@ func TestNew_real(t *testing.T) {
 		})
 	}
 
+	failDefaultCredentials := true
+	if home, err := os.UserHomeDir(); err == nil {
+		file := filepath.Join(home, ".config", "gcloud", "application_default_credentials.json")
+		if _, err := os.Stat(file); err == nil {
+			failDefaultCredentials = false
+		}
+	}
+
 	type args struct {
 		ctx  context.Context
 		opts apiv1.Options
@@ -412,7 +421,7 @@ func TestNew_real(t *testing.T) {
 		args     args
 		wantErr  bool
 	}{
-		{"fail default credentials", true, args{context.Background(), apiv1.Options{CertificateAuthority: testAuthorityName}}, true},
+		{"fail default credentials", true, args{context.Background(), apiv1.Options{CertificateAuthority: testAuthorityName}}, failDefaultCredentials},
 		{"fail certificate authority", false, args{context.Background(), apiv1.Options{}}, true},
 		{"fail with credentials", false, args{context.Background(), apiv1.Options{
 			CertificateAuthority: testAuthorityName, CredentialsFile: "testdata/missing.json",
