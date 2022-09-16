@@ -45,8 +45,8 @@ type mockClient struct {
 
 func (m *mockClient) Get(url string) (*http.Response, error)  { return m.get(url) }
 func (m *mockClient) LookupTxt(name string) ([]string, error) { return m.lookupTxt(name) }
-func (m *mockClient) TLSDial(network, addr string, config *tls.Config) (*tls.Conn, error) {
-	return m.tlsDial(network, addr, config)
+func (m *mockClient) TLSDial(network, addr string, tlsConfig *tls.Config) (*tls.Conn, error) {
+	return m.tlsDial(network, addr, tlsConfig)
 }
 
 func Test_storeError(t *testing.T) {
