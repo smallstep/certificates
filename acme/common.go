@@ -73,6 +73,7 @@ type Provisioner interface {
 	AuthorizeRevoke(ctx context.Context, token string) error
 	IsChallengeEnabled(ctx context.Context, challenge provisioner.ACMEChallenge) bool
 	IsAttestationFormatEnabled(ctx context.Context, format provisioner.ACMEAttestationFormat) bool
+	GetAttestationRoots() (*x509.CertPool, bool)
 	GetID() string
 	GetName() string
 	DefaultTLSCertDuration() time.Duration
@@ -113,6 +114,7 @@ type MockProvisioner struct {
 	MauthorizeRevoke          func(ctx context.Context, token string) error
 	MisChallengeEnabled       func(ctx context.Context, challenge provisioner.ACMEChallenge) bool
 	MisAttFormatEnabled       func(ctx context.Context, format provisioner.ACMEAttestationFormat) bool
+	MgetAttestationRoots      func() (*x509.CertPool, bool)
 	MdefaultTLSCertDuration   func() time.Duration
 	MgetOptions               func() *provisioner.Options
 }
@@ -163,6 +165,13 @@ func (m *MockProvisioner) IsAttestationFormatEnabled(ctx context.Context, format
 		return m.MisAttFormatEnabled(ctx, format)
 	}
 	return m.Merr == nil
+}
+
+func (m *MockProvisioner) GetAttestationRoots() (*x509.CertPool, bool) {
+	if m.MgetAttestationRoots != nil {
+		return m.MgetAttestationRoots()
+	}
+	return m.Mret1.(*x509.CertPool), m.Mret1 != nil
 }
 
 // DefaultTLSCertDuration mock

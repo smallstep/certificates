@@ -3,6 +3,7 @@ package provisioner
 import (
 	"context"
 	"crypto/x509"
+	"encoding/pem"
 	"fmt"
 	"net"
 	"strings"
@@ -95,10 +96,14 @@ type ACME struct {
 	// provisioner. If this value is not set the default apple, step and tpm
 	// will be used.
 	AttestationFormats []ACMEAttestationFormat `json:"attestationFormats,omitempty"`
-	Claims             *Claims                 `json:"claims,omitempty"`
-	Options            *Options                `json:"options,omitempty"`
-
-	ctl *Controller
+	// AttestationRoots contains a bundle of root certificates in PEM format
+	// that will be used to verify the attestation certificates. If provided,
+	// this bundle will be used even for well-known CAs like Apple and Yubico.
+	AttestationRoots    []byte   `json:"attestationRoots,omitempty"`
+	Claims              *Claims  `json:"claims,omitempty"`
+	Options             *Options `json:"options,omitempty"`
+	attestationRootPool *x509.CertPool
+	ctl                 *Controller
 }
 
 // GetID returns the provisioner unique identifier.
@@ -163,6 +168,29 @@ func (p *ACME) Init(config Config) (err error) {
 	for _, f := range p.AttestationFormats {
 		if err := f.Validate(); err != nil {
 			return err
+		}
+	}
+
+	// Parse attestation roots.
+	// The pool will be nil if the there are not roots.
+	if rest := p.AttestationRoots; len(rest) > 0 {
+		var block *pem.Block
+		var hasCert bool
+		p.attestationRootPool = x509.NewCertPool()
+		for rest != nil {
+			block, rest = pem.Decode(rest)
+			if block == nil {
+				break
+			}
+			cert, err := x509.ParseCertificate(block.Bytes)
+			if err != nil {
+				return errors.New("error parsing attestationRoots: malformed certificate")
+			}
+			p.attestationRootPool.AddCert(cert)
+			hasCert = true
+		}
+		if !hasCert {
+			return errors.New("error parsing attestationRoots: no certificates found")
 		}
 	}
 
@@ -281,4 +309,13 @@ func (p *ACME) IsAttestationFormatEnabled(ctx context.Context, format ACMEAttest
 		}
 	}
 	return false
+}
+
+// GetAttestationRoots returns certificate pool with the configured attestation
+// roots and reports if the pool contains at least one certificate.
+//
+// TODO(hs): we may not want to expose the root pool like this; call into an
+// interface function instead to authorize?
+func (p *ACME) GetAttestationRoots() (*x509.CertPool, bool) {
+	return p.attestationRootPool, p.attestationRootPool != nil
 }
