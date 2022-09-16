@@ -41,6 +41,7 @@ type dbWebhook struct {
 	BearerToken          string      `json:"bearerToken,omitempty"`
 	BasicAuth            dbBasicAuth `json:"basicAuth,omitempty"`
 	DisableTLSClientAuth bool        `json:"disableTLSClientAuth,omitempty"`
+	CertType             string      `json:"certType,omitempty"`
 }
 
 func (dbp *dbProvisioner) clone() *dbProvisioner {
@@ -244,6 +245,7 @@ func dbWebhooksToLinkedca(dbwhs []dbWebhook) []*linkedca.Webhook {
 			Kind:                 linkedca.Webhook_Kind(linkedca.Webhook_Kind_value[dbwh.Kind]),
 			Secret:               dbwh.SigningSecret,
 			DisableTlsClientAuth: dbwh.DisableTLSClientAuth,
+			CertType:             linkedca.Webhook_CertType(linkedca.Webhook_CertType_value[dbwh.CertType]),
 		}
 		if dbwh.BearerToken != "" {
 			lwh.Auth = &linkedca.Webhook_BearerToken{
@@ -279,6 +281,7 @@ func linkedcaWebhooksToDB(lwhs []*linkedca.Webhook) []dbWebhook {
 			Kind:                 lwh.Kind.String(),
 			SigningSecret:        lwh.Secret,
 			DisableTLSClientAuth: lwh.DisableTlsClientAuth,
+			CertType:             lwh.CertType.String(),
 		}
 		switch a := lwh.GetAuth().(type) {
 		case *linkedca.Webhook_BearerToken:

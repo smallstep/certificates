@@ -29,6 +29,7 @@ type WebhookSetter interface {
 type WebhookController struct {
 	client       *http.Client
 	webhooks     []*Webhook
+	certType     linkedca.Webhook_CertType
 	TemplateData WebhookSetter
 }
 
@@ -40,6 +41,9 @@ func (wc *WebhookController) Enrich(req *webhook.RequestBody) error {
 	}
 	for _, wh := range wc.webhooks {
 		if wh.Kind != linkedca.Webhook_ENRICHING.String() {
+			continue
+		}
+		if !wc.isCertTypeOK(wh) {
 			continue
 		}
 		resp, err := wh.Do(wc.client, req, wc.TemplateData)
@@ -63,6 +67,9 @@ func (wc *WebhookController) Authorize(req *webhook.RequestBody) error {
 		if wh.Kind != linkedca.Webhook_AUTHORIZING.String() {
 			continue
 		}
+		if !wc.isCertTypeOK(wh) {
+			continue
+		}
 		resp, err := wh.Do(wc.client, req, wc.TemplateData)
 		if err != nil {
 			return err
@@ -74,12 +81,23 @@ func (wc *WebhookController) Authorize(req *webhook.RequestBody) error {
 	return nil
 }
 
+func (wc *WebhookController) isCertTypeOK(wh *Webhook) bool {
+	if wc.certType == linkedca.Webhook_ALL {
+		return true
+	}
+	if wh.CertType == linkedca.Webhook_ALL.String() || wh.CertType == "" {
+		return true
+	}
+	return wc.certType.String() == wh.CertType
+}
+
 type Webhook struct {
 	ID                   string `json:"id"`
 	Name                 string `json:"name"`
 	URL                  string `json:"url"`
 	Kind                 string `json:"kind"`
 	DisableTLSClientAuth bool   `json:"disableTLSClientAuth,omitempty"`
+	CertType             string `json:"certType"`
 	Secret               string `json:"-"`
 	BearerToken          string `json:"-"`
 	BasicAuth            struct {

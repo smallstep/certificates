@@ -210,19 +210,21 @@ func TestWebhookAdminResponder_CreateProvisionerWebhook(t *testing.T) {
 				Name: "provName",
 			}
 			ctx := linkedca.NewContextWithProvisioner(context.Background(), prov)
-			body := []byte(`{"name": "metadata", "url": "https://example.com", "kind": "ENRICHING"}`)
+			body := []byte(`{"name": "metadata", "url": "https://example.com", "kind": "ENRICHING", "certType": "X509"}`)
 			return test{
 				ctx: ctx,
 				auth: &mockAdminAuthority{
 					MockUpdateProvisioner: func(ctx context.Context, nu *linkedca.Provisioner) error {
+						assert.Equal(t, linkedca.Webhook_X509, nu.Webhooks[0].CertType)
 						return nil
 					},
 				},
 				body: body,
 				response: &linkedca.Webhook{
-					Name: "metadata",
-					Url:  "https://example.com",
-					Kind: linkedca.Webhook_ENRICHING,
+					Name:     "metadata",
+					Url:      "https://example.com",
+					Kind:     linkedca.Webhook_ENRICHING,
+					CertType: linkedca.Webhook_X509,
 				},
 				statusCode: 201,
 			}

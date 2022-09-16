@@ -1262,6 +1262,7 @@ func Test_linkedcaWebhooksToDB(t *testing.T) {
 						},
 					},
 					DisableTlsClientAuth: true,
+					CertType:             linkedca.Webhook_X509,
 				},
 			},
 			want: []dbWebhook{
@@ -1272,6 +1273,7 @@ func Test_linkedcaWebhooksToDB(t *testing.T) {
 					SigningSecret:        "signing secret",
 					BearerToken:          "token",
 					DisableTLSClientAuth: true,
+					CertType:             linkedca.Webhook_X509.String(),
 				},
 			},
 		},

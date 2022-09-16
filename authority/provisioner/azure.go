@@ -17,6 +17,7 @@ import (
 	"go.step.sm/crypto/jose"
 	"go.step.sm/crypto/sshutil"
 	"go.step.sm/crypto/x509util"
+	"go.step.sm/linkedca"
 
 	"github.com/smallstep/certificates/errs"
 )
@@ -363,7 +364,7 @@ func (p *Azure) AuthorizeSign(ctx context.Context, token string) ([]SignOption, 
 		defaultPublicKeyValidator{},
 		newValidityValidator(p.ctl.Claimer.MinTLSCertDuration(), p.ctl.Claimer.MaxTLSCertDuration()),
 		newX509NamePolicyValidator(p.ctl.getPolicy().getX509()),
-		p.ctl.newWebhookController(data),
+		p.ctl.newWebhookController(data, linkedca.Webhook_X509),
 	), nil
 }
 
@@ -433,7 +434,7 @@ func (p *Azure) AuthorizeSSHSign(ctx context.Context, token string) ([]SignOptio
 		// Ensure that all principal names are allowed
 		newSSHNamePolicyValidator(p.ctl.getPolicy().getSSHHost(), nil),
 		// Call webhooks
-		p.ctl.newWebhookController(data),
+		p.ctl.newWebhookController(data, linkedca.Webhook_SSH),
 	), nil
 }
 

@@ -15,6 +15,7 @@ import (
 	"go.step.sm/crypto/sshutil"
 	"go.step.sm/crypto/x25519"
 	"go.step.sm/crypto/x509util"
+	"go.step.sm/linkedca"
 	"golang.org/x/crypto/ssh"
 
 	"github.com/smallstep/certificates/errs"
@@ -164,7 +165,7 @@ func (p *Nebula) AuthorizeSign(ctx context.Context, token string) ([]SignOption,
 		defaultPublicKeyValidator{},
 		newValidityValidator(p.ctl.Claimer.MinTLSCertDuration(), p.ctl.Claimer.MaxTLSCertDuration()),
 		newX509NamePolicyValidator(p.ctl.getPolicy().getX509()),
-		p.ctl.newWebhookController(data),
+		p.ctl.newWebhookController(data, linkedca.Webhook_X509),
 	}, nil
 }
 
@@ -264,7 +265,7 @@ func (p *Nebula) AuthorizeSSHSign(ctx context.Context, token string) ([]SignOpti
 		// Ensure that all principal names are allowed
 		newSSHNamePolicyValidator(p.ctl.getPolicy().getSSHHost(), nil),
 		// Call webhooks
-		p.ctl.newWebhookController(data),
+		p.ctl.newWebhookController(data, linkedca.Webhook_SSH),
 	), nil
 }
 

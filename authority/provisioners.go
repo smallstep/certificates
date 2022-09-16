@@ -509,6 +509,7 @@ func webhookToCertificates(wh *linkedca.Webhook) *provisioner.Webhook {
 		Kind:                 wh.Kind.String(),
 		Secret:               wh.Secret,
 		DisableTLSClientAuth: wh.DisableTlsClientAuth,
+		CertType:             wh.CertType.String(),
 	}
 
 	switch a := wh.GetAuth().(type) {

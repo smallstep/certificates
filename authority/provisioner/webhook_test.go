@@ -17,7 +17,83 @@ import (
 	"github.com/smallstep/assert"
 	"github.com/smallstep/certificates/webhook"
 	"go.step.sm/crypto/x509util"
+	"go.step.sm/linkedca"
 )
+
+func TestWebhookController_isCertTypeOK(t *testing.T) {
+	type test struct {
+		wc   *WebhookController
+		wh   *Webhook
+		want bool
+	}
+	tests := map[string]test{
+		"all/all": {
+			wc:   &WebhookController{certType: linkedca.Webhook_ALL},
+			wh:   &Webhook{CertType: linkedca.Webhook_ALL.String()},
+			want: true,
+		},
+		"all/x509": {
+			wc:   &WebhookController{certType: linkedca.Webhook_ALL},
+			wh:   &Webhook{CertType: linkedca.Webhook_X509.String()},
+			want: true,
+		},
+		"all/ssh": {
+			wc:   &WebhookController{certType: linkedca.Webhook_ALL},
+			wh:   &Webhook{CertType: linkedca.Webhook_SSH.String()},
+			want: true,
+		},
+		`all/""`: {
+			wc:   &WebhookController{certType: linkedca.Webhook_ALL},
+			wh:   &Webhook{},
+			want: true,
+		},
+		"x509/all": {
+			wc:   &WebhookController{certType: linkedca.Webhook_X509},
+			wh:   &Webhook{CertType: linkedca.Webhook_ALL.String()},
+			want: true,
+		},
+		"x509/x509": {
+			wc:   &WebhookController{certType: linkedca.Webhook_X509},
+			wh:   &Webhook{CertType: linkedca.Webhook_X509.String()},
+			want: true,
+		},
+		"x509/ssh": {
+			wc:   &WebhookController{certType: linkedca.Webhook_X509},
+			wh:   &Webhook{CertType: linkedca.Webhook_SSH.String()},
+			want: false,
+		},
+		`x509/""`: {
+			wc:   &WebhookController{certType: linkedca.Webhook_X509},
+			wh:   &Webhook{},
+			want: true,
+		},
+		"ssh/all": {
+			wc:   &WebhookController{certType: linkedca.Webhook_SSH},
+			wh:   &Webhook{CertType: linkedca.Webhook_ALL.String()},
+			want: true,
+		},
+		"ssh/x509": {
+			wc:   &WebhookController{certType: linkedca.Webhook_SSH},
+			wh:   &Webhook{CertType: linkedca.Webhook_X509.String()},
+			want: false,
+		},
+		"ssh/ssh": {
+			wc:   &WebhookController{certType: linkedca.Webhook_SSH},
+			wh:   &Webhook{CertType: linkedca.Webhook_SSH.String()},
+			want: true,
+		},
+		`ssh/""`: {
+			wc:   &WebhookController{certType: linkedca.Webhook_SSH},
+			wh:   &Webhook{},
+			want: true,
+		},
+	}
+	for name, test := range tests {
+		t.Run(name, func(t *testing.T) {
+			assert.Equals(t, test.want, test.wc.isCertTypeOK(test.wh))
+		})
+	}
+}
 
 func TestWebhookController_Enrich(t *testing.T) {
 	type test struct {
@@ -69,6 +145,28 @@ func TestWebhookController_Enrich(t *testing.T) {
 				"Webhooks": map[string]any{
 					"devices": map[string]any{"serial": "123"},
 					"people":  map[string]any{"role": "bar"},
+				},
+			},
+		},
+		"ok/x509 only": {
+			ctl: &WebhookController{
+				client: http.DefaultClient,
+				webhooks: []*Webhook{
+					{Name: "people", Kind: "ENRICHING", CertType: linkedca.Webhook_SSH.String()},
+					{Name: "devices", Kind: "ENRICHING"},
+				},
+				TemplateData: x509util.TemplateData{},
+				certType:     linkedca.Webhook_X509,
+			},
+			req: &webhook.RequestBody{},
+			responses: []*webhook.ResponseBody{
+				{Allow: true, Data: map[string]any{"role": "bar"}},
+				{Allow: true, Data: map[string]any{"serial": "123"}},
+			},
+			expectErr: false,
+			expectTemplateData: x509util.TemplateData{
+				"Webhooks": map[string]any{
+					"devices": map[string]any{"serial": "123"},
 				},
 			},
 		},
@@ -130,6 +228,16 @@ func TestWebhookController_Authorize(t *testing.T) {
 			},
 			req:       &webhook.RequestBody{},
 			responses: []*webhook.ResponseBody{{Allow: true}},
+			expectErr: false,
+		},
+		"ok/ssh only": {
+			ctl: &WebhookController{
+				client:   http.DefaultClient,
+				webhooks: []*Webhook{{Name: "people", Kind: "AUTHORIZING", CertType: linkedca.Webhook_X509.String()}},
+				certType: linkedca.Webhook_SSH,
+			},
+			req:       &webhook.RequestBody{},
+			responses: []*webhook.ResponseBody{{Allow: false}},
 			expectErr: false,
 		},
 		"deny": {

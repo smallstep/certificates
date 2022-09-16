@@ -149,7 +149,7 @@ require (
 replace go.step.sm/crypto => ../crypto
 
 // replace go.step.sm/cli-utils => ../cli-utils
-// replace go.step.sm/linkedca => ../linkedca
+replace go.step.sm/linkedca => ../linkedca
 
 // use github.com/smallstep/pkcs7 fork with patches applied
 replace go.mozilla.org/pkcs7 => github.com/smallstep/pkcs7 v0.0.0-20211016004704-52592125d6f6
