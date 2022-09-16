@@ -146,7 +146,7 @@ retry:
 	}
 	resp, err := client.Do(req)
 	if err != nil {
-		if err == context.DeadlineExceeded {
+		if errors.Is(err, context.DeadlineExceeded) {
 			return nil, err
 		} else if retries > 0 {
 			retries--
