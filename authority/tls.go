@@ -137,7 +137,7 @@ func (a *Authority) Sign(csr *x509.CertificateRequest, signOpts provisioner.Sign
 			// TODO(mariano,areed): remove me once attData is used.
 			_ = attData
 
-			// Capture the provisioner's webhook controller
+		// Capture the provisioner's webhook controller
 		case webhookController:
 			webhookCtl = k
 

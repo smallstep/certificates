@@ -3,7 +3,6 @@ package api
 import (
 	"encoding/base64"
 	"fmt"
-	"log"
 	"net/http"
 	"net/url"
 
@@ -76,7 +75,6 @@ func (war *webhookAdminResponder) CreateProvisionerWebhook(w http.ResponseWriter
 		render.Error(w, err)
 		return
 	}
-	log.Printf("newWebhook:\n%+v", newWebhook)
 
 	if err := validateWebhook(newWebhook); err != nil {
 		render.Error(w, err)
@@ -176,7 +174,6 @@ func (war *webhookAdminResponder) UpdateProvisionerWebhook(w http.ResponseWriter
 		render.Error(w, err)
 		return
 	}
-	log.Printf("update newWebhook:\n%+v", newWebhook)
 
 	if err := validateWebhook(newWebhook); err != nil {
 		render.Error(w, err)
