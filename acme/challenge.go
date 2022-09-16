@@ -350,7 +350,7 @@ func deviceAttest01Validate(ctx context.Context, ch *Challenge, db DB, jwk *jose
 
 	switch att.Format {
 	case "apple":
-		data, err := doAppleAttestationFormat(ctx, ch, db, &att)
+		data, err := doAppleAttestationFormat(ctx, prov, ch, &att)
 		if err != nil {
 			var acmeError *Error
 			if errors.As(err, &acmeError) {
@@ -378,7 +378,7 @@ func deviceAttest01Validate(ctx context.Context, ch *Challenge, db DB, jwk *jose
 			return storeError(ctx, db, ch, true, NewError(ErrorBadAttestationStatementType, "permanent identifier does not match"))
 		}
 	case "step":
-		data, err := doStepAttestationFormat(ctx, ch, jwk, &att)
+		data, err := doStepAttestationFormat(ctx, prov, ch, jwk, &att)
 		if err != nil {
 			var acmeError *Error
 			if errors.As(err, &acmeError) {
@@ -444,13 +444,17 @@ type appleAttestationData struct {
 	Certificate  *x509.Certificate
 }
 
-func doAppleAttestationFormat(ctx context.Context, ch *Challenge, db DB, att *AttestationObject) (*appleAttestationData, error) {
-	root, err := pemutil.ParseCertificate([]byte(appleEnterpriseAttestationRootCA))
-	if err != nil {
-		return nil, WrapErrorISE(err, "error parsing apple enterprise ca")
+func doAppleAttestationFormat(ctx context.Context, prov Provisioner, ch *Challenge, att *AttestationObject) (*appleAttestationData, error) {
+	// Use configured or default attestation roots if none is configured.
+	roots, ok := prov.GetAttestationRoots()
+	if !ok {
+		root, err := pemutil.ParseCertificate([]byte(appleEnterpriseAttestationRootCA))
+		if err != nil {
+			return nil, WrapErrorISE(err, "error parsing apple enterprise ca")
+		}
+		roots = x509.NewCertPool()
+		roots.AddCert(root)
 	}
-	roots := x509.NewCertPool()
-	roots.AddCert(root)
 
 	x5c, ok := att.AttStatement["x5c"].([]interface{})
 	if !ok {
@@ -541,13 +545,17 @@ type stepAttestationData struct {
 	SerialNumber string
 }
 
-func doStepAttestationFormat(ctx context.Context, ch *Challenge, jwk *jose.JSONWebKey, att *AttestationObject) (*stepAttestationData, error) {
-	root, err := pemutil.ParseCertificate([]byte(yubicoPIVRootCA))
-	if err != nil {
-		return nil, WrapErrorISE(err, "error parsing root ca")
+func doStepAttestationFormat(ctx context.Context, prov Provisioner, ch *Challenge, jwk *jose.JSONWebKey, att *AttestationObject) (*stepAttestationData, error) {
+	// Use configured or default attestation roots if none is configured.
+	roots, ok := prov.GetAttestationRoots()
+	if !ok {
+		root, err := pemutil.ParseCertificate([]byte(yubicoPIVRootCA))
+		if err != nil {
+			return nil, WrapErrorISE(err, "error parsing root ca")
+		}
+		roots = x509.NewCertPool()
+		roots.AddCert(root)
 	}
-	roots := x509.NewCertPool()
-	roots.AddCert(root)
 
 	// Extract x5c and verify certificate
 	x5c, ok := att.AttStatement["x5c"].([]interface{})
