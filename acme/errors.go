@@ -335,7 +335,7 @@ func (e *Error) StatusCode() int {
 	return e.Status
 }
 
-// Error allows AError to implement the error interface.
+// Error implements the error interface.
 func (e *Error) Error() string {
 	if e.Err == nil {
 		return e.Detail
