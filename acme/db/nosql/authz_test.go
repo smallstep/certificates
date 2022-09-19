@@ -77,7 +77,7 @@ func TestDB_getDBAuthz(t *testing.T) {
 				Token:        "token",
 				CreatedAt:    now,
 				ExpiresAt:    now.Add(5 * time.Minute),
-				Error:        acme.NewErrorISE("force"),
+				Error:        acme.NewErrorISE("The server experienced an internal error"),
 				ChallengeIDs: []string{"foo", "bar"},
 				Wildcard:     true,
 			}
@@ -254,7 +254,7 @@ func TestDB_GetAuthorization(t *testing.T) {
 				Token:        "token",
 				CreatedAt:    now,
 				ExpiresAt:    now.Add(5 * time.Minute),
-				Error:        acme.NewErrorISE("force"),
+				Error:        acme.NewErrorISE("The server experienced an internal error"),
 				ChallengeIDs: []string{"foo", "bar"},
 				Wildcard:     true,
 			}
@@ -532,7 +532,7 @@ func TestDB_UpdateAuthorization(t *testing.T) {
 						assert.Equals(t, dbNew.Wildcard, dbaz.Wildcard)
 						assert.Equals(t, dbNew.CreatedAt, dbaz.CreatedAt)
 						assert.Equals(t, dbNew.ExpiresAt, dbaz.ExpiresAt)
-						assert.Equals(t, dbNew.Error.Error(), acme.NewError(acme.ErrorMalformedType, "malformed").Error())
+						assert.Equals(t, dbNew.Error.Error(), acme.NewError(acme.ErrorMalformedType, "The request message was malformed").Error())
 						return nil, false, errors.New("force")
 					},
 				},
@@ -582,7 +582,7 @@ func TestDB_UpdateAuthorization(t *testing.T) {
 						assert.Equals(t, dbNew.Wildcard, dbaz.Wildcard)
 						assert.Equals(t, dbNew.CreatedAt, dbaz.CreatedAt)
 						assert.Equals(t, dbNew.ExpiresAt, dbaz.ExpiresAt)
-						assert.Equals(t, dbNew.Error.Error(), acme.NewError(acme.ErrorMalformedType, "malformed").Error())
+						assert.Equals(t, dbNew.Error.Error(), acme.NewError(acme.ErrorMalformedType, "The request message was malformed").Error())
 						return nu, true, nil
 					},
 				},
