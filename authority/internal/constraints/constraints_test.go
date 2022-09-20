@@ -79,8 +79,7 @@ func TestNew(t *testing.T) {
 	}
 }
 
-func Test_service_Validate(t *testing.T) {
-
+func TestEngine_Validate(t *testing.T) {
 	type fields struct {
 		hasNameConstraints      bool
 		permittedDNSDomains     []string
@@ -223,7 +222,7 @@ func Test_service_Validate(t *testing.T) {
 	}
 }
 
-func Test_service_Validate_nil(t *testing.T) {
+func TestEngine_Validate_nil(t *testing.T) {
 	var e *Engine
 	if err := e.Validate([]string{"www.example.com"}, nil, nil, nil); err != nil {
 		t.Errorf("service.Validate() error = %v, wantErr false", err)
