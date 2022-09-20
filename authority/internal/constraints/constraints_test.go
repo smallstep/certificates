@@ -222,3 +222,10 @@ func Test_service_Validate(t *testing.T) {
 		})
 	}
 }
+
+func Test_service_Validate_nil(t *testing.T) {
+	var s *Engine
+	if err := s.Validate([]string{"www.example.com"}, nil, nil, nil); err != nil {
+		t.Errorf("service.Validate() error = %v, wantErr false", err)
+	}
+}
