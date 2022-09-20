@@ -229,3 +229,75 @@ func Test_service_Validate_nil(t *testing.T) {
 		t.Errorf("service.Validate() error = %v, wantErr false", err)
 	}
 }
+
+func TestEngine_ValidateCertificate(t *testing.T) {
+	type fields struct {
+		hasNameConstraints      bool
+		permittedDNSDomains     []string
+		excludedDNSDomains      []string
+		permittedIPRanges       []*net.IPNet
+		excludedIPRanges        []*net.IPNet
+		permittedEmailAddresses []string
+		excludedEmailAddresses  []string
+		permittedURIDomains     []string
+		excludedURIDomains      []string
+	}
+	type args struct {
+		cert *x509.Certificate
+	}
+	tests := []struct {
+		name    string
+		fields  fields
+		args    args
+		wantErr bool
+	}{
+		{"ok", fields{hasNameConstraints: false}, args{&x509.Certificate{
+			DNSNames:       []string{"example.com"},
+			IPAddresses:    []net.IP{{127, 0, 0, 1}},
+			EmailAddresses: []string{"info@example.com"},
+			URIs:           []*url.URL{{Scheme: "https", Host: "uuid.example.com", Path: "/dc4c76b5-5262-4551-a881-48094a604d63"}},
+		}}, false},
+		{"ok with constraints", fields{
+			hasNameConstraints:  false,
+			permittedDNSDomains: []string{"example.com"},
+			permittedIPRanges: []*net.IPNet{
+				{IP: net.ParseIP("127.0.0.1").To4(), Mask: net.IPMask{255, 255, 255, 255}},
+				{IP: net.ParseIP("10.3.0.0").To4(), Mask: net.IPMask{255, 255, 0, 0}},
+			},
+			permittedEmailAddresses: []string{"example.com"},
+			permittedURIDomains:     []string{".example.com"},
+		}, args{&x509.Certificate{
+			DNSNames:       []string{"www.example.com"},
+			IPAddresses:    []net.IP{{127, 0, 0, 1}, {10, 3, 1, 1}},
+			EmailAddresses: []string{"info@example.com"},
+			URIs:           []*url.URL{{Scheme: "https", Host: "uuid.example.com", Path: "/dc4c76b5-5262-4551-a881-48094a604d63"}},
+		}}, false},
+		{"fail", fields{
+			hasNameConstraints:  true,
+			permittedURIDomains: []string{".example.com"},
+		}, args{&x509.Certificate{
+			DNSNames:       []string{"example.com"},
+			IPAddresses:    []net.IP{{127, 0, 0, 1}},
+			EmailAddresses: []string{"info@example.com"},
+			URIs:           []*url.URL{{Scheme: "https", Host: "uuid.example.org", Path: "/dc4c76b5-5262-4551-a881-48094a604d63"}},
+		}}, true},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			s := &Engine{
+				hasNameConstraints:      tt.fields.hasNameConstraints,
+				permittedDNSDomains:     tt.fields.permittedDNSDomains,
+				excludedDNSDomains:      tt.fields.excludedDNSDomains,
+				permittedIPRanges:       tt.fields.permittedIPRanges,
+				excludedIPRanges:        tt.fields.excludedIPRanges,
+				permittedEmailAddresses: tt.fields.permittedEmailAddresses,
+				excludedEmailAddresses:  tt.fields.excludedEmailAddresses,
+				permittedURIDomains:     tt.fields.permittedURIDomains,
+				excludedURIDomains:      tt.fields.excludedURIDomains,
+			}
+			if err := s.ValidateCertificate(tt.args.cert); (err != nil) != tt.wantErr {
+				t.Errorf("Engine.ValidateCertificate() error = %v, wantErr %v", err, tt.wantErr)
+			}
+		})
+	}
+}
