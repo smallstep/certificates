@@ -22,7 +22,9 @@ func (e ConstraintError) Error() string {
 	return e.Detail
 }
 
-type service struct {
+// Service implements a constraint validator for DNS names, IP addresses, Email
+// addresses and URIs.
+type Service struct {
 	hasNameConstraints      bool
 	permittedDNSDomains     []string
 	excludedDNSDomains      []string
@@ -36,8 +38,8 @@ type service struct {
 
 // New creates a constraint validation service that contains the given chain of
 // certificates.
-func New(chain ...*x509.Certificate) *service {
-	s := new(service)
+func New(chain ...*x509.Certificate) *Service {
+	s := new(Service)
 	for _, crt := range chain {
 		s.permittedDNSDomains = append(s.permittedDNSDomains, crt.PermittedDNSDomains...)
 		s.excludedDNSDomains = append(s.excludedDNSDomains, crt.ExcludedDNSDomains...)
@@ -62,7 +64,7 @@ func New(chain ...*x509.Certificate) *service {
 
 // Validate checks the given names with the name constraints defined in the
 // service.
-func (s *service) Validate(dnsNames []string, ipAddresses []net.IP, emailAddresses []string, uris []*url.URL) error {
+func (s *Service) Validate(dnsNames []string, ipAddresses []net.IP, emailAddresses []string, uris []*url.URL) error {
 	if !s.hasNameConstraints {
 		return nil
 	}
