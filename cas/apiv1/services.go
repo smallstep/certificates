@@ -59,14 +59,14 @@ func (t Type) String() string {
 	return strings.ToLower(string(t))
 }
 
-// ErrNotImplemented is the type of error returned if an operation is not implemented.
-type ErrNotImplemented struct { //nolint:errname // ignore error name warning
+// NotImplementedError is the type of error returned if an operation is not implemented.
+type NotImplementedError struct { //nolint:errname // ignore error name warning
 
 	Message string
 }
 
-// ErrNotImplemented implements the error interface.
-func (e ErrNotImplemented) Error() string {
+// NotImplementedError implements the error interface.
+func (e NotImplementedError) Error() string {
 	if e.Message != "" {
 		return e.Message
 	}
@@ -75,6 +75,6 @@ func (e ErrNotImplemented) Error() string {
 
 // StatusCode implements the StatusCoder interface and returns the HTTP 501
 // error.
-func (e ErrNotImplemented) StatusCode() int {
+func (e NotImplementedError) StatusCode() int {
 	return http.StatusNotImplemented
 }
