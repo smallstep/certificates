@@ -205,7 +205,7 @@ func Test_service_Validate(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			s := &Engine{
+			e := &Engine{
 				hasNameConstraints:      tt.fields.hasNameConstraints,
 				permittedDNSDomains:     tt.fields.permittedDNSDomains,
 				excludedDNSDomains:      tt.fields.excludedDNSDomains,
@@ -216,7 +216,7 @@ func Test_service_Validate(t *testing.T) {
 				permittedURIDomains:     tt.fields.permittedURIDomains,
 				excludedURIDomains:      tt.fields.excludedURIDomains,
 			}
-			if err := s.Validate(tt.args.dnsNames, tt.args.ipAddresses, tt.args.emailAddresses, tt.args.uris); (err != nil) != tt.wantErr {
+			if err := e.Validate(tt.args.dnsNames, tt.args.ipAddresses, tt.args.emailAddresses, tt.args.uris); (err != nil) != tt.wantErr {
 				t.Errorf("service.Validate() error = %v, wantErr %v", err, tt.wantErr)
 			}
 		})
@@ -224,8 +224,8 @@ func Test_service_Validate(t *testing.T) {
 }
 
 func Test_service_Validate_nil(t *testing.T) {
-	var s *Engine
-	if err := s.Validate([]string{"www.example.com"}, nil, nil, nil); err != nil {
+	var e *Engine
+	if err := e.Validate([]string{"www.example.com"}, nil, nil, nil); err != nil {
 		t.Errorf("service.Validate() error = %v, wantErr false", err)
 	}
 }
@@ -284,7 +284,7 @@ func TestEngine_ValidateCertificate(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			s := &Engine{
+			e := &Engine{
 				hasNameConstraints:      tt.fields.hasNameConstraints,
 				permittedDNSDomains:     tt.fields.permittedDNSDomains,
 				excludedDNSDomains:      tt.fields.excludedDNSDomains,
@@ -295,7 +295,7 @@ func TestEngine_ValidateCertificate(t *testing.T) {
 				permittedURIDomains:     tt.fields.permittedURIDomains,
 				excludedURIDomains:      tt.fields.excludedURIDomains,
 			}
-			if err := s.ValidateCertificate(tt.args.cert); (err != nil) != tt.wantErr {
+			if err := e.ValidateCertificate(tt.args.cert); (err != nil) != tt.wantErr {
 				t.Errorf("Engine.ValidateCertificate() error = %v, wantErr %v", err, tt.wantErr)
 			}
 		})

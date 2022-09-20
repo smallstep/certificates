@@ -4,6 +4,7 @@ import (
 	"crypto/x509"
 	"fmt"
 	"net"
+	"net/http"
 	"net/url"
 )
 
@@ -20,6 +21,11 @@ type ConstraintError struct {
 // Error implements the error interface.
 func (e ConstraintError) Error() string {
 	return e.Detail
+}
+
+// StatusCode implements an status coder interface.
+func (e ConstraintError) StatusCode() int {
+	return http.StatusForbidden
 }
 
 // Engine implements a constraint validator for DNS names, IP addresses, Email
@@ -39,38 +45,38 @@ type Engine struct {
 // New creates a constraint validation engine that contains the given chain of
 // certificates.
 func New(chain ...*x509.Certificate) *Engine {
-	s := new(Engine)
+	e := new(Engine)
 	for _, crt := range chain {
-		s.permittedDNSDomains = append(s.permittedDNSDomains, crt.PermittedDNSDomains...)
-		s.excludedDNSDomains = append(s.excludedDNSDomains, crt.ExcludedDNSDomains...)
-		s.permittedIPRanges = append(s.permittedIPRanges, crt.PermittedIPRanges...)
-		s.excludedIPRanges = append(s.excludedIPRanges, crt.ExcludedIPRanges...)
-		s.permittedEmailAddresses = append(s.permittedEmailAddresses, crt.PermittedEmailAddresses...)
-		s.excludedEmailAddresses = append(s.excludedEmailAddresses, crt.ExcludedEmailAddresses...)
-		s.permittedURIDomains = append(s.permittedURIDomains, crt.PermittedURIDomains...)
-		s.excludedURIDomains = append(s.excludedURIDomains, crt.ExcludedURIDomains...)
+		e.permittedDNSDomains = append(e.permittedDNSDomains, crt.PermittedDNSDomains...)
+		e.excludedDNSDomains = append(e.excludedDNSDomains, crt.ExcludedDNSDomains...)
+		e.permittedIPRanges = append(e.permittedIPRanges, crt.PermittedIPRanges...)
+		e.excludedIPRanges = append(e.excludedIPRanges, crt.ExcludedIPRanges...)
+		e.permittedEmailAddresses = append(e.permittedEmailAddresses, crt.PermittedEmailAddresses...)
+		e.excludedEmailAddresses = append(e.excludedEmailAddresses, crt.ExcludedEmailAddresses...)
+		e.permittedURIDomains = append(e.permittedURIDomains, crt.PermittedURIDomains...)
+		e.excludedURIDomains = append(e.excludedURIDomains, crt.ExcludedURIDomains...)
 
-		if !s.hasNameConstraints {
+		if !e.hasNameConstraints {
 			for _, ext := range crt.Extensions {
 				if ext.Id.Equal(oidExtensionNameConstraints) {
-					s.hasNameConstraints = true
+					e.hasNameConstraints = true
 					break
 				}
 			}
 		}
 	}
-	return s
+	return e
 }
 
 // Validate checks the given names with the name constraints defined in the
 // service.
-func (s *Engine) Validate(dnsNames []string, ipAddresses []net.IP, emailAddresses []string, uris []*url.URL) error {
-	if s == nil || !s.hasNameConstraints {
+func (e *Engine) Validate(dnsNames []string, ipAddresses []net.IP, emailAddresses []string, uris []*url.URL) error {
+	if e == nil || !e.hasNameConstraints {
 		return nil
 	}
 
 	for _, name := range dnsNames {
-		if err := checkNameConstraints("DNS name", name, name, s.permittedDNSDomains, s.excludedDNSDomains,
+		if err := checkNameConstraints("DNS name", name, name, e.permittedDNSDomains, e.excludedDNSDomains,
 			func(parsedName, constraint any) (bool, error) {
 				return matchDomainConstraint(parsedName.(string), constraint.(string))
 			},
@@ -80,7 +86,7 @@ func (s *Engine) Validate(dnsNames []string, ipAddresses []net.IP, emailAddresse
 	}
 
 	for _, ip := range ipAddresses {
-		if err := checkNameConstraints("IP address", ip.String(), ip, s.permittedIPRanges, s.excludedIPRanges,
+		if err := checkNameConstraints("IP address", ip.String(), ip, e.permittedIPRanges, e.excludedIPRanges,
 			func(parsedName, constraint any) (bool, error) {
 				return matchIPConstraint(parsedName.(net.IP), constraint.(*net.IPNet))
 			},
@@ -94,7 +100,7 @@ func (s *Engine) Validate(dnsNames []string, ipAddresses []net.IP, emailAddresse
 		if !ok {
 			return fmt.Errorf("cannot parse rfc822Name %q", email)
 		}
-		if err := checkNameConstraints("Email address", email, mailbox, s.permittedEmailAddresses, s.excludedEmailAddresses,
+		if err := checkNameConstraints("Email address", email, mailbox, e.permittedEmailAddresses, e.excludedEmailAddresses,
 			func(parsedName, constraint any) (bool, error) {
 				return matchEmailConstraint(parsedName.(rfc2821Mailbox), constraint.(string))
 			},
@@ -104,7 +110,7 @@ func (s *Engine) Validate(dnsNames []string, ipAddresses []net.IP, emailAddresse
 	}
 
 	for _, uri := range uris {
-		if err := checkNameConstraints("URI", uri.String(), uri, s.permittedURIDomains, s.excludedURIDomains,
+		if err := checkNameConstraints("URI", uri.String(), uri, e.permittedURIDomains, e.excludedURIDomains,
 			func(parsedName, constraint any) (bool, error) {
 				return matchURIConstraint(parsedName.(*url.URL), constraint.(string))
 			},
@@ -118,6 +124,6 @@ func (s *Engine) Validate(dnsNames []string, ipAddresses []net.IP, emailAddresse
 
 // ValidateCertificate validates the DNS names, IP addresses, Email address and
 // URIs present in the given certificate.
-func (s *Engine) ValidateCertificate(cert *x509.Certificate) error {
-	return s.Validate(cert.DNSNames, cert.IPAddresses, cert.EmailAddresses, cert.URIs)
+func (e *Engine) ValidateCertificate(cert *x509.Certificate) error {
+	return e.Validate(cert.DNSNames, cert.IPAddresses, cert.EmailAddresses, cert.URIs)
 }
