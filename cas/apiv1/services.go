@@ -60,8 +60,7 @@ func (t Type) String() string {
 }
 
 // NotImplementedError is the type of error returned if an operation is not implemented.
-type NotImplementedError struct { //nolint:errname // ignore error name warning
-
+type NotImplementedError struct {
 	Message string
 }
 
