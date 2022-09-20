@@ -10,12 +10,13 @@ import (
 var oidExtensionNameConstraints = []int{2, 5, 29, 30}
 
 type ConstraintError struct {
-	Type string
-	Name string
+	Type   string
+	Name   string
+	Detail string
 }
 
 func (e ConstraintError) Error() string {
-	return fmt.Sprintf("%s %q is not allowed", e.Type, e.Name)
+	return e.Detail
 }
 
 type service struct {
@@ -74,7 +75,8 @@ func (s *service) Validate(dnsNames []string, ipAddresses []*net.IP, emailAddres
 		if err := checkNameConstraints("IP address", ip.String(), ip, s.permittedIPRanges, s.excludedIPRanges,
 			func(parsedName, constraint any) (bool, error) {
 				return matchIPConstraint(parsedName.(net.IP), constraint.(*net.IPNet))
-			}); err != nil {
+			},
+		); err != nil {
 			return err
 		}
 	}
@@ -97,7 +99,8 @@ func (s *service) Validate(dnsNames []string, ipAddresses []*net.IP, emailAddres
 		if err := checkNameConstraints("URI", uri.String(), uri, s.permittedURIDomains, s.excludedURIDomains,
 			func(parsedName, constraint any) (bool, error) {
 				return matchURIConstraint(parsedName.(*url.URL), constraint.(string))
-			}); err != nil {
+			},
+		); err != nil {
 			return err
 		}
 	}

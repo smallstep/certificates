@@ -43,11 +43,19 @@ func checkNameConstraints(nameType string, name string, parsedName any, permitte
 		constraint := excludedValue.Index(i).Interface()
 		match, err := match(parsedName, constraint)
 		if err != nil {
-			return err
+			return ConstraintError{
+				Type:   nameType,
+				Name:   name,
+				Detail: err.Error(),
+			}
 		}
 
 		if match {
-			return fmt.Errorf("%s %q is excluded by constraint %q", nameType, name, constraint)
+			return ConstraintError{
+				Type:   nameType,
+				Name:   name,
+				Detail: fmt.Sprintf("%s %q is excluded by constraint %q", nameType, name, constraint),
+			}
 		}
 	}
 
@@ -60,14 +68,22 @@ func checkNameConstraints(nameType string, name string, parsedName any, permitte
 	for i := 0; i < permittedValue.Len(); i++ {
 		constraint := permittedValue.Index(i).Interface()
 		if ok, err = match(parsedName, constraint); err != nil {
-			return err
+			return ConstraintError{
+				Type:   nameType,
+				Name:   name,
+				Detail: err.Error(),
+			}
 		}
 		if ok {
 			break
 		}
 	}
 	if !ok {
-		return fmt.Errorf("%s %q is not permitted by any constraint", nameType, name)
+		return ConstraintError{
+			Type:   nameType,
+			Name:   name,
+			Detail: fmt.Sprintf("%s %q is not permitted by any constraint", nameType, name),
+		}
 	}
 
 	return nil
