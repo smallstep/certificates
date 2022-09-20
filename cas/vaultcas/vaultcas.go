@@ -162,7 +162,7 @@ func (v *VaultCAS) GetCertificateAuthority(req *apiv1.GetCertificateAuthorityReq
 // RenewCertificate will always return a non-implemented error as renewals
 // are not supported yet.
 func (v *VaultCAS) RenewCertificate(req *apiv1.RenewCertificateRequest) (*apiv1.RenewCertificateResponse, error) {
-	return nil, apiv1.ErrNotImplemented{Message: "vaultCAS does not support renewals"}
+	return nil, apiv1.NotImplementedError{Message: "vaultCAS does not support renewals"}
 }
 
 // RevokeCertificate revokes a certificate by serial number.
