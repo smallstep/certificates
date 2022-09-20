@@ -47,12 +47,12 @@ func TestNew(t *testing.T) {
 	tests := []struct {
 		name string
 		args args
-		want *Service
+		want *Engine
 	}{
-		{"ok", args{[]*x509.Certificate{ca1.Intermediate, ca1.Root}}, &Service{
+		{"ok", args{[]*x509.Certificate{ca1.Intermediate, ca1.Root}}, &Engine{
 			hasNameConstraints: false,
 		}},
-		{"ok with constraints", args{[]*x509.Certificate{ca2.Intermediate, ca2.Root}}, &Service{
+		{"ok with constraints", args{[]*x509.Certificate{ca2.Intermediate, ca2.Root}}, &Engine{
 			hasNameConstraints:  true,
 			permittedDNSDomains: []string{"internal.example.org"},
 			excludedDNSDomains:  []string{"internal.example.com"},
@@ -205,7 +205,7 @@ func Test_service_Validate(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			s := &Service{
+			s := &Engine{
 				hasNameConstraints:      tt.fields.hasNameConstraints,
 				permittedDNSDomains:     tt.fields.permittedDNSDomains,
 				excludedDNSDomains:      tt.fields.excludedDNSDomains,

@@ -80,6 +80,8 @@ type Authority struct {
 	authorizeRenewFunc    provisioner.AuthorizeRenewFunc
 	authorizeSSHRenewFunc provisioner.AuthorizeSSHRenewFunc
 
+	// Constraint engine
+
 	// Policy engines
 	policyEngine *policy.Engine
 
