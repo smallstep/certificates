@@ -4,7 +4,6 @@ import (
 	"flag"
 	"fmt"
 	"html"
-	"log"
 	"math/rand"
 	"net/http"
 	"os"
@@ -176,7 +175,11 @@ $ step-ca --context=mybiz --password-file ./password.txt
 	debugProfAddr := os.Getenv("STEP_PROF_ADDR")
 	if debugProfAddr != "" {
 		go func() {
-			log.Println(http.ListenAndServe(debugProfAddr, nil))
+			srv := http.Server{
+				Addr:              debugProfAddr,
+				ReadHeaderTimeout: 15 * time.Second,
+			}
+			srv.ListenAndServe()
 		}()
 	}
 

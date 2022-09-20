@@ -28,8 +28,9 @@ ci: testcgo build
 #########################################
 
 bootstra%:
-	# Using a released version of golangci-lint to take into account custom replacements in their go.mod
-	$Q curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s -- -b $(shell go env GOPATH)/bin v1.48.0
+	$Q curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s -- -b $$(go env GOPATH)/bin latest
+	$Q go install golang.org/x/vuln/cmd/govulncheck@latest
+	$Q go install gotest.tools/gotestsum@latest
 
 .PHONY: bootstra%
 
@@ -151,15 +152,14 @@ integration: bin/$(BINNAME)
 #########################################
 
 fmt:
-	$Q goimports -local github.com/golangci/golangci-lint -l -w $(SRC)
+	$Q goimports -l -w $(SRC)
 
+lint: SHELL:=/bin/bash
 lint:
-	$Q golangci-lint run --timeout=30m
+	$Q LOG_LEVEL=error golangci-lint run --config <(curl -s https://raw.githubusercontent.com/smallstep/workflows/master/.golangci.yml) --timeout=30m
+	$Q govulncheck ./...
 
-lintcgo:
-	$Q LOG_LEVEL=error golangci-lint run --timeout=30m
-
-.PHONY: fmt lint lintcgo
+.PHONY: fmt lint
 
 #########################################
 # Install

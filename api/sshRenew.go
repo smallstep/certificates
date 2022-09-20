@@ -75,6 +75,7 @@ func SSHRenew(w http.ResponseWriter, r *http.Request) {
 	notBefore := time.Unix(int64(oldCert.ValidAfter), 0)
 	notAfter := time.Unix(int64(oldCert.ValidBefore), 0)
 
+	//nolint:contextcheck // the reqest has the context
 	identity, err := renewIdentityCertificate(r, notBefore, notAfter)
 	if err != nil {
 		render.Error(w, errs.ForbiddenErr(err, "error renewing identity certificate"))

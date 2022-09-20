@@ -15,7 +15,7 @@ import (
 // ACMEChallenge represents the supported acme challenges.
 type ACMEChallenge string
 
-// nolint:revive // better names
+//nolint:stylecheck,revive // better names
 const (
 	// HTTP_01 is the http-01 ACME challenge.
 	HTTP_01 ACMEChallenge = "http-01"
