@@ -82,7 +82,7 @@ func matchDomainConstraint(domain, constraint string) (bool, error) {
 
 	domainLabels, ok := domainToReverseLabels(domain)
 	if !ok {
-		return false, fmt.Errorf("x509: internal error: cannot parse domain %q", domain)
+		return false, fmt.Errorf("internal error: cannot parse domain %q", domain)
 	}
 
 	// RFC 5280 says that a leading period in a domain name means that at
@@ -98,7 +98,7 @@ func matchDomainConstraint(domain, constraint string) (bool, error) {
 
 	constraintLabels, ok := domainToReverseLabels(constraint)
 	if !ok {
-		return false, fmt.Errorf("x509: internal error: cannot parse domain %q", constraint)
+		return false, fmt.Errorf("internal error: cannot parse domain %q", constraint)
 	}
 
 	if len(domainLabels) < len(constraintLabels) ||
@@ -135,7 +135,7 @@ func matchEmailConstraint(mailbox rfc2821Mailbox, constraint string) (bool, erro
 	if strings.Contains(constraint, "@") {
 		constraintMailbox, ok := parseRFC2821Mailbox(constraint)
 		if !ok {
-			return false, fmt.Errorf("x509: internal error: cannot parse constraint %q", constraint)
+			return false, fmt.Errorf("internal error: cannot parse constraint %q", constraint)
 		}
 		return mailbox.local == constraintMailbox.local && strings.EqualFold(mailbox.domain, constraintMailbox.domain), nil
 	}
