@@ -9,12 +9,15 @@ import (
 
 var oidExtensionNameConstraints = []int{2, 5, 29, 30}
 
+// ConstraintError is the typed error that will be returned if a constraint
+// error is found.
 type ConstraintError struct {
 	Type   string
 	Name   string
 	Detail string
 }
 
+// Error implements the error interface.
 func (e ConstraintError) Error() string {
 	return e.Detail
 }
@@ -31,6 +34,8 @@ type service struct {
 	excludedURIDomains      []string
 }
 
+// New creates a constraint validation service that contains the given chain of
+// certificates.
 func New(chain ...*x509.Certificate) *service {
 	s := new(service)
 	for _, crt := range chain {
@@ -55,8 +60,9 @@ func New(chain ...*x509.Certificate) *service {
 	return s
 }
 
-// Validates
-func (s *service) Validate(dnsNames []string, ipAddresses []*net.IP, emailAddresses []string, uris []*url.URL) error {
+// Validate checks the given names with the name constraints defined in the
+// service.
+func (s *service) Validate(dnsNames []string, ipAddresses []net.IP, emailAddresses []string, uris []*url.URL) error {
 	if !s.hasNameConstraints {
 		return nil
 	}
