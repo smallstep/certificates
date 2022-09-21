@@ -1135,7 +1135,8 @@ retry:
 	}
 	var check api.SSHCheckPrincipalResponse
 	if err := readJSON(resp.Body, &check); err != nil {
-		return nil, errs.Wrapf(http.StatusInternalServerError, err, "error reading %s response", u)
+		return nil, errs.Wrapf(http.StatusInternalServerError, err, "error reading %s response",
+			[]any{u, errs.WithMessage("Failed to parse response from /ssh/check-host endpoint")}...)
 	}
 	return &check, nil
 }

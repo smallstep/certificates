@@ -4,6 +4,7 @@ import (
 	"flag"
 	"fmt"
 	"html"
+	"log"
 	"math/rand"
 	"net/http"
 	"os"
@@ -179,7 +180,7 @@ $ step-ca --context=mybiz --password-file ./password.txt
 				Addr:              debugProfAddr,
 				ReadHeaderTimeout: 15 * time.Second,
 			}
-			srv.ListenAndServe()
+			log.Println(srv.ListenAndServe())
 		}()
 	}
 
