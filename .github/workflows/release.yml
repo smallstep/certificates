@@ -7,41 +7,13 @@ on:
     - 'v*' # Push events to matching v*, i.e. v1.0, v20.15.10
 
 jobs:
-  test:
-    name: Lint, Test, Build
-    runs-on: ubuntu-20.04
-    strategy:
-      matrix:
-        go: [ '1.18', '1.19' ]
-    outputs:
-      is_prerelease: ${{ steps.is_prerelease.outputs.IS_PRERELEASE }}
-    steps:
-      -
-        name: Checkout
-        uses: actions/checkout@v2
-      -
-        name: Setup Go
-        uses: actions/setup-go@v2
-        with:
-          go-version: ${{ matrix.go }}
-      -
-        name: Install Deps
-        id: install-deps
-        run: sudo apt-get -y install libpcsclite-dev
-      -
-        name: golangci-lint
-        uses: golangci/golangci-lint-action@v2
-        with:
-          version: ${{ secrets.GOLANGCI_LINT_VERSION }}
-          args: --timeout=30m
-      -
-        name: Test, Build
-        id: lint_test_build
-        run: V=1 make ci
+  ci:
+    uses: smallstep/workflows/.github/workflows/goCI.yml@main
+
 
   create_release:
     name: Create Release
-    needs: test
+    needs: ci
     runs-on: ubuntu-20.04
     outputs:
       debversion: ${{ steps.extract-tag.outputs.DEB_VERSION }}
@@ -132,7 +104,7 @@ jobs:
   build_upload_docker:
     name: Build & Upload Docker Images
     runs-on: ubuntu-20.04
-    needs: test
+    needs: ci
     steps:
       -
         name: Checkout
