@@ -112,13 +112,9 @@ type MockProvisioner struct {
 	MauthorizeOrderIdentifier func(ctx context.Context, identifier provisioner.ACMEIdentifier) error
 	MauthorizeSign            func(ctx context.Context, ott string) ([]provisioner.SignOption, error)
 	MauthorizeRevoke          func(ctx context.Context, token string) error
-<<<<<<< HEAD
 	MisChallengeEnabled       func(ctx context.Context, challenge provisioner.ACMEChallenge) bool
 	MisAttFormatEnabled       func(ctx context.Context, format provisioner.ACMEAttestationFormat) bool
 	MgetAttestationRoots      func() (*x509.CertPool, bool)
-=======
-	MauthorizeChallenge       func(Ctx context.Context, challenge string) error
->>>>>>> 0f84b333 (Add acme property to enable challenges)
 	MdefaultTLSCertDuration   func() time.Duration
 	MgetOptions               func() *provisioner.Options
 }
@@ -155,7 +151,6 @@ func (m *MockProvisioner) AuthorizeRevoke(ctx context.Context, token string) err
 	return m.Merr
 }
 
-<<<<<<< HEAD
 // IsChallengeEnabled mock
 func (m *MockProvisioner) IsChallengeEnabled(ctx context.Context, challenge provisioner.ACMEChallenge) bool {
 	if m.MisChallengeEnabled != nil {
@@ -177,14 +172,6 @@ func (m *MockProvisioner) GetAttestationRoots() (*x509.CertPool, bool) {
 		return m.MgetAttestationRoots()
 	}
 	return m.Mret1.(*x509.CertPool), m.Mret1 != nil
-=======
-// AuthorizeChallenge mock
-func (m *MockProvisioner) AuthorizeChallenge(ctx context.Context, challenge string) error {
-	if m.MauthorizeChallenge != nil {
-		return m.MauthorizeChallenge(ctx, challenge)
-	}
-	return m.Merr
->>>>>>> 0f84b333 (Add acme property to enable challenges)
 }
 
 // DefaultTLSCertDuration mock
