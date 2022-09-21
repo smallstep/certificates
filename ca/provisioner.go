@@ -182,19 +182,17 @@ func loadProvisionerJWKByKid(client *Client, kid string, password []byte) (*jose
 // loadProvisionerJWKByName retrieves the list of provisioners and encrypted key then
 // returns the key of the first provisioner with a matching name that can be successfully
 // decrypted with the specified password.
-func loadProvisionerJWKByName(client *Client, name string, password []byte) (key *jose.JSONWebKey, err error) {
+func loadProvisionerJWKByName(client *Client, name string, password []byte) (*jose.JSONWebKey, error) {
 	provisioners, err := getProvisioners(client)
 	if err != nil {
-		err = errors.Wrap(err, "error getting the provisioners")
-		return
+		return nil, errors.Wrap(err, "error getting the provisioners")
 	}
 
 	for _, provisioner := range provisioners {
 		if provisioner.GetName() == name {
 			if _, encryptedKey, ok := provisioner.GetEncryptedKey(); ok {
-				key, err = decryptProvisionerJWK(encryptedKey, password)
-				if err == nil {
-					return
+				if key, err := decryptProvisionerJWK(encryptedKey, password); err == nil {
+					return key, nil
 				}
 			}
 		}

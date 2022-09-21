@@ -389,7 +389,7 @@ func New(o apiv1.Options, opts ...Option) (*PKI, error) {
 		if port == "443" || p.options.isHelm {
 			p.Defaults.CaUrl = fmt.Sprintf("https://%s", p.Defaults.CaUrl)
 		} else {
-			p.Defaults.CaUrl = fmt.Sprintf("https://%s:%s", p.Defaults.CaUrl, port)
+			p.Defaults.CaUrl = fmt.Sprintf("https://%s", net.JoinHostPort(p.Defaults.CaUrl, port))
 		}
 	}
 

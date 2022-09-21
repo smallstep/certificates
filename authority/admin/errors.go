@@ -156,16 +156,17 @@ func NewErrorISE(msg string, args ...interface{}) *Error {
 
 // WrapError attempts to wrap the internal error.
 func WrapError(typ ProblemType, err error, msg string, args ...interface{}) *Error {
-	switch e := err.(type) {
-	case nil:
+	var ee *Error
+	switch {
+	case err == nil:
 		return nil
-	case *Error:
-		if e.Err == nil {
-			e.Err = errors.Errorf(msg+"; "+e.Detail, args...)
+	case errors.As(err, &ee):
+		if ee.Err == nil {
+			ee.Err = errors.Errorf(msg+"; "+ee.Detail, args...)
 		} else {
-			e.Err = errors.Wrapf(e.Err, msg, args...)
+			ee.Err = errors.Wrapf(ee.Err, msg, args...)
 		}
-		return e
+		return ee
 	default:
 		return newError(typ, errors.Wrapf(err, msg, args...))
 	}

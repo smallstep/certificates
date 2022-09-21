@@ -93,16 +93,16 @@ func TestDB_getDBExternalAccountKey(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			d := DB{db: tc.db}
 			if dbeak, err := d.getDBExternalAccountKey(context.Background(), keyID); err != nil {
-				switch k := err.(type) {
-				case *acme.Error:
+				var ae *acme.Error
+				if errors.As(err, &ae) {
 					if assert.NotNil(t, tc.acmeErr) {
-						assert.Equals(t, k.Type, tc.acmeErr.Type)
-						assert.Equals(t, k.Detail, tc.acmeErr.Detail)
-						assert.Equals(t, k.Status, tc.acmeErr.Status)
-						assert.Equals(t, k.Err.Error(), tc.acmeErr.Err.Error())
-						assert.Equals(t, k.Detail, tc.acmeErr.Detail)
+						assert.Equals(t, ae.Type, tc.acmeErr.Type)
+						assert.Equals(t, ae.Detail, tc.acmeErr.Detail)
+						assert.Equals(t, ae.Status, tc.acmeErr.Status)
+						assert.Equals(t, ae.Err.Error(), tc.acmeErr.Err.Error())
+						assert.Equals(t, ae.Detail, tc.acmeErr.Detail)
 					}
-				default:
+				} else {
 					if assert.NotNil(t, tc.err) {
 						assert.HasPrefix(t, err.Error(), tc.err.Error())
 					}
@@ -210,16 +210,16 @@ func TestDB_GetExternalAccountKey(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			d := DB{db: tc.db}
 			if eak, err := d.GetExternalAccountKey(context.Background(), provID, keyID); err != nil {
-				switch k := err.(type) {
-				case *acme.Error:
+				var ae *acme.Error
+				if errors.As(err, &ae) {
 					if assert.NotNil(t, tc.acmeErr) {
-						assert.Equals(t, k.Type, tc.acmeErr.Type)
-						assert.Equals(t, k.Detail, tc.acmeErr.Detail)
-						assert.Equals(t, k.Status, tc.acmeErr.Status)
-						assert.Equals(t, k.Err.Error(), tc.acmeErr.Err.Error())
-						assert.Equals(t, k.Detail, tc.acmeErr.Detail)
+						assert.Equals(t, ae.Type, tc.acmeErr.Type)
+						assert.Equals(t, ae.Detail, tc.acmeErr.Detail)
+						assert.Equals(t, ae.Status, tc.acmeErr.Status)
+						assert.Equals(t, ae.Err.Error(), tc.acmeErr.Err.Error())
+						assert.Equals(t, ae.Detail, tc.acmeErr.Detail)
 					}
-				default:
+				} else {
 					if assert.NotNil(t, tc.err) {
 						assert.HasPrefix(t, err.Error(), tc.err.Error())
 					}
@@ -374,16 +374,16 @@ func TestDB_GetExternalAccountKeyByReference(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			d := DB{db: tc.db}
 			if eak, err := d.GetExternalAccountKeyByReference(context.Background(), provID, tc.ref); err != nil {
-				switch k := err.(type) {
-				case *acme.Error:
+				var ae *acme.Error
+				if errors.As(err, &ae) {
 					if assert.NotNil(t, tc.acmeErr) {
-						assert.Equals(t, k.Type, tc.acmeErr.Type)
-						assert.Equals(t, k.Detail, tc.acmeErr.Detail)
-						assert.Equals(t, k.Status, tc.acmeErr.Status)
-						assert.Equals(t, k.Err.Error(), tc.acmeErr.Err.Error())
-						assert.Equals(t, k.Detail, tc.acmeErr.Detail)
+						assert.Equals(t, ae.Type, tc.acmeErr.Type)
+						assert.Equals(t, ae.Detail, tc.acmeErr.Detail)
+						assert.Equals(t, ae.Status, tc.acmeErr.Status)
+						assert.Equals(t, ae.Err.Error(), tc.acmeErr.Err.Error())
+						assert.Equals(t, ae.Detail, tc.acmeErr.Detail)
 					}
-				default:
+				} else {
 					if assert.NotNil(t, tc.err) {
 						assert.HasPrefix(t, err.Error(), tc.err.Error())
 					}
@@ -580,16 +580,16 @@ func TestDB_GetExternalAccountKeys(t *testing.T) {
 			cursor, limit := "", 0
 			if eaks, nextCursor, err := d.GetExternalAccountKeys(context.Background(), provID, cursor, limit); err != nil {
 				assert.Equals(t, "", nextCursor)
-				switch k := err.(type) {
-				case *acme.Error:
+				var ae *acme.Error
+				if errors.As(err, &ae) {
 					if assert.NotNil(t, tc.acmeErr) {
-						assert.Equals(t, k.Type, tc.acmeErr.Type)
-						assert.Equals(t, k.Detail, tc.acmeErr.Detail)
-						assert.Equals(t, k.Status, tc.acmeErr.Status)
-						assert.Equals(t, k.Err.Error(), tc.acmeErr.Err.Error())
-						assert.Equals(t, k.Detail, tc.acmeErr.Detail)
+						assert.Equals(t, ae.Type, tc.acmeErr.Type)
+						assert.Equals(t, ae.Detail, tc.acmeErr.Detail)
+						assert.Equals(t, ae.Status, tc.acmeErr.Status)
+						assert.Equals(t, ae.Err.Error(), tc.acmeErr.Err.Error())
+						assert.Equals(t, ae.Detail, tc.acmeErr.Detail)
 					}
-				default:
+				} else {
 					if assert.NotNil(t, tc.err) {
 						assert.Equals(t, tc.err.Error(), err.Error())
 					}
@@ -672,7 +672,7 @@ func TestDB_DeleteExternalAccountKey(t *testing.T) {
 							return errors.New("force default")
 						}
 					},
-					MCmpAndSwap: func(bucket, key, old, new []byte) ([]byte, bool, error) {
+					MCmpAndSwap: func(bucket, key, old, nu []byte) ([]byte, bool, error) {
 						fmt.Println(string(bucket))
 						switch string(bucket) {
 						case string(externalAccountKeyIDsByReferenceTable):
@@ -882,16 +882,16 @@ func TestDB_DeleteExternalAccountKey(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			d := DB{db: tc.db}
 			if err := d.DeleteExternalAccountKey(context.Background(), provID, keyID); err != nil {
-				switch k := err.(type) {
-				case *acme.Error:
+				var ae *acme.Error
+				if errors.As(err, &ae) {
 					if assert.NotNil(t, tc.acmeErr) {
-						assert.Equals(t, k.Type, tc.acmeErr.Type)
-						assert.Equals(t, k.Detail, tc.acmeErr.Detail)
-						assert.Equals(t, k.Status, tc.acmeErr.Status)
-						assert.Equals(t, k.Err.Error(), tc.acmeErr.Err.Error())
-						assert.Equals(t, k.Detail, tc.acmeErr.Detail)
+						assert.Equals(t, ae.Type, tc.acmeErr.Type)
+						assert.Equals(t, ae.Detail, tc.acmeErr.Detail)
+						assert.Equals(t, ae.Status, tc.acmeErr.Status)
+						assert.Equals(t, ae.Err.Error(), tc.acmeErr.Err.Error())
+						assert.Equals(t, ae.Detail, tc.acmeErr.Detail)
 					}
-				default:
+				} else {
 					if assert.NotNil(t, tc.err) {
 						assert.Equals(t, err.Error(), tc.err.Error())
 					}

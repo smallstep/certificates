@@ -52,6 +52,7 @@ func NewACMEClient(endpoint string, contact []string, opts ...ClientOption) (*AC
 	if err != nil {
 		return nil, errors.Wrapf(err, "client GET %s failed", endpoint)
 	}
+	defer resp.Body.Close()
 	if resp.StatusCode >= 400 {
 		return nil, readACMEError(resp.Body)
 	}
@@ -80,6 +81,7 @@ func NewACMEClient(endpoint string, contact []string, opts ...ClientOption) (*AC
 	if err != nil {
 		return nil, err
 	}
+	defer resp.Body.Close()
 	if resp.StatusCode >= 400 {
 		return nil, readACMEError(resp.Body)
 	}
@@ -111,6 +113,7 @@ func (c *ACMEClient) GetNonce() (string, error) {
 	if err != nil {
 		return "", errors.Wrapf(err, "client GET %s failed", c.dir.NewNonce)
 	}
+	defer resp.Body.Close()
 	if resp.StatusCode >= 400 {
 		return "", readACMEError(resp.Body)
 	}
@@ -198,6 +201,7 @@ func (c *ACMEClient) NewOrder(payload []byte) (*acme.Order, error) {
 	if err != nil {
 		return nil, err
 	}
+	defer resp.Body.Close()
 	if resp.StatusCode >= 400 {
 		return nil, readACMEError(resp.Body)
 	}
@@ -218,6 +222,7 @@ func (c *ACMEClient) GetChallenge(url string) (*acme.Challenge, error) {
 	if err != nil {
 		return nil, err
 	}
+	defer resp.Body.Close()
 	if resp.StatusCode >= 400 {
 		return nil, readACMEError(resp.Body)
 	}
@@ -237,6 +242,7 @@ func (c *ACMEClient) ValidateChallenge(url string) error {
 	if err != nil {
 		return err
 	}
+	defer resp.Body.Close()
 	if resp.StatusCode >= 400 {
 		return readACMEError(resp.Body)
 	}
@@ -250,6 +256,7 @@ func (c *ACMEClient) ValidateWithPayload(url string, payload []byte) error {
 	if err != nil {
 		return err
 	}
+	defer resp.Body.Close()
 	if resp.StatusCode >= 400 {
 		return readACMEError(resp.Body)
 	}
@@ -262,6 +269,7 @@ func (c *ACMEClient) GetAuthz(url string) (*acme.Authorization, error) {
 	if err != nil {
 		return nil, err
 	}
+	defer resp.Body.Close()
 	if resp.StatusCode >= 400 {
 		return nil, readACMEError(resp.Body)
 	}
@@ -279,6 +287,7 @@ func (c *ACMEClient) GetOrder(url string) (*acme.Order, error) {
 	if err != nil {
 		return nil, err
 	}
+	defer resp.Body.Close()
 	if resp.StatusCode >= 400 {
 		return nil, readACMEError(resp.Body)
 	}
@@ -302,6 +311,7 @@ func (c *ACMEClient) FinalizeOrder(url string, csr *x509.CertificateRequest) err
 	if err != nil {
 		return err
 	}
+	defer resp.Body.Close()
 	if resp.StatusCode >= 400 {
 		return readACMEError(resp.Body)
 	}
@@ -314,6 +324,7 @@ func (c *ACMEClient) GetCertificate(url string) (*x509.Certificate, []*x509.Cert
 	if err != nil {
 		return nil, nil, err
 	}
+	defer resp.Body.Close()
 	if resp.StatusCode >= 400 {
 		return nil, nil, readACMEError(resp.Body)
 	}
@@ -350,6 +361,7 @@ func (c *ACMEClient) GetAccountOrders() ([]string, error) {
 	if err != nil {
 		return nil, err
 	}
+	defer resp.Body.Close()
 	if resp.StatusCode >= 400 {
 		return nil, readACMEError(resp.Body)
 	}

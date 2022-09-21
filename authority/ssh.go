@@ -140,6 +140,7 @@ func (a *Authority) GetSSHBastion(ctx context.Context, user, hostname string) (*
 				return a.config.SSH.Bastion, nil
 			}
 		}
+		//nolint:nilnil // legacy
 		return nil, nil
 	}
 	return nil, errs.NotFound("authority.GetSSHBastion; ssh is not configured")
@@ -202,7 +203,8 @@ func (a *Authority) SignSSH(ctx context.Context, key ssh.PublicKey, opts provisi
 	// Create certificate from template.
 	certificate, err := sshutil.NewCertificate(cr, certOptions...)
 	if err != nil {
-		if _, ok := err.(*sshutil.TemplateError); ok {
+		var te *sshutil.TemplateError
+		if errors.As(err, &te) {
 			return nil, errs.ApplyOptions(
 				errs.BadRequestErr(err, err.Error()),
 				errs.WithKeyVal("signOptions", signOpts),
@@ -281,7 +283,7 @@ func (a *Authority) SignSSH(ctx context.Context, key ssh.PublicKey, opts provisi
 		}
 	}
 
-	if err = a.storeSSHCertificate(prov, cert); err != nil && err != db.ErrNotImplemented {
+	if err = a.storeSSHCertificate(prov, cert); err != nil && !errors.Is(err, db.ErrNotImplemented) {
 		return nil, errs.Wrap(http.StatusInternalServerError, err, "authority.SignSSH: error storing certificate in db")
 	}
 
@@ -351,7 +353,7 @@ func (a *Authority) RenewSSH(ctx context.Context, oldCert *ssh.Certificate) (*ss
 		return nil, errs.Wrap(http.StatusInternalServerError, err, "signSSH: error signing certificate")
 	}
 
-	if err = a.storeRenewedSSHCertificate(prov, oldCert, cert); err != nil && err != db.ErrNotImplemented {
+	if err = a.storeRenewedSSHCertificate(prov, oldCert, cert); err != nil && !errors.Is(err, db.ErrNotImplemented) {
 		return nil, errs.Wrap(http.StatusInternalServerError, err, "renewSSH: error storing certificate in db")
 	}
 
@@ -434,7 +436,7 @@ func (a *Authority) RekeySSH(ctx context.Context, oldCert *ssh.Certificate, pub 
 		}
 	}
 
-	if err = a.storeRenewedSSHCertificate(prov, oldCert, cert); err != nil && err != db.ErrNotImplemented {
+	if err = a.storeRenewedSSHCertificate(prov, oldCert, cert); err != nil && !errors.Is(err, db.ErrNotImplemented) {
 		return nil, errs.Wrap(http.StatusInternalServerError, err, "rekeySSH; error storing certificate in db")
 	}
 
@@ -570,7 +572,7 @@ func (a *Authority) SignSSHAddUser(ctx context.Context, key ssh.PublicKey, subje
 	}
 	cert.Signature = sig
 
-	if err = a.storeRenewedSSHCertificate(prov, subject, cert); err != nil && err != db.ErrNotImplemented {
+	if err = a.storeRenewedSSHCertificate(prov, subject, cert); err != nil && !errors.Is(err, db.ErrNotImplemented) {
 		return nil, errs.Wrap(http.StatusInternalServerError, err, "signSSHAddUser: error storing certificate in db")
 	}
 
@@ -589,7 +591,7 @@ func (a *Authority) CheckSSHHost(ctx context.Context, principal, token string) (
 	}
 	exists, err := a.db.IsSSHHost(principal)
 	if err != nil {
-		if err == db.ErrNotImplemented {
+		if errors.Is(err, db.ErrNotImplemented) {
 			return false, errs.Wrap(http.StatusNotImplemented, err,
 				"checkSSHHost: isSSHHost is not implemented")
 		}

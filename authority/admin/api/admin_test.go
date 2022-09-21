@@ -229,11 +229,13 @@ func TestCreateAdminRequest_Validate(t *testing.T) {
 
 			if err != nil {
 				assert.Type(t, &admin.Error{}, err)
-				adminErr, _ := err.(*admin.Error)
-				assert.Equals(t, tt.err.Type, adminErr.Type)
-				assert.Equals(t, tt.err.Detail, adminErr.Detail)
-				assert.Equals(t, tt.err.Status, adminErr.Status)
-				assert.Equals(t, tt.err.Message, adminErr.Message)
+				var adminErr *admin.Error
+				if assert.True(t, errors.As(err, &adminErr)) {
+					assert.Equals(t, tt.err.Type, adminErr.Type)
+					assert.Equals(t, tt.err.Detail, adminErr.Detail)
+					assert.Equals(t, tt.err.Status, adminErr.Status)
+					assert.Equals(t, tt.err.Message, adminErr.Message)
+				}
 			}
 		})
 	}
@@ -278,11 +280,13 @@ func TestUpdateAdminRequest_Validate(t *testing.T) {
 
 			if err != nil {
 				assert.Type(t, &admin.Error{}, err)
-				adminErr, _ := err.(*admin.Error)
-				assert.Equals(t, tt.err.Type, adminErr.Type)
-				assert.Equals(t, tt.err.Detail, adminErr.Detail)
-				assert.Equals(t, tt.err.Status, adminErr.Status)
-				assert.Equals(t, tt.err.Message, adminErr.Message)
+				var ae *admin.Error
+				if assert.True(t, errors.As(err, &ae)) {
+					assert.Equals(t, tt.err.Type, ae.Type)
+					assert.Equals(t, tt.err.Detail, ae.Detail)
+					assert.Equals(t, tt.err.Status, ae.Status)
+					assert.Equals(t, tt.err.Message, ae.Message)
+				}
 			}
 		})
 	}

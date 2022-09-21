@@ -92,7 +92,8 @@ func Wrap(status int, e error, m string, args ...interface{}) error {
 		return nil
 	}
 	_, opts := splitOptionArgs(args)
-	if err, ok := e.(*Error); ok {
+	var err *Error
+	if errors.As(e, &err) {
 		err.Err = errors.Wrap(err.Err, m)
 		e = err
 	} else {
@@ -108,7 +109,8 @@ func Wrapf(status int, e error, format string, args ...interface{}) error {
 		return nil
 	}
 	as, opts := splitOptionArgs(args)
-	if err, ok := e.(*Error); ok {
+	var err *Error
+	if errors.As(e, &err) {
 		err.Err = errors.Wrapf(err.Err, format, args...)
 		e = err
 	} else {
@@ -246,7 +248,8 @@ func New(status int, format string, args ...interface{}) error {
 
 // NewError creates a new http error with the given error and message.
 func NewError(status int, err error, format string, args ...interface{}) error {
-	if _, ok := err.(*Error); ok {
+	var e *Error
+	if errors.As(err, &e) {
 		return err
 	}
 	msg := fmt.Sprintf(format, args...)
@@ -263,11 +266,8 @@ func NewError(status int, err error, format string, args ...interface{}) error {
 // NewErr returns a new Error. If the given error implements the StatusCoder
 // interface we will ignore the given status.
 func NewErr(status int, err error, opts ...Option) error {
-	var (
-		e  *Error
-		ok bool
-	)
-	if e, ok = err.(*Error); !ok {
+	var e *Error
+	if !errors.As(err, &e) {
 		if sc, ok := err.(render.StatusCodedError); ok {
 			e = &Error{Status: sc.StatusCode(), Err: err}
 		} else {
@@ -299,7 +299,8 @@ func Errorf(code int, format string, args ...interface{}) error {
 // ApplyOptions applies the given options to the error if is the type *Error.
 // TODO(mariano): try to get rid of this.
 func ApplyOptions(err error, opts ...interface{}) error {
-	if e, ok := err.(*Error); ok {
+	var e *Error
+	if errors.As(err, &e) {
 		_, o := splitOptionArgs(opts)
 		for _, fn := range o {
 			fn(e)

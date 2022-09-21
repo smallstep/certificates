@@ -102,7 +102,6 @@ func (p *GCP) GetID() string {
 		return p.ID
 	}
 	return p.GetIDForToken()
-
 }
 
 // GetIDForToken returns an identifier that will be used to load the provisioner

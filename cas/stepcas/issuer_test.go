@@ -15,11 +15,11 @@ import (
 type mockErrIssuer struct{}
 
 func (m mockErrIssuer) SignToken(subject string, sans []string, info *raInfo) (string, error) {
-	return "", apiv1.ErrNotImplemented{}
+	return "", apiv1.NotImplementedError{}
 }
 
 func (m mockErrIssuer) RevokeToken(subject string) (string, error) {
-	return "", apiv1.ErrNotImplemented{}
+	return "", apiv1.NotImplementedError{}
 }
 
 func (m mockErrIssuer) Lifetime(d time.Duration) time.Duration {
@@ -29,7 +29,7 @@ func (m mockErrIssuer) Lifetime(d time.Duration) time.Duration {
 type mockErrSigner struct{}
 
 func (s *mockErrSigner) Sign(payload []byte) (*jose.JSONWebSignature, error) {
-	return nil, apiv1.ErrNotImplemented{}
+	return nil, apiv1.NotImplementedError{}
 }
 
 func (s *mockErrSigner) Options() jose.SignerOptions {

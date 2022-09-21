@@ -372,7 +372,7 @@ func (a *Authority) init() error {
 			}
 			options.Signer, err = a.keyManager.CreateSigner(&kmsapi.CreateSignerRequest{
 				SigningKey: a.config.IntermediateKey,
-				Password:   []byte(a.password),
+				Password:   a.password,
 			})
 			if err != nil {
 				return err
@@ -443,7 +443,7 @@ func (a *Authority) init() error {
 		if a.config.SSH.HostKey != "" {
 			signer, err := a.keyManager.CreateSigner(&kmsapi.CreateSignerRequest{
 				SigningKey: a.config.SSH.HostKey,
-				Password:   []byte(a.sshHostPassword),
+				Password:   a.sshHostPassword,
 			})
 			if err != nil {
 				return err
@@ -469,7 +469,7 @@ func (a *Authority) init() error {
 		if a.config.SSH.UserKey != "" {
 			signer, err := a.keyManager.CreateSigner(&kmsapi.CreateSignerRequest{
 				SigningKey: a.config.SSH.UserKey,
-				Password:   []byte(a.sshUserPassword),
+				Password:   a.sshUserPassword,
 			})
 			if err != nil {
 				return err
@@ -554,7 +554,7 @@ func (a *Authority) init() error {
 		options.CertificateChain = append(options.CertificateChain, a.rootX509Certs...)
 		options.Signer, err = a.keyManager.CreateSigner(&kmsapi.CreateSignerRequest{
 			SigningKey: a.config.IntermediateKey,
-			Password:   []byte(a.password),
+			Password:   a.password,
 		})
 		if err != nil {
 			return err
@@ -563,7 +563,7 @@ func (a *Authority) init() error {
 		if km, ok := a.keyManager.(kmsapi.Decrypter); ok {
 			options.Decrypter, err = km.CreateDecrypter(&kmsapi.CreateDecrypterRequest{
 				DecryptionKey: a.config.IntermediateKey,
-				Password:      []byte(a.password),
+				Password:      a.password,
 			})
 			if err != nil {
 				return err

@@ -56,7 +56,7 @@ func newClient(transport http.RoundTripper) *uaClient {
 	}
 }
 
-// nolint:gosec // used in bootstrap protocol
+//nolint:gosec // used in bootstrap protocol
 func newInsecureClient() *uaClient {
 	return &uaClient{
 		Client: &http.Client{
@@ -120,9 +120,7 @@ type clientOptions struct {
 }
 
 func (o *clientOptions) apply(opts []ClientOption) (err error) {
-	if err = o.applyDefaultIdentity(); err != nil {
-		return
-	}
+	o.applyDefaultIdentity()
 	for _, fn := range opts {
 		if err = fn(o); err != nil {
 			return
@@ -133,26 +131,25 @@ func (o *clientOptions) apply(opts []ClientOption) (err error) {
 
 // applyDefaultIdentity sets the options for the default identity if the
 // identity file is present. The identity is enabled by default.
-func (o *clientOptions) applyDefaultIdentity() error {
+func (o *clientOptions) applyDefaultIdentity() {
 	if DisableIdentity {
-		return nil
+		return
 	}
 
 	// Do not load an identity if something fails
 	i, err := identity.LoadDefaultIdentity()
 	if err != nil {
-		return nil
+		return
 	}
 	if err := i.Validate(); err != nil {
-		return nil
+		return
 	}
 	crt, err := i.TLSCertificate()
 	if err != nil {
-		return nil
+		return
 	}
 	o.certificate = crt
 	o.getClientCertificate = i.GetClientCertificateFunc()
-	return nil
 }
 
 // checkTransport checks if other ways to set up a transport have been provided.
@@ -241,13 +238,13 @@ func WithTransport(tr http.RoundTripper) ClientOption {
 }
 
 // WithInsecure adds a insecure transport that bypasses TLS verification.
-// nolint:gosec // insecure option
 func WithInsecure() ClientOption {
 	return func(o *clientOptions) error {
 		o.transport = &http.Transport{
 			Proxy: http.ProxyFromEnvironment,
 			TLSClientConfig: &tls.Config{
-				MinVersion:         tls.VersionTLS12,
+				MinVersion: tls.VersionTLS12,
+				//nolint:gosec // insecure option
 				InsecureSkipVerify: true,
 			},
 		}
@@ -1139,7 +1136,7 @@ retry:
 	var check api.SSHCheckPrincipalResponse
 	if err := readJSON(resp.Body, &check); err != nil {
 		return nil, errs.Wrapf(http.StatusInternalServerError, err, "error reading %s response",
-			[]interface{}{u, errs.WithMessage("Failed to parse response from /ssh/check-host endpoint")})
+			[]any{u, errs.WithMessage("Failed to parse response from /ssh/check-host endpoint")}...)
 	}
 	return &check, nil
 }
@@ -1203,6 +1200,7 @@ func (c *Client) RootFingerprint() (string, error) {
 	if err != nil {
 		return "", errors.Wrapf(err, "client GET %s failed", u)
 	}
+	defer resp.Body.Close()
 	if resp.TLS == nil || len(resp.TLS.VerifiedChains) == 0 {
 		return "", errors.New("missing verified chains")
 	}

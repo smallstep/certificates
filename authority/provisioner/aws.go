@@ -35,20 +35,17 @@ const awsIdentityURL = "http://169.254.169.254/latest/dynamic/instance-identity/
 const awsSignatureURL = "http://169.254.169.254/latest/dynamic/instance-identity/signature"
 
 // awsAPITokenURL is the url used to get the IMDSv2 API token
-// nolint:gosec // no credentials here
-const awsAPITokenURL = "http://169.254.169.254/latest/api/token"
+const awsAPITokenURL = "http://169.254.169.254/latest/api/token" //nolint:gosec // no credentials here
 
 // awsAPITokenTTL is the default TTL to use when requesting IMDSv2 API tokens
 // -- we keep this short-lived since we get a new token with every call to readURL()
 const awsAPITokenTTL = "30"
 
 // awsMetadataTokenHeader is the header that must be passed with every IMDSv2 request
-// nolint:gosec // no credentials here
-const awsMetadataTokenHeader = "X-aws-ec2-metadata-token"
+const awsMetadataTokenHeader = "X-aws-ec2-metadata-token" //nolint:gosec // no credentials here
 
 // awsMetadataTokenTTLHeader is the header used to indicate the token TTL requested
-// nolint:gosec // no credentials here
-const awsMetadataTokenTTLHeader = "X-aws-ec2-metadata-token-ttl-seconds"
+const awsMetadataTokenTTLHeader = "X-aws-ec2-metadata-token-ttl-seconds" //nolint:gosec // no credentials here
 
 // awsCertificate is the certificate used to validate the instance identity
 // signature.

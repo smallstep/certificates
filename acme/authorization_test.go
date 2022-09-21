@@ -130,14 +130,14 @@ func TestAuthorization_UpdateStatus(t *testing.T) {
 			tc := run(t)
 			if err := tc.az.UpdateStatus(context.Background(), tc.db); err != nil {
 				if assert.NotNil(t, tc.err) {
-					switch k := err.(type) {
-					case *Error:
+					var k *Error
+					if errors.As(err, &k) {
 						assert.Equals(t, k.Type, tc.err.Type)
 						assert.Equals(t, k.Detail, tc.err.Detail)
 						assert.Equals(t, k.Status, tc.err.Status)
 						assert.Equals(t, k.Err.Error(), tc.err.Err.Error())
 						assert.Equals(t, k.Detail, tc.err.Detail)
-					default:
+					} else {
 						assert.FatalError(t, errors.New("unexpected error type"))
 					}
 				}

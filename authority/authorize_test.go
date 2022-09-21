@@ -748,8 +748,8 @@ func TestAuthority_Authorize(t *testing.T) {
 					assert.Equals(t, sc.StatusCode(), tc.code)
 					assert.HasPrefix(t, err.Error(), tc.err.Error())
 
-					ctxErr, ok := err.(*errs.Error)
-					assert.Fatal(t, ok, "error is not of type *errs.Error")
+					var ctxErr *errs.Error
+					assert.Fatal(t, errors.As(err, &ctxErr), "error is not of type *errs.Error")
 					assert.Equals(t, ctxErr.Details["token"], tc.token)
 				}
 			} else {
@@ -884,8 +884,8 @@ func TestAuthority_authorizeRenew(t *testing.T) {
 					assert.Equals(t, sc.StatusCode(), tc.code)
 					assert.HasPrefix(t, err.Error(), tc.err.Error())
 
-					ctxErr, ok := err.(*errs.Error)
-					assert.Fatal(t, ok, "error is not of type *errs.Error")
+					var ctxErr *errs.Error
+					assert.Fatal(t, errors.As(err, &ctxErr), "error is not of type *errs.Error")
 					assert.Equals(t, ctxErr.Details["serialNumber"], tc.cert.SerialNumber.String())
 				}
 			} else {

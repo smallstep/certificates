@@ -13,7 +13,7 @@ import (
 	"github.com/smallstep/certificates/api"
 )
 
-// nolint:gosec // test tls config
+//nolint:gosec // test tls config
 func Test_newTLSOptionCtx(t *testing.T) {
 	client, err := NewClient("https://ca.smallstep.com", WithTransport(http.DefaultTransport))
 	if err != nil {
@@ -41,7 +41,7 @@ func Test_newTLSOptionCtx(t *testing.T) {
 	}
 }
 
-// nolint:gosec // test tls config
+//nolint:gosec // test tls config
 func TestTLSOptionCtx_apply(t *testing.T) {
 	fail := func() TLSOption {
 		return func(ctx *TLSOptionCtx) error {
@@ -78,7 +78,7 @@ func TestTLSOptionCtx_apply(t *testing.T) {
 	}
 }
 
-// nolint:gosec // test tls config
+//nolint:gosec // test tls config
 func TestRequireAndVerifyClientCert(t *testing.T) {
 	tests := []struct {
 		name string
@@ -103,7 +103,7 @@ func TestRequireAndVerifyClientCert(t *testing.T) {
 	}
 }
 
-// nolint:gosec // test tls config
+//nolint:gosec // test tls config
 func TestVerifyClientCertIfGiven(t *testing.T) {
 	tests := []struct {
 		name string
@@ -128,7 +128,7 @@ func TestVerifyClientCertIfGiven(t *testing.T) {
 	}
 }
 
-// nolint:gosec // test tls config
+//nolint:gosec // test tls config
 func TestAddRootCA(t *testing.T) {
 	cert := parseCertificate(rootPEM)
 	pool := x509.NewCertPool()
@@ -161,7 +161,7 @@ func TestAddRootCA(t *testing.T) {
 	}
 }
 
-// nolint:gosec // test tls config
+//nolint:gosec // test tls config
 func TestAddClientCA(t *testing.T) {
 	cert := parseCertificate(rootPEM)
 	pool := x509.NewCertPool()
@@ -194,7 +194,7 @@ func TestAddClientCA(t *testing.T) {
 	}
 }
 
-// nolint:gosec // test tls config
+//nolint:gosec // test tls config
 func TestAddRootsToRootCAs(t *testing.T) {
 	ca := startCATestServer()
 	defer ca.Close()
@@ -249,7 +249,7 @@ func TestAddRootsToRootCAs(t *testing.T) {
 	}
 }
 
-// nolint:gosec // test tls config
+//nolint:gosec // test tls config
 func TestAddRootsToClientCAs(t *testing.T) {
 	ca := startCATestServer()
 	defer ca.Close()
@@ -304,7 +304,7 @@ func TestAddRootsToClientCAs(t *testing.T) {
 	}
 }
 
-// nolint:gosec // test tls config
+//nolint:gosec // test tls config
 func TestAddFederationToRootCAs(t *testing.T) {
 	ca := startCATestServer()
 	defer ca.Close()
@@ -369,7 +369,7 @@ func TestAddFederationToRootCAs(t *testing.T) {
 	}
 }
 
-// nolint:gosec // test tls config
+//nolint:gosec // test tls config
 func TestAddFederationToClientCAs(t *testing.T) {
 	ca := startCATestServer()
 	defer ca.Close()
@@ -434,7 +434,7 @@ func TestAddFederationToClientCAs(t *testing.T) {
 	}
 }
 
-// nolint:gosec // test tls config
+//nolint:gosec // test tls config
 func TestAddRootsToCAs(t *testing.T) {
 	ca := startCATestServer()
 	defer ca.Close()
@@ -489,7 +489,7 @@ func TestAddRootsToCAs(t *testing.T) {
 	}
 }
 
-// nolint:gosec // test tls config
+//nolint:gosec // test tls config
 func TestAddFederationToCAs(t *testing.T) {
 	ca := startCATestServer()
 	defer ca.Close()
@@ -554,7 +554,7 @@ func TestAddFederationToCAs(t *testing.T) {
 	}
 }
 
-// nolint:staticcheck,gocritic
+//nolint:staticcheck,gocritic
 func equalPools(a, b *x509.CertPool) bool {
 	if reflect.DeepEqual(a, b) {
 		return true
