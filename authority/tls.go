@@ -94,6 +94,7 @@ func (a *Authority) Sign(csr *x509.CertificateRequest, signOpts provisioner.Sign
 
 	var prov provisioner.Interface
 	var pInfo *casapi.ProvisionerInfo
+	var attData provisioner.AttestationData
 	for _, op := range extraOpts {
 		switch k := op.(type) {
 		// Capture current provisioner
@@ -129,6 +130,11 @@ func (a *Authority) Sign(csr *x509.CertificateRequest, signOpts provisioner.Sign
 		case provisioner.CertificateEnforcer:
 			certEnforcers = append(certEnforcers, k)
 
+		// Extra information from ACME attestations.
+		case provisioner.AttestationData:
+			attData = k
+			// TODO(mariano,areed): remove me once attData is used.
+			_ = attData
 		default:
 			return nil, errs.InternalServer("authority.Sign; invalid extra option type %T", append([]interface{}{k}, opts...)...)
 		}

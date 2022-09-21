@@ -72,7 +72,7 @@ func TestDB_getDBChallenge(t *testing.T) {
 				Value:       "test.ca.smallstep.com",
 				CreatedAt:   clock.Now(),
 				ValidatedAt: "foobar",
-				Error:       acme.NewErrorISE("force"),
+				Error:       acme.NewErrorISE("The server experienced an internal error"),
 			}
 			b, err := json.Marshal(dbc)
 			assert.FatalError(t, err)
@@ -264,7 +264,7 @@ func TestDB_GetChallenge(t *testing.T) {
 				Value:       "test.ca.smallstep.com",
 				CreatedAt:   clock.Now(),
 				ValidatedAt: "foobar",
-				Error:       acme.NewErrorISE("force"),
+				Error:       acme.NewErrorISE("The server experienced an internal error"),
 			}
 			b, err := json.Marshal(dbc)
 			assert.FatalError(t, err)
@@ -354,7 +354,7 @@ func TestDB_UpdateChallenge(t *testing.T) {
 				ID:          chID,
 				Status:      acme.StatusValid,
 				ValidatedAt: "foobar",
-				Error:       acme.NewError(acme.ErrorMalformedType, "malformed"),
+				Error:       acme.NewError(acme.ErrorMalformedType, "The request message was malformed"),
 			}
 			return test{
 				ch: updCh,
@@ -428,7 +428,7 @@ func TestDB_UpdateChallenge(t *testing.T) {
 						assert.Equals(t, dbNew.CreatedAt, dbc.CreatedAt)
 						assert.Equals(t, dbNew.Status, acme.StatusValid)
 						assert.Equals(t, dbNew.ValidatedAt, "foobar")
-						assert.Equals(t, dbNew.Error.Error(), acme.NewError(acme.ErrorMalformedType, "malformed").Error())
+						assert.Equals(t, dbNew.Error.Error(), acme.NewError(acme.ErrorMalformedType, "The request message was malformed").Error())
 						return nu, true, nil
 					},
 				},

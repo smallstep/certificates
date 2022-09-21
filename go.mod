@@ -18,6 +18,7 @@ require (
 	github.com/go-piv/piv-go v1.10.0 // indirect
 	github.com/golang/mock v1.6.0
 	github.com/google/go-cmp v0.5.8
+	github.com/google/go-tpm v0.3.3
 	github.com/google/uuid v1.3.0
 	github.com/googleapis/gax-go/v2 v2.4.0
 	github.com/hashicorp/vault/api v1.3.1
@@ -31,6 +32,7 @@ require (
 	github.com/newrelic/go-agent/v3 v3.18.0
 	github.com/pkg/errors v0.9.1
 	github.com/rs/xid v1.2.1
+	github.com/ryboe/q v1.0.17
 	github.com/sirupsen/logrus v1.8.1
 	github.com/slackhq/nebula v1.5.2
 	github.com/smallstep/assert v0.0.0-20200723003110-82e2b9b3b262
@@ -40,7 +42,7 @@ require (
 	go.mozilla.org/pkcs7 v0.0.0-20210826202110-33d05740a352
 	go.step.sm/cli-utils v0.7.4
 	go.step.sm/crypto v0.19.0
-	go.step.sm/linkedca v0.18.1-0.20220909212924-c69cf68797cb
+	go.step.sm/linkedca v0.19.0-rc.1
 	golang.org/x/crypto v0.0.0-20211215153901-e495a2d5b3d3
 	golang.org/x/net v0.0.0-20220607020251-c690dde0001d
 	golang.org/x/time v0.0.0-20210220033141-f8bda1e9f3ba // indirect
@@ -49,11 +51,6 @@ require (
 	google.golang.org/grpc v1.47.0
 	google.golang.org/protobuf v1.28.0
 	gopkg.in/square/go-jose.v2 v2.6.0
-)
-
-require (
-	github.com/google/go-tpm v0.3.3
-	github.com/ryboe/q v1.0.17
 )
 
 require (

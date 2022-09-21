@@ -3,6 +3,7 @@ package api
 import (
 	"bytes"
 	"context"
+	"crypto/x509"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -47,6 +48,10 @@ func (*fakeProvisioner) IsChallengeEnabled(ctx context.Context, challenge provis
 
 func (*fakeProvisioner) IsAttestationFormatEnabled(ctx context.Context, format provisioner.ACMEAttestationFormat) bool {
 	return true
+}
+
+func (*fakeProvisioner) GetAttestationRoots() (*x509.CertPool, bool) {
+	return nil, false
 }
 
 func (*fakeProvisioner) AuthorizeRevoke(ctx context.Context, token string) error { return nil }

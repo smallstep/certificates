@@ -335,9 +335,12 @@ func (e *Error) StatusCode() int {
 	return e.Status
 }
 
-// Error allows AError to implement the error interface.
+// Error implements the error interface.
 func (e *Error) Error() string {
-	return e.Detail
+	if e.Err == nil {
+		return e.Detail
+	}
+	return e.Err.Error()
 }
 
 // Cause returns the internal error and implements the Causer interface.

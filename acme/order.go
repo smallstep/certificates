@@ -157,6 +157,9 @@ func (o *Order) Finalize(ctx context.Context, db DB, csr *x509.CertificateReques
 	data := x509util.NewTemplateData()
 	data.SetCommonName(csr.Subject.CommonName)
 
+	// Custom sign options passed to authority.Sign
+	var extraOptions []provisioner.SignOption
+
 	// TODO: support for multiple identifiers?
 	var permanentIdentifier string
 	for i := range o.Identifiers {
@@ -172,6 +175,9 @@ func (o *Order) Finalize(ctx context.Context, db DB, csr *x509.CertificateReques
 		data.SetSubjectAlternativeNames(x509util.SubjectAlternativeName{
 			Type:  x509util.PermanentIdentifierType,
 			Value: permanentIdentifier,
+		})
+		extraOptions = append(extraOptions, provisioner.AttestationData{
+			PermanentIdentifier: permanentIdentifier,
 		})
 	} else {
 		defaultTemplate = x509util.DefaultLeafTemplate
@@ -193,7 +199,11 @@ func (o *Order) Finalize(ctx context.Context, db DB, csr *x509.CertificateReques
 	if err != nil {
 		return WrapErrorISE(err, "error creating template options from ACME provisioner")
 	}
+
+	// Build extra signing options.
 	signOps = append(signOps, templateOptions)
+	signOps = append(signOps, extraOptions...)
+
 	// Sign a new certificate.
 	certChain, err := auth.Sign(csr, provisioner.SignOptions{
 		NotBefore: provisioner.NewTimeDuration(o.NotBefore),
