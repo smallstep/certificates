@@ -748,14 +748,15 @@ func ProvisionerToCertificates(p *linkedca.Provisioner) (provisioner.Interface, 
 	case *linkedca.ProvisionerDetails_ACME:
 		cfg := d.ACME
 		return &provisioner.ACME{
-			ID:         p.Id,
-			Type:       p.Type.String(),
-			Name:       p.Name,
-			ForceCN:    cfg.ForceCn,
-			RequireEAB: cfg.RequireEab,
-			Challenges: challengesToCertificates(cfg.Challenges),
-			Claims:     claims,
-			Options:    options,
+			ID:                 p.Id,
+			Type:               p.Type.String(),
+			Name:               p.Name,
+			ForceCN:            cfg.ForceCn,
+			RequireEAB:         cfg.RequireEab,
+			Challenges:         challengesToCertificates(cfg.Challenges),
+			AttestationFormats: attestationFormatsToCertificates(cfg.AttestationFormats),
+			Claims:             claims,
+			Options:            options,
 		}, nil
 	case *linkedca.ProvisionerDetails_OIDC:
 		cfg := d.OIDC
@@ -1002,8 +1003,9 @@ func ProvisionerToLinkedca(p provisioner.Interface) (*linkedca.Provisioner, erro
 			Details: &linkedca.ProvisionerDetails{
 				Data: &linkedca.ProvisionerDetails_ACME{
 					ACME: &linkedca.ACMEProvisioner{
-						ForceCn:    p.ForceCN,
-						Challenges: challengesToLinkedca(p.Challenges),
+						ForceCn:            p.ForceCN,
+						Challenges:         challengesToLinkedca(p.Challenges),
+						AttestationFormats: attestationFormatsToLinkedca(p.AttestationFormats),
 					},
 				},
 			},
@@ -1135,7 +1137,7 @@ func challengesToCertificates(challenges []linkedca.ACMEProvisioner_ChallengeTyp
 			ret = append(ret, provisioner.HTTP_01)
 		case linkedca.ACMEProvisioner_DNS_01:
 			ret = append(ret, provisioner.DNS_01)
-		case linkedca.ACMEProvisioner_TLS_ALPN_O1:
+		case linkedca.ACMEProvisioner_TLS_ALPN_01:
 			ret = append(ret, provisioner.TLS_ALPN_01)
 		case linkedca.ACMEProvisioner_DEVICE_ATTEST_01:
 			ret = append(ret, provisioner.DEVICE_ATTEST_01)
@@ -1155,9 +1157,43 @@ func challengesToLinkedca(challenges []provisioner.ACMEChallenge) []linkedca.ACM
 		case provisioner.DNS_01:
 			ret = append(ret, linkedca.ACMEProvisioner_DNS_01)
 		case provisioner.TLS_ALPN_01:
-			ret = append(ret, linkedca.ACMEProvisioner_TLS_ALPN_O1)
+			ret = append(ret, linkedca.ACMEProvisioner_TLS_ALPN_01)
 		case provisioner.DEVICE_ATTEST_01:
 			ret = append(ret, linkedca.ACMEProvisioner_DEVICE_ATTEST_01)
+		}
+	}
+	return ret
+}
+
+// attestationFormatsToCertificates converts linkedca attestation formats to
+// provisioner ones skipping the unknown ones.
+func attestationFormatsToCertificates(formats []linkedca.ACMEProvisioner_AttestationFormatType) []provisioner.ACMEAttestationFormat {
+	ret := make([]provisioner.ACMEAttestationFormat, 0, len(formats))
+	for _, f := range formats {
+		switch f {
+		case linkedca.ACMEProvisioner_APPLE:
+			ret = append(ret, provisioner.APPLE)
+		case linkedca.ACMEProvisioner_STEP:
+			ret = append(ret, provisioner.STEP)
+		case linkedca.ACMEProvisioner_TPM:
+			ret = append(ret, provisioner.TPM)
+		}
+	}
+	return ret
+}
+
+// attestationFormatsToLinkedca converts provisioner attestation formats to
+// linkedca ones skipping the unknown ones.
+func attestationFormatsToLinkedca(formats []provisioner.ACMEAttestationFormat) []linkedca.ACMEProvisioner_AttestationFormatType {
+	ret := make([]linkedca.ACMEProvisioner_AttestationFormatType, 0, len(formats))
+	for _, f := range formats {
+		switch provisioner.ACMEAttestationFormat(f.String()) {
+		case provisioner.APPLE:
+			ret = append(ret, linkedca.ACMEProvisioner_APPLE)
+		case provisioner.STEP:
+			ret = append(ret, linkedca.ACMEProvisioner_STEP)
+		case provisioner.TPM:
+			ret = append(ret, linkedca.ACMEProvisioner_TPM)
 		}
 	}
 	return ret

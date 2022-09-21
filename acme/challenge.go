@@ -346,6 +346,12 @@ func deviceAttest01Validate(ctx context.Context, ch *Challenge, db DB, jwk *jose
 		return WrapErrorISE(err, "error unmarshalling CBOR")
 	}
 
+	prov := MustProvisionerFromContext(ctx)
+	if !prov.IsAttestationFormatEnabled(ctx, provisioner.ACMEAttestationFormat(att.Format)) {
+		return storeError(ctx, db, ch, true,
+			NewError(ErrorBadAttestationStatementType, "attestation format %q is not enabled", att.Format))
+	}
+
 	switch att.Format {
 	case "apple":
 		data, err := doAppleAttestationFormat(ctx, ch, db, &att)
