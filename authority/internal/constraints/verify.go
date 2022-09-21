@@ -131,13 +131,22 @@ func matchDomainConstraint(domain, constraint string) (bool, error) {
 	return true, nil
 }
 
+func normalizeIP(ip net.IP) net.IP {
+	if ip4 := ip.To4(); ip4 != nil {
+		return ip4
+	}
+	return ip
+}
+
 func matchIPConstraint(ip net.IP, constraint *net.IPNet) (bool, error) {
-	if len(ip) != len(constraint.IP) {
+	ip = normalizeIP(ip)
+	constraintIP := normalizeIP(constraint.IP)
+	if len(ip) != len(constraintIP) {
 		return false, nil
 	}
 
 	for i := range ip {
-		if mask := constraint.Mask[i]; ip[i]&mask != constraint.IP[i]&mask {
+		if mask := constraint.Mask[i]; ip[i]&mask != constraintIP[i]&mask {
 			return false, nil
 		}
 	}

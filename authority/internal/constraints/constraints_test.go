@@ -105,7 +105,7 @@ func TestEngine_Validate(t *testing.T) {
 	}{
 		{"ok", fields{hasNameConstraints: false}, args{
 			dnsNames:       []string{"example.com", "host.example.com"},
-			ipAddresses:    []net.IP{{192, 168, 1, 1}, {0x26, 0x00, 0x1f, 0x1c, 0x47, 0x1, 0x9d, 0x00, 0xc3, 0xa7, 0x66, 0x94, 0x87, 0x0f, 0x20, 0x72}},
+			ipAddresses:    []net.IP{{192, 168, 1, 1}, {0x26, 0x00, 0x1f, 0x1c, 0x47, 0x01, 0x9d, 0x00, 0xc3, 0xa7, 0x66, 0x94, 0x87, 0x0f, 0x20, 0x72}},
 			emailAddresses: []string{"root@example.com"},
 			uris:           []*url.URL{{Scheme: "https", Host: "example.com", Path: "/uuid/c6d1a755-0c12-431e-9136-b64cb3173ec7"}},
 		}, false},
@@ -120,14 +120,15 @@ func TestEngine_Validate(t *testing.T) {
 		{"ok permitted ip", fields{
 			hasNameConstraints: true,
 			permittedIPRanges: []*net.IPNet{
-				{IP: net.ParseIP("192.168.1.0").To4(), Mask: net.IPMask{255, 255, 255, 0}},
+				{IP: net.ParseIP("192.168.1.0"), Mask: net.IPMask{255, 255, 255, 0}},
 				{IP: net.ParseIP("192.168.2.1").To4(), Mask: net.IPMask{255, 255, 255, 255}},
+				{IP: net.ParseIP("2600:1700:22f8:2600:e559:bd88:350a:34d6"), Mask: net.IPMask{255, 255, 255, 255, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0}},
 			},
-		}, args{ipAddresses: []net.IP{{192, 168, 1, 10}, {192, 168, 2, 1}}}, false},
+		}, args{ipAddresses: []net.IP{{192, 168, 1, 10}, {192, 168, 2, 1}, {0x26, 0x0, 0x17, 0x00, 0x1, 0x2, 0x3, 0x4, 0x5, 0x6, 0x7, 0x8, 0x9, 0xa, 0xb, 0xc}}}, false},
 		{"ok not excluded ip", fields{
 			hasNameConstraints: true,
 			excludedIPRanges: []*net.IPNet{
-				{IP: net.ParseIP("192.168.1.0").To4(), Mask: net.IPMask{255, 255, 255, 0}},
+				{IP: net.ParseIP("192.168.1.0"), Mask: net.IPMask{255, 255, 255, 0}},
 				{IP: net.ParseIP("192.168.2.1").To4(), Mask: net.IPMask{255, 255, 255, 255}},
 			},
 		}, args{ipAddresses: []net.IP{{192, 168, 2, 2}, {192, 168, 3, 1}}}, false},
