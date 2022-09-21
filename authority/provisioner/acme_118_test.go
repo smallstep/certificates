@@ -59,7 +59,9 @@ func TestACME_GetAttestationRoots(t *testing.T) {
 			case tt.want == nil && got != nil, tt.want != nil && got == nil:
 				t.Errorf("ACME.GetAttestationRoots() got = %v, want %v", got, tt.want)
 			default:
+				//nolint:staticcheck // this file only runs in go1.18
 				gotSubjects := got.Subjects()
+				//nolint:staticcheck // this file only runs in go1.18
 				wantSubjects := tt.want.Subjects()
 				if len(gotSubjects) != len(wantSubjects) {
 					t.Errorf("ACME.GetAttestationRoots() got = %v, want %v", got, tt.want)
