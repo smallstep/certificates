@@ -630,6 +630,18 @@ func (a *Authority) GetTLSCertificate() (*tls.Certificate, error) {
 	certTpl.NotBefore = now.Add(-1 * time.Minute)
 	certTpl.NotAfter = now.Add(24 * time.Hour)
 
+	// Policy and constraints require this fields to be set. At this moment they
+	// are only present in the extra extension.
+	certTpl.DNSNames = cr.DNSNames
+	certTpl.IPAddresses = cr.IPAddresses
+	certTpl.EmailAddresses = cr.EmailAddresses
+	certTpl.URIs = cr.URIs
+
+	// Fail if name constraints or policy does not allow the server names.
+	if err := a.isAllowedToSignX509Certificate(certTpl); err != nil {
+		return fatal(err)
+	}
+
 	resp, err := a.x509CAService.CreateCertificate(&casapi.CreateCertificateRequest{
 		Template:       certTpl,
 		CSR:            cr,
