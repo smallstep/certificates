@@ -151,16 +151,23 @@ func WithKeyManager(k kms.KeyManager) Option {
 
 // WithX509Signer defines the signer used to sign X509 certificates.
 func WithX509Signer(crt *x509.Certificate, s crypto.Signer) Option {
+	return WithX509SignerChain([]*x509.Certificate{crt}, s)
+}
+
+// WithX509SignerChain defines the signer used to sign X509 certificates. This
+// option is similar to WithX509Signer but it supports a chain of intermediates.
+func WithX509SignerChain(issuerChain []*x509.Certificate, s crypto.Signer) Option {
 	return func(a *Authority) error {
 		srv, err := cas.New(context.Background(), casapi.Options{
 			Type:             casapi.SoftCAS,
 			Signer:           s,
-			CertificateChain: []*x509.Certificate{crt},
+			CertificateChain: issuerChain,
 		})
 		if err != nil {
 			return err
 		}
 		a.x509CAService = srv
+		a.intermediateX509Certs = append(a.intermediateX509Certs, issuerChain...)
 		return nil
 	}
 }
@@ -229,6 +236,25 @@ func WithX509RootCerts(rootCerts ...*x509.Certificate) Option {
 func WithX509FederatedCerts(certs ...*x509.Certificate) Option {
 	return func(a *Authority) error {
 		a.federatedX509Certs = certs
+		return nil
+	}
+}
+
+// WithX509RootCerts is an option that allows to define the list of intermediate
+// certificates that the CA will be using. This option will replace any
+// intermediate certificate defined before.
+//
+// Note that these certificates will not be bundled with the certificates signed
+// by the CA, the CAS service will take care of that, although they should
+// match, this is not guaranteed.  These certificates will be mainly used for
+// constraint purposes.
+//
+// This option should only used on specific configurations, for example when
+// WithX509SignerFunc is used, as we don't know the list of intermediates on
+// advance.
+func WithX509IntermediateCerts(intermediateCerts ...*x509.Certificate) Option {
+	return func(a *Authority) error {
+		a.intermediateX509Certs = intermediateCerts
 		return nil
 	}
 }

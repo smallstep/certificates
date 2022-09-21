@@ -256,6 +256,9 @@ func (a *Authority) Sign(csr *x509.CertificateRequest, signOpts provisioner.Sign
 // isAllowedToSignX509Certificate checks if the Authority is allowed
 // to sign the X.509 certificate.
 func (a *Authority) isAllowedToSignX509Certificate(cert *x509.Certificate) error {
+	if err := a.constraintsEngine.ValidateCertificate(cert); err != nil {
+		return err
+	}
 	return a.policyEngine.IsX509CertificateAllowed(cert)
 }
 
@@ -349,6 +352,12 @@ func (a *Authority) Rekey(oldCert *x509.Certificate, pk crypto.PublicKey) ([]*x5
 			continue
 		}
 		newCert.ExtraExtensions = append(newCert.ExtraExtensions, ext)
+	}
+
+	// Check if the certificate is allowed to be renewed, policies or
+	// constraints might change over time.
+	if err := a.isAllowedToSignX509Certificate(newCert); err != nil {
+		return nil, err
 	}
 
 	resp, err := a.x509CAService.RenewCertificate(&casapi.RenewCertificateRequest{

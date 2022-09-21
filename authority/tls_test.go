@@ -22,6 +22,7 @@ import (
 
 	"go.step.sm/crypto/jose"
 	"go.step.sm/crypto/keyutil"
+	"go.step.sm/crypto/minica"
 	"go.step.sm/crypto/pemutil"
 	"go.step.sm/crypto/x509util"
 
@@ -1585,6 +1586,89 @@ func TestAuthority_Revoke(t *testing.T) {
 				}
 			} else {
 				assert.Nil(t, tc.err)
+			}
+		})
+	}
+}
+
+func TestAuthority_constraints(t *testing.T) {
+	ca, err := minica.New(
+		minica.WithIntermediateTemplate(`{
+				"subject": {{ toJson .Subject }},
+				"keyUsage": ["certSign", "crlSign"],
+				"basicConstraints": {
+					"isCA": true,
+					"maxPathLen": 0
+				},
+				"nameConstraints": {
+					"critical": true,
+					"permittedDNSDomains": ["internal.example.org"],
+					"excludedDNSDomains": ["internal.example.com"],
+					"permittedIPRanges": ["192.168.1.0/24", "192.168.2.1/32"],
+					"excludedIPRanges": ["192.168.3.0/24", "192.168.4.0/28"],
+					"permittedEmailAddresses": ["root@example.org", "example.org", ".acme.org"],
+					"excludedEmailAddresses": ["root@example.com", "example.com", ".acme.com"],
+					"permittedURIDomains": ["uuid.example.org", ".acme.org"],
+					"excludedURIDomains": ["uuid.example.com", ".acme.com"]
+				}
+			}`),
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	auth, err := NewEmbedded(WithX509RootCerts(ca.Root), WithX509Signer(ca.Intermediate, ca.Signer))
+	if err != nil {
+		t.Fatal(err)
+	}
+	signer, err := keyutil.GenerateDefaultSigner()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	tests := []struct {
+		name    string
+		sans    []string
+		wantErr bool
+	}{
+		{"ok dns", []string{"internal.example.org", "host.internal.example.org"}, false},
+		{"ok ip", []string{"192.168.1.10", "192.168.2.1"}, false},
+		{"ok email", []string{"root@example.org", "info@example.org", "info@www.acme.org"}, false},
+		{"ok uri", []string{"https://uuid.example.org/b908d973-5167-4a62-abe3-6beda358d82a", "https://uuid.acme.org/1724aae1-1bb3-44fb-83c3-9a1a18df67c8"}, false},
+		{"fail permitted dns", []string{"internal.acme.org"}, true},
+		{"fail excluded dns", []string{"internal.example.com"}, true},
+		{"fail permitted ips", []string{"192.168.2.10"}, true},
+		{"fail excluded ips", []string{"192.168.3.1"}, true},
+		{"fail permitted emails", []string{"root@acme.org"}, true},
+		{"fail excluded emails", []string{"root@example.com"}, true},
+		{"fail permitted uris", []string{"https://acme.org/uuid/7848819c-9d0b-4e12-bbff-cd66079a3444"}, true},
+		{"fail excluded uris", []string{"https://uuid.example.com/d325eda7-6356-4d60-b8f6-3d64724afeb3"}, true},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			csr, err := x509util.CreateCertificateRequest(tt.sans[0], tt.sans, signer)
+			if err != nil {
+				t.Fatal(err)
+			}
+			cert, err := ca.SignCSR(csr)
+			if err != nil {
+				t.Fatal(err)
+			}
+
+			data := x509util.CreateTemplateData(tt.sans[0], tt.sans)
+			templateOption, err := provisioner.TemplateOptions(nil, data)
+			if err != nil {
+				t.Fatal(err)
+			}
+
+			_, err = auth.Sign(csr, provisioner.SignOptions{}, templateOption)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("Authority.Sign() error = %v, wantErr %v", err, tt.wantErr)
+			}
+
+			_, err = auth.Renew(cert)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("Authority.Renew() error = %v, wantErr %v", err, tt.wantErr)
 			}
 		})
 	}
