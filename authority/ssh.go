@@ -203,10 +203,10 @@ func (a *Authority) SignSSH(ctx context.Context, key ssh.PublicKey, opts provisi
 	// Create certificate from template.
 	certificate, err := sshutil.NewCertificate(cr, certOptions...)
 	if err != nil {
-		var templErr *sshutil.TemplateError
-		if errors.As(err, &templErr) {
+		var te *sshutil.TemplateError
+		if errors.As(err, &te) {
 			return nil, errs.ApplyOptions(
-				errs.BadRequestErr(templErr, templErr.Error()),
+				errs.BadRequestErr(err, err.Error()),
 				errs.WithKeyVal("signOptions", signOpts),
 			)
 		}
