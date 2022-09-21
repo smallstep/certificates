@@ -519,9 +519,9 @@ func doTPMAttestationFormat(ctx context.Context, ch *Challenge, db DB, att *Atte
 		leaf.UnhandledCriticalExtensions = unhandledCriticalExtensions
 	}
 
-	roots, err := prov.GetAttestationRoots()
-	if err != nil {
-		return nil, WrapErrorISE(err, "error getting tpm attestation root CAs")
+	roots, ok := prov.GetAttestationRoots()
+	if !ok {
+		return nil, NewErrorISE("error getting tpm attestation root CAs")
 	}
 
 	verifiedChains, err := leaf.Verify(x509.VerifyOptions{
