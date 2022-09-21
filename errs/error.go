@@ -93,7 +93,7 @@ func Wrap(status int, e error, m string, args ...interface{}) error {
 	}
 	_, opts := splitOptionArgs(args)
 	var err *Error
-	if ok := errors.As(e, &err); ok {
+	if errors.As(e, &err) {
 		err.Err = errors.Wrap(err.Err, m)
 		e = err
 	} else {
@@ -110,7 +110,7 @@ func Wrapf(status int, e error, format string, args ...interface{}) error {
 	}
 	as, opts := splitOptionArgs(args)
 	var err *Error
-	if ok := errors.As(e, &err); ok {
+	if errors.As(e, &err) {
 		err.Err = errors.Wrapf(err.Err, format, args...)
 		e = err
 	} else {
@@ -143,7 +143,6 @@ func (e *Error) UnmarshalJSON(data []byte) error {
 
 // Format implements the fmt.Formatter interface.
 func (e *Error) Format(f fmt.State, c rune) {
-	//nolint:errorlint // ignore type assertion warning. casting to interface is hard.
 	if err, ok := e.Err.(fmt.Formatter); ok {
 		err.Format(f, c)
 		return
@@ -254,7 +253,7 @@ func NewError(status int, err error, format string, args ...interface{}) error {
 		return err
 	}
 	msg := fmt.Sprintf(format, args...)
-	if _, ok := log.AsStackTracedError(err); !ok {
+	if _, ok := err.(log.StackTracedError); !ok {
 		err = errors.Wrap(err, msg)
 	}
 	return &Error{
@@ -269,11 +268,11 @@ func NewError(status int, err error, format string, args ...interface{}) error {
 func NewErr(status int, err error, opts ...Option) error {
 	var e *Error
 	if !errors.As(err, &e) {
-		if sc, ok := render.AsStatusCodedError(err); ok {
+		if sc, ok := err.(render.StatusCodedError); ok {
 			e = &Error{Status: sc.StatusCode(), Err: err}
 		} else {
 			cause := errors.Cause(err)
-			if sc, ok := render.AsStatusCodedError(cause); ok {
+			if sc, ok := cause.(render.StatusCodedError); ok {
 				e = &Error{Status: sc.StatusCode(), Err: err}
 			} else {
 				e = &Error{Status: status, Err: err}
@@ -301,7 +300,7 @@ func Errorf(code int, format string, args ...interface{}) error {
 // TODO(mariano): try to get rid of this.
 func ApplyOptions(err error, opts ...interface{}) error {
 	var e *Error
-	if ok := errors.As(err, &e); ok {
+	if errors.As(err, &e) {
 		_, o := splitOptionArgs(opts)
 		for _, fn := range o {
 			fn(e)

@@ -133,17 +133,18 @@ generate:
 # Test
 #########################################
 test:
-	$Q $(GOFLAGS) go test -short -coverprofile=coverage.out ./...
+	$Q $(GOFLAGS) gotestsum -- -coverprofile=coverage.out -short -covermode=atomic ./...
+
 
 testcgo:
-	$Q go test -short -coverprofile=coverage.out ./...
+	$Q gotestsum -- -coverprofile=coverage.out -short -covermode=atomic ./...
 
 .PHONY: test testcgo
 
 integrate: integration
 
 integration: bin/$(BINNAME)
-	$Q $(GOFLAGS) go test -tags=integration ./integration/...
+	$Q $(GOFLAGS) gotestsum -- -tags=integration ./integration/...
 
 .PHONY: integrate integration
 

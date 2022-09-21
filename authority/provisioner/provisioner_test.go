@@ -241,7 +241,7 @@ func TestUnimplementedMethods(t *testing.T) {
 			default:
 				t.Errorf("unexpected method %s", tt.method)
 			}
-			sc, ok := render.AsStatusCodedError(err)
+			sc, ok := err.(render.StatusCodedError)
 			assert.Fatal(t, ok, "error does not implement StatusCodedError interface")
 			assert.Equals(t, sc.StatusCode(), http.StatusUnauthorized)
 			assert.Equals(t, err.Error(), msg)

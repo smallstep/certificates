@@ -389,7 +389,7 @@ lgsqsR63is+0YQ==
 			tc := tt(t)
 			if claims, err := tc.p.authorizeToken(tc.token, testAudiences.Sign); err != nil {
 				if assert.NotNil(t, tc.err) {
-					sc, ok := render.AsStatusCodedError(err)
+					sc, ok := err.(render.StatusCodedError)
 					assert.Fatal(t, ok, "error does not implement StatusCodedError interface")
 					assert.Equals(t, sc.StatusCode(), tc.code)
 					assert.HasPrefix(t, err.Error(), tc.err.Error())
@@ -460,7 +460,7 @@ func TestX5C_AuthorizeSign(t *testing.T) {
 			tc := tt(t)
 			if opts, err := tc.p.AuthorizeSign(context.Background(), tc.token); err != nil {
 				if assert.NotNil(t, tc.err) {
-					sc, ok := render.AsStatusCodedError(err)
+					sc, ok := err.(render.StatusCodedError)
 					assert.Fatal(t, ok, "error does not implement StatusCoder interface")
 					assert.Equals(t, sc.StatusCode(), tc.code)
 					assert.HasPrefix(t, err.Error(), tc.err.Error())
@@ -545,7 +545,7 @@ func TestX5C_AuthorizeRevoke(t *testing.T) {
 			tc := tt(t)
 			if err := tc.p.AuthorizeRevoke(context.Background(), tc.token); err != nil {
 				if assert.NotNil(t, tc.err) {
-					sc, ok := render.AsStatusCodedError(err)
+					sc, ok := err.(render.StatusCodedError)
 					assert.Fatal(t, ok, "error does not implement StatusCodedError interface")
 					assert.Equals(t, sc.StatusCode(), tc.code)
 					assert.HasPrefix(t, err.Error(), tc.err.Error())
@@ -595,7 +595,7 @@ func TestX5C_AuthorizeRenew(t *testing.T) {
 				NotAfter:  now.Add(time.Hour),
 			}); err != nil {
 				if assert.NotNil(t, tc.err) {
-					sc, ok := render.AsStatusCodedError(err)
+					sc, ok := err.(render.StatusCodedError)
 					assert.Fatal(t, ok, "error does not implement StatusCodedError interface")
 					assert.Equals(t, sc.StatusCode(), tc.code)
 					assert.HasPrefix(t, err.Error(), tc.err.Error())
@@ -756,7 +756,7 @@ func TestX5C_AuthorizeSSHSign(t *testing.T) {
 			tc := tt(t)
 			if opts, err := tc.p.AuthorizeSSHSign(context.Background(), tc.token); err != nil {
 				if assert.NotNil(t, tc.err) {
-					sc, ok := render.AsStatusCodedError(err)
+					sc, ok := err.(render.StatusCodedError)
 					assert.Fatal(t, ok, "error does not implement StatusCoder interface")
 					assert.Equals(t, sc.StatusCode(), tc.code)
 					assert.HasPrefix(t, err.Error(), tc.err.Error())

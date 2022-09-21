@@ -336,7 +336,7 @@ func TestAzure_authorizeToken(t *testing.T) {
 			tc := tt(t)
 			if claims, name, group, subscriptionID, objectID, err := tc.p.authorizeToken(tc.token); err != nil {
 				if assert.NotNil(t, tc.err) {
-					sc, ok := render.AsStatusCodedError(err)
+					sc, ok := err.(render.StatusCodedError)
 					assert.Fatal(t, ok, "error does not implement StatusCodedError interface")
 					assert.Equals(t, sc.StatusCode(), tc.code)
 					assert.HasPrefix(t, err.Error(), tc.err.Error())
@@ -498,7 +498,7 @@ func TestAzure_AuthorizeSign(t *testing.T) {
 				t.Errorf("Azure.AuthorizeSign() error = %v, wantErr %v", err, tt.wantErr)
 				return
 			case err != nil:
-				sc, ok := render.AsStatusCodedError(err)
+				sc, ok := err.(render.StatusCodedError)
 				assert.Fatal(t, ok, "error does not implement StatusCodedError interface")
 				assert.Equals(t, sc.StatusCode(), tt.code)
 			default:
@@ -576,7 +576,7 @@ func TestAzure_AuthorizeRenew(t *testing.T) {
 			if err := tt.azure.AuthorizeRenew(context.Background(), tt.args.cert); (err != nil) != tt.wantErr {
 				t.Errorf("Azure.AuthorizeRenew() error = %v, wantErr %v", err, tt.wantErr)
 			} else if err != nil {
-				sc, ok := render.AsStatusCodedError(err)
+				sc, ok := err.(render.StatusCodedError)
 				assert.Fatal(t, ok, "error does not implement StatusCodedError interface")
 				assert.Equals(t, sc.StatusCode(), tt.code)
 			}
@@ -673,7 +673,7 @@ func TestAzure_AuthorizeSSHSign(t *testing.T) {
 				return
 			}
 			if err != nil {
-				sc, ok := render.AsStatusCodedError(err)
+				sc, ok := err.(render.StatusCodedError)
 				assert.Fatal(t, ok, "error does not implement StatusCodedError interface")
 				assert.Equals(t, sc.StatusCode(), tt.code)
 				assert.Nil(t, got)

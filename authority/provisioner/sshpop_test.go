@@ -218,7 +218,7 @@ func TestSSHPOP_authorizeToken(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			tc := tt(t)
 			if claims, err := tc.p.authorizeToken(tc.token, testAudiences.Sign, true); err != nil {
-				sc, ok := render.AsStatusCodedError(err)
+				sc, ok := err.(render.StatusCodedError)
 				assert.Fatal(t, ok, "error does not implement StatusCodedError interface")
 				assert.Equals(t, sc.StatusCode(), tc.code)
 				if assert.NotNil(t, tc.err) {
@@ -289,7 +289,7 @@ func TestSSHPOP_AuthorizeSSHRevoke(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			tc := tt(t)
 			if err := tc.p.AuthorizeSSHRevoke(context.Background(), tc.token); err != nil {
-				sc, ok := render.AsStatusCodedError(err)
+				sc, ok := err.(render.StatusCodedError)
 				assert.Fatal(t, ok, "error does not implement StatusCodedError interface")
 				assert.Equals(t, sc.StatusCode(), tc.code)
 				if assert.NotNil(t, tc.err) {
@@ -370,7 +370,7 @@ func TestSSHPOP_AuthorizeSSHRenew(t *testing.T) {
 			tc := tt(t)
 			if cert, err := tc.p.AuthorizeSSHRenew(context.Background(), tc.token); err != nil {
 				if assert.NotNil(t, tc.err) {
-					sc, ok := render.AsStatusCodedError(err)
+					sc, ok := err.(render.StatusCodedError)
 					assert.Fatal(t, ok, "error does not implement StatusCodedError interface")
 					assert.Equals(t, sc.StatusCode(), tc.code)
 					assert.HasPrefix(t, err.Error(), tc.err.Error())
@@ -452,7 +452,7 @@ func TestSSHPOP_AuthorizeSSHRekey(t *testing.T) {
 			tc := tt(t)
 			if cert, opts, err := tc.p.AuthorizeSSHRekey(context.Background(), tc.token); err != nil {
 				if assert.NotNil(t, tc.err) {
-					sc, ok := render.AsStatusCodedError(err)
+					sc, ok := err.(render.StatusCodedError)
 					assert.Fatal(t, ok, "error does not implement StatusCodedError interface")
 					assert.Equals(t, sc.StatusCode(), tc.code)
 					assert.HasPrefix(t, err.Error(), tc.err.Error())

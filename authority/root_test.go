@@ -32,7 +32,7 @@ func TestRoot(t *testing.T) {
 			crt, err := a.Root(tc.sum)
 			if err != nil {
 				if assert.NotNil(t, tc.err) {
-					sc, ok := render.AsStatusCodedError(err)
+					sc, ok := err.(render.StatusCodedError)
 					assert.Fatal(t, ok, "error does not implement StatusCoder interface")
 					assert.Equals(t, sc.StatusCode(), tc.code)
 					assert.HasPrefix(t, err.Error(), tc.err.Error())
