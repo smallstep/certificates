@@ -350,7 +350,6 @@ func formatCapabilities(caps []string) []byte {
 
 // writeResponse writes a SCEP response back to the SCEP client.
 func writeResponse(w http.ResponseWriter, res Response) {
-
 	if res.Error != nil {
 		log.Error(w, res.Error)
 	}

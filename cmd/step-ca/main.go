@@ -14,7 +14,7 @@ import (
 	"time"
 
 	// Server profiler
-	// nolint:gosec // profile server, if enabled runs on a different port
+	//nolint:gosec // profile server, if enabled runs on a different port
 	_ "net/http/pprof"
 
 	"github.com/smallstep/certificates/authority"
@@ -176,7 +176,11 @@ $ step-ca --context=mybiz --password-file ./password.txt
 	debugProfAddr := os.Getenv("STEP_PROF_ADDR")
 	if debugProfAddr != "" {
 		go func() {
-			log.Println(http.ListenAndServe(debugProfAddr, nil))
+			srv := http.Server{
+				Addr:              debugProfAddr,
+				ReadHeaderTimeout: 15 * time.Second,
+			}
+			log.Println(srv.ListenAndServe())
 		}()
 	}
 

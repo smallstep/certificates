@@ -68,16 +68,16 @@ func TestDB_getDBAdminBytes(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			d := DB{db: tc.db}
 			if b, err := d.getDBAdminBytes(context.Background(), adminID); err != nil {
-				switch k := err.(type) {
-				case *admin.Error:
+				var ae *admin.Error
+				if errors.As(err, &ae) {
 					if assert.NotNil(t, tc.adminErr) {
-						assert.Equals(t, k.Type, tc.adminErr.Type)
-						assert.Equals(t, k.Detail, tc.adminErr.Detail)
-						assert.Equals(t, k.Status, tc.adminErr.Status)
-						assert.Equals(t, k.Err.Error(), tc.adminErr.Err.Error())
-						assert.Equals(t, k.Detail, tc.adminErr.Detail)
+						assert.Equals(t, ae.Type, tc.adminErr.Type)
+						assert.Equals(t, ae.Detail, tc.adminErr.Detail)
+						assert.Equals(t, ae.Status, tc.adminErr.Status)
+						assert.Equals(t, ae.Err.Error(), tc.adminErr.Err.Error())
+						assert.Equals(t, ae.Detail, tc.adminErr.Detail)
 					}
-				default:
+				} else {
 					if assert.NotNil(t, tc.err) {
 						assert.HasPrefix(t, err.Error(), tc.err.Error())
 					}
@@ -192,16 +192,16 @@ func TestDB_getDBAdmin(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			d := DB{db: tc.db, authorityID: admin.DefaultAuthorityID}
 			if dba, err := d.getDBAdmin(context.Background(), adminID); err != nil {
-				switch k := err.(type) {
-				case *admin.Error:
+				var ae *admin.Error
+				if errors.As(err, &ae) {
 					if assert.NotNil(t, tc.adminErr) {
-						assert.Equals(t, k.Type, tc.adminErr.Type)
-						assert.Equals(t, k.Detail, tc.adminErr.Detail)
-						assert.Equals(t, k.Status, tc.adminErr.Status)
-						assert.Equals(t, k.Err.Error(), tc.adminErr.Err.Error())
-						assert.Equals(t, k.Detail, tc.adminErr.Detail)
+						assert.Equals(t, ae.Type, tc.adminErr.Type)
+						assert.Equals(t, ae.Detail, tc.adminErr.Detail)
+						assert.Equals(t, ae.Status, tc.adminErr.Status)
+						assert.Equals(t, ae.Err.Error(), tc.adminErr.Err.Error())
+						assert.Equals(t, ae.Detail, tc.adminErr.Detail)
 					}
-				default:
+				} else {
 					if assert.NotNil(t, tc.err) {
 						assert.HasPrefix(t, err.Error(), tc.err.Error())
 					}
@@ -280,16 +280,16 @@ func TestDB_unmarshalDBAdmin(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			d := DB{authorityID: admin.DefaultAuthorityID}
 			if dba, err := d.unmarshalDBAdmin(tc.in, adminID); err != nil {
-				switch k := err.(type) {
-				case *admin.Error:
+				var ae *admin.Error
+				if errors.As(err, &ae) {
 					if assert.NotNil(t, tc.adminErr) {
-						assert.Equals(t, k.Type, tc.adminErr.Type)
-						assert.Equals(t, k.Detail, tc.adminErr.Detail)
-						assert.Equals(t, k.Status, tc.adminErr.Status)
-						assert.Equals(t, k.Err.Error(), tc.adminErr.Err.Error())
-						assert.Equals(t, k.Detail, tc.adminErr.Detail)
+						assert.Equals(t, ae.Type, tc.adminErr.Type)
+						assert.Equals(t, ae.Detail, tc.adminErr.Detail)
+						assert.Equals(t, ae.Status, tc.adminErr.Status)
+						assert.Equals(t, ae.Err.Error(), tc.adminErr.Err.Error())
+						assert.Equals(t, ae.Detail, tc.adminErr.Detail)
 					}
-				default:
+				} else {
 					if assert.NotNil(t, tc.err) {
 						assert.HasPrefix(t, err.Error(), tc.err.Error())
 					}
@@ -355,16 +355,16 @@ func TestDB_unmarshalAdmin(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			d := DB{authorityID: admin.DefaultAuthorityID}
 			if adm, err := d.unmarshalAdmin(tc.in, adminID); err != nil {
-				switch k := err.(type) {
-				case *admin.Error:
+				var ae *admin.Error
+				if errors.As(err, &ae) {
 					if assert.NotNil(t, tc.adminErr) {
-						assert.Equals(t, k.Type, tc.adminErr.Type)
-						assert.Equals(t, k.Detail, tc.adminErr.Detail)
-						assert.Equals(t, k.Status, tc.adminErr.Status)
-						assert.Equals(t, k.Err.Error(), tc.adminErr.Err.Error())
-						assert.Equals(t, k.Detail, tc.adminErr.Detail)
+						assert.Equals(t, ae.Type, tc.adminErr.Type)
+						assert.Equals(t, ae.Detail, tc.adminErr.Detail)
+						assert.Equals(t, ae.Status, tc.adminErr.Status)
+						assert.Equals(t, ae.Err.Error(), tc.adminErr.Err.Error())
+						assert.Equals(t, ae.Detail, tc.adminErr.Detail)
 					}
-				default:
+				} else {
 					if assert.NotNil(t, tc.err) {
 						assert.HasPrefix(t, err.Error(), tc.err.Error())
 					}
@@ -509,16 +509,16 @@ func TestDB_GetAdmin(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			d := DB{db: tc.db, authorityID: admin.DefaultAuthorityID}
 			if adm, err := d.GetAdmin(context.Background(), adminID); err != nil {
-				switch k := err.(type) {
-				case *admin.Error:
+				var ae *admin.Error
+				if errors.As(err, &ae) {
 					if assert.NotNil(t, tc.adminErr) {
-						assert.Equals(t, k.Type, tc.adminErr.Type)
-						assert.Equals(t, k.Detail, tc.adminErr.Detail)
-						assert.Equals(t, k.Status, tc.adminErr.Status)
-						assert.Equals(t, k.Err.Error(), tc.adminErr.Err.Error())
-						assert.Equals(t, k.Detail, tc.adminErr.Detail)
+						assert.Equals(t, ae.Type, tc.adminErr.Type)
+						assert.Equals(t, ae.Detail, tc.adminErr.Detail)
+						assert.Equals(t, ae.Status, tc.adminErr.Status)
+						assert.Equals(t, ae.Err.Error(), tc.adminErr.Err.Error())
+						assert.Equals(t, ae.Detail, tc.adminErr.Detail)
 					}
-				default:
+				} else {
 					if assert.NotNil(t, tc.err) {
 						assert.HasPrefix(t, err.Error(), tc.err.Error())
 					}
@@ -661,16 +661,16 @@ func TestDB_DeleteAdmin(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			d := DB{db: tc.db, authorityID: admin.DefaultAuthorityID}
 			if err := d.DeleteAdmin(context.Background(), adminID); err != nil {
-				switch k := err.(type) {
-				case *admin.Error:
+				var ae *admin.Error
+				if errors.As(err, &ae) {
 					if assert.NotNil(t, tc.adminErr) {
-						assert.Equals(t, k.Type, tc.adminErr.Type)
-						assert.Equals(t, k.Detail, tc.adminErr.Detail)
-						assert.Equals(t, k.Status, tc.adminErr.Status)
-						assert.Equals(t, k.Err.Error(), tc.adminErr.Err.Error())
-						assert.Equals(t, k.Detail, tc.adminErr.Detail)
+						assert.Equals(t, ae.Type, tc.adminErr.Type)
+						assert.Equals(t, ae.Detail, tc.adminErr.Detail)
+						assert.Equals(t, ae.Status, tc.adminErr.Status)
+						assert.Equals(t, ae.Err.Error(), tc.adminErr.Err.Error())
+						assert.Equals(t, ae.Detail, tc.adminErr.Detail)
 					}
-				default:
+				} else {
 					if assert.NotNil(t, tc.err) {
 						assert.HasPrefix(t, err.Error(), tc.err.Error())
 					}
@@ -812,16 +812,16 @@ func TestDB_UpdateAdmin(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			d := DB{db: tc.db, authorityID: admin.DefaultAuthorityID}
 			if err := d.UpdateAdmin(context.Background(), tc.adm); err != nil {
-				switch k := err.(type) {
-				case *admin.Error:
+				var ae *admin.Error
+				if errors.As(err, &ae) {
 					if assert.NotNil(t, tc.adminErr) {
-						assert.Equals(t, k.Type, tc.adminErr.Type)
-						assert.Equals(t, k.Detail, tc.adminErr.Detail)
-						assert.Equals(t, k.Status, tc.adminErr.Status)
-						assert.Equals(t, k.Err.Error(), tc.adminErr.Err.Error())
-						assert.Equals(t, k.Detail, tc.adminErr.Detail)
+						assert.Equals(t, ae.Type, tc.adminErr.Type)
+						assert.Equals(t, ae.Detail, tc.adminErr.Detail)
+						assert.Equals(t, ae.Status, tc.adminErr.Status)
+						assert.Equals(t, ae.Err.Error(), tc.adminErr.Err.Error())
+						assert.Equals(t, ae.Detail, tc.adminErr.Detail)
 					}
-				default:
+				} else {
 					if assert.NotNil(t, tc.err) {
 						assert.HasPrefix(t, err.Error(), tc.err.Error())
 					}
@@ -910,16 +910,16 @@ func TestDB_CreateAdmin(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			d := DB{db: tc.db, authorityID: admin.DefaultAuthorityID}
 			if err := d.CreateAdmin(context.Background(), tc.adm); err != nil {
-				switch k := err.(type) {
-				case *admin.Error:
+				var ae *admin.Error
+				if errors.As(err, &ae) {
 					if assert.NotNil(t, tc.adminErr) {
-						assert.Equals(t, k.Type, tc.adminErr.Type)
-						assert.Equals(t, k.Detail, tc.adminErr.Detail)
-						assert.Equals(t, k.Status, tc.adminErr.Status)
-						assert.Equals(t, k.Err.Error(), tc.adminErr.Err.Error())
-						assert.Equals(t, k.Detail, tc.adminErr.Detail)
+						assert.Equals(t, ae.Type, tc.adminErr.Type)
+						assert.Equals(t, ae.Detail, tc.adminErr.Detail)
+						assert.Equals(t, ae.Status, tc.adminErr.Status)
+						assert.Equals(t, ae.Err.Error(), tc.adminErr.Err.Error())
+						assert.Equals(t, ae.Detail, tc.adminErr.Detail)
 					}
-				default:
+				} else {
 					if assert.NotNil(t, tc.err) {
 						assert.HasPrefix(t, err.Error(), tc.err.Error())
 					}
@@ -1086,16 +1086,16 @@ func TestDB_GetAdmins(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			d := DB{db: tc.db, authorityID: admin.DefaultAuthorityID}
 			if admins, err := d.GetAdmins(context.Background()); err != nil {
-				switch k := err.(type) {
-				case *admin.Error:
+				var ae *admin.Error
+				if errors.As(err, &ae) {
 					if assert.NotNil(t, tc.adminErr) {
-						assert.Equals(t, k.Type, tc.adminErr.Type)
-						assert.Equals(t, k.Detail, tc.adminErr.Detail)
-						assert.Equals(t, k.Status, tc.adminErr.Status)
-						assert.Equals(t, k.Err.Error(), tc.adminErr.Err.Error())
-						assert.Equals(t, k.Detail, tc.adminErr.Detail)
+						assert.Equals(t, ae.Type, tc.adminErr.Type)
+						assert.Equals(t, ae.Detail, tc.adminErr.Detail)
+						assert.Equals(t, ae.Status, tc.adminErr.Status)
+						assert.Equals(t, ae.Err.Error(), tc.adminErr.Err.Error())
+						assert.Equals(t, ae.Detail, tc.adminErr.Detail)
 					}
-				default:
+				} else {
 					if assert.NotNil(t, tc.err) {
 						assert.HasPrefix(t, err.Error(), tc.err.Error())
 					}

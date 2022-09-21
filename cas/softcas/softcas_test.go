@@ -261,9 +261,6 @@ func TestSoftCAS_CreateCertificate(t *testing.T) {
 	tmplNotBefore := *testTemplate
 	tmplNotBefore.NotBefore = testNow
 
-	tmplNotAfter := *testTemplate
-	tmplNotAfter.NotAfter = testNow.Add(24 * time.Hour)
-
 	tmplWithLifetime := *testTemplate
 	tmplWithLifetime.NotBefore = testNow
 	tmplWithLifetime.NotAfter = testNow.Add(24 * time.Hour)

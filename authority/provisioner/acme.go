@@ -15,7 +15,7 @@ import (
 // ACMEChallenge represents the supported acme challenges.
 type ACMEChallenge string
 
-// nolint:revive // better names
+//nolint:stylecheck,revive // better names
 const (
 	// HTTP_01 is the http-01 ACME challenge.
 	HTTP_01 ACMEChallenge = "http-01"
@@ -217,7 +217,6 @@ type ACMEIdentifier struct {
 // AuthorizeOrderIdentifier verifies the provisioner is allowed to issue a
 // certificate for an ACME Order Identifier.
 func (p *ACME) AuthorizeOrderIdentifier(ctx context.Context, identifier ACMEIdentifier) error {
-
 	x509Policy := p.ctl.getPolicy().getX509()
 
 	// identifier is allowed if no policy is configured

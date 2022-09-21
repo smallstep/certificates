@@ -120,7 +120,7 @@ M46l92gdOozT
 			return ProvisionerValidateTest{
 				p: p,
 				extraValid: func(p *X5C) error {
-					// nolint:staticcheck // We don't have a different way to
+					//nolint:staticcheck // We don't have a different way to
 					// check the number of certificates in the pool.
 					numCerts := len(p.rootPool.Subjects())
 					if numCerts != 2 {

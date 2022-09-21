@@ -215,7 +215,6 @@ func (c *SoftCAS) getCertSigner() ([]*x509.Certificate, crypto.Signer, error) {
 		return c.CertificateSigner()
 	}
 	return c.CertificateChain, c.Signer, nil
-
 }
 
 // createKey uses the configured kms to create a key.

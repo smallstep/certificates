@@ -1,4 +1,4 @@
-name: Lint, Test, Build
+name: CI
 
 on:
   push:
@@ -7,43 +7,13 @@ on:
     branches:
     - "**"
   pull_request:
+  schedule:
+    - cron: '0 0 * * *'
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
 
 jobs:
-  lintTestBuild:
-    name: Lint, Test, Build
-    runs-on: ubuntu-20.04
-    strategy:
-      matrix:
-        go: [ '1.18', '1.19' ]
-    steps:
-      -
-        name: Checkout
-        uses: actions/checkout@v2
-      -
-        name: Setup Go
-        uses: actions/setup-go@v2
-        with:
-          go-version: ${{ matrix.go }}
-      -
-        name: Install Deps
-        id: install-deps
-        run: sudo apt-get -y install libpcsclite-dev
-      -
-        name: golangci-lint
-        uses: golangci/golangci-lint-action@v2
-        with:
-          version: ${{ secrets.GOLANGCI_LINT_VERSION }}
-          args: --timeout=30m
-      -
-        name: Test, Build
-        id: lint_test_build
-        run: V=1 make ci
-      -
-        name: Codecov
-        if: matrix.go == '1.19'
-        uses: codecov/codecov-action@v2
-        with:
-          token: ${{ secrets.CODECOV_TOKEN }}
-          files: ./coverage.out # optional
-          name: codecov-umbrella # optional
-          fail_ci_if_error: true # optional (default = false)
+  ci:
+    uses: smallstep/workflows/.github/workflows/goCI.yml@main

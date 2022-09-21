@@ -62,12 +62,12 @@ func TestRevokeRequestValidate(t *testing.T) {
 	for name, tc := range tests {
 		t.Run(name, func(t *testing.T) {
 			if err := tc.rr.Validate(); err != nil {
-				switch v := err.(type) {
-				case *errs.Error:
-					assert.HasPrefix(t, v.Error(), tc.err.Error())
-					assert.Equals(t, v.StatusCode(), tc.err.Status)
-				default:
-					t.Errorf("unexpected error type: %T", v)
+				var ee *errs.Error
+				if errors.As(err, &ee) {
+					assert.HasPrefix(t, ee.Error(), tc.err.Error())
+					assert.Equals(t, ee.StatusCode(), tc.err.Status)
+				} else {
+					t.Errorf("unexpected error type: %T", err)
 				}
 			} else {
 				assert.Nil(t, tc.err)

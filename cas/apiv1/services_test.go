@@ -24,7 +24,7 @@ func TestType_String(t *testing.T) {
 	}
 }
 
-func TestErrNotImplemented_Error(t *testing.T) {
+func TestNotImplementedError_Error(t *testing.T) {
 	type fields struct {
 		Message string
 	}
@@ -38,17 +38,17 @@ func TestErrNotImplemented_Error(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			e := ErrNotImplemented{
+			e := NotImplementedError{
 				Message: tt.fields.Message,
 			}
 			if got := e.Error(); got != tt.want {
-				t.Errorf("ErrNotImplemented.Error() = %v, want %v", got, tt.want)
+				t.Errorf("NotImplementedError.Error() = %v, want %v", got, tt.want)
 			}
 		})
 	}
 }
 
-func TestErrNotImplemented_StatusCode(t *testing.T) {
+func TestNotImplementedError_StatusCode(t *testing.T) {
 	type fields struct {
 		Message string
 	}
@@ -62,11 +62,11 @@ func TestErrNotImplemented_StatusCode(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			s := ErrNotImplemented{
+			s := NotImplementedError{
 				Message: tt.fields.Message,
 			}
 			if got := s.StatusCode(); got != tt.want {
-				t.Errorf("ErrNotImplemented.StatusCode() = %v, want %v", got, tt.want)
+				t.Errorf("NotImplementedError.StatusCode() = %v, want %v", got, tt.want)
 			}
 		})
 	}

@@ -250,16 +250,16 @@ func TestDB_GetCertificate(t *testing.T) {
 			d := DB{db: tc.db}
 			cert, err := d.GetCertificate(context.Background(), certID)
 			if err != nil {
-				switch k := err.(type) {
-				case *acme.Error:
+				var acmeErr *acme.Error
+				if errors.As(err, &acmeErr) {
 					if assert.NotNil(t, tc.acmeErr) {
-						assert.Equals(t, k.Type, tc.acmeErr.Type)
-						assert.Equals(t, k.Detail, tc.acmeErr.Detail)
-						assert.Equals(t, k.Status, tc.acmeErr.Status)
-						assert.Equals(t, k.Err.Error(), tc.acmeErr.Err.Error())
-						assert.Equals(t, k.Detail, tc.acmeErr.Detail)
+						assert.Equals(t, acmeErr.Type, tc.acmeErr.Type)
+						assert.Equals(t, acmeErr.Detail, tc.acmeErr.Detail)
+						assert.Equals(t, acmeErr.Status, tc.acmeErr.Status)
+						assert.Equals(t, acmeErr.Err.Error(), tc.acmeErr.Err.Error())
+						assert.Equals(t, acmeErr.Detail, tc.acmeErr.Detail)
 					}
-				default:
+				} else {
 					if assert.NotNil(t, tc.err) {
 						assert.HasPrefix(t, err.Error(), tc.err.Error())
 					}
@@ -444,16 +444,16 @@ func TestDB_GetCertificateBySerial(t *testing.T) {
 			d := DB{db: tc.db}
 			cert, err := d.GetCertificateBySerial(context.Background(), serial)
 			if err != nil {
-				switch k := err.(type) {
-				case *acme.Error:
+				var ae *acme.Error
+				if errors.As(err, &ae) {
 					if assert.NotNil(t, tc.acmeErr) {
-						assert.Equals(t, k.Type, tc.acmeErr.Type)
-						assert.Equals(t, k.Detail, tc.acmeErr.Detail)
-						assert.Equals(t, k.Status, tc.acmeErr.Status)
-						assert.Equals(t, k.Err.Error(), tc.acmeErr.Err.Error())
-						assert.Equals(t, k.Detail, tc.acmeErr.Detail)
+						assert.Equals(t, ae.Type, tc.acmeErr.Type)
+						assert.Equals(t, ae.Detail, tc.acmeErr.Detail)
+						assert.Equals(t, ae.Status, tc.acmeErr.Status)
+						assert.Equals(t, ae.Err.Error(), tc.acmeErr.Err.Error())
+						assert.Equals(t, ae.Detail, tc.acmeErr.Detail)
 					}
-				default:
+				} else {
 					if assert.NotNil(t, tc.err) {
 						assert.HasPrefix(t, err.Error(), tc.err.Error())
 					}

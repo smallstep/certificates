@@ -6,7 +6,7 @@ import (
 	"crypto/ecdsa"
 	"crypto/elliptic"
 	"crypto/rand"
-	"crypto/sha1" // nolint:gosec // used to create the Subject Key Identifier by RFC 5280
+	"crypto/sha1" //nolint:gosec // used to create the Subject Key Identifier by RFC 5280
 	"crypto/x509"
 	"crypto/x509/pkix"
 	"encoding/asn1"
@@ -199,7 +199,7 @@ func generateSubjectKeyID(pub crypto.PublicKey) ([]byte, error) {
 	if _, err = asn1.Unmarshal(b, &info); err != nil {
 		return nil, fmt.Errorf("error unmarshaling public key: %w", err)
 	}
-	// nolint:gosec // used to create the Subject Key Identifier by RFC 5280
+	//nolint:gosec // used to create the Subject Key Identifier by RFC 5280
 	hash := sha1.Sum(info.SubjectPublicKey.Bytes)
 	return hash[:], nil
 }
@@ -577,7 +577,7 @@ ZYtQ9Ot36qc=
 				{Id: stepOIDProvisioner, Value: []byte("foo")},
 				{Id: []int{1, 1, 1}, Value: []byte("bar")}}))
 			now := time.Now().UTC()
-			// nolint:gocritic
+			//nolint:gocritic
 			enforcedExtraOptions := append(extraOpts, &certificateDurationEnforcer{
 				NotBefore: now,
 				NotAfter:  now.Add(365 * 24 * time.Hour),
@@ -735,8 +735,8 @@ ZYtQ9Ot36qc=
 					assert.Equals(t, sc.StatusCode(), tc.code)
 					assert.HasPrefix(t, err.Error(), tc.err.Error())
 
-					ctxErr, ok := err.(*errs.Error)
-					assert.Fatal(t, ok, "error is not of type *errs.Error")
+					var ctxErr *errs.Error
+					assert.Fatal(t, errors.As(err, &ctxErr), "error is not of type *errs.Error")
 					assert.Equals(t, ctxErr.Details["csr"], tc.csr)
 					assert.Equals(t, ctxErr.Details["signOptions"], tc.signOpts)
 				}
@@ -934,8 +934,8 @@ func TestAuthority_Renew(t *testing.T) {
 					assert.Equals(t, sc.StatusCode(), tc.code)
 					assert.HasPrefix(t, err.Error(), tc.err.Error())
 
-					ctxErr, ok := err.(*errs.Error)
-					assert.Fatal(t, ok, "error is not of type *errs.Error")
+					var ctxErr *errs.Error
+					assert.Fatal(t, errors.As(err, &ctxErr), "error is not of type *errs.Error")
 					assert.Equals(t, ctxErr.Details["serialNumber"], tc.cert.SerialNumber.String())
 				}
 			} else {
@@ -1141,8 +1141,8 @@ func TestAuthority_Rekey(t *testing.T) {
 					assert.Equals(t, sc.StatusCode(), tc.code)
 					assert.HasPrefix(t, err.Error(), tc.err.Error())
 
-					ctxErr, ok := err.(*errs.Error)
-					assert.Fatal(t, ok, "error is not of type *errs.Error")
+					var ctxErr *errs.Error
+					assert.Fatal(t, errors.As(err, &ctxErr), "error is not of type *errs.Error")
 					assert.Equals(t, ctxErr.Details["serialNumber"], tc.cert.SerialNumber.String())
 				}
 			} else {
@@ -1571,8 +1571,8 @@ func TestAuthority_Revoke(t *testing.T) {
 					assert.Equals(t, sc.StatusCode(), tc.code)
 					assert.HasPrefix(t, err.Error(), tc.err.Error())
 
-					ctxErr, ok := err.(*errs.Error)
-					assert.Fatal(t, ok, "error is not of type *errs.Error")
+					var ctxErr *errs.Error
+					assert.Fatal(t, errors.As(err, &ctxErr), "error is not of type *errs.Error")
 					assert.Equals(t, ctxErr.Details["serialNumber"], tc.opts.Serial)
 					assert.Equals(t, ctxErr.Details["reasonCode"], tc.opts.ReasonCode)
 					assert.Equals(t, ctxErr.Details["reason"], tc.opts.Reason)

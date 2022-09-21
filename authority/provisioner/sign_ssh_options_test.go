@@ -287,7 +287,7 @@ func Test_sshCertTypeModifier_Modify(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			tc := run()
 			if assert.Nil(t, tc.modifier.Modify(tc.cert, SignSSHOptions{})) {
-				assert.Equals(t, tc.cert.CertType, uint32(tc.expected))
+				assert.Equals(t, tc.cert.CertType, tc.expected)
 			}
 		})
 	}
