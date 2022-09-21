@@ -37,7 +37,7 @@ import (
 	"strings"
 )
 
-func checkNameConstraints(nameType string, name string, parsedName any, permitted, excluded any, match func(name, constraint any) (bool, error)) error {
+func checkNameConstraints(nameType, name string, parsedName, permitted, excluded any, match func(name, constraint any) (bool, error)) error {
 	excludedValue := reflect.ValueOf(excluded)
 	for i := 0; i < excludedValue.Len(); i++ {
 		constraint := excludedValue.Index(i).Interface()
@@ -92,7 +92,7 @@ func checkNameConstraints(nameType string, name string, parsedName any, permitte
 func matchDomainConstraint(domain, constraint string) (bool, error) {
 	// The meaning of zero length constraints is not specified, but this
 	// code follows NSS and accepts them as matching everything.
-	if len(constraint) == 0 {
+	if constraint == "" {
 		return true, nil
 	}
 
@@ -101,10 +101,10 @@ func matchDomainConstraint(domain, constraint string) (bool, error) {
 		return false, fmt.Errorf("internal error: cannot parse domain %q", domain)
 	}
 
-	// RFC 5280 says that a leading period in a domain name means that at
-	// least one label must be prepended, but only for URI and email
-	// constraints, not DNS constraints. The code also supports that
-	// behaviour for DNS constraints.
+	// RFC 5280 says that a leading period in a domain name means that at least
+	// one label must be prepended, but only for URI and email constraints, not
+	// DNS constraints. The code also supports that behavior for DNS
+	// constraints.
 
 	mustHaveSubdomains := false
 	if constraint[0] == '.' {
@@ -180,7 +180,7 @@ func matchURIConstraint(uri *url.URL, constraint string) (bool, error) {
 	// certificate.”
 
 	host := uri.Host
-	if len(host) == 0 {
+	if host == "" {
 		return false, fmt.Errorf("URI with empty host (%q) cannot be matched against constraints", uri.String())
 	}
 
@@ -213,13 +213,13 @@ func domainToReverseLabels(domain string) (reverseLabels []string, ok bool) {
 		}
 	}
 
-	if len(reverseLabels) > 0 && len(reverseLabels[0]) == 0 {
+	if len(reverseLabels) > 0 && reverseLabels[0] == "" {
 		// An empty label at the end indicates an absolute value.
 		return nil, false
 	}
 
 	for _, label := range reverseLabels {
-		if len(label) == 0 {
+		if label == "" {
 			// Empty labels are otherwise invalid.
 			return nil, false
 		}
@@ -247,7 +247,7 @@ type rfc2821Mailbox struct {
 // Section 4.2.1.6 that's correct for an rfc822Name from a certificate: “The
 // format of an rfc822Name is a "Mailbox" as defined in RFC 2821, Section 4.1.2”.
 func parseRFC2821Mailbox(in string) (mailbox rfc2821Mailbox, ok bool) {
-	if len(in) == 0 {
+	if in == "" {
 		return mailbox, false
 	}
 
@@ -267,7 +267,7 @@ func parseRFC2821Mailbox(in string) (mailbox rfc2821Mailbox, ok bool) {
 		in = in[1:]
 	QuotedString:
 		for {
-			if len(in) == 0 {
+			if in == "" {
 				return mailbox, false
 			}
 			c := in[0]
@@ -279,7 +279,7 @@ func parseRFC2821Mailbox(in string) (mailbox rfc2821Mailbox, ok bool) {
 
 			case c == '\\':
 				// quoted-pair
-				if len(in) == 0 {
+				if in == "" {
 					return mailbox, false
 				}
 				if in[0] == 11 ||
@@ -328,7 +328,7 @@ func parseRFC2821Mailbox(in string) (mailbox rfc2821Mailbox, ok bool) {
 				// continue to argue the point. We choose to
 				// accept it.
 				in = in[1:]
-				if len(in) == 0 {
+				if in == "" {
 					return mailbox, false
 				}
 				fallthrough
@@ -365,7 +365,7 @@ func parseRFC2821Mailbox(in string) (mailbox rfc2821Mailbox, ok bool) {
 		}
 	}
 
-	if len(in) == 0 || in[0] != '@' {
+	if in == "" || in[0] != '@' {
 		return mailbox, false
 	}
 	in = in[1:]
