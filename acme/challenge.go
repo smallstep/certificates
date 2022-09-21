@@ -850,10 +850,10 @@ func uitoa(val uint) string {
 	var buf [20]byte // big enough for 64bit value base 10
 	i := len(buf) - 1
 	for val >= 10 {
-		q := val / 10
-		buf[i] = byte('0' + val - q*10)
+		v := val / 10
+		buf[i] = byte('0' + val - v*10)
 		i--
-		val = q
+		val = v
 	}
 	// val < 10
 	buf[i] = byte('0' + val)
