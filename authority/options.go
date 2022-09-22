@@ -240,16 +240,16 @@ func WithX509FederatedCerts(certs ...*x509.Certificate) Option {
 	}
 }
 
-// WithX509RootCerts is an option that allows to define the list of intermediate
-// certificates that the CA will be using. This option will replace any
-// intermediate certificate defined before.
+// WithX509IntermediateCerts is an option that allows to define the list of
+// intermediate certificates that the CA will be using. This option will replace
+// any intermediate certificate defined before.
 //
 // Note that these certificates will not be bundled with the certificates signed
 // by the CA, the CAS service will take care of that, although they should
 // match, this is not guaranteed.  These certificates will be mainly used for
 // constraint purposes.
 //
-// This option should only used on specific configurations, for example when
+// This option should only be used on specific configurations, for example when
 // WithX509SignerFunc is used, as we don't know the list of intermediates on
 // advance.
 func WithX509IntermediateCerts(intermediateCerts ...*x509.Certificate) Option {
