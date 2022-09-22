@@ -214,7 +214,7 @@ func (a *Authority) Sign(csr *x509.CertificateRequest, signOpts provisioner.Sign
 	if err := a.isAllowedToSignX509Certificate(leaf); err != nil {
 		var ee *errs.Error
 		if errors.As(err, &ee) {
-			return nil, ee
+			return nil, errs.ApplyOptions(ee, opts...)
 		}
 		return nil, errs.InternalServerErr(err,
 			errs.WithKeyVal("csr", csr),
@@ -353,7 +353,7 @@ func (a *Authority) Rekey(oldCert *x509.Certificate, pk crypto.PublicKey) ([]*x5
 	if err := a.isAllowedToSignX509Certificate(newCert); err != nil {
 		var ee *errs.Error
 		if errors.As(err, &ee) {
-			return nil, ee
+			return nil, errs.ApplyOptions(ee, opts...)
 		}
 		return nil, errs.InternalServerErr(err,
 			errs.WithKeyVal("serialNumber", oldCert.SerialNumber.String()),
