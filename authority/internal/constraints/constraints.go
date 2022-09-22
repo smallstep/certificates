@@ -6,6 +6,8 @@ import (
 	"net"
 	"net/http"
 	"net/url"
+
+	"github.com/smallstep/certificates/errs"
 )
 
 var oidExtensionNameConstraints = []int{2, 5, 29, 30}
@@ -23,9 +25,18 @@ func (e ConstraintError) Error() string {
 	return e.Detail
 }
 
-// StatusCode implements an status coder interface.
-func (e ConstraintError) StatusCode() int {
-	return http.StatusForbidden
+// As implements the As(any) bool interface and allows to use "errors.As()" to
+// convert the ConstraintError to an errs.Error.
+func (e ConstraintError) As(v any) bool {
+	if err, ok := v.(**errs.Error); ok {
+		*err = &errs.Error{
+			Status: http.StatusForbidden,
+			Msg:    e.Detail,
+			Err:    e,
+		}
+		return true
+	}
+	return false
 }
 
 // Engine implements a constraint validator for DNS names, IP addresses, Email

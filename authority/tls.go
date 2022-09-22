@@ -28,7 +28,6 @@ import (
 	casapi "github.com/smallstep/certificates/cas/apiv1"
 	"github.com/smallstep/certificates/db"
 	"github.com/smallstep/certificates/errs"
-	"github.com/smallstep/certificates/policy"
 )
 
 // GetTLSOptions returns the tls options configured.
@@ -213,15 +212,9 @@ func (a *Authority) Sign(csr *x509.CertificateRequest, signOpts provisioner.Sign
 
 	// Check if authority is allowed to sign the certificate
 	if err := a.isAllowedToSignX509Certificate(leaf); err != nil {
-		var pe *policy.NamePolicyError
-		if errors.As(err, &pe) && pe.Reason == policy.NotAllowed {
-			return nil, errs.ApplyOptions(&errs.Error{
-				// NOTE: custom forbidden error, so that denied name is sent to client
-				// as well as shown in the logs.
-				Status: http.StatusForbidden,
-				Err:    fmt.Errorf("authority not allowed to sign: %w", err),
-				Msg:    fmt.Sprintf("The request was forbidden by the certificate authority: %s", err.Error()),
-			}, opts...)
+		var ee *errs.Error
+		if errors.As(err, &ee) {
+			return nil, ee
 		}
 		return nil, errs.InternalServerErr(err,
 			errs.WithKeyVal("csr", csr),
@@ -358,7 +351,14 @@ func (a *Authority) Rekey(oldCert *x509.Certificate, pk crypto.PublicKey) ([]*x5
 	// Check if the certificate is allowed to be renewed, policies or
 	// constraints might change over time.
 	if err := a.isAllowedToSignX509Certificate(newCert); err != nil {
-		return nil, err
+		var ee *errs.Error
+		if errors.As(err, &ee) {
+			return nil, ee
+		}
+		return nil, errs.InternalServerErr(err,
+			errs.WithKeyVal("serialNumber", oldCert.SerialNumber.String()),
+			errs.WithMessage("error renewing certificate"),
+		)
 	}
 
 	resp, err := a.x509CAService.RenewCertificate(&casapi.RenewCertificateRequest{

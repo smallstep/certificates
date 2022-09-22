@@ -4,11 +4,13 @@ import (
 	"crypto/x509"
 	"fmt"
 	"net"
+	"net/http"
 	"net/url"
 
+	"go.step.sm/crypto/x509util"
 	"golang.org/x/crypto/ssh"
 
-	"go.step.sm/crypto/x509util"
+	"github.com/smallstep/certificates/errs"
 )
 
 type NamePolicyReason int
@@ -60,6 +62,22 @@ func (e *NamePolicyError) Error() string {
 	default:
 		return fmt.Sprintf("unknown error reason (%d): %s", e.Reason, e.detail)
 	}
+}
+
+// As implements the As(any) bool interface and allows to use "errors.As()" to
+// convert a NotAllowed NamePolicyError to an errs.Error.
+func (e *NamePolicyError) As(v any) bool {
+	if e.Reason == NotAllowed {
+		if err, ok := v.(**errs.Error); ok {
+			*err = &errs.Error{
+				Status: http.StatusForbidden,
+				Msg:    fmt.Sprintf("The request was forbidden by the certificate authority: %s", e.Error()),
+				Err:    e,
+			}
+			return true
+		}
+	}
+	return false
 }
 
 func (e *NamePolicyError) Detail() string {
