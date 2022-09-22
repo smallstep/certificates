@@ -348,9 +348,12 @@ func (a *Authority) Rekey(oldCert *x509.Certificate, pk crypto.PublicKey) ([]*x5
 		newCert.ExtraExtensions = append(newCert.ExtraExtensions, ext)
 	}
 
-	// Check if the certificate is allowed to be renewed, policies or
-	// constraints might change over time.
-	if err := a.isAllowedToSignX509Certificate(newCert); err != nil {
+	// Check if the certificate is allowed to be renewed, name constraints might
+	// change over time.
+	//
+	// TODO(hslatman,maraino): consider adding policies too and consider if
+	// RenewSSH should check policies.
+	if err := a.constraintsEngine.ValidateCertificate(newCert); err != nil {
 		var ee *errs.Error
 		if errors.As(err, &ee) {
 			return nil, errs.ApplyOptions(ee, opts...)
