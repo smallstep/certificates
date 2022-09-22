@@ -245,9 +245,9 @@ func WithX509FederatedCerts(certs ...*x509.Certificate) Option {
 // any intermediate certificate defined before.
 //
 // Note that these certificates will not be bundled with the certificates signed
-// by the CA, the CAS service will take care of that, although they should
-// match, this is not guaranteed.  These certificates will be mainly used for
-// constraint purposes.
+// by the CA, because the CAS service will take care of that. They should match,
+// but that's not guaranteed.  These certificates will be mainly used for name
+// constraint validation before a certificate is issued.
 //
 // This option should only be used on specific configurations, for example when
 // WithX509SignerFunc is used, as we don't know the list of intermediates on
