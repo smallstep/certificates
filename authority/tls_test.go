@@ -543,7 +543,7 @@ ZYtQ9Ot36qc=
 				notBefore:       signOpts.NotBefore.Time().Truncate(time.Second),
 				notAfter:        signOpts.NotAfter.Time().Truncate(time.Second),
 				extensionsCount: 6,
-				err:             errors.New("authority not allowed to sign"),
+				err:             errors.New("dns name \"test.smallstep.com\" not allowed"),
 				code:            http.StatusForbidden,
 			}
 		},
