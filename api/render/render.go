@@ -4,6 +4,7 @@ package render
 import (
 	"bytes"
 	"encoding/json"
+	"errors"
 	"net/http"
 
 	"google.golang.org/protobuf/encoding/protojson"
@@ -77,8 +78,9 @@ type RenderableError interface {
 func Error(w http.ResponseWriter, err error) {
 	log.Error(w, err)
 
-	if e, ok := err.(RenderableError); ok {
-		e.Render(w)
+	var r RenderableError
+	if errors.As(err, &r) {
+		r.Render(w)
 
 		return
 	}
@@ -105,17 +107,18 @@ func statusCodeFromError(err error) (code int) {
 	}
 
 	for err != nil {
-		if sc, ok := err.(StatusCodedError); ok {
+		var sc StatusCodedError
+		if errors.As(err, &sc) {
 			code = sc.StatusCode()
 
 			break
 		}
 
-		cause, ok := err.(causer)
-		if !ok {
+		var c causer
+		if !errors.As(err, &c) {
 			break
 		}
-		err = cause.Cause()
+		err = c.Cause()
 	}
 
 	return
