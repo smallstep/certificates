@@ -10,8 +10,6 @@ import (
 	"github.com/smallstep/certificates/errs"
 )
 
-var oidExtensionNameConstraints = []int{2, 5, 29, 30}
-
 // ConstraintError is the typed error that will be returned if a constraint
 // error is found.
 type ConstraintError struct {
