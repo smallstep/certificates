@@ -79,6 +79,37 @@ func TestNew(t *testing.T) {
 	}
 }
 
+func TestNew_hasNameConstraints(t *testing.T) {
+	tests := []struct {
+		name string
+		fn   func(c *x509.Certificate)
+		want bool
+	}{
+		{"no constraints", func(c *x509.Certificate) {}, false},
+		{"permittedDNSDomains", func(c *x509.Certificate) { c.PermittedDNSDomains = []string{"constraint"} }, true},
+		{"excludedDNSDomains", func(c *x509.Certificate) { c.ExcludedDNSDomains = []string{"constraint"} }, true},
+		{"permittedIPRanges", func(c *x509.Certificate) {
+			c.PermittedIPRanges = []*net.IPNet{{IP: net.ParseIP("192.168.3.0").To4(), Mask: net.IPMask{255, 255, 255, 0}}}
+		}, true},
+		{"excludedIPRanges", func(c *x509.Certificate) {
+			c.ExcludedIPRanges = []*net.IPNet{{IP: net.ParseIP("192.168.3.0").To4(), Mask: net.IPMask{255, 255, 255, 0}}}
+		}, true},
+		{"permittedEmailAddresses", func(c *x509.Certificate) { c.PermittedEmailAddresses = []string{"constraint"} }, true},
+		{"excludedEmailAddresses", func(c *x509.Certificate) { c.ExcludedEmailAddresses = []string{"constraint"} }, true},
+		{"permittedURIDomains", func(c *x509.Certificate) { c.PermittedURIDomains = []string{"constraint"} }, true},
+		{"excludedURIDomains", func(c *x509.Certificate) { c.ExcludedURIDomains = []string{"constraint"} }, true},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			cert := &x509.Certificate{}
+			tt.fn(cert)
+			if e := New(cert); e.hasNameConstraints != tt.want {
+				t.Errorf("Engine.hasNameConstraints = %v, want %v", e.hasNameConstraints, tt.want)
+			}
+		})
+	}
+}
+
 func TestEngine_Validate(t *testing.T) {
 	type fields struct {
 		hasNameConstraints      bool

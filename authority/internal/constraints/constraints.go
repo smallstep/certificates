@@ -66,16 +66,13 @@ func New(chain ...*x509.Certificate) *Engine {
 		e.excludedEmailAddresses = append(e.excludedEmailAddresses, crt.ExcludedEmailAddresses...)
 		e.permittedURIDomains = append(e.permittedURIDomains, crt.PermittedURIDomains...)
 		e.excludedURIDomains = append(e.excludedURIDomains, crt.ExcludedURIDomains...)
-
-		if !e.hasNameConstraints {
-			for _, ext := range crt.Extensions {
-				if ext.Id.Equal(oidExtensionNameConstraints) {
-					e.hasNameConstraints = true
-					break
-				}
-			}
-		}
 	}
+
+	e.hasNameConstraints = len(e.permittedDNSDomains) > 0 || len(e.excludedDNSDomains) > 0 ||
+		len(e.permittedIPRanges) > 0 || len(e.excludedIPRanges) > 0 ||
+		len(e.permittedEmailAddresses) > 0 || len(e.excludedEmailAddresses) > 0 ||
+		len(e.permittedURIDomains) > 0 || len(e.excludedURIDomains) > 0
+
 	return e
 }
 
