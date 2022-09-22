@@ -258,7 +258,7 @@ func TestEngine_ValidateCertificate(t *testing.T) {
 			URIs:           []*url.URL{{Scheme: "https", Host: "uuid.example.com", Path: "/dc4c76b5-5262-4551-a881-48094a604d63"}},
 		}}, false},
 		{"ok with constraints", fields{
-			hasNameConstraints:  false,
+			hasNameConstraints:  true,
 			permittedDNSDomains: []string{"example.com"},
 			permittedIPRanges: []*net.IPNet{
 				{IP: net.ParseIP("127.0.0.1").To4(), Mask: net.IPMask{255, 255, 255, 255}},
