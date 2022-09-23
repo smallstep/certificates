@@ -640,8 +640,8 @@ func (a *Authority) GetTLSCertificate() (*tls.Certificate, error) {
 	certTpl.EmailAddresses = cr.EmailAddresses
 	certTpl.URIs = cr.URIs
 
-	// Fail if name constraints or policy does not allow the server names.
-	if err := a.isAllowedToSignX509Certificate(certTpl); err != nil {
+	// Fail if name constraints do not allow the server names.
+	if err := a.constraintsEngine.ValidateCertificate(certTpl); err != nil {
 		return fatal(err)
 	}
 
