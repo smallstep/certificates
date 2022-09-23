@@ -377,8 +377,8 @@ func (a *Authority) init() error {
 			if err != nil {
 				return err
 			}
-			// If not defined with an option, add intermediates to the the list
-			// of certificates used for name constraints validation at issuance
+			// If not defined with an option, add intermediates to the list of
+			// certificates used for name constraints validation at issuance
 			// time.
 			if len(a.intermediateX509Certs) == 0 {
 				a.intermediateX509Certs = append(a.intermediateX509Certs, options.CertificateChain...)

@@ -140,7 +140,7 @@ func TestEngine_Validate(t *testing.T) {
 			emailAddresses: []string{"root@example.com"},
 			uris:           []*url.URL{{Scheme: "https", Host: "example.com", Path: "/uuid/c6d1a755-0c12-431e-9136-b64cb3173ec7"}},
 		}, false},
-		{"ok permitted dns ", fields{
+		{"ok permitted dns", fields{
 			hasNameConstraints:  true,
 			permittedDNSDomains: []string{"example.com"},
 		}, args{dnsNames: []string{"example.com", "www.example.com"}}, false},
@@ -163,7 +163,7 @@ func TestEngine_Validate(t *testing.T) {
 				{IP: net.ParseIP("192.168.2.1").To4(), Mask: net.IPMask{255, 255, 255, 255}},
 			},
 		}, args{ipAddresses: []net.IP{{192, 168, 2, 2}, {192, 168, 3, 1}}}, false},
-		{"ok permitted emails ", fields{
+		{"ok permitted emails", fields{
 			hasNameConstraints:      true,
 			permittedEmailAddresses: []string{"root@example.com", "acme.org", ".acme.com"},
 		}, args{emailAddresses: []string{"root@example.com", "name@acme.org", "name@coyote.acme.com", `"(quoted)"@www.acme.com`}}, false},
