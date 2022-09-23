@@ -171,7 +171,7 @@ func TestEngine_Validate(t *testing.T) {
 			hasNameConstraints:     true,
 			excludedEmailAddresses: []string{"root@example.com", "acme.org", ".acme.com"},
 		}, args{emailAddresses: []string{"name@example.com", "root@acme.com", "root@other.com"}}, false},
-		{"ok permitted uris ", fields{
+		{"ok permitted uris", fields{
 			hasNameConstraints:  true,
 			permittedURIDomains: []string{"example.com", ".acme.com"},
 		}, args{uris: []*url.URL{{Scheme: "https", Host: "example.com", Path: "/path"}, {Scheme: "https", Host: "www.acme.com", Path: "/path"}}}, false},
@@ -179,7 +179,7 @@ func TestEngine_Validate(t *testing.T) {
 			hasNameConstraints: true,
 			excludedURIDomains: []string{"example.com", ".acme.com"},
 		}, args{uris: []*url.URL{{Scheme: "https", Host: "example.org", Path: "/path"}, {Scheme: "https", Host: "acme.com", Path: "/path"}}}, false},
-		{"fail permitted dns ", fields{
+		{"fail permitted dns", fields{
 			hasNameConstraints:  true,
 			permittedDNSDomains: []string{"example.com"},
 		}, args{dnsNames: []string{"www.example.com", "www.example.org"}}, true},
@@ -201,7 +201,7 @@ func TestEngine_Validate(t *testing.T) {
 				{IP: net.ParseIP("192.168.2.1").To4(), Mask: net.IPMask{255, 255, 255, 255}},
 			},
 		}, args{ipAddresses: []net.IP{{192, 168, 2, 2}, {192, 168, 1, 1}}}, true},
-		{"fail permitted emails ", fields{
+		{"fail permitted emails", fields{
 			hasNameConstraints:      true,
 			permittedEmailAddresses: []string{"root@example.com", "acme.org", ".acme.com"},
 		}, args{emailAddresses: []string{"root@example.com", "name@acme.org", "name@acme.com"}}, true},
@@ -209,7 +209,7 @@ func TestEngine_Validate(t *testing.T) {
 			hasNameConstraints:     true,
 			excludedEmailAddresses: []string{"root@example.com", "acme.org", ".acme.com"},
 		}, args{emailAddresses: []string{"name@example.com", "root@example.com"}}, true},
-		{"fail permitted uris ", fields{
+		{"fail permitted uris", fields{
 			hasNameConstraints:  true,
 			permittedURIDomains: []string{"example.com", ".acme.com"},
 		}, args{uris: []*url.URL{{Scheme: "https", Host: "example.com", Path: "/path"}, {Scheme: "https", Host: "acme.com", Path: "/path"}}}, true},
@@ -217,7 +217,7 @@ func TestEngine_Validate(t *testing.T) {
 			hasNameConstraints: true,
 			excludedURIDomains: []string{"example.com", ".acme.com"},
 		}, args{uris: []*url.URL{{Scheme: "https", Host: "www.example.com", Path: "/path"}, {Scheme: "https", Host: "acme.com", Path: "/path"}}}, true},
-		{"fail parse emails ", fields{
+		{"fail parse emails", fields{
 			hasNameConstraints:      true,
 			permittedEmailAddresses: []string{"example.com"},
 		}, args{emailAddresses: []string{`(notquoted)@example.com`}}, true},
