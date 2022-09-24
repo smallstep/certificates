@@ -1,0 +1,12 @@
+on:
+  schedule:
+    - cron: '0 0 * * *'
+
+jobs:
+  gitleaks:
+    uses: smallstep/workflows/.github/workflows/gitleaks.yml@main
+    secrets:
+      GITLEAKS_LICENSE_KEY: ${{ secrets.GITLEAKS_LICENSE_KEY }}
+
+  codeql:
+    uses: smallstep/workflows/.github/workflows/codeql-analysis.yml@main
