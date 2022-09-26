@@ -17,6 +17,8 @@ import (
 	"github.com/pkg/errors"
 	"github.com/smallstep/certificates/templates"
 	"github.com/smallstep/certificates/webhook"
+	"go.step.sm/crypto/sshutil"
+	"go.step.sm/crypto/x509util"
 	"go.step.sm/linkedca"
 )
 
@@ -117,6 +119,12 @@ func (w *Webhook) Do(client *http.Client, reqBody *webhook.RequestBody, data any
 	}
 	url := buf.String()
 
+	switch tmpl := data.(type) {
+	case x509util.TemplateData:
+		reqBody.Token = tmpl[x509util.TokenKey]
+	case sshutil.TemplateData:
+		reqBody.Token = tmpl[sshutil.TokenKey]
+	}
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second*10)
 	defer cancel()
 

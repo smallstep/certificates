@@ -68,6 +68,7 @@ func validateWebhook(webhook *linkedca.Webhook) error {
 func (war *webhookAdminResponder) CreateProvisionerWebhook(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 
+	auth := mustAuthority(ctx)
 	prov := linkedca.MustProvisionerFromContext(ctx)
 
 	var newWebhook = new(linkedca.Webhook)
@@ -116,7 +117,6 @@ func (war *webhookAdminResponder) CreateProvisionerWebhook(w http.ResponseWriter
 
 	prov.Webhooks = append(prov.Webhooks, newWebhook)
 
-	auth := mustAuthority(ctx)
 	if err := auth.UpdateProvisioner(ctx, prov); err != nil {
 		if isBadRequest(err) {
 			render.Error(w, admin.WrapError(admin.ErrorBadRequestType, err, "error creating provisioner webhook"))
@@ -133,6 +133,7 @@ func (war *webhookAdminResponder) CreateProvisionerWebhook(w http.ResponseWriter
 func (war *webhookAdminResponder) DeleteProvisionerWebhook(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 
+	auth := mustAuthority(ctx)
 	prov := linkedca.MustProvisionerFromContext(ctx)
 
 	webhookName := chi.URLParam(r, "webhookName")
@@ -150,7 +151,6 @@ func (war *webhookAdminResponder) DeleteProvisionerWebhook(w http.ResponseWriter
 		return
 	}
 
-	auth := mustAuthority(ctx)
 	if err := auth.UpdateProvisioner(ctx, prov); err != nil {
 		if isBadRequest(err) {
 			render.Error(w, admin.WrapError(admin.ErrorBadRequestType, err, "error deleting provisioner webhook"))
@@ -167,6 +167,7 @@ func (war *webhookAdminResponder) DeleteProvisionerWebhook(w http.ResponseWriter
 func (war *webhookAdminResponder) UpdateProvisionerWebhook(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 
+	auth := mustAuthority(ctx)
 	prov := linkedca.MustProvisionerFromContext(ctx)
 
 	var newWebhook = new(linkedca.Webhook)
@@ -208,7 +209,6 @@ func (war *webhookAdminResponder) UpdateProvisionerWebhook(w http.ResponseWriter
 		return
 	}
 
-	auth := mustAuthority(ctx)
 	if err := auth.UpdateProvisioner(ctx, prov); err != nil {
 		if isBadRequest(err) {
 			render.Error(w, admin.WrapError(admin.ErrorBadRequestType, err, "error updating provisioner webhook"))

@@ -205,23 +205,11 @@ func (a *Authority) SignSSH(ctx context.Context, key ssh.PublicKey, opts provisi
 	}
 
 	// Call enriching webhooks
-	if webhookCtl != nil {
-		whEnrichReq, err := webhook.NewRequestBody(
-			webhook.WithSSHCertificateRequest(cr),
+	if err := callEnrichingWebhooksSSH(webhookCtl, cr); err != nil {
+		return nil, errs.ApplyOptions(
+			errs.ForbiddenErr(err, err.Error()),
+			errs.WithKeyVal("signOptions", signOpts),
 		)
-		if err != nil {
-			return nil, errs.ApplyOptions(
-				errs.InternalServerErr(err),
-				errs.WithKeyVal("signOptions", signOpts),
-			)
-		}
-		err = webhookCtl.Enrich(whEnrichReq)
-		if err != nil {
-			return nil, errs.ApplyOptions(
-				errs.ForbiddenErr(err, err.Error()),
-				errs.WithKeyVal("signOptions", signOpts),
-			)
-		}
 	}
 
 	// Create certificate from template.
@@ -289,21 +277,10 @@ func (a *Authority) SignSSH(ctx context.Context, key ssh.PublicKey, opts provisi
 	}
 
 	// Send certificate to webhooks for authorization
-	if webhookCtl != nil {
-		whAuthBody, err := webhook.NewRequestBody(
-			webhook.WithSSHCertificate(certificate, certTpl),
+	if err := callAuthorizingWebhooksSSH(webhookCtl, certificate, certTpl); err != nil {
+		return nil, errs.ApplyOptions(
+			errs.ForbiddenErr(err, "authority.SignSSH: error signing certificate"),
 		)
-		if err != nil {
-			return nil, errs.ApplyOptions(
-				errs.ForbiddenErr(err, "authority.SignSSH: error signing certificate"),
-			)
-		}
-		err = webhookCtl.Authorize(whAuthBody)
-		if err != nil {
-			return nil, errs.ApplyOptions(
-				errs.ForbiddenErr(err, "authority.SignSSH: error signing certificate"),
-			)
-		}
 	}
 
 	// Sign certificate.
@@ -674,4 +651,38 @@ func (a *Authority) getAddUserCommand(principal string) string {
 		cmd = a.config.SSH.AddUserCommand
 	}
 	return strings.ReplaceAll(cmd, "<principal>", principal)
+}
+
+func callEnrichingWebhooksSSH(webhookCtl webhookController, cr sshutil.CertificateRequest) error {
+	if webhookCtl == nil {
+		return nil
+	}
+	whEnrichReq, err := webhook.NewRequestBody(
+		webhook.WithSSHCertificateRequest(cr),
+	)
+	if err != nil {
+		return err
+	}
+	if err := webhookCtl.Enrich(whEnrichReq); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func callAuthorizingWebhooksSSH(webhookCtl webhookController, cert *sshutil.Certificate, certTpl *ssh.Certificate) error {
+	if webhookCtl == nil {
+		return nil
+	}
+	whAuthBody, err := webhook.NewRequestBody(
+		webhook.WithSSHCertificate(cert, certTpl),
+	)
+	if err != nil {
+		return err
+	}
+	if err := webhookCtl.Authorize(whAuthBody); err != nil {
+		return err
+	}
+
+	return nil
 }

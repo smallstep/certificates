@@ -144,33 +144,12 @@ func (a *Authority) Sign(csr *x509.CertificateRequest, signOpts provisioner.Sign
 		}
 	}
 
-	// Call enriching webhooks
-	if webhookCtl != nil {
-		var attested *webhook.AttestationData
-		if attData != nil {
-			attested = &webhook.AttestationData{
-				PermanentIdentifier: attData.PermanentIdentifier,
-			}
-		}
-		whEnrichReq, err := webhook.NewRequestBody(
-			webhook.WithX509CertificateRequest(csr),
-			webhook.WithAttestationData(attested),
+	if err := callEnrichingWebhooksX509(webhookCtl, attData, csr); err != nil {
+		return nil, errs.ApplyOptions(
+			errs.ForbiddenErr(err, err.Error()),
+			errs.WithKeyVal("csr", csr),
+			errs.WithKeyVal("signOptions", signOpts),
 		)
-		if err != nil {
-			return nil, errs.ApplyOptions(
-				errs.InternalServerErr(err),
-				errs.WithKeyVal("csr", csr),
-				errs.WithKeyVal("signOptions", signOpts),
-			)
-		}
-		err = webhookCtl.Enrich(whEnrichReq)
-		if err != nil {
-			return nil, errs.ApplyOptions(
-				errs.ForbiddenErr(err, err.Error()),
-				errs.WithKeyVal("csr", csr),
-				errs.WithKeyVal("signOptions", signOpts),
-			)
-		}
 	}
 
 	cert, err := x509util.NewCertificate(csr, certOptions...)
@@ -258,23 +237,11 @@ func (a *Authority) Sign(csr *x509.CertificateRequest, signOpts provisioner.Sign
 	}
 
 	// Send certificate to webhooks for authorization
-	if webhookCtl != nil {
-		whAuthBody, err := webhook.NewRequestBody(
-			webhook.WithX509Certificate(cert, leaf),
+	if err := callAuthorizingWebhooksX509(webhookCtl, cert, leaf, attData); err != nil {
+		return nil, errs.ApplyOptions(
+			errs.ForbiddenErr(err, "error creating certificate"),
+			opts...,
 		)
-		if err != nil {
-			return nil, errs.ApplyOptions(
-				errs.ForbiddenErr(err, "error creating certificate"),
-				opts...,
-			)
-		}
-		err = webhookCtl.Authorize(whAuthBody)
-		if err != nil {
-			return nil, errs.ApplyOptions(
-				errs.ForbiddenErr(err, "error creating certificate"),
-				opts...,
-			)
-		}
 	}
 
 	// Sign certificate
@@ -752,4 +719,52 @@ func templatingError(err error) error {
 		cause = fmt.Errorf("cannot unmarshal %s at offset %d into Go value of type %s", typeError.Value, typeError.Offset, typeError.Type)
 	}
 	return errors.Wrap(cause, "error applying certificate template")
+}
+
+func callEnrichingWebhooksX509(webhookCtl webhookController, attData *provisioner.AttestationData, csr *x509.CertificateRequest) error {
+	if webhookCtl == nil {
+		return nil
+	}
+	var attested *webhook.AttestationData
+	if attData != nil {
+		attested = &webhook.AttestationData{
+			PermanentIdentifier: attData.PermanentIdentifier,
+		}
+	}
+	whEnrichReq, err := webhook.NewRequestBody(
+		webhook.WithX509CertificateRequest(csr),
+		webhook.WithAttestationData(attested),
+	)
+	if err != nil {
+		return err
+	}
+	if err := webhookCtl.Enrich(whEnrichReq); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func callAuthorizingWebhooksX509(webhookCtl webhookController, cert *x509util.Certificate, leaf *x509.Certificate, attData *provisioner.AttestationData) error {
+	if webhookCtl == nil {
+		return nil
+	}
+	var attested *webhook.AttestationData
+	if attData != nil {
+		attested = &webhook.AttestationData{
+			PermanentIdentifier: attData.PermanentIdentifier,
+		}
+	}
+	whAuthBody, err := webhook.NewRequestBody(
+		webhook.WithX509Certificate(cert, leaf),
+		webhook.WithAttestationData(attested),
+	)
+	if err != nil {
+		return err
+	}
+	if err := webhookCtl.Authorize(whAuthBody); err != nil {
+		return err
+	}
+
+	return nil
 }

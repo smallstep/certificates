@@ -358,11 +358,11 @@ func defaultDBP(t *testing.T) *dbProvisioner {
 		CreatedAt: clock.Now(),
 		Webhooks: []dbWebhook{
 			{
-				Name:          "metadata",
-				URL:           "https://inventory.smallstep.com",
-				Kind:          linkedca.Webhook_ENRICHING.String(),
-				SigningSecret: "signing secret",
-				BearerToken:   "token",
+				Name:        "metadata",
+				URL:         "https://inventory.smallstep.com",
+				Kind:        linkedca.Webhook_ENRICHING.String(),
+				Secret:      "secret",
+				BearerToken: "token",
 			},
 		},
 	}
@@ -1255,7 +1255,7 @@ func Test_linkedcaWebhooksToDB(t *testing.T) {
 					Name:   "bearer",
 					Url:    "https://example.com",
 					Kind:   linkedca.Webhook_ENRICHING,
-					Secret: "signing secret",
+					Secret: "secret",
 					Auth: &linkedca.Webhook_BearerToken{
 						BearerToken: &linkedca.BearerToken{
 							BearerToken: "token",
@@ -1270,7 +1270,7 @@ func Test_linkedcaWebhooksToDB(t *testing.T) {
 					Name:                 "bearer",
 					URL:                  "https://example.com",
 					Kind:                 "ENRICHING",
-					SigningSecret:        "signing secret",
+					Secret:               "secret",
 					BearerToken:          "token",
 					DisableTLSClientAuth: true,
 					CertType:             linkedca.Webhook_X509.String(),
@@ -1283,7 +1283,7 @@ func Test_linkedcaWebhooksToDB(t *testing.T) {
 					Name:   "basic",
 					Url:    "https://example.com",
 					Kind:   linkedca.Webhook_ENRICHING,
-					Secret: "signing secret",
+					Secret: "secret",
 					Auth: &linkedca.Webhook_BasicAuth{
 						BasicAuth: &linkedca.BasicAuth{
 							Username: "user",
@@ -1294,11 +1294,11 @@ func Test_linkedcaWebhooksToDB(t *testing.T) {
 			},
 			want: []dbWebhook{
 				{
-					Name:          "basic",
-					URL:           "https://example.com",
-					Kind:          "ENRICHING",
-					SigningSecret: "signing secret",
-					BasicAuth: dbBasicAuth{
+					Name:   "basic",
+					URL:    "https://example.com",
+					Kind:   "ENRICHING",
+					Secret: "secret",
+					BasicAuth: &dbBasicAuth{
 						Username: "user",
 						Password: "pass",
 					},
@@ -1336,7 +1336,7 @@ func Test_dbWebhooksToLinkedca(t *testing.T) {
 					ID:                   "69350cb6-6c31-4b5e-bf25-affd5053427d",
 					URL:                  "https://example.com",
 					Kind:                 "ENRICHING",
-					SigningSecret:        "signing secret",
+					Secret:               "secret",
 					BearerToken:          "token",
 					DisableTLSClientAuth: true,
 				},
@@ -1347,7 +1347,7 @@ func Test_dbWebhooksToLinkedca(t *testing.T) {
 					Id:     "69350cb6-6c31-4b5e-bf25-affd5053427d",
 					Url:    "https://example.com",
 					Kind:   linkedca.Webhook_ENRICHING,
-					Secret: "signing secret",
+					Secret: "secret",
 					Auth: &linkedca.Webhook_BearerToken{
 						BearerToken: &linkedca.BearerToken{
 							BearerToken: "token",
@@ -1360,12 +1360,12 @@ func Test_dbWebhooksToLinkedca(t *testing.T) {
 		"basic": {
 			in: []dbWebhook{
 				{
-					Name:          "basic",
-					ID:            "69350cb6-6c31-4b5e-bf25-affd5053427d",
-					URL:           "https://example.com",
-					Kind:          "ENRICHING",
-					SigningSecret: "signing secret",
-					BasicAuth: dbBasicAuth{
+					Name:   "basic",
+					ID:     "69350cb6-6c31-4b5e-bf25-affd5053427d",
+					URL:    "https://example.com",
+					Kind:   "ENRICHING",
+					Secret: "secret",
+					BasicAuth: &dbBasicAuth{
 						Username: "user",
 						Password: "pass",
 					},
@@ -1377,7 +1377,7 @@ func Test_dbWebhooksToLinkedca(t *testing.T) {
 					Id:     "69350cb6-6c31-4b5e-bf25-affd5053427d",
 					Url:    "https://example.com",
 					Kind:   linkedca.Webhook_ENRICHING,
-					Secret: "signing secret",
+					Secret: "secret",
 					Auth: &linkedca.Webhook_BasicAuth{
 						BasicAuth: &linkedca.BasicAuth{
 							Username: "user",

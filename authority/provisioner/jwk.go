@@ -281,7 +281,7 @@ func (p *JWK) AuthorizeSSHSign(ctx context.Context, token string) ([]SignOption,
 		// Ensure that all principal names are allowed
 		newSSHNamePolicyValidator(p.ctl.getPolicy().getSSHHost(), p.ctl.getPolicy().getSSHUser()),
 		// Call webhooks
-		p.ctl.newWebhookController(data, linkedca.Webhook_X509),
+		p.ctl.newWebhookController(data, linkedca.Webhook_SSH),
 	), nil
 }
 

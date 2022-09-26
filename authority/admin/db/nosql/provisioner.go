@@ -33,15 +33,15 @@ type dbBasicAuth struct {
 }
 
 type dbWebhook struct {
-	Name                 string      `json:"name"`
-	ID                   string      `json:"id"`
-	URL                  string      `json:"url"`
-	Kind                 string      `json:"kind"`
-	SigningSecret        string      `json:"signingSecret"`
-	BearerToken          string      `json:"bearerToken,omitempty"`
-	BasicAuth            dbBasicAuth `json:"basicAuth,omitempty"`
-	DisableTLSClientAuth bool        `json:"disableTLSClientAuth,omitempty"`
-	CertType             string      `json:"certType,omitempty"`
+	Name                 string       `json:"name"`
+	ID                   string       `json:"id"`
+	URL                  string       `json:"url"`
+	Kind                 string       `json:"kind"`
+	Secret               string       `json:"secret"`
+	BearerToken          string       `json:"bearerToken,omitempty"`
+	BasicAuth            *dbBasicAuth `json:"basicAuth,omitempty"`
+	DisableTLSClientAuth bool         `json:"disableTLSClientAuth,omitempty"`
+	CertType             string       `json:"certType,omitempty"`
 }
 
 func (dbp *dbProvisioner) clone() *dbProvisioner {
@@ -243,7 +243,7 @@ func dbWebhooksToLinkedca(dbwhs []dbWebhook) []*linkedca.Webhook {
 			Id:                   dbwh.ID,
 			Url:                  dbwh.URL,
 			Kind:                 linkedca.Webhook_Kind(linkedca.Webhook_Kind_value[dbwh.Kind]),
-			Secret:               dbwh.SigningSecret,
+			Secret:               dbwh.Secret,
 			DisableTlsClientAuth: dbwh.DisableTLSClientAuth,
 			CertType:             linkedca.Webhook_CertType(linkedca.Webhook_CertType_value[dbwh.CertType]),
 		}
@@ -253,7 +253,7 @@ func dbWebhooksToLinkedca(dbwhs []dbWebhook) []*linkedca.Webhook {
 					BearerToken: dbwh.BearerToken,
 				},
 			}
-		} else if dbwh.BasicAuth.Username != "" || dbwh.BasicAuth.Password != "" {
+		} else if dbwh.BasicAuth != nil && (dbwh.BasicAuth.Username != "" || dbwh.BasicAuth.Password != "") {
 			lwh.Auth = &linkedca.Webhook_BasicAuth{
 				BasicAuth: &linkedca.BasicAuth{
 					Username: dbwh.BasicAuth.Username,
@@ -279,7 +279,7 @@ func linkedcaWebhooksToDB(lwhs []*linkedca.Webhook) []dbWebhook {
 			ID:                   lwh.Id,
 			URL:                  lwh.Url,
 			Kind:                 lwh.Kind.String(),
-			SigningSecret:        lwh.Secret,
+			Secret:               lwh.Secret,
 			DisableTLSClientAuth: lwh.DisableTlsClientAuth,
 			CertType:             lwh.CertType.String(),
 		}
@@ -287,8 +287,10 @@ func linkedcaWebhooksToDB(lwhs []*linkedca.Webhook) []dbWebhook {
 		case *linkedca.Webhook_BearerToken:
 			dbwh.BearerToken = a.BearerToken.BearerToken
 		case *linkedca.Webhook_BasicAuth:
-			dbwh.BasicAuth.Username = a.BasicAuth.Username
-			dbwh.BasicAuth.Password = a.BasicAuth.Password
+			dbwh.BasicAuth = &dbBasicAuth{
+				Username: a.BasicAuth.Username,
+				Password: a.BasicAuth.Password,
+			}
 		}
 		dbwhs[i] = dbwh
 	}
