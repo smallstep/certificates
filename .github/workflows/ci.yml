@@ -25,4 +25,3 @@ jobs:
       run-codeql: true
     secrets:
       GITLEAKS_LICENSE_KEY: ${{ secrets.GITLEAKS_LICENSE_KEY }}
-
