@@ -23,6 +23,8 @@ func assertEqualWebhook(t *testing.T, a, b *linkedca.Webhook) {
 	assert.Equal(t, a.Name, b.Name)
 	assert.Equal(t, a.Url, b.Url)
 	assert.Equal(t, a.Kind, b.Kind)
+	assert.Equal(t, a.CertType, b.CertType)
+	assert.Equal(t, a.DisableTlsClientAuth, b.DisableTlsClientAuth)
 
 	assert.Equal(t, a.GetAuth(), b.GetAuth())
 }

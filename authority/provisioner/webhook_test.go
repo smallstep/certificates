@@ -16,6 +16,7 @@ import (
 	"github.com/pkg/errors"
 	"github.com/smallstep/assert"
 	"github.com/smallstep/certificates/webhook"
+	"go.step.sm/crypto/sshutil"
 	"go.step.sm/crypto/x509util"
 	"go.step.sm/linkedca"
 )
@@ -281,6 +282,7 @@ func TestWebhook_Do(t *testing.T) {
 		errStatusCode   int
 		serverErrMsg    string
 		expectErr       error
+		expectToken     any
 	}
 	tests := map[string]test{
 		"ok": {
@@ -330,6 +332,28 @@ func TestWebhook_Do(t *testing.T) {
 				Data: map[string]interface{}{"role": "dba"},
 			},
 			expectPath: "/users/areed?region=central",
+		},
+		"ok/token from ssh template": {
+			webhook: Webhook{
+				ID:     "abc123",
+				Secret: "c2VjcmV0Cg==",
+			},
+			webhookResponse: webhook.ResponseBody{
+				Data: map[string]interface{}{"role": "dba"},
+			},
+			dataArg:     sshutil.TemplateData{sshutil.TokenKey: "token"},
+			expectToken: "token",
+		},
+		"ok/token from x509 template": {
+			webhook: Webhook{
+				ID:     "abc123",
+				Secret: "c2VjcmV0Cg==",
+			},
+			webhookResponse: webhook.ResponseBody{
+				Data: map[string]interface{}{"role": "dba"},
+			},
+			dataArg:     x509util.TemplateData{sshutil.TokenKey: "token"},
+			expectToken: "token",
 		},
 		"ok/allow": {
 			webhook: Webhook{
@@ -392,6 +416,11 @@ func TestWebhook_Do(t *testing.T) {
 					http.Error(w, tc.serverErrMsg, tc.errStatusCode)
 					return
 				}
+
+				reqBody := new(webhook.RequestBody)
+				err = json.Unmarshal(body, reqBody)
+				assert.FatalError(t, err)
+				assert.Equals(t, tc.expectToken, reqBody.Token)
 
 				err = json.NewEncoder(w).Encode(tc.webhookResponse)
 				assert.FatalError(t, err)
