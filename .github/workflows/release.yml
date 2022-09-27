@@ -8,8 +8,8 @@ on:
 
 jobs:
   ci:
-    uses: smallstep/workflows/.github/workflows/goCI.yml@main
-
+    uses: smallstep/certificates/.github/workflows/ci.yml@main
+    secrets: inherit
 
   create_release:
     name: Create Release
