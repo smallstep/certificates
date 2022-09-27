@@ -18,6 +18,8 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
 ## [Unreleased]
 ### Added
 - Added support for ACME device-attest-01 challenge.
+- Added name constraints evaluation and enforcement when issuing or renewing
+  X.509 certificates.
 
 ## [0.22.1] - 2022-08-31
 ### Fixed
