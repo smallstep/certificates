@@ -25,6 +25,7 @@ import (
 	"go.step.sm/cli-utils/step"
 	"go.step.sm/cli-utils/ui"
 	"go.step.sm/cli-utils/usage"
+	"go.step.sm/crypto/pemutil"
 
 	// Enabled kms interfaces.
 	_ "go.step.sm/crypto/kms/awskms"
@@ -52,6 +53,10 @@ func init() {
 	step.Set("Smallstep CA", Version, BuildTime)
 	authority.GlobalVersion.Version = Version
 	rand.Seed(time.Now().UnixNano())
+	// Add support for asking passwords
+	pemutil.PromptPassword = func(msg string) ([]byte, error) {
+		return ui.PromptPassword(msg)
+	}
 }
 
 func exit(code int) {
