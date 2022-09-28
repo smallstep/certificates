@@ -332,7 +332,7 @@ func matchesAudience(as, bs []string) bool {
 
 	for _, b := range bs {
 		for _, a := range as {
-			if b == a || stripPort(a) == stripPort(b) {
+			if strings.ToLower(b) == strings.ToLower(a) || stripPort(strings.ToLower(a)) == stripPort(strings.ToLower(b)) {
 				return true
 			}
 		}
