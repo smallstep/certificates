@@ -1112,12 +1112,12 @@ func (c *AdminClient) CreateProvisionerWebhook(provisionerName string, wh *linke
 	if err != nil {
 		return nil, fmt.Errorf("error generating admin token: %w", err)
 	}
+retry:
 	req, err := http.NewRequest(http.MethodPost, u.String(), bytes.NewReader(body))
 	if err != nil {
 		return nil, fmt.Errorf("creating POST %s request failed: %w", u, err)
 	}
 	req.Header.Add("Authorization", tok)
-retry:
 	resp, err := c.client.Do(req)
 	if err != nil {
 		return nil, fmt.Errorf("client POST %s failed: %w", u, err)
@@ -1147,12 +1147,12 @@ func (c *AdminClient) UpdateProvisionerWebhook(provisionerName string, wh *linke
 	if err != nil {
 		return nil, fmt.Errorf("error generating admin token: %w", err)
 	}
+retry:
 	req, err := http.NewRequest(http.MethodPut, u.String(), bytes.NewReader(body))
 	if err != nil {
 		return nil, fmt.Errorf("creating PUT %s request failed: %w", u, err)
 	}
 	req.Header.Add("Authorization", tok)
-retry:
 	resp, err := c.client.Do(req)
 	if err != nil {
 		return nil, fmt.Errorf("client PUT %s failed: %w", u, err)
@@ -1178,12 +1178,12 @@ func (c *AdminClient) DeleteProvisionerWebhook(provisionerName, webhookName stri
 	if err != nil {
 		return fmt.Errorf("error generating admin token: %w", err)
 	}
+retry:
 	req, err := http.NewRequest(http.MethodDelete, u.String(), http.NoBody)
 	if err != nil {
 		return fmt.Errorf("creating DELETE %s request failed: %w", u, err)
 	}
 	req.Header.Add("Authorization", tok)
-retry:
 	resp, err := c.client.Do(req)
 	if err != nil {
 		return fmt.Errorf("client DELETE %s failed: %w", u, err)

@@ -17,8 +17,6 @@ import (
 	"github.com/pkg/errors"
 	"github.com/smallstep/certificates/templates"
 	"github.com/smallstep/certificates/webhook"
-	"go.step.sm/crypto/sshutil"
-	"go.step.sm/crypto/x509util"
 	"go.step.sm/linkedca"
 )
 
@@ -119,23 +117,30 @@ func (w *Webhook) Do(client *http.Client, reqBody *webhook.RequestBody, data any
 	}
 	url := buf.String()
 
-	switch tmpl := data.(type) {
-	case x509util.TemplateData:
-		reqBody.Token = tmpl[x509util.TokenKey]
-	case sshutil.TemplateData:
-		reqBody.Token = tmpl[sshutil.TokenKey]
-	}
+	/*
+		Sending the token to the webhook server is a security risk. A K8sSA
+		token can be reused multiple times. The webhook can misuse it to get
+		fake certificates. A webhook can misuse any other token to get its own
+		certificate before responding.
+		switch tmpl := data.(type) {
+		case x509util.TemplateData:
+			reqBody.Token = tmpl[x509util.TokenKey]
+		case sshutil.TemplateData:
+			reqBody.Token = tmpl[sshutil.TokenKey]
+		}
+	*/
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second*10)
 	defer cancel()
 
-	retries := 1
-retry:
 	reqBody.Timestamp = time.Now()
 
 	reqBytes, err := json.Marshal(reqBody)
 	if err != nil {
 		return nil, err
 	}
+
+	retries := 1
+retry:
 
 	req, err := http.NewRequestWithContext(ctx, "POST", url, bytes.NewReader(reqBytes))
 	if err != nil {

@@ -27,6 +27,7 @@ func WithX509CertificateRequest(cr *x509.CertificateRequest) RequestBodyOption {
 		rb.X509CertificateRequest = &X509CertificateRequest{
 			CertificateRequest: x509util.NewCertificateRequestFromX509(cr),
 			PublicKeyAlgorithm: cr.PublicKeyAlgorithm.String(),
+			Raw:                cr.Raw,
 		}
 		if cr.PublicKey != nil {
 			key, err := x509.MarshalPKIXPublicKey(cr.PublicKey)

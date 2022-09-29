@@ -36,6 +36,7 @@ func TestNewRequestBody(t *testing.T) {
 				WithX509CertificateRequest(&x509.CertificateRequest{
 					PublicKeyAlgorithm: x509.ECDSA,
 					Subject:            pkix.Name{CommonName: "foo"},
+					Raw:                []byte("csr der"),
 				}),
 			},
 			want: &RequestBody{
@@ -45,6 +46,7 @@ func TestNewRequestBody(t *testing.T) {
 						Subject:            x509util.Subject{CommonName: "foo"},
 					},
 					PublicKeyAlgorithm: "ECDSA",
+					Raw:                []byte("csr der"),
 				},
 			},
 			wantErr: false,

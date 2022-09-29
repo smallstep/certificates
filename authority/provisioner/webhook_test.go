@@ -16,7 +16,6 @@ import (
 	"github.com/pkg/errors"
 	"github.com/smallstep/assert"
 	"github.com/smallstep/certificates/webhook"
-	"go.step.sm/crypto/sshutil"
 	"go.step.sm/crypto/x509util"
 	"go.step.sm/linkedca"
 )
@@ -333,28 +332,30 @@ func TestWebhook_Do(t *testing.T) {
 			},
 			expectPath: "/users/areed?region=central",
 		},
-		"ok/token from ssh template": {
-			webhook: Webhook{
-				ID:     "abc123",
-				Secret: "c2VjcmV0Cg==",
+		/*
+			"ok/token from ssh template": {
+				webhook: Webhook{
+					ID:     "abc123",
+					Secret: "c2VjcmV0Cg==",
+				},
+				webhookResponse: webhook.ResponseBody{
+					Data: map[string]interface{}{"role": "dba"},
+				},
+				dataArg:     sshutil.TemplateData{sshutil.TokenKey: "token"},
+				expectToken: "token",
 			},
-			webhookResponse: webhook.ResponseBody{
-				Data: map[string]interface{}{"role": "dba"},
+			"ok/token from x509 template": {
+				webhook: Webhook{
+					ID:     "abc123",
+					Secret: "c2VjcmV0Cg==",
+				},
+				webhookResponse: webhook.ResponseBody{
+					Data: map[string]interface{}{"role": "dba"},
+				},
+				dataArg:     x509util.TemplateData{sshutil.TokenKey: "token"},
+				expectToken: "token",
 			},
-			dataArg:     sshutil.TemplateData{sshutil.TokenKey: "token"},
-			expectToken: "token",
-		},
-		"ok/token from x509 template": {
-			webhook: Webhook{
-				ID:     "abc123",
-				Secret: "c2VjcmV0Cg==",
-			},
-			webhookResponse: webhook.ResponseBody{
-				Data: map[string]interface{}{"role": "dba"},
-			},
-			dataArg:     x509util.TemplateData{sshutil.TokenKey: "token"},
-			expectToken: "token",
-		},
+		*/
 		"ok/allow": {
 			webhook: Webhook{
 				ID:     "abc123",

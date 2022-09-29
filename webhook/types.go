@@ -19,6 +19,7 @@ type X509CertificateRequest struct {
 	*x509util.CertificateRequest
 	PublicKey          []byte `json:"publicKey"`
 	PublicKeyAlgorithm string `json:"publicKeyAlgorithm"`
+	Raw                []byte `json:"raw"`
 }
 
 // X509Certificate is the certificate sent to webhook servers for authorizing
