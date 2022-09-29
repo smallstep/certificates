@@ -17,6 +17,7 @@ type helmVariables struct {
 	Defaults     *linkedca.Defaults
 	Password     string
 	EnableSSH    bool
+	EnableAdmin  bool
 	TLS          authconfig.TLSOptions
 	Provisioners []provisioner.Interface
 }
@@ -35,7 +36,11 @@ func (p *PKI) WriteHelmTemplate(w io.Writer) error {
 	}
 
 	// Convert provisioner to ca.json
-	provisioners := make([]provisioner.Interface, len(p.Authority.Provisioners))
+	numberOfProvisioners := len(p.Authority.Provisioners)
+	if p.options.enableACME {
+		numberOfProvisioners++
+	}
+	provisioners := make([]provisioner.Interface, numberOfProvisioners)
 	for i, p := range p.Authority.Provisioners {
 		pp, err := authority.ProvisionerToCertificates(p)
 		if err != nil {
@@ -44,11 +49,25 @@ func (p *PKI) WriteHelmTemplate(w io.Writer) error {
 		provisioners[i] = pp
 	}
 
+	// Add default ACME provisioner if enabled. Note that this logic is similar
+	// to what's in p.GenerateConfig(), but that codepath isn't taken when
+	// writing the Helm template. The default JWK provisioner is added earlier in
+	// the process and that's part of the provisioners above.
+	// TODO(hs): consider refactoring the initialization, so that this becomes
+	// easier to reason about and maintain.
+	if p.options.enableACME {
+		provisioners[len(provisioners)-1] = &provisioner.ACME{
+			Type: "ACME",
+			Name: "acme",
+		}
+	}
+
 	if err := tmpl.Execute(w, helmVariables{
 		Configuration: &p.Configuration,
 		Defaults:      &p.Defaults,
 		Password:      "",
 		EnableSSH:     p.options.enableSSH,
+		EnableAdmin:   p.options.enableAdmin,
 		TLS:           authconfig.DefaultTLSOptions,
 		Provisioners:  provisioners,
 	}); err != nil {
@@ -88,6 +107,7 @@ inject:
           type: badgerv2
           dataSource: /home/step/db
         authority:
+          enableAdmin: {{ .EnableAdmin }}
           provisioners:
           {{- range .Provisioners }}
             - {{ . | toJson }}
