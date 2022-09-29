@@ -39,7 +39,7 @@ require (
 	github.com/smallstep/assert v0.0.0-20200723003110-82e2b9b3b262
 	github.com/smallstep/nosql v0.4.0
 	github.com/stretchr/testify v1.8.0
-	github.com/urfave/cli v1.22.4
+	github.com/urfave/cli v1.22.10
 	go.mozilla.org/pkcs7 v0.0.0-20210826202110-33d05740a352
 	go.step.sm/cli-utils v0.7.4
 	go.step.sm/crypto v0.19.0
