@@ -60,7 +60,7 @@ type AttestationData struct {
 type RequestBody struct {
 	Timestamp time.Time `json:"timestamp"`
 	// Only set after successfully completing acme device-attest-01 challenge
-	AttestationData *AttestationData `json:"attestationData"`
+	AttestationData *AttestationData `json:"attestationData,omitempty"`
 	// Set for most provisioners, but not acme or scep
 	// Token any `json:"token,omitempty"`
 	// Exactly one of the remaining fields should be set
