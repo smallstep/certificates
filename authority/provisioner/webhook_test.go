@@ -281,7 +281,7 @@ func TestWebhook_Do(t *testing.T) {
 		errStatusCode   int
 		serverErrMsg    string
 		expectErr       error
-		expectToken     any
+		// expectToken     any
 	}
 	tests := map[string]test{
 		"ok": {
@@ -421,7 +421,7 @@ func TestWebhook_Do(t *testing.T) {
 				reqBody := new(webhook.RequestBody)
 				err = json.Unmarshal(body, reqBody)
 				assert.FatalError(t, err)
-				assert.Equals(t, tc.expectToken, reqBody.Token)
+				// assert.Equals(t, tc.expectToken, reqBody.Token)
 
 				err = json.NewEncoder(w).Encode(tc.webhookResponse)
 				assert.FatalError(t, err)
