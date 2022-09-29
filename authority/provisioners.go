@@ -676,6 +676,17 @@ func provisionerPEMToLinkedca(b []byte) [][]byte {
 	return roots
 }
 
+func provisionerPEMToCertificates(bs [][]byte) []byte {
+	var roots []byte
+	for i, root := range bs {
+		if i > 0 && !bytes.HasSuffix(root, []byte{'\n'}) {
+			roots = append(roots, '\n')
+		}
+		roots = append(roots, root...)
+	}
+	return roots
+}
+
 // ProvisionerToCertificates converts the linkedca provisioner type to the certificates provisioner
 // interface.
 func ProvisionerToCertificates(p *linkedca.Provisioner) (provisioner.Interface, error) {
@@ -755,6 +766,7 @@ func ProvisionerToCertificates(p *linkedca.Provisioner) (provisioner.Interface, 
 			RequireEAB:         cfg.RequireEab,
 			Challenges:         challengesToCertificates(cfg.Challenges),
 			AttestationFormats: attestationFormatsToCertificates(cfg.AttestationFormats),
+			AttestationRoots:   provisionerPEMToCertificates(cfg.AttestationRoots),
 			Claims:             claims,
 			Options:            options,
 		}, nil
@@ -1006,6 +1018,7 @@ func ProvisionerToLinkedca(p provisioner.Interface) (*linkedca.Provisioner, erro
 						ForceCn:            p.ForceCN,
 						Challenges:         challengesToLinkedca(p.Challenges),
 						AttestationFormats: attestationFormatsToLinkedca(p.AttestationFormats),
+						AttestationRoots:   provisionerPEMToLinkedca(p.AttestationRoots),
 					},
 				},
 			},
