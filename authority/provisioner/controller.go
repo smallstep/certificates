@@ -86,6 +86,7 @@ func (c *Controller) newWebhookController(templateData WebhookSetter, certType l
 		TemplateData: templateData,
 		client:       client,
 		webhooks:     c.webhooks,
+		certType:     certType,
 	}
 }
 
