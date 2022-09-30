@@ -547,6 +547,36 @@ ZYtQ9Ot36qc=
 				code:            http.StatusForbidden,
 			}
 		},
+		"fail enriching webhooks": func(t *testing.T) *signTest {
+			csr := getCSR(t, priv)
+			csr.Raw = []byte("foo")
+			return &signTest{
+				auth:            a,
+				csr:             csr,
+				extensionsCount: 7,
+				extraOpts: append(extraOpts, &mockWebhookController{
+					enrichErr: provisioner.ErrWebhookDenied,
+				}),
+				signOpts: signOpts,
+				err:      provisioner.ErrWebhookDenied,
+				code:     http.StatusForbidden,
+			}
+		},
+		"fail authorizing webhooks": func(t *testing.T) *signTest {
+			csr := getCSR(t, priv)
+			csr.Raw = []byte("foo")
+			return &signTest{
+				auth:            a,
+				csr:             csr,
+				extensionsCount: 7,
+				extraOpts: append(extraOpts, &mockWebhookController{
+					authorizeErr: provisioner.ErrWebhookDenied,
+				}),
+				signOpts: signOpts,
+				err:      provisioner.ErrWebhookDenied,
+				code:     http.StatusForbidden,
+			}
+		},
 		"ok": func(t *testing.T) *signTest {
 			csr := getCSR(t, priv)
 			_a := testAuthority(t)
@@ -623,6 +653,48 @@ ZYtQ9Ot36qc=
 					assert.Equals(t, crt.Subject.CommonName, "smallstep test")
 					return nil
 				},
+			}
+			return &signTest{
+				auth:            testAuthority,
+				csr:             csr,
+				extraOpts:       testExtraOpts,
+				signOpts:        signOpts,
+				notBefore:       signOpts.NotBefore.Time().Truncate(time.Second),
+				notAfter:        signOpts.NotAfter.Time().Truncate(time.Second),
+				extensionsCount: 6,
+			}
+		},
+		"ok with enriching webhook": func(t *testing.T) *signTest {
+			csr := getCSR(t, priv)
+			testAuthority := testAuthority(t)
+			testAuthority.config.AuthorityConfig.Template = a.config.AuthorityConfig.Template
+			p, ok := testAuthority.provisioners.Load("step-cli:4UELJx8e0aS9m0CH3fZ0EB7D5aUPICb759zALHFejvc")
+			if !ok {
+				t.Fatal("provisioner not found")
+			}
+			p.(*provisioner.JWK).Options = &provisioner.Options{
+				X509: &provisioner.X509Options{Template: `{
+					"subject": {"commonName": {{ toJson .Webhooks.people.role }} },
+					"dnsNames": {{ toJson .Insecure.CR.DNSNames }},
+					"keyUsage": ["digitalSignature"],
+					"extKeyUsage": ["serverAuth","clientAuth"]
+				}`},
+			}
+			testExtraOpts, err := testAuthority.Authorize(ctx, token)
+			assert.FatalError(t, err)
+			testAuthority.db = &db.MockAuthDB{
+				MStoreCertificate: func(crt *x509.Certificate) error {
+					assert.Equals(t, crt.Subject.CommonName, "smallstep test")
+					return nil
+				},
+			}
+			for i, o := range testExtraOpts {
+				if wc, ok := o.(*provisioner.WebhookController); ok {
+					testExtraOpts[i] = &mockWebhookController{
+						templateData: wc.TemplateData,
+						respData:     map[string]any{"people": map[string]any{"role": "smallstep test"}},
+					}
+				}
 			}
 			return &signTest{
 				auth:            testAuthority,

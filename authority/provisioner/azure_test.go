@@ -474,11 +474,11 @@ func TestAzure_AuthorizeSign(t *testing.T) {
 		code    int
 		wantErr bool
 	}{
-		{"ok", p1, args{t1}, 7, http.StatusOK, false},
-		{"ok", p2, args{t2}, 12, http.StatusOK, false},
-		{"ok", p1, args{t11}, 7, http.StatusOK, false},
-		{"ok", p5, args{t5}, 7, http.StatusOK, false},
-		{"ok", p7, args{t7}, 7, http.StatusOK, false},
+		{"ok", p1, args{t1}, 8, http.StatusOK, false},
+		{"ok", p2, args{t2}, 13, http.StatusOK, false},
+		{"ok", p1, args{t11}, 8, http.StatusOK, false},
+		{"ok", p5, args{t5}, 8, http.StatusOK, false},
+		{"ok", p7, args{t7}, 8, http.StatusOK, false},
 		{"fail tenant", p3, args{t3}, 0, http.StatusUnauthorized, true},
 		{"fail resource group", p4, args{t4}, 0, http.StatusUnauthorized, true},
 		{"fail subscription", p6, args{t6}, 0, http.StatusUnauthorized, true},
@@ -530,6 +530,8 @@ func TestAzure_AuthorizeSign(t *testing.T) {
 						assert.Equals(t, []string(v), []string{"virtualMachine"})
 					case *x509NamePolicyValidator:
 						assert.Equals(t, nil, v.policyEngine)
+					case *WebhookController:
+						assert.Len(t, 0, v.webhooks)
 					default:
 						assert.FatalError(t, fmt.Errorf("unexpected sign option of type %T", v))
 					}

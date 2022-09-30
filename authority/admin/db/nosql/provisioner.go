@@ -24,6 +24,24 @@ type dbProvisioner struct {
 	SSHTemplate  *linkedca.Template        `json:"sshTemplate"`
 	CreatedAt    time.Time                 `json:"createdAt"`
 	DeletedAt    time.Time                 `json:"deletedAt"`
+	Webhooks     []dbWebhook               `json:"webhooks,omitempty"`
+}
+
+type dbBasicAuth struct {
+	Username string `json:"username"`
+	Password string `json:"password"`
+}
+
+type dbWebhook struct {
+	Name                 string       `json:"name"`
+	ID                   string       `json:"id"`
+	URL                  string       `json:"url"`
+	Kind                 string       `json:"kind"`
+	Secret               string       `json:"secret"`
+	BearerToken          string       `json:"bearerToken,omitempty"`
+	BasicAuth            *dbBasicAuth `json:"basicAuth,omitempty"`
+	DisableTLSClientAuth bool         `json:"disableTLSClientAuth,omitempty"`
+	CertType             string       `json:"certType,omitempty"`
 }
 
 func (dbp *dbProvisioner) clone() *dbProvisioner {
@@ -48,6 +66,7 @@ func (dbp *dbProvisioner) convert2linkedca() (*linkedca.Provisioner, error) {
 		SshTemplate:  dbp.SSHTemplate,
 		CreatedAt:    timestamppb.New(dbp.CreatedAt),
 		DeletedAt:    timestamppb.New(dbp.DeletedAt),
+		Webhooks:     dbWebhooksToLinkedca(dbp.Webhooks),
 	}, nil
 }
 
@@ -164,6 +183,7 @@ func (db *DB) CreateProvisioner(ctx context.Context, prov *linkedca.Provisioner)
 		X509Template: prov.X509Template,
 		SSHTemplate:  prov.SshTemplate,
 		CreatedAt:    clock.Now(),
+		Webhooks:     linkedcaWebhooksToDB(prov.Webhooks),
 	}
 
 	if err := db.save(ctx, prov.Id, dbp, nil, "provisioner", provisionersTable); err != nil {
@@ -193,6 +213,7 @@ func (db *DB) UpdateProvisioner(ctx context.Context, prov *linkedca.Provisioner)
 	}
 	nu.X509Template = prov.X509Template
 	nu.SSHTemplate = prov.SshTemplate
+	nu.Webhooks = linkedcaWebhooksToDB(prov.Webhooks)
 
 	return db.save(ctx, prov.Id, nu, old, "provisioner", provisionersTable)
 }
@@ -208,4 +229,71 @@ func (db *DB) DeleteProvisioner(ctx context.Context, id string) error {
 	nu.DeletedAt = clock.Now()
 
 	return db.save(ctx, old.ID, nu, old, "provisioner", provisionersTable)
+}
+
+func dbWebhooksToLinkedca(dbwhs []dbWebhook) []*linkedca.Webhook {
+	if len(dbwhs) == 0 {
+		return nil
+	}
+	lwhs := make([]*linkedca.Webhook, len(dbwhs))
+
+	for i, dbwh := range dbwhs {
+		lwh := &linkedca.Webhook{
+			Name:                 dbwh.Name,
+			Id:                   dbwh.ID,
+			Url:                  dbwh.URL,
+			Kind:                 linkedca.Webhook_Kind(linkedca.Webhook_Kind_value[dbwh.Kind]),
+			Secret:               dbwh.Secret,
+			DisableTlsClientAuth: dbwh.DisableTLSClientAuth,
+			CertType:             linkedca.Webhook_CertType(linkedca.Webhook_CertType_value[dbwh.CertType]),
+		}
+		if dbwh.BearerToken != "" {
+			lwh.Auth = &linkedca.Webhook_BearerToken{
+				BearerToken: &linkedca.BearerToken{
+					BearerToken: dbwh.BearerToken,
+				},
+			}
+		} else if dbwh.BasicAuth != nil && (dbwh.BasicAuth.Username != "" || dbwh.BasicAuth.Password != "") {
+			lwh.Auth = &linkedca.Webhook_BasicAuth{
+				BasicAuth: &linkedca.BasicAuth{
+					Username: dbwh.BasicAuth.Username,
+					Password: dbwh.BasicAuth.Password,
+				},
+			}
+		}
+		lwhs[i] = lwh
+	}
+
+	return lwhs
+}
+
+func linkedcaWebhooksToDB(lwhs []*linkedca.Webhook) []dbWebhook {
+	if len(lwhs) == 0 {
+		return nil
+	}
+	dbwhs := make([]dbWebhook, len(lwhs))
+
+	for i, lwh := range lwhs {
+		dbwh := dbWebhook{
+			Name:                 lwh.Name,
+			ID:                   lwh.Id,
+			URL:                  lwh.Url,
+			Kind:                 lwh.Kind.String(),
+			Secret:               lwh.Secret,
+			DisableTLSClientAuth: lwh.DisableTlsClientAuth,
+			CertType:             lwh.CertType.String(),
+		}
+		switch a := lwh.GetAuth().(type) {
+		case *linkedca.Webhook_BearerToken:
+			dbwh.BearerToken = a.BearerToken.BearerToken
+		case *linkedca.Webhook_BasicAuth:
+			dbwh.BasicAuth = &dbBasicAuth{
+				Username: a.BasicAuth.Username,
+				Password: a.BasicAuth.Password,
+			}
+		}
+		dbwhs[i] = dbwh
+	}
+
+	return dbwhs
 }

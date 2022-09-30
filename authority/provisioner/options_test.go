@@ -68,6 +68,36 @@ func TestOptions_GetSSHOptions(t *testing.T) {
 	}
 }
 
+func TestOptions_GetWebhooks(t *testing.T) {
+	type fields struct {
+		o *Options
+	}
+	tests := []struct {
+		name   string
+		fields fields
+		want   []*Webhook
+	}{
+		{"ok", fields{&Options{Webhooks: []*Webhook{
+			{Name: "foo"},
+			{Name: "bar"},
+		}}},
+			[]*Webhook{
+				{Name: "foo"},
+				{Name: "bar"},
+			},
+		},
+		{"nil", fields{&Options{}}, nil},
+		{"nilOptions", fields{nil}, nil},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := tt.fields.o.GetWebhooks(); !reflect.DeepEqual(got, tt.want) {
+				t.Errorf("Options.GetWebhooks() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
 func TestProvisionerX509Options_HasTemplate(t *testing.T) {
 	type fields struct {
 		Template     string

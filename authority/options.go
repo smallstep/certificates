@@ -5,6 +5,7 @@ import (
 	"crypto"
 	"crypto/x509"
 	"encoding/pem"
+	"net/http"
 
 	"github.com/pkg/errors"
 	"golang.org/x/crypto/ssh"
@@ -81,6 +82,14 @@ func WithIssuerPassword(password []byte) Option {
 func WithDatabase(d db.AuthDB) Option {
 	return func(a *Authority) error {
 		a.db = d
+		return nil
+	}
+}
+
+// WithWebhookClient sets the http.Client to be used for outbound requests.
+func WithWebhookClient(c *http.Client) Option {
+	return func(a *Authority) error {
+		a.webhookClient = c
 		return nil
 	}
 }

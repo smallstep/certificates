@@ -297,11 +297,13 @@ func TestK8sSA_AuthorizeSign(t *testing.T) {
 								assert.Equals(t, v.max, tc.p.ctl.Claimer.MaxTLSCertDuration())
 							case *x509NamePolicyValidator:
 								assert.Equals(t, nil, v.policyEngine)
+							case *WebhookController:
+								assert.Len(t, 0, v.webhooks)
 							default:
 								assert.FatalError(t, fmt.Errorf("unexpected sign option of type %T", v))
 							}
 						}
-						assert.Equals(t, 7, len(opts))
+						assert.Equals(t, 8, len(opts))
 					}
 				}
 			}
@@ -368,7 +370,7 @@ func TestK8sSA_AuthorizeSSHSign(t *testing.T) {
 			} else {
 				if assert.Nil(t, tc.err) {
 					if assert.NotNil(t, opts) {
-						assert.Len(t, 8, opts)
+						assert.Len(t, 9, opts)
 						for _, o := range opts {
 							switch v := o.(type) {
 							case Interface:
@@ -384,6 +386,8 @@ func TestK8sSA_AuthorizeSSHSign(t *testing.T) {
 							case *sshNamePolicyValidator:
 								assert.Equals(t, nil, v.userPolicyEngine)
 								assert.Equals(t, nil, v.hostPolicyEngine)
+							case *WebhookController:
+								assert.Len(t, 0, v.webhooks)
 							default:
 								assert.FatalError(t, fmt.Errorf("unexpected sign option of type %T", v))
 							}

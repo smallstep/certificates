@@ -491,7 +491,7 @@ func TestAuthority_authorizeSign(t *testing.T) {
 				}
 			} else {
 				if assert.Nil(t, tc.err) {
-					assert.Equals(t, 9, len(got)) // number of provisioner.SignOptions returned
+					assert.Equals(t, 10, len(got)) // number of provisioner.SignOptions returned
 				}
 			}
 		})
@@ -1034,7 +1034,7 @@ func TestAuthority_authorizeSSHSign(t *testing.T) {
 				}
 			} else {
 				if assert.Nil(t, tc.err) {
-					assert.Len(t, 9, got) // number of provisioner.SignOptions returned
+					assert.Len(t, 10, got) // number of provisioner.SignOptions returned
 				}
 			}
 		})
