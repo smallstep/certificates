@@ -122,14 +122,14 @@ func (db *DB) GetProvisioners(ctx context.Context) ([]*linkedca.Provisioner, err
 	for _, entry := range dbEntries {
 		prov, err := db.unmarshalProvisioner(entry.Value, string(entry.Key))
 		if err != nil {
-			switch k := err.(type) {
-			case *admin.Error:
-				if k.IsType(admin.ErrorDeletedType) || k.IsType(admin.ErrorAuthorityMismatchType) {
+			var ae *admin.Error
+			if errors.As(err, &ae) {
+				if ae.IsType(admin.ErrorDeletedType) || ae.IsType(admin.ErrorAuthorityMismatchType) {
 					continue
 				} else {
 					return nil, err
 				}
-			default:
+			} else {
 				return nil, err
 			}
 		}

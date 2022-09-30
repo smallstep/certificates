@@ -30,7 +30,6 @@ import (
 	casapi "github.com/smallstep/certificates/cas/apiv1"
 	"github.com/smallstep/certificates/db"
 	"github.com/smallstep/certificates/errs"
-	"github.com/smallstep/certificates/policy"
 )
 
 // GetTLSOptions returns the tls options configured.
@@ -96,6 +95,7 @@ func (a *Authority) Sign(csr *x509.CertificateRequest, signOpts provisioner.Sign
 
 	var prov provisioner.Interface
 	var pInfo *casapi.ProvisionerInfo
+	var attData provisioner.AttestationData
 	for _, op := range extraOpts {
 		switch k := op.(type) {
 		// Capture current provisioner
@@ -131,6 +131,11 @@ func (a *Authority) Sign(csr *x509.CertificateRequest, signOpts provisioner.Sign
 		case provisioner.CertificateEnforcer:
 			certEnforcers = append(certEnforcers, k)
 
+		// Extra information from ACME attestations.
+		case provisioner.AttestationData:
+			attData = k
+			// TODO(mariano,areed): remove me once attData is used.
+			_ = attData
 		default:
 			return nil, errs.InternalServer("authority.Sign; invalid extra option type %T", append([]interface{}{k}, opts...)...)
 		}
@@ -138,7 +143,8 @@ func (a *Authority) Sign(csr *x509.CertificateRequest, signOpts provisioner.Sign
 
 	cert, err := x509util.NewCertificate(csr, certOptions...)
 	if err != nil {
-		if _, ok := err.(*x509util.TemplateError); ok {
+		var te *x509util.TemplateError
+		if errors.As(err, &te) {
 			return nil, errs.ApplyOptions(
 				errs.BadRequestErr(err, err.Error()),
 				errs.WithKeyVal("csr", csr),
@@ -208,15 +214,9 @@ func (a *Authority) Sign(csr *x509.CertificateRequest, signOpts provisioner.Sign
 
 	// Check if authority is allowed to sign the certificate
 	if err := a.isAllowedToSignX509Certificate(leaf); err != nil {
-		var pe *policy.NamePolicyError
-		if errors.As(err, &pe) && pe.Reason == policy.NotAllowed {
-			return nil, errs.ApplyOptions(&errs.Error{
-				// NOTE: custom forbidden error, so that denied name is sent to client
-				// as well as shown in the logs.
-				Status: http.StatusForbidden,
-				Err:    fmt.Errorf("authority not allowed to sign: %w", err),
-				Msg:    fmt.Sprintf("The request was forbidden by the certificate authority: %s", err.Error()),
-			}, opts...)
+		var ee *errs.Error
+		if errors.As(err, &ee) {
+			return nil, errs.ApplyOptions(ee, opts...)
 		}
 		return nil, errs.InternalServerErr(err,
 			errs.WithKeyVal("csr", csr),
@@ -240,7 +240,7 @@ func (a *Authority) Sign(csr *x509.CertificateRequest, signOpts provisioner.Sign
 
 	fullchain := append([]*x509.Certificate{resp.Certificate}, resp.CertificateChain...)
 	if err = a.storeCertificate(prov, fullchain); err != nil {
-		if err != db.ErrNotImplemented {
+		if !errors.Is(err, db.ErrNotImplemented) {
 			return nil, errs.Wrap(http.StatusInternalServerError, err,
 				"authority.Sign; error storing certificate in db", opts...)
 		}
@@ -252,6 +252,9 @@ func (a *Authority) Sign(csr *x509.CertificateRequest, signOpts provisioner.Sign
 // isAllowedToSignX509Certificate checks if the Authority is allowed
 // to sign the X.509 certificate.
 func (a *Authority) isAllowedToSignX509Certificate(cert *x509.Certificate) error {
+	if err := a.constraintsEngine.ValidateCertificate(cert); err != nil {
+		return err
+	}
 	return a.policyEngine.IsX509CertificateAllowed(cert)
 }
 
@@ -347,6 +350,22 @@ func (a *Authority) Rekey(oldCert *x509.Certificate, pk crypto.PublicKey) ([]*x5
 		newCert.ExtraExtensions = append(newCert.ExtraExtensions, ext)
 	}
 
+	// Check if the certificate is allowed to be renewed, name constraints might
+	// change over time.
+	//
+	// TODO(hslatman,maraino): consider adding policies too and consider if
+	// RenewSSH should check policies.
+	if err := a.constraintsEngine.ValidateCertificate(newCert); err != nil {
+		var ee *errs.Error
+		if errors.As(err, &ee) {
+			return nil, errs.ApplyOptions(ee, opts...)
+		}
+		return nil, errs.InternalServerErr(err,
+			errs.WithKeyVal("serialNumber", oldCert.SerialNumber.String()),
+			errs.WithMessage("error renewing certificate"),
+		)
+	}
+
 	resp, err := a.x509CAService.RenewCertificate(&casapi.RenewCertificateRequest{
 		Template: newCert,
 		Lifetime: lifetime,
@@ -358,7 +377,7 @@ func (a *Authority) Rekey(oldCert *x509.Certificate, pk crypto.PublicKey) ([]*x5
 
 	fullchain := append([]*x509.Certificate{resp.Certificate}, resp.CertificateChain...)
 	if err = a.storeRenewedCertificate(oldCert, fullchain); err != nil {
-		if err != db.ErrNotImplemented {
+		if !errors.Is(err, db.ErrNotImplemented) {
 			return nil, errs.Wrap(http.StatusInternalServerError, err, "authority.Rekey; error storing certificate in db", opts...)
 		}
 	}
@@ -559,12 +578,12 @@ func (a *Authority) Revoke(ctx context.Context, revokeOpts *RevokeOptions) error
 			return errs.Wrap(http.StatusInternalServerError, err, "authority.Revoke", opts...)
 		}
 	}
-	switch err {
-	case nil:
+	switch {
+	case err == nil:
 		return nil
-	case db.ErrNotImplemented:
+	case errors.Is(err, db.ErrNotImplemented):
 		return errs.NotImplemented("authority.Revoke; no persistence layer configured", opts...)
-	case db.ErrAlreadyExists:
+	case errors.Is(err, db.ErrAlreadyExists):
 		return errs.ApplyOptions(
 			errs.BadRequest("certificate with serial number '%s' is already revoked", rci.Serial),
 			opts...,
@@ -752,6 +771,18 @@ func (a *Authority) GetTLSCertificate() (*tls.Certificate, error) {
 	certTpl.NotBefore = now.Add(-1 * time.Minute)
 	certTpl.NotAfter = now.Add(24 * time.Hour)
 
+	// Policy and constraints require this fields to be set. At this moment they
+	// are only present in the extra extension.
+	certTpl.DNSNames = cr.DNSNames
+	certTpl.IPAddresses = cr.IPAddresses
+	certTpl.EmailAddresses = cr.EmailAddresses
+	certTpl.URIs = cr.URIs
+
+	// Fail if name constraints do not allow the server names.
+	if err := a.constraintsEngine.ValidateCertificate(certTpl); err != nil {
+		return fatal(err)
+	}
+
 	resp, err := a.x509CAService.CreateCertificate(&casapi.CreateCertificateRequest{
 		Template:       certTpl,
 		CSR:            cr,
@@ -799,7 +830,7 @@ func templatingError(err error) error {
 	)
 	if errors.As(err, &syntaxError) {
 		// offset is arguably not super clear to the user, but it's the best we can do here
-		cause = fmt.Errorf("%s at offset %d", cause.Error(), syntaxError.Offset)
+		cause = fmt.Errorf("%w at offset %d", cause, syntaxError.Offset)
 	} else if errors.As(err, &typeError) {
 		// slightly rewriting the default error message to include the offset
 		cause = fmt.Errorf("cannot unmarshal %s at offset %d into Go value of type %s", typeError.Value, typeError.Offset, typeError.Type)

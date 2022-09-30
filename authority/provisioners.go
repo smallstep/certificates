@@ -145,7 +145,6 @@ func (a *Authority) generateProvisionerConfig(ctx context.Context) (provisioner.
 		AuthorizeRenewFunc:    a.authorizeRenewFunc,
 		AuthorizeSSHRenewFunc: a.authorizeSSHRenewFunc,
 	}, nil
-
 }
 
 // StoreProvisioner stores a provisioner to the authority.
@@ -530,6 +529,7 @@ func durationsToLinkedca(d *provisioner.Duration) string {
 // certifictes claims type.
 func claimsToCertificates(c *linkedca.Claims) (*provisioner.Claims, error) {
 	if c == nil {
+		//nolint:nilnil // nil claims do not pose an issue.
 		return nil, nil
 	}
 
@@ -676,6 +676,17 @@ func provisionerPEMToLinkedca(b []byte) [][]byte {
 	return roots
 }
 
+func provisionerPEMToCertificates(bs [][]byte) []byte {
+	var roots []byte
+	for i, root := range bs {
+		if i > 0 && !bytes.HasSuffix(root, []byte{'\n'}) {
+			roots = append(roots, '\n')
+		}
+		roots = append(roots, root...)
+	}
+	return roots
+}
+
 // ProvisionerToCertificates converts the linkedca provisioner type to the certificates provisioner
 // interface.
 func ProvisionerToCertificates(p *linkedca.Provisioner) (provisioner.Interface, error) {
@@ -748,13 +759,16 @@ func ProvisionerToCertificates(p *linkedca.Provisioner) (provisioner.Interface, 
 	case *linkedca.ProvisionerDetails_ACME:
 		cfg := d.ACME
 		return &provisioner.ACME{
-			ID:         p.Id,
-			Type:       p.Type.String(),
-			Name:       p.Name,
-			ForceCN:    cfg.ForceCn,
-			RequireEAB: cfg.RequireEab,
-			Claims:     claims,
-			Options:    options,
+			ID:                 p.Id,
+			Type:               p.Type.String(),
+			Name:               p.Name,
+			ForceCN:            cfg.ForceCn,
+			RequireEAB:         cfg.RequireEab,
+			Challenges:         challengesToCertificates(cfg.Challenges),
+			AttestationFormats: attestationFormatsToCertificates(cfg.AttestationFormats),
+			AttestationRoots:   provisionerPEMToCertificates(cfg.AttestationRoots),
+			Claims:             claims,
+			Options:            options,
 		}, nil
 	case *linkedca.ProvisionerDetails_OIDC:
 		cfg := d.OIDC
@@ -1001,7 +1015,10 @@ func ProvisionerToLinkedca(p provisioner.Interface) (*linkedca.Provisioner, erro
 			Details: &linkedca.ProvisionerDetails{
 				Data: &linkedca.ProvisionerDetails_ACME{
 					ACME: &linkedca.ACMEProvisioner{
-						ForceCn: p.ForceCN,
+						ForceCn:            p.ForceCN,
+						Challenges:         challengesToLinkedca(p.Challenges),
+						AttestationFormats: attestationFormatsToLinkedca(p.AttestationFormats),
+						AttestationRoots:   provisionerPEMToLinkedca(p.AttestationRoots),
 					},
 				},
 			},
@@ -1121,4 +1138,76 @@ func parseInstanceAge(age string) (provisioner.Duration, error) {
 		instanceAge = *iap
 	}
 	return instanceAge, nil
+}
+
+// challengesToCertificates converts linkedca challenges to provisioner ones
+// skipping the unknown ones.
+func challengesToCertificates(challenges []linkedca.ACMEProvisioner_ChallengeType) []provisioner.ACMEChallenge {
+	ret := make([]provisioner.ACMEChallenge, 0, len(challenges))
+	for _, ch := range challenges {
+		switch ch {
+		case linkedca.ACMEProvisioner_HTTP_01:
+			ret = append(ret, provisioner.HTTP_01)
+		case linkedca.ACMEProvisioner_DNS_01:
+			ret = append(ret, provisioner.DNS_01)
+		case linkedca.ACMEProvisioner_TLS_ALPN_01:
+			ret = append(ret, provisioner.TLS_ALPN_01)
+		case linkedca.ACMEProvisioner_DEVICE_ATTEST_01:
+			ret = append(ret, provisioner.DEVICE_ATTEST_01)
+		}
+	}
+	return ret
+}
+
+// challengesToLinkedca converts provisioner challenges to linkedca ones
+// skipping the unknown ones.
+func challengesToLinkedca(challenges []provisioner.ACMEChallenge) []linkedca.ACMEProvisioner_ChallengeType {
+	ret := make([]linkedca.ACMEProvisioner_ChallengeType, 0, len(challenges))
+	for _, ch := range challenges {
+		switch provisioner.ACMEChallenge(ch.String()) {
+		case provisioner.HTTP_01:
+			ret = append(ret, linkedca.ACMEProvisioner_HTTP_01)
+		case provisioner.DNS_01:
+			ret = append(ret, linkedca.ACMEProvisioner_DNS_01)
+		case provisioner.TLS_ALPN_01:
+			ret = append(ret, linkedca.ACMEProvisioner_TLS_ALPN_01)
+		case provisioner.DEVICE_ATTEST_01:
+			ret = append(ret, linkedca.ACMEProvisioner_DEVICE_ATTEST_01)
+		}
+	}
+	return ret
+}
+
+// attestationFormatsToCertificates converts linkedca attestation formats to
+// provisioner ones skipping the unknown ones.
+func attestationFormatsToCertificates(formats []linkedca.ACMEProvisioner_AttestationFormatType) []provisioner.ACMEAttestationFormat {
+	ret := make([]provisioner.ACMEAttestationFormat, 0, len(formats))
+	for _, f := range formats {
+		switch f {
+		case linkedca.ACMEProvisioner_APPLE:
+			ret = append(ret, provisioner.APPLE)
+		case linkedca.ACMEProvisioner_STEP:
+			ret = append(ret, provisioner.STEP)
+		case linkedca.ACMEProvisioner_TPM:
+			ret = append(ret, provisioner.TPM)
+		}
+	}
+	return ret
+}
+
+// attestationFormatsToLinkedca converts provisioner attestation formats to
+// linkedca ones skipping the unknown ones.
+func attestationFormatsToLinkedca(formats []provisioner.ACMEAttestationFormat) []linkedca.ACMEProvisioner_AttestationFormatType {
+	ret := make([]linkedca.ACMEProvisioner_AttestationFormatType, 0, len(formats))
+	for _, f := range formats {
+		switch provisioner.ACMEAttestationFormat(f.String()) {
+		case provisioner.APPLE:
+			ret = append(ret, linkedca.ACMEProvisioner_APPLE)
+		case provisioner.STEP:
+			ret = append(ret, linkedca.ACMEProvisioner_STEP)
+		case provisioner.TPM:
+			ret = append(ret, linkedca.ACMEProvisioner_TPM)
+		}
+	}
+	return ret
 }

@@ -200,7 +200,7 @@ func TestBootstrap(t *testing.T) {
 	}
 }
 
-// nolint:gosec // insecure test servers
+//nolint:gosec // insecure test servers
 func TestBootstrapServerWithoutMTLS(t *testing.T) {
 	srv := startCABootstrapServer()
 	defer srv.Close()
@@ -246,6 +246,7 @@ func TestBootstrapServerWithoutMTLS(t *testing.T) {
 				expected := &http.Server{
 					TLSConfig: got.TLSConfig,
 				}
+				//nolint:govet // not comparing errors
 				if !reflect.DeepEqual(got, expected) {
 					t.Errorf("BootstrapServer() = %v, want %v", got, expected)
 				}
@@ -257,7 +258,7 @@ func TestBootstrapServerWithoutMTLS(t *testing.T) {
 	}
 }
 
-// nolint:gosec // insecure test servers
+//nolint:gosec // insecure test servers
 func TestBootstrapServerWithMTLS(t *testing.T) {
 	srv := startCABootstrapServer()
 	defer srv.Close()
@@ -303,6 +304,7 @@ func TestBootstrapServerWithMTLS(t *testing.T) {
 				expected := &http.Server{
 					TLSConfig: got.TLSConfig,
 				}
+				//nolint:govet // not comparing errors
 				if !reflect.DeepEqual(got, expected) {
 					t.Errorf("BootstrapServer() = %v, want %v", got, expected)
 				}
@@ -407,7 +409,7 @@ func TestBootstrapClientServerRotation(t *testing.T) {
 
 	// Create bootstrap server
 	token := generateBootstrapToken(caURL, "127.0.0.1", "ef742f95dc0d8aa82d3cca4017af6dac3fce84290344159891952d18c53eefe7")
-	// nolint:gosec // insecure test server
+	//nolint:gosec // insecure test server
 	server, err := BootstrapServer(context.Background(), token, &http.Server{
 		Addr: ":0",
 		Handler: http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
@@ -526,7 +528,7 @@ func TestBootstrapClientServerFederation(t *testing.T) {
 
 	// Create bootstrap server
 	token := generateBootstrapToken(caURL1, "127.0.0.1", "ef742f95dc0d8aa82d3cca4017af6dac3fce84290344159891952d18c53eefe7")
-	// nolint:gosec // insecure test server
+	//nolint:gosec // insecure test server
 	server, err := BootstrapServer(context.Background(), token, &http.Server{
 		Addr: ":0",
 		Handler: http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {

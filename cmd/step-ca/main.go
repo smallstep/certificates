@@ -14,7 +14,7 @@ import (
 	"time"
 
 	// Server profiler
-	// nolint:gosec // profile server, if enabled runs on a different port
+	//nolint:gosec // profile server, if enabled runs on a different port
 	_ "net/http/pprof"
 
 	"github.com/smallstep/certificates/authority"
@@ -25,6 +25,7 @@ import (
 	"go.step.sm/cli-utils/step"
 	"go.step.sm/cli-utils/ui"
 	"go.step.sm/cli-utils/usage"
+	"go.step.sm/crypto/pemutil"
 
 	// Enabled kms interfaces.
 	_ "go.step.sm/crypto/kms/awskms"
@@ -52,6 +53,10 @@ func init() {
 	step.Set("Smallstep CA", Version, BuildTime)
 	authority.GlobalVersion.Version = Version
 	rand.Seed(time.Now().UnixNano())
+	// Add support for asking passwords
+	pemutil.PromptPassword = func(msg string) ([]byte, error) {
+		return ui.PromptPassword(msg)
+	}
 }
 
 func exit(code int) {
@@ -176,7 +181,11 @@ $ step-ca --context=mybiz --password-file ./password.txt
 	debugProfAddr := os.Getenv("STEP_PROF_ADDR")
 	if debugProfAddr != "" {
 		go func() {
-			log.Println(http.ListenAndServe(debugProfAddr, nil))
+			srv := http.Server{
+				Addr:              debugProfAddr,
+				ReadHeaderTimeout: 15 * time.Second,
+			}
+			log.Println(srv.ListenAndServe())
 		}()
 	}
 

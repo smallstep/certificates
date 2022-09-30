@@ -95,16 +95,16 @@ func TestDB_getDBAccount(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			d := DB{db: tc.db}
 			if dbacc, err := d.getDBAccount(context.Background(), accID); err != nil {
-				switch k := err.(type) {
-				case *acme.Error:
+				var acmeErr *acme.Error
+				if errors.As(err, &acmeErr) {
 					if assert.NotNil(t, tc.acmeErr) {
-						assert.Equals(t, k.Type, tc.acmeErr.Type)
-						assert.Equals(t, k.Detail, tc.acmeErr.Detail)
-						assert.Equals(t, k.Status, tc.acmeErr.Status)
-						assert.Equals(t, k.Err.Error(), tc.acmeErr.Err.Error())
-						assert.Equals(t, k.Detail, tc.acmeErr.Detail)
+						assert.Equals(t, acmeErr.Type, tc.acmeErr.Type)
+						assert.Equals(t, acmeErr.Detail, tc.acmeErr.Detail)
+						assert.Equals(t, acmeErr.Status, tc.acmeErr.Status)
+						assert.Equals(t, acmeErr.Err.Error(), tc.acmeErr.Err.Error())
+						assert.Equals(t, acmeErr.Detail, tc.acmeErr.Detail)
 					}
-				default:
+				} else {
 					if assert.NotNil(t, tc.err) {
 						assert.HasPrefix(t, err.Error(), tc.err.Error())
 					}
@@ -174,16 +174,16 @@ func TestDB_getAccountIDByKeyID(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			d := DB{db: tc.db}
 			if retAccID, err := d.getAccountIDByKeyID(context.Background(), kid); err != nil {
-				switch k := err.(type) {
-				case *acme.Error:
+				var acmeErr *acme.Error
+				if errors.As(err, &acmeErr) {
 					if assert.NotNil(t, tc.acmeErr) {
-						assert.Equals(t, k.Type, tc.acmeErr.Type)
-						assert.Equals(t, k.Detail, tc.acmeErr.Detail)
-						assert.Equals(t, k.Status, tc.acmeErr.Status)
-						assert.Equals(t, k.Err.Error(), tc.acmeErr.Err.Error())
-						assert.Equals(t, k.Detail, tc.acmeErr.Detail)
+						assert.Equals(t, acmeErr.Type, tc.acmeErr.Type)
+						assert.Equals(t, acmeErr.Detail, tc.acmeErr.Detail)
+						assert.Equals(t, acmeErr.Status, tc.acmeErr.Status)
+						assert.Equals(t, acmeErr.Err.Error(), tc.acmeErr.Err.Error())
+						assert.Equals(t, acmeErr.Detail, tc.acmeErr.Detail)
 					}
-				default:
+				} else {
 					if assert.NotNil(t, tc.err) {
 						assert.HasPrefix(t, err.Error(), tc.err.Error())
 					}
@@ -248,16 +248,16 @@ func TestDB_GetAccount(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			d := DB{db: tc.db}
 			if acc, err := d.GetAccount(context.Background(), accID); err != nil {
-				switch k := err.(type) {
-				case *acme.Error:
+				var acmeErr *acme.Error
+				if errors.As(err, &acmeErr) {
 					if assert.NotNil(t, tc.acmeErr) {
-						assert.Equals(t, k.Type, tc.acmeErr.Type)
-						assert.Equals(t, k.Detail, tc.acmeErr.Detail)
-						assert.Equals(t, k.Status, tc.acmeErr.Status)
-						assert.Equals(t, k.Err.Error(), tc.acmeErr.Err.Error())
-						assert.Equals(t, k.Detail, tc.acmeErr.Detail)
+						assert.Equals(t, acmeErr.Type, tc.acmeErr.Type)
+						assert.Equals(t, acmeErr.Detail, tc.acmeErr.Detail)
+						assert.Equals(t, acmeErr.Status, tc.acmeErr.Status)
+						assert.Equals(t, acmeErr.Err.Error(), tc.acmeErr.Err.Error())
+						assert.Equals(t, acmeErr.Detail, tc.acmeErr.Detail)
 					}
-				default:
+				} else {
 					if assert.NotNil(t, tc.err) {
 						assert.HasPrefix(t, err.Error(), tc.err.Error())
 					}
@@ -354,16 +354,16 @@ func TestDB_GetAccountByKeyID(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			d := DB{db: tc.db}
 			if acc, err := d.GetAccountByKeyID(context.Background(), kid); err != nil {
-				switch k := err.(type) {
-				case *acme.Error:
+				var acmeErr *acme.Error
+				if errors.As(err, &acmeErr) {
 					if assert.NotNil(t, tc.acmeErr) {
-						assert.Equals(t, k.Type, tc.acmeErr.Type)
-						assert.Equals(t, k.Detail, tc.acmeErr.Detail)
-						assert.Equals(t, k.Status, tc.acmeErr.Status)
-						assert.Equals(t, k.Err.Error(), tc.acmeErr.Err.Error())
-						assert.Equals(t, k.Detail, tc.acmeErr.Detail)
+						assert.Equals(t, acmeErr.Type, tc.acmeErr.Type)
+						assert.Equals(t, acmeErr.Detail, tc.acmeErr.Detail)
+						assert.Equals(t, acmeErr.Status, tc.acmeErr.Status)
+						assert.Equals(t, acmeErr.Err.Error(), tc.acmeErr.Err.Error())
+						assert.Equals(t, acmeErr.Detail, tc.acmeErr.Detail)
 					}
-				default:
+				} else {
 					if assert.NotNil(t, tc.err) {
 						assert.HasPrefix(t, err.Error(), tc.err.Error())
 					}

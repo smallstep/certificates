@@ -3,6 +3,7 @@ package api
 import (
 	"bytes"
 	"context"
+	"crypto/x509"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -39,6 +40,18 @@ func (*fakeProvisioner) AuthorizeOrderIdentifier(ctx context.Context, identifier
 
 func (*fakeProvisioner) AuthorizeSign(ctx context.Context, token string) ([]provisioner.SignOption, error) {
 	return nil, nil
+}
+
+func (*fakeProvisioner) IsChallengeEnabled(ctx context.Context, challenge provisioner.ACMEChallenge) bool {
+	return true
+}
+
+func (*fakeProvisioner) IsAttestationFormatEnabled(ctx context.Context, format provisioner.ACMEAttestationFormat) bool {
+	return true
+}
+
+func (*fakeProvisioner) GetAttestationRoots() (*x509.CertPool, bool) {
+	return nil, false
 }
 
 func (*fakeProvisioner) AuthorizeRevoke(ctx context.Context, token string) error { return nil }
@@ -184,11 +197,12 @@ func TestNewAccountRequest_Validate(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			if err := tc.nar.Validate(); err != nil {
 				if assert.NotNil(t, err) {
-					ae, ok := err.(*acme.Error)
-					assert.True(t, ok)
-					assert.HasPrefix(t, ae.Error(), tc.err.Error())
-					assert.Equals(t, ae.StatusCode(), tc.err.StatusCode())
-					assert.Equals(t, ae.Type, tc.err.Type)
+					var ae *acme.Error
+					if assert.True(t, errors.As(err, &ae)) {
+						assert.HasPrefix(t, ae.Error(), tc.err.Error())
+						assert.Equals(t, ae.StatusCode(), tc.err.StatusCode())
+						assert.Equals(t, ae.Type, tc.err.Type)
+					}
 				}
 			} else {
 				assert.Nil(t, tc.err)
@@ -255,11 +269,12 @@ func TestUpdateAccountRequest_Validate(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			if err := tc.uar.Validate(); err != nil {
 				if assert.NotNil(t, err) {
-					ae, ok := err.(*acme.Error)
-					assert.True(t, ok)
-					assert.HasPrefix(t, ae.Error(), tc.err.Error())
-					assert.Equals(t, ae.StatusCode(), tc.err.StatusCode())
-					assert.Equals(t, ae.Type, tc.err.Type)
+					var ae *acme.Error
+					if assert.True(t, errors.As(err, &ae)) {
+						assert.HasPrefix(t, ae.Error(), tc.err.Error())
+						assert.Equals(t, ae.StatusCode(), tc.err.StatusCode())
+						assert.Equals(t, ae.Type, tc.err.Type)
+					}
 				}
 			} else {
 				assert.Nil(t, tc.err)

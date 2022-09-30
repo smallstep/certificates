@@ -116,7 +116,6 @@ func (c *AdminClient) generateAdminToken(aud *url.URL) (string, error) {
 	}
 
 	return tok.SignedString(c.x5cJWK.Algorithm, c.x5cJWK.Key)
-
 }
 
 func (c *AdminClient) retryOnError(r *http.Response) bool {

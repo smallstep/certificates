@@ -12,6 +12,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/pkg/errors"
 	"github.com/smallstep/certificates/authority/admin"
 	"github.com/smallstep/certificates/authority/provisioner"
 	"github.com/smallstep/certificates/errs"
@@ -416,16 +417,16 @@ func (a *Authority) AuthorizeRenewToken(ctx context.Context, ott string) (*x509.
 		Subject: leaf.Subject.CommonName,
 		Time:    time.Now().UTC(),
 	}, time.Minute); err != nil {
-		switch err {
-		case jose.ErrInvalidIssuer:
+		switch {
+		case errors.Is(err, jose.ErrInvalidIssuer):
 			return nil, errs.UnauthorizedErr(err, errs.WithMessage("error validating renew token: invalid issuer claim (iss)"))
-		case jose.ErrInvalidSubject:
+		case errors.Is(err, jose.ErrInvalidSubject):
 			return nil, errs.UnauthorizedErr(err, errs.WithMessage("error validating renew token: invalid subject claim (sub)"))
-		case jose.ErrNotValidYet:
+		case errors.Is(err, jose.ErrNotValidYet):
 			return nil, errs.UnauthorizedErr(err, errs.WithMessage("error validating renew token: token not valid yet (nbf)"))
-		case jose.ErrExpired:
+		case errors.Is(err, jose.ErrExpired):
 			return nil, errs.UnauthorizedErr(err, errs.WithMessage("error validating renew token: token is expired (exp)"))
-		case jose.ErrIssuedInTheFuture:
+		case errors.Is(err, jose.ErrIssuedInTheFuture):
 			return nil, errs.UnauthorizedErr(err, errs.WithMessage("error validating renew token: token issued in the future (iat)"))
 		default:
 			return nil, errs.UnauthorizedErr(err, errs.WithMessage("error validating renew token"))
@@ -434,7 +435,7 @@ func (a *Authority) AuthorizeRenewToken(ctx context.Context, ott string) (*x509.
 
 	audiences := a.config.GetAudiences().Renew
 	if !matchesAudience(claims.Audience, audiences) {
-		return nil, errs.InternalServerErr(err, errs.WithMessage("error validating renew token: invalid audience claim (aud)"))
+		return nil, errs.InternalServerErr(jose.ErrInvalidAudience, errs.WithMessage("error validating renew token: invalid audience claim (aud)"))
 	}
 
 	// validate issuer: old versions used the provisioner name, new version uses

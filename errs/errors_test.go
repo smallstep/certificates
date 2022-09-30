@@ -57,6 +57,7 @@ func TestError_UnmarshalJSON(t *testing.T) {
 			if err := e.UnmarshalJSON(tt.args.data); (err != nil) != tt.wantErr {
 				t.Errorf("Error.UnmarshalJSON() error = %v, wantErr %v", err, tt.wantErr)
 			}
+			//nolint:govet // best option
 			if !reflect.DeepEqual(tt.expected, e) {
 				t.Errorf("Error.UnmarshalJSON() wants = %+v, got %+v", tt.expected, e)
 			}

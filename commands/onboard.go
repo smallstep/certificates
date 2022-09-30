@@ -92,11 +92,12 @@ func onboardAction(ctx *cli.Context) error {
 	token := ctx.Args().Get(0)
 	onboardingURL := u.ResolveReference(&url.URL{Path: token}).String()
 
-	// nolint:gosec // onboarding url
+	//nolint:gosec // onboarding url
 	res, err := http.Get(onboardingURL)
 	if err != nil {
 		return errors.Wrap(err, "error connecting onboarding guide")
 	}
+	defer res.Body.Close()
 	if res.StatusCode >= 400 {
 		var msg onboardingError
 		if err := readJSON(res.Body, &msg); err != nil {
@@ -133,7 +134,7 @@ func onboardAction(ctx *cli.Context) error {
 		return errors.Wrap(err, "error marshaling payload")
 	}
 
-	// nolint:gosec // onboarding url
+	//nolint:gosec // onboarding url
 	resp, err := http.Post(onboardingURL, "application/json", bytes.NewBuffer(payload))
 	if err != nil {
 		return errors.Wrap(err, "error connecting onboarding guide")
@@ -158,7 +159,7 @@ func onboardAction(ctx *cli.Context) error {
 	}
 
 	go ca.StopReloaderHandler(srv)
-	if err := srv.Run(); err != nil && err != http.ErrServerClosed {
+	if err := srv.Run(); err != nil && !errors.Is(err, http.ErrServerClosed) {
 		fatal(err)
 	}
 

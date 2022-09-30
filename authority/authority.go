@@ -1,6 +1,7 @@
 package authority
 
 import (
+	"bytes"
 	"context"
 	"crypto"
 	"crypto/sha256"
@@ -25,6 +26,7 @@ import (
 	adminDBNosql "github.com/smallstep/certificates/authority/admin/db/nosql"
 	"github.com/smallstep/certificates/authority/administrator"
 	"github.com/smallstep/certificates/authority/config"
+	"github.com/smallstep/certificates/authority/internal/constraints"
 	"github.com/smallstep/certificates/authority/policy"
 	"github.com/smallstep/certificates/authority/provisioner"
 	"github.com/smallstep/certificates/cas"
@@ -47,14 +49,15 @@ type Authority struct {
 	linkedCAToken string
 
 	// X509 CA
-	password           []byte
-	issuerPassword     []byte
-	x509CAService      cas.CertificateAuthorityService
-	rootX509Certs      []*x509.Certificate
-	rootX509CertPool   *x509.CertPool
-	federatedX509Certs []*x509.Certificate
-	certificates       *sync.Map
-	x509Enforcers      []provisioner.CertificateEnforcer
+	password              []byte
+	issuerPassword        []byte
+	x509CAService         cas.CertificateAuthorityService
+	rootX509Certs         []*x509.Certificate
+	rootX509CertPool      *x509.CertPool
+	federatedX509Certs    []*x509.Certificate
+	intermediateX509Certs []*x509.Certificate
+	certificates          *sync.Map
+	x509Enforcers         []provisioner.CertificateEnforcer
 
 	// SCEP CA
 	scepService *scep.Service
@@ -85,8 +88,9 @@ type Authority struct {
 	authorizeRenewFunc    provisioner.AuthorizeRenewFunc
 	authorizeSSHRenewFunc provisioner.AuthorizeSSHRenewFunc
 
-	// Policy engines
-	policyEngine *policy.Engine
+	// Constraints and Policy engines
+	constraintsEngine *constraints.Engine
+	policyEngine      *policy.Engine
 
 	adminMutex sync.RWMutex
 
@@ -373,10 +377,16 @@ func (a *Authority) init() error {
 			}
 			options.Signer, err = a.keyManager.CreateSigner(&kmsapi.CreateSignerRequest{
 				SigningKey: a.config.IntermediateKey,
-				Password:   []byte(a.password),
+				Password:   a.password,
 			})
 			if err != nil {
 				return err
+			}
+			// If not defined with an option, add intermediates to the list of
+			// certificates used for name constraints validation at issuance
+			// time.
+			if len(a.intermediateX509Certs) == 0 {
+				a.intermediateX509Certs = append(a.intermediateX509Certs, options.CertificateChain...)
 			}
 		}
 		a.x509CAService, err = cas.New(ctx, options)
@@ -439,7 +449,7 @@ func (a *Authority) init() error {
 		if a.config.SSH.HostKey != "" {
 			signer, err := a.keyManager.CreateSigner(&kmsapi.CreateSignerRequest{
 				SigningKey: a.config.SSH.HostKey,
-				Password:   []byte(a.sshHostPassword),
+				Password:   a.sshHostPassword,
 			})
 			if err != nil {
 				return err
@@ -465,7 +475,7 @@ func (a *Authority) init() error {
 		if a.config.SSH.UserKey != "" {
 			signer, err := a.keyManager.CreateSigner(&kmsapi.CreateSignerRequest{
 				SigningKey: a.config.SSH.UserKey,
-				Password:   []byte(a.sshUserPassword),
+				Password:   a.sshUserPassword,
 			})
 			if err != nil {
 				return err
@@ -550,7 +560,7 @@ func (a *Authority) init() error {
 		options.CertificateChain = append(options.CertificateChain, a.rootX509Certs...)
 		options.Signer, err = a.keyManager.CreateSigner(&kmsapi.CreateSignerRequest{
 			SigningKey: a.config.IntermediateKey,
-			Password:   []byte(a.password),
+			Password:   a.password,
 		})
 		if err != nil {
 			return err
@@ -559,7 +569,7 @@ func (a *Authority) init() error {
 		if km, ok := a.keyManager.(kmsapi.Decrypter); ok {
 			options.Decrypter, err = km.CreateDecrypter(&kmsapi.CreateDecrypterRequest{
 				DecryptionKey: a.config.IntermediateKey,
-				Password:      []byte(a.password),
+				Password:      a.password,
 			})
 			if err != nil {
 				return err
@@ -613,6 +623,21 @@ func (a *Authority) init() error {
 	// Load Provisioners and Admins
 	if err := a.ReloadAdminResources(ctx); err != nil {
 		return err
+	}
+
+	// Load X509 constraints engine.
+	//
+	// This is currently only available in CA mode.
+	if size := len(a.intermediateX509Certs); size > 0 {
+		last := a.intermediateX509Certs[size-1]
+		constraintCerts := make([]*x509.Certificate, 0, size+1)
+		constraintCerts = append(constraintCerts, a.intermediateX509Certs...)
+		for _, root := range a.rootX509Certs {
+			if bytes.Equal(last.RawIssuer, root.RawSubject) && bytes.Equal(last.AuthorityKeyId, root.SubjectKeyId) {
+				constraintCerts = append(constraintCerts, root)
+			}
+		}
+		a.constraintsEngine = constraints.New(constraintCerts...)
 	}
 
 	// Load x509 and SSH Policy Engines

@@ -4,11 +4,13 @@ import (
 	"crypto/x509"
 	"fmt"
 	"net"
+	"net/http"
 	"net/url"
 
+	"go.step.sm/crypto/x509util"
 	"golang.org/x/crypto/ssh"
 
-	"go.step.sm/crypto/x509util"
+	"github.com/smallstep/certificates/errs"
 )
 
 type NamePolicyReason int
@@ -62,6 +64,22 @@ func (e *NamePolicyError) Error() string {
 	}
 }
 
+// As implements the As(any) bool interface and allows to use "errors.As()" to
+// convert a NotAllowed NamePolicyError to an errs.Error.
+func (e *NamePolicyError) As(v any) bool {
+	if e.Reason == NotAllowed {
+		if err, ok := v.(**errs.Error); ok {
+			*err = &errs.Error{
+				Status: http.StatusForbidden,
+				Msg:    fmt.Sprintf("The request was forbidden by the certificate authority: %s", e.Error()),
+				Err:    e,
+			}
+			return true
+		}
+	}
+	return false
+}
+
 func (e *NamePolicyError) Detail() string {
 	return e.detail
 }
@@ -73,7 +91,6 @@ func (e *NamePolicyError) Detail() string {
 // TODO(hs): implement matching URI schemes, paths, etc; not just the domain part of URI domains
 
 type NamePolicyEngine struct {
-
 	// verifySubjectCommonName is set when Subject Common Name must be verified
 	verifySubjectCommonName bool
 	// allowLiteralWildcardNames allows literal wildcard DNS domains
@@ -107,7 +124,6 @@ type NamePolicyEngine struct {
 
 // NewNamePolicyEngine creates a new NamePolicyEngine with NamePolicyOptions
 func New(opts ...NamePolicyOption) (*NamePolicyEngine, error) {
-
 	e := &NamePolicyEngine{}
 	for _, option := range opts {
 		if err := option(e); err != nil {
@@ -153,7 +169,6 @@ func New(opts ...NamePolicyOption) (*NamePolicyEngine, error) {
 // duplicate values removed. It retains the order of elements
 // in the source slice.
 func removeDuplicates(items []string) (ret []string) {
-
 	// no need to remove dupes; return original
 	if len(items) <= 1 {
 		return items
@@ -179,7 +194,6 @@ func removeDuplicates(items []string) (ret []string) {
 // the source slice. An IPNet is considered duplicate if its CIDR
 // notation exists multiple times in the slice.
 func removeDuplicateIPNets(items []*net.IPNet) (ret []*net.IPNet) {
-
 	// no need to remove dupes; return original
 	if len(items) <= 1 {
 		return items

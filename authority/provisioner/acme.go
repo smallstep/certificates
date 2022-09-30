@@ -3,12 +3,77 @@ package provisioner
 import (
 	"context"
 	"crypto/x509"
+	"encoding/pem"
 	"fmt"
 	"net"
+	"strings"
 	"time"
 
 	"github.com/pkg/errors"
 )
+
+// ACMEChallenge represents the supported acme challenges.
+type ACMEChallenge string
+
+//nolint:stylecheck,revive // better names
+const (
+	// HTTP_01 is the http-01 ACME challenge.
+	HTTP_01 ACMEChallenge = "http-01"
+	// DNS_01 is the dns-01 ACME challenge.
+	DNS_01 ACMEChallenge = "dns-01"
+	// TLS_ALPN_01 is the tls-alpn-01 ACME challenge.
+	TLS_ALPN_01 ACMEChallenge = "tls-alpn-01"
+	// DEVICE_ATTEST_01 is the device-attest-01 ACME challenge.
+	DEVICE_ATTEST_01 ACMEChallenge = "device-attest-01"
+)
+
+// String returns a normalized version of the challenge.
+func (c ACMEChallenge) String() string {
+	return strings.ToLower(string(c))
+}
+
+// Validate returns an error if the acme challenge is not a valid one.
+func (c ACMEChallenge) Validate() error {
+	switch ACMEChallenge(c.String()) {
+	case HTTP_01, DNS_01, TLS_ALPN_01, DEVICE_ATTEST_01:
+		return nil
+	default:
+		return fmt.Errorf("acme challenge %q is not supported", c)
+	}
+}
+
+// ACMEAttestationFormat represents the format used on a device-attest-01
+// challenge.
+type ACMEAttestationFormat string
+
+const (
+	// APPLE is the format used to enable device-attest-01 on apple devices.
+	APPLE ACMEAttestationFormat = "apple"
+
+	// STEP is the format used to enable device-attest-01 on devices that
+	// provide attestation certificates like the PIV interface on YubiKeys.
+	//
+	// TODO(mariano): should we rename this to something else.
+	STEP ACMEAttestationFormat = "step"
+
+	// TPM is the format used to enable device-attest-01 on TPMs.
+	TPM ACMEAttestationFormat = "tpm"
+)
+
+// String returns a normalized version of the attestation format.
+func (f ACMEAttestationFormat) String() string {
+	return strings.ToLower(string(f))
+}
+
+// Validate returns an error if the attestation format is not a valid one.
+func (f ACMEAttestationFormat) Validate() error {
+	switch ACMEAttestationFormat(f.String()) {
+	case APPLE, STEP, TPM:
+		return nil
+	default:
+		return fmt.Errorf("acme attestation format %q is not supported", f)
+	}
+}
 
 // ACME is the acme provisioner type, an entity that can authorize the ACME
 // provisioning flow.
@@ -22,11 +87,23 @@ type ACME struct {
 	// by clients when creating a new Account. If set to true, the provided
 	// EAB will be verified. If set to false and an EAB is provided, it is
 	// not verified. Defaults to false.
-	RequireEAB bool     `json:"requireEAB,omitempty"`
-	Claims     *Claims  `json:"claims,omitempty"`
-	Options    *Options `json:"options,omitempty"`
-
-	ctl *Controller
+	RequireEAB bool `json:"requireEAB,omitempty"`
+	// Challenges contains the enabled challenges for this provisioner. If this
+	// value is not set the default http-01, dns-01 and tls-alpn-01 challenges
+	// will be enabled, device-attest-01 will be disabled.
+	Challenges []ACMEChallenge `json:"challenges,omitempty"`
+	// AttestationFormats contains the enabled attestation formats for this
+	// provisioner. If this value is not set the default apple, step and tpm
+	// will be used.
+	AttestationFormats []ACMEAttestationFormat `json:"attestationFormats,omitempty"`
+	// AttestationRoots contains a bundle of root certificates in PEM format
+	// that will be used to verify the attestation certificates. If provided,
+	// this bundle will be used even for well-known CAs like Apple and Yubico.
+	AttestationRoots    []byte   `json:"attestationRoots,omitempty"`
+	Claims              *Claims  `json:"claims,omitempty"`
+	Options             *Options `json:"options,omitempty"`
+	attestationRootPool *x509.CertPool
+	ctl                 *Controller
 }
 
 // GetID returns the provisioner unique identifier.
@@ -83,6 +160,40 @@ func (p *ACME) Init(config Config) (err error) {
 		return errors.New("provisioner name cannot be empty")
 	}
 
+	for _, c := range p.Challenges {
+		if err := c.Validate(); err != nil {
+			return err
+		}
+	}
+	for _, f := range p.AttestationFormats {
+		if err := f.Validate(); err != nil {
+			return err
+		}
+	}
+
+	// Parse attestation roots.
+	// The pool will be nil if the there are not roots.
+	if rest := p.AttestationRoots; len(rest) > 0 {
+		var block *pem.Block
+		var hasCert bool
+		p.attestationRootPool = x509.NewCertPool()
+		for rest != nil {
+			block, rest = pem.Decode(rest)
+			if block == nil {
+				break
+			}
+			cert, err := x509.ParseCertificate(block.Bytes)
+			if err != nil {
+				return errors.New("error parsing attestationRoots: malformed certificate")
+			}
+			p.attestationRootPool.AddCert(cert)
+			hasCert = true
+		}
+		if !hasCert {
+			return errors.New("error parsing attestationRoots: no certificates found")
+		}
+	}
+
 	p.ctl, err = NewController(p, p.Claims, config, p.Options)
 	return
 }
@@ -106,7 +217,6 @@ type ACMEIdentifier struct {
 // AuthorizeOrderIdentifier verifies the provisioner is allowed to issue a
 // certificate for an ACME Order Identifier.
 func (p *ACME) AuthorizeOrderIdentifier(ctx context.Context, identifier ACMEIdentifier) error {
-
 	x509Policy := p.ctl.getPolicy().getX509()
 
 	// identifier is allowed if no policy is configured
@@ -162,4 +272,49 @@ func (p *ACME) AuthorizeRevoke(ctx context.Context, token string) error {
 // certificate was configured to allow renewals.
 func (p *ACME) AuthorizeRenew(ctx context.Context, cert *x509.Certificate) error {
 	return p.ctl.AuthorizeRenew(ctx, cert)
+}
+
+// IsChallengeEnabled checks if the given challenge is enabled. By default
+// http-01, dns-01 and tls-alpn-01 are enabled, to disable any of them the
+// Challenge provisioner property should have at least one element.
+func (p *ACME) IsChallengeEnabled(ctx context.Context, challenge ACMEChallenge) bool {
+	enabledChallenges := []ACMEChallenge{
+		HTTP_01, DNS_01, TLS_ALPN_01,
+	}
+	if len(p.Challenges) > 0 {
+		enabledChallenges = p.Challenges
+	}
+	for _, ch := range enabledChallenges {
+		if strings.EqualFold(string(ch), string(challenge)) {
+			return true
+		}
+	}
+	return false
+}
+
+// IsAttestationFormatEnabled checks if the given attestation format is enabled.
+// By default apple, step and tpm are enabled, to disable any of them the
+// AttestationFormat provisioner property should have at least one element.
+func (p *ACME) IsAttestationFormatEnabled(ctx context.Context, format ACMEAttestationFormat) bool {
+	enabledFormats := []ACMEAttestationFormat{
+		APPLE, STEP, TPM,
+	}
+	if len(p.AttestationFormats) > 0 {
+		enabledFormats = p.AttestationFormats
+	}
+	for _, f := range enabledFormats {
+		if strings.EqualFold(string(f), string(format)) {
+			return true
+		}
+	}
+	return false
+}
+
+// GetAttestationRoots returns certificate pool with the configured attestation
+// roots and reports if the pool contains at least one certificate.
+//
+// TODO(hs): we may not want to expose the root pool like this; call into an
+// interface function instead to authorize?
+func (p *ACME) GetAttestationRoots() (*x509.CertPool, bool) {
+	return p.attestationRootPool, p.attestationRootPool != nil
 }

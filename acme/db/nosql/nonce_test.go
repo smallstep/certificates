@@ -146,16 +146,16 @@ func TestDB_DeleteNonce(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			d := DB{db: tc.db}
 			if err := d.DeleteNonce(context.Background(), acme.Nonce(nonceID)); err != nil {
-				switch k := err.(type) {
-				case *acme.Error:
+				var ae *acme.Error
+				if errors.As(err, &ae) {
 					if assert.NotNil(t, tc.acmeErr) {
-						assert.Equals(t, k.Type, tc.acmeErr.Type)
-						assert.Equals(t, k.Detail, tc.acmeErr.Detail)
-						assert.Equals(t, k.Status, tc.acmeErr.Status)
-						assert.Equals(t, k.Err.Error(), tc.acmeErr.Err.Error())
-						assert.Equals(t, k.Detail, tc.acmeErr.Detail)
+						assert.Equals(t, ae.Type, tc.acmeErr.Type)
+						assert.Equals(t, ae.Detail, tc.acmeErr.Detail)
+						assert.Equals(t, ae.Status, tc.acmeErr.Status)
+						assert.Equals(t, ae.Err.Error(), tc.acmeErr.Err.Error())
+						assert.Equals(t, ae.Detail, tc.acmeErr.Detail)
 					}
-				default:
+				} else {
 					if assert.NotNil(t, tc.err) {
 						assert.HasPrefix(t, err.Error(), tc.err.Error())
 					}

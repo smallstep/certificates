@@ -12,13 +12,12 @@ import (
 	"time"
 
 	"github.com/pkg/errors"
-	"go.step.sm/crypto/jose"
-	"go.step.sm/crypto/pemutil"
-
 	"github.com/smallstep/assert"
 	"github.com/smallstep/certificates/acme"
 	acmeAPI "github.com/smallstep/certificates/acme/api"
 	"github.com/smallstep/certificates/api/render"
+	"go.step.sm/crypto/jose"
+	"go.step.sm/crypto/pemutil"
 )
 
 func TestNewACMEClient(t *testing.T) {
@@ -980,6 +979,100 @@ func TestACMEClient_ValidateChallenge(t *testing.T) {
 	}
 }
 
+func TestACMEClient_ValidateWithPayload(t *testing.T) {
+	key, err := jose.GenerateJWK("EC", "P-256", "ES256", "sig", "", 0)
+	assert.FatalError(t, err)
+
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+		assert.Equals(t, "step-http-client/1.0", req.Header.Get("User-Agent")) // check default User-Agent header
+
+		t.Log(req.RequestURI)
+		w.Header().Set("Replay-Nonce", "nonce")
+		switch req.RequestURI {
+		case "/nonce":
+			render.JSONStatus(w, []byte{}, 200)
+			return
+		case "/fail-nonce":
+			render.JSONStatus(w, acme.NewError(acme.ErrorMalformedType, "malformed request"), 400)
+			return
+		}
+
+		// validate jws request protected headers and body
+		body, err := io.ReadAll(req.Body)
+		assert.FatalError(t, err)
+
+		jws, err := jose.ParseJWS(string(body))
+		assert.FatalError(t, err)
+
+		hdr := jws.Signatures[0].Protected
+		assert.Equals(t, hdr.Nonce, "nonce")
+
+		_, ok := hdr.ExtraHeaders["url"].(string)
+		assert.Fatal(t, ok)
+		assert.Equals(t, hdr.KeyID, "kid")
+
+		payload, err := jws.Verify(key.Public())
+		assert.FatalError(t, err)
+		assert.Equals(t, payload, []byte("the-payload"))
+
+		switch req.RequestURI {
+		case "/ok":
+			render.JSONStatus(w, acme.Challenge{
+				Type:   "device-attestation-01",
+				Status: "valid",
+				Token:  "foo",
+			}, 200)
+		case "/fail":
+			render.JSONStatus(w, acme.NewError(acme.ErrorMalformedType, "malformed request"), 400)
+		}
+	}))
+	defer srv.Close()
+
+	type fields struct {
+		client *http.Client
+		dirLoc string
+		dir    *acmeAPI.Directory
+		acc    *acme.Account
+		Key    *jose.JSONWebKey
+		kid    string
+	}
+	type args struct {
+		url     string
+		payload []byte
+	}
+	tests := []struct {
+		name    string
+		fields  fields
+		args    args
+		wantErr bool
+	}{
+		{"ok", fields{srv.Client(), srv.URL, &acmeAPI.Directory{
+			NewNonce: srv.URL + "/nonce",
+		}, nil, key, "kid"}, args{srv.URL + "/ok", []byte("the-payload")}, false},
+		{"fail nonce", fields{srv.Client(), srv.URL, &acmeAPI.Directory{
+			NewNonce: srv.URL + "/fail-nonce",
+		}, nil, key, "kid"}, args{srv.URL + "/ok", []byte("the-payload")}, true},
+		{"fail payload", fields{srv.Client(), srv.URL, &acmeAPI.Directory{
+			NewNonce: srv.URL + "/nonce",
+		}, nil, key, "kid"}, args{srv.URL + "/fail", []byte("the-payload")}, true},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			c := &ACMEClient{
+				client: tt.fields.client,
+				dirLoc: tt.fields.dirLoc,
+				dir:    tt.fields.dir,
+				acc:    tt.fields.acc,
+				Key:    tt.fields.Key,
+				kid:    tt.fields.kid,
+			}
+			if err := c.ValidateWithPayload(tt.args.url, tt.args.payload); (err != nil) != tt.wantErr {
+				t.Errorf("ACMEClient.ValidateWithPayload() error = %v, wantErr %v", err, tt.wantErr)
+			}
+		})
+	}
+}
+
 func TestACMEClient_FinalizeOrder(t *testing.T) {
 	type test struct {
 		r1, r2   interface{}
@@ -1266,7 +1359,7 @@ func TestACMEClient_GetCertificate(t *testing.T) {
 		Type:  "Certificate",
 		Bytes: leaf.Raw,
 	})
-	// nolint:gocritic
+	//nolint:gocritic
 	certBytes := append(leafb, leafb...)
 	certBytes = append(certBytes, leafb...)
 	ac := &ACMEClient{

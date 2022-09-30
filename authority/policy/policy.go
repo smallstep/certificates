@@ -19,7 +19,6 @@ type HostPolicy policy.SSHNamePolicyEngine
 
 // NewX509PolicyEngine creates a new x509 name policy engine
 func NewX509PolicyEngine(policyOptions X509PolicyOptionsInterface) (X509Policy, error) {
-
 	// return early if no policy engine options to configure
 	if policyOptions == nil {
 		return nil, nil
@@ -92,7 +91,6 @@ func NewSSHHostPolicyEngine(policyOptions SSHPolicyOptionsInterface) (HostPolicy
 
 // newSSHPolicyEngine creates a new SSH name policy engine
 func newSSHPolicyEngine(policyOptions SSHPolicyOptionsInterface, typ sshPolicyEngineType) (policy.SSHNamePolicyEngine, error) {
-
 	// return early if no policy engine options to configure
 	if policyOptions == nil {
 		return nil, nil
@@ -143,7 +141,6 @@ func newSSHPolicyEngine(policyOptions SSHPolicyOptionsInterface, typ sshPolicyEn
 }
 
 func LinkedToCertificates(p *linkedca.Policy) *Options {
-
 	// return early
 	if p == nil {
 		return nil

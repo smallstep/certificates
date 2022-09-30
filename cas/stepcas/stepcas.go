@@ -101,7 +101,7 @@ func (s *StepCAS) CreateCertificate(req *apiv1.CreateCertificateRequest) (*apiv1
 // RenewCertificate will always return a non-implemented error as mTLS renewals
 // are not supported yet.
 func (s *StepCAS) RenewCertificate(req *apiv1.RenewCertificateRequest) (*apiv1.RenewCertificateResponse, error) {
-	return nil, apiv1.ErrNotImplemented{Message: "stepCAS does not support mTLS renewals"}
+	return nil, apiv1.NotImplementedError{Message: "stepCAS does not support mTLS renewals"}
 }
 
 // RevokeCertificate revokes a certificate.

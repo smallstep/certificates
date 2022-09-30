@@ -77,7 +77,7 @@ func TestDB_getDBAuthz(t *testing.T) {
 				Token:        "token",
 				CreatedAt:    now,
 				ExpiresAt:    now.Add(5 * time.Minute),
-				Error:        acme.NewErrorISE("force"),
+				Error:        acme.NewErrorISE("The server experienced an internal error"),
 				ChallengeIDs: []string{"foo", "bar"},
 				Wildcard:     true,
 			}
@@ -101,16 +101,16 @@ func TestDB_getDBAuthz(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			d := DB{db: tc.db}
 			if dbaz, err := d.getDBAuthz(context.Background(), azID); err != nil {
-				switch k := err.(type) {
-				case *acme.Error:
+				var acmeErr *acme.Error
+				if errors.As(err, &acmeErr) {
 					if assert.NotNil(t, tc.acmeErr) {
-						assert.Equals(t, k.Type, tc.acmeErr.Type)
-						assert.Equals(t, k.Detail, tc.acmeErr.Detail)
-						assert.Equals(t, k.Status, tc.acmeErr.Status)
-						assert.Equals(t, k.Err.Error(), tc.acmeErr.Err.Error())
-						assert.Equals(t, k.Detail, tc.acmeErr.Detail)
+						assert.Equals(t, acmeErr.Type, tc.acmeErr.Type)
+						assert.Equals(t, acmeErr.Detail, tc.acmeErr.Detail)
+						assert.Equals(t, acmeErr.Status, tc.acmeErr.Status)
+						assert.Equals(t, acmeErr.Err.Error(), tc.acmeErr.Err.Error())
+						assert.Equals(t, acmeErr.Detail, tc.acmeErr.Detail)
 					}
-				default:
+				} else {
 					if assert.NotNil(t, tc.err) {
 						assert.HasPrefix(t, err.Error(), tc.err.Error())
 					}
@@ -254,7 +254,7 @@ func TestDB_GetAuthorization(t *testing.T) {
 				Token:        "token",
 				CreatedAt:    now,
 				ExpiresAt:    now.Add(5 * time.Minute),
-				Error:        acme.NewErrorISE("force"),
+				Error:        acme.NewErrorISE("The server experienced an internal error"),
 				ChallengeIDs: []string{"foo", "bar"},
 				Wildcard:     true,
 			}
@@ -295,16 +295,16 @@ func TestDB_GetAuthorization(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			d := DB{db: tc.db}
 			if az, err := d.GetAuthorization(context.Background(), azID); err != nil {
-				switch k := err.(type) {
-				case *acme.Error:
+				var acmeErr *acme.Error
+				if errors.As(err, &acmeErr) {
 					if assert.NotNil(t, tc.acmeErr) {
-						assert.Equals(t, k.Type, tc.acmeErr.Type)
-						assert.Equals(t, k.Detail, tc.acmeErr.Detail)
-						assert.Equals(t, k.Status, tc.acmeErr.Status)
-						assert.Equals(t, k.Err.Error(), tc.acmeErr.Err.Error())
-						assert.Equals(t, k.Detail, tc.acmeErr.Detail)
+						assert.Equals(t, acmeErr.Type, tc.acmeErr.Type)
+						assert.Equals(t, acmeErr.Detail, tc.acmeErr.Detail)
+						assert.Equals(t, acmeErr.Status, tc.acmeErr.Status)
+						assert.Equals(t, acmeErr.Err.Error(), tc.acmeErr.Err.Error())
+						assert.Equals(t, acmeErr.Detail, tc.acmeErr.Detail)
 					}
-				default:
+				} else {
 					if assert.NotNil(t, tc.err) {
 						assert.HasPrefix(t, err.Error(), tc.err.Error())
 					}
@@ -532,7 +532,7 @@ func TestDB_UpdateAuthorization(t *testing.T) {
 						assert.Equals(t, dbNew.Wildcard, dbaz.Wildcard)
 						assert.Equals(t, dbNew.CreatedAt, dbaz.CreatedAt)
 						assert.Equals(t, dbNew.ExpiresAt, dbaz.ExpiresAt)
-						assert.Equals(t, dbNew.Error.Error(), acme.NewError(acme.ErrorMalformedType, "malformed").Error())
+						assert.Equals(t, dbNew.Error.Error(), acme.NewError(acme.ErrorMalformedType, "The request message was malformed").Error())
 						return nil, false, errors.New("force")
 					},
 				},
@@ -582,7 +582,7 @@ func TestDB_UpdateAuthorization(t *testing.T) {
 						assert.Equals(t, dbNew.Wildcard, dbaz.Wildcard)
 						assert.Equals(t, dbNew.CreatedAt, dbaz.CreatedAt)
 						assert.Equals(t, dbNew.ExpiresAt, dbaz.ExpiresAt)
-						assert.Equals(t, dbNew.Error.Error(), acme.NewError(acme.ErrorMalformedType, "malformed").Error())
+						assert.Equals(t, dbNew.Error.Error(), acme.NewError(acme.ErrorMalformedType, "The request message was malformed").Error())
 						return nu, true, nil
 					},
 				},
@@ -745,16 +745,16 @@ func TestDB_GetAuthorizationsByAccountID(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			d := DB{db: tc.db}
 			if azs, err := d.GetAuthorizationsByAccountID(context.Background(), accountID); err != nil {
-				switch k := err.(type) {
-				case *acme.Error:
+				var acmeErr *acme.Error
+				if errors.As(err, &acmeErr) {
 					if assert.NotNil(t, tc.acmeErr) {
-						assert.Equals(t, k.Type, tc.acmeErr.Type)
-						assert.Equals(t, k.Detail, tc.acmeErr.Detail)
-						assert.Equals(t, k.Status, tc.acmeErr.Status)
-						assert.Equals(t, k.Err.Error(), tc.acmeErr.Err.Error())
-						assert.Equals(t, k.Detail, tc.acmeErr.Detail)
+						assert.Equals(t, acmeErr.Type, tc.acmeErr.Type)
+						assert.Equals(t, acmeErr.Detail, tc.acmeErr.Detail)
+						assert.Equals(t, acmeErr.Status, tc.acmeErr.Status)
+						assert.Equals(t, acmeErr.Err.Error(), tc.acmeErr.Err.Error())
+						assert.Equals(t, acmeErr.Detail, tc.acmeErr.Detail)
 					}
-				default:
+				} else {
 					if assert.NotNil(t, tc.err) {
 						assert.HasPrefix(t, err.Error(), tc.err.Error())
 					}

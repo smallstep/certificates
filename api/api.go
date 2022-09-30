@@ -3,7 +3,7 @@ package api
 import (
 	"context"
 	"crypto"
-	"crypto/dsa" //nolint
+	"crypto/dsa" //nolint:staticcheck // support legacy algorithms
 	"crypto/ecdsa"
 	"crypto/ed25519"
 	"crypto/rsa"

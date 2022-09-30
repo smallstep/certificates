@@ -17,6 +17,8 @@ const (
 	ErrorAccountDoesNotExistType ProblemType = iota
 	// ErrorAlreadyRevokedType request specified a certificate to be revoked that has already been revoked
 	ErrorAlreadyRevokedType
+	// ErrorBadAttestationStatementType WebAuthn attestation statement could not be verified
+	ErrorBadAttestationStatementType
 	// ErrorBadCSRType CSR is unacceptable (e.g., due to a short key)
 	ErrorBadCSRType
 	// ErrorBadNonceType client sent an unacceptable anti-replay nonce
@@ -172,6 +174,11 @@ var (
 			details: "The JWS was signed with an algorithm the server does not support",
 			status:  400,
 		},
+		ErrorBadAttestationStatementType: {
+			typ:     officialACMEPrefix + ErrorBadAttestationStatementType.String(),
+			details: "Attestation statement cannot be verified",
+			status:  400,
+		},
 		ErrorCaaType: {
 			typ:     officialACMEPrefix + ErrorCaaType.String(),
 			details: "Certification Authority Authorization (CAA) records forbid the CA from issuing a certificate",
@@ -303,10 +310,11 @@ func NewErrorISE(msg string, args ...interface{}) *Error {
 
 // WrapError attempts to wrap the internal error.
 func WrapError(typ ProblemType, err error, msg string, args ...interface{}) *Error {
-	switch e := err.(type) {
-	case nil:
+	var e *Error
+	switch {
+	case err == nil:
 		return nil
-	case *Error:
+	case errors.As(err, &e):
 		if e.Err == nil {
 			e.Err = errors.Errorf(msg+"; "+e.Detail, args...)
 		} else {
@@ -328,9 +336,12 @@ func (e *Error) StatusCode() int {
 	return e.Status
 }
 
-// Error allows AError to implement the error interface.
+// Error implements the error interface.
 func (e *Error) Error() string {
-	return e.Detail
+	if e.Err == nil {
+		return e.Detail
+	}
+	return e.Err.Error()
 }
 
 // Cause returns the internal error and implements the Causer interface.

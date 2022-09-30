@@ -185,11 +185,11 @@ func TestAuthority_checkPolicy(t *testing.T) {
 			} else {
 				assert.IsType(t, &PolicyError{}, err)
 
-				pe, ok := err.(*PolicyError)
-				assert.True(t, ok)
-
-				assert.Equal(t, tc.err.Typ, pe.Typ)
-				assert.Equal(t, tc.err.Error(), pe.Error())
+				var pe *PolicyError
+				if assert.True(t, errors.As(err, &pe)) {
+					assert.Equal(t, tc.err.Typ, pe.Typ)
+					assert.Equal(t, tc.err.Error(), pe.Error())
+				}
 			}
 		})
 	}
@@ -1179,10 +1179,11 @@ func TestAuthority_RemoveAuthorityPolicy(t *testing.T) {
 			}
 			err := a.RemoveAuthorityPolicy(tt.args.ctx)
 			if err != nil {
-				pe, ok := err.(*PolicyError)
-				assert.True(t, ok)
-				assert.Equal(t, tt.wantErr.Typ, pe.Typ)
-				assert.Equal(t, tt.wantErr.Err.Error(), pe.Err.Error())
+				var pe *PolicyError
+				if assert.True(t, errors.As(err, &pe)) {
+					assert.Equal(t, tt.wantErr.Typ, pe.Typ)
+					assert.Equal(t, tt.wantErr.Err.Error(), pe.Err.Error())
+				}
 				return
 			}
 		})
@@ -1250,10 +1251,11 @@ func TestAuthority_GetAuthorityPolicy(t *testing.T) {
 			}
 			got, err := a.GetAuthorityPolicy(tt.args.ctx)
 			if err != nil {
-				pe, ok := err.(*PolicyError)
-				assert.True(t, ok)
-				assert.Equal(t, tt.wantErr.Typ, pe.Typ)
-				assert.Equal(t, tt.wantErr.Err.Error(), pe.Err.Error())
+				var pe *PolicyError
+				if assert.True(t, errors.As(err, &pe)) {
+					assert.Equal(t, tt.wantErr.Typ, pe.Typ)
+					assert.Equal(t, tt.wantErr.Err.Error(), pe.Err.Error())
+				}
 				return
 			}
 			if !reflect.DeepEqual(got, tt.want) {
@@ -1429,10 +1431,11 @@ func TestAuthority_CreateAuthorityPolicy(t *testing.T) {
 			}
 			got, err := a.CreateAuthorityPolicy(tt.args.ctx, tt.args.adm, tt.args.p)
 			if err != nil {
-				pe, ok := err.(*PolicyError)
-				assert.True(t, ok)
-				assert.Equal(t, tt.wantErr.Typ, pe.Typ)
-				assert.Equal(t, tt.wantErr.Err.Error(), pe.Err.Error())
+				var pe *PolicyError
+				if assert.True(t, errors.As(err, &pe)) {
+					assert.Equal(t, tt.wantErr.Typ, pe.Typ)
+					assert.Equal(t, tt.wantErr.Err.Error(), pe.Err.Error())
+				}
 				return
 			}
 			if !reflect.DeepEqual(got, tt.want) {
@@ -1611,10 +1614,11 @@ func TestAuthority_UpdateAuthorityPolicy(t *testing.T) {
 			}
 			got, err := a.UpdateAuthorityPolicy(tt.args.ctx, tt.args.adm, tt.args.p)
 			if err != nil {
-				pe, ok := err.(*PolicyError)
-				assert.True(t, ok)
-				assert.Equal(t, tt.wantErr.Typ, pe.Typ)
-				assert.Equal(t, tt.wantErr.Err.Error(), pe.Err.Error())
+				var pe *PolicyError
+				if assert.True(t, errors.As(err, &pe)) {
+					assert.Equal(t, tt.wantErr.Typ, pe.Typ)
+					assert.Equal(t, tt.wantErr.Err.Error(), pe.Err.Error())
+				}
 				return
 			}
 			if !reflect.DeepEqual(got, tt.want) {
