@@ -8,9 +8,6 @@ on:
     - "master"
   pull_request:
   workflow_call:
-    secrets:
-      GITLEAKS_LICENSE_KEY:
-        required: true
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
@@ -23,5 +20,4 @@ jobs:
       os-dependencies: "libpcsclite-dev"
       run-gitleaks: true
       run-codeql: true
-    secrets:
-      GITLEAKS_LICENSE_KEY: ${{ secrets.GITLEAKS_LICENSE_KEY }}
+    secrets: inherit
