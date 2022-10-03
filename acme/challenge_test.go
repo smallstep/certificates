@@ -170,7 +170,6 @@ func Test_storeError(t *testing.T) {
 						assert.Equals(t, updch.Token, ch.Token)
 						assert.Equals(t, updch.Value, ch.Value)
 						assert.Equals(t, updch.Status, StatusInvalid)
-						assert.True(t, updch.ValidatedAt != "")
 
 						assert.HasPrefix(t, updch.Error.Err.Error(), err.Err.Error())
 						assert.Equals(t, updch.Error.Type, err.Type)
