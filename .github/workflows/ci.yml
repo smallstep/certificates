@@ -9,7 +9,7 @@ on:
   pull_request:
   workflow_call:
     secrets:
-      GITLEAKS_LICENSE_KEY:
+      CODECOV_TOKEN:
         required: true
 
 concurrency:
@@ -23,5 +23,4 @@ jobs:
       os-dependencies: "libpcsclite-dev"
       run-gitleaks: true
       run-codeql: true
-    secrets:
-      GITLEAKS_LICENSE_KEY: ${{ secrets.GITLEAKS_LICENSE_KEY }}
+    secrets: inherit
