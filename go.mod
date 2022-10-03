@@ -25,7 +25,7 @@ require (
 	github.com/googleapis/gax-go/v2 v2.5.1
 	github.com/hashicorp/vault/api v1.8.0
 	github.com/hashicorp/vault/api/auth/approle v0.3.0
-	github.com/hashicorp/vault/api/auth/kubernetes v0.1.0
+	github.com/hashicorp/vault/api/auth/kubernetes v0.3.0
 	github.com/jhump/protoreflect v1.9.0 // indirect
 	github.com/kr/pretty v0.3.0 // indirect
 	github.com/mattn/go-colorable v0.1.8 // indirect
