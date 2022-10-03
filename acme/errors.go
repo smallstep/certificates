@@ -75,6 +75,8 @@ func (ap ProblemType) String() string {
 		return "accountDoesNotExist"
 	case ErrorAlreadyRevokedType:
 		return "alreadyRevoked"
+	case ErrorBadAttestationStatementType:
+		return "badAttestationStatement"
 	case ErrorBadCSRType:
 		return "badCSR"
 	case ErrorBadNonceType:
