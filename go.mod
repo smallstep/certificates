@@ -33,7 +33,7 @@ require (
 	github.com/micromdm/scep/v2 v2.1.0
 	github.com/newrelic/go-agent/v3 v3.18.0
 	github.com/pkg/errors v0.9.1
-	github.com/rs/xid v1.2.1
+	github.com/rs/xid v1.4.0
 	github.com/sirupsen/logrus v1.8.1
 	github.com/slackhq/nebula v1.6.1
 	github.com/smallstep/assert v0.0.0-20200723003110-82e2b9b3b262
