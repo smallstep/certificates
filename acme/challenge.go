@@ -729,6 +729,7 @@ func storeError(ctx context.Context, db DB, ch *Challenge, markInvalid bool, err
 	ch.Error = err
 	if markInvalid {
 		ch.Status = StatusInvalid
+		ch.ValidatedAt = clock.Now().Format(time.RFC3339)
 	}
 	if err := db.UpdateChallenge(ctx, ch); err != nil {
 		return WrapErrorISE(err, "failure saving error to acme challenge")
