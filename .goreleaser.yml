@@ -26,49 +26,7 @@ builds:
     flags:
       - -trimpath
     main: ./cmd/step-ca/main.go
-    binary: bin/step-ca
-    ldflags:
-      - -w -X main.Version={{.Version}} -X main.BuildTime={{.Date}}
-  -
-    id: step-cloudkms-init
-    env:
-      - CGO_ENABLED=0
-    targets:
-      - darwin_amd64
-      - darwin_arm64
-      - freebsd_amd64
-      - linux_386
-      - linux_amd64
-      - linux_arm64
-      - linux_arm_5
-      - linux_arm_6
-      - linux_arm_7
-      - windows_amd64
-    flags:
-      - -trimpath
-    main: ./cmd/step-cloudkms-init/main.go
-    binary: bin/step-cloudkms-init
-    ldflags:
-      - -w -X main.Version={{.Version}} -X main.BuildTime={{.Date}}
-  -
-    id: step-awskms-init
-    env:
-      - CGO_ENABLED=0
-    targets:
-      - darwin_amd64
-      - darwin_arm64
-      - freebsd_amd64
-      - linux_386
-      - linux_amd64
-      - linux_arm64
-      - linux_arm_5
-      - linux_arm_6
-      - linux_arm_7
-      - windows_amd64
-    flags:
-      - -trimpath
-    main: ./cmd/step-awskms-init/main.go
-    binary: bin/step-awskms-init
+    binary: step-ca
     ldflags:
       - -w -X main.Version={{.Version}} -X main.BuildTime={{.Date}}
 
@@ -85,6 +43,38 @@ archives:
     files:
       - README.md
       - LICENSE
+    allow_different_binary_count: true
+
+nfpms:
+  # Configure nFPM for .deb and .rpm releases
+  #
+  # See https://nfpm.goreleaser.com/configuration/
+  # and https://goreleaser.com/customization/nfpm/
+  #
+  # Useful tools for debugging .debs:
+  # List file contents: dpkg -c dist/step_...deb
+  # Package metadata: dpkg --info dist/step_....deb
+  #
+  -
+    builds:
+      - step-ca
+    package_name: step-ca
+    file_name_template: "{{ .PackageName }}_{{ .Version }}_{{ .Arch }}{{ if .Arm }}v{{ .Arm }}{{ end }}{{ if .Mips }}_{{ .Mips }}{{ end }}"
+    vendor: Smallstep Labs
+    homepage: https://github.com/smallstep/certificates
+    maintainer: Smallstep <techadmin@smallstep.com>
+    description: >
+      step-ca is an online certificate authority for secure, automated certificate management.
+    license: Apache 2.0
+    section: utils
+    formats:
+      - deb
+      - rpm
+    priority: optional
+    bindir: /usr/bin
+    contents:
+      - src: debian/copyright
+        dst: /usr/share/doc/step-ca/copyright
 
 source:
   enabled: true
@@ -98,7 +88,7 @@ checksum:
 signs:
 - cmd: cosign
   stdin: '{{ .Env.COSIGN_PWD }}'
-  args: ["sign-blob", "-key=/tmp/cosign.key", "-output=${signature}", "${artifact}"]
+  args: ["sign-blob", "-key=/tmp/cosign.key", "-output-signature=${signature}", "${artifact}"]
   artifacts: all
 
 snapshot:
@@ -140,7 +130,7 @@ release:
     #### Linux
 
     - 📦 [step-ca_linux_{{ .Version }}_amd64.tar.gz](https://dl.step.sm/gh-release/certificates/gh-release-header/{{ .Tag }}/step-ca_linux_{{ .Version }}_amd64.tar.gz)
-    - 📦 [step-ca_{{ .Env.DEB_VERSION }}_amd64.deb](https://dl.step.sm/gh-release/certificates/gh-release-header/{{ .Tag }}/step-ca_{{ .Env.DEB_VERSION }}_amd64.deb)
+    - 📦 [step-ca_{{ .Version }}_amd64.deb](https://dl.step.sm/gh-release/certificates/gh-release-header/{{ .Tag }}/step-ca_{{ .Version }}_amd64.deb)
 
     #### OSX Darwin
 
@@ -194,39 +184,3 @@ release:
   #  - glob: ./path/to/file.txt
   #  - glob: ./glob/**/to/**/file/**/*
   #  - glob: ./glob/foo/to/bar/file/foobar/override_from_previous
-
-scoop:
-  # Template for the url which is determined by the given Token (github or gitlab)
-  # Default for github is "https://github.com/<repo_owner>/<repo_name>/releases/download/{{ .Tag }}/{{ .ArtifactName }}"
-  # Default for gitlab is "https://gitlab.com/<repo_owner>/<repo_name>/uploads/{{ .ArtifactUploadHash }}/{{ .ArtifactName }}"
-  # Default for gitea is "https://gitea.com/<repo_owner>/<repo_name>/releases/download/{{ .Tag }}/{{ .ArtifactName }}"
-  url_template: "http://github.com/smallstep/certificates/releases/download/{{ .Tag }}/{{ .ArtifactName }}"
-
-  # Repository to push the app manifest to.
-  bucket:
-    owner: smallstep
-    name: scoop-bucket
-
-  # Git author used to commit to the repository.
-  # Defaults are shown.
-  commit_author:
-    name: goreleaserbot
-    email: goreleaser@smallstep.com
-
-  # The project name and current git tag are used in the format string.
-  commit_msg_template: "Scoop update for {{ .ProjectName }} version {{ .Tag }}"
-
-  # Your app's homepage.
-  # Default is empty.
-  homepage: "https://smallstep.com/docs/step-ca"
-
-  # Skip uploads for prerelease.
-  skip_upload: auto
-
-  # Your app's description.
-  # Default is empty.
-  description: "A private certificate authority (X.509 & SSH) & ACME server for secure automated certificate management, so you can use TLS everywhere & SSO for SSH."
-
-  # Your app's license
-  # Default is empty.
-  license: "Apache-2.0"
