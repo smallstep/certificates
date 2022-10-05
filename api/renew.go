@@ -17,7 +17,6 @@ const (
 // Renew uses the information of certificate in the TLS connection to create a
 // new one.
 func Renew(w http.ResponseWriter, r *http.Request) {
-	//nolint:contextcheck // the reqest has the context
 	cert, err := getPeerCertificate(r)
 	if err != nil {
 		render.Error(w, err)
