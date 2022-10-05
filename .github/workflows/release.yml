@@ -67,7 +67,7 @@ jobs:
           version: 'latest'
           args: release --rm-dist
         env:
-          GITHUB_TOKEN: ${{ secrets.PAT }}
+          GITHUB_TOKEN: ${{ secrets.GORELEASER_PAT }}
           COSIGN_PWD: ${{ secrets.COSIGN_PWD }}
           RELEASE_DATE: ${{ steps.release_date.outputs.RELEASE_DATE }}
 
