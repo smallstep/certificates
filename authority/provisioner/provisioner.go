@@ -5,6 +5,7 @@ import (
 	"crypto/x509"
 	"encoding/json"
 	stderrors "errors"
+	"net/http"
 	"net/url"
 	"strings"
 
@@ -222,6 +223,8 @@ type Config struct {
 	// AuthorizeSSHRenewFunc is a function that returns nil if a given SSH
 	// certificate can be renewed.
 	AuthorizeSSHRenewFunc AuthorizeSSHRenewFunc
+	// WebhookClient is an http client to use in webhook request
+	WebhookClient *http.Client
 }
 
 type provisioner struct {

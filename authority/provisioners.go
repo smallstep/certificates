@@ -144,6 +144,7 @@ func (a *Authority) generateProvisionerConfig(ctx context.Context) (provisioner.
 		GetIdentityFunc:       a.getIdentityFunc,
 		AuthorizeRenewFunc:    a.authorizeRenewFunc,
 		AuthorizeSSHRenewFunc: a.authorizeSSHRenewFunc,
+		WebhookClient:         a.webhookClient,
 	}, nil
 }
 
@@ -493,7 +494,61 @@ func optionsToCertificates(p *linkedca.Provisioner) *provisioner.Options {
 			}
 		}
 	}
+	for _, wh := range p.Webhooks {
+		whCert := webhookToCertificates(wh)
+		ops.Webhooks = append(ops.Webhooks, whCert)
+	}
 	return ops
+}
+
+func webhookToCertificates(wh *linkedca.Webhook) *provisioner.Webhook {
+	pwh := &provisioner.Webhook{
+		ID:                   wh.Id,
+		Name:                 wh.Name,
+		URL:                  wh.Url,
+		Kind:                 wh.Kind.String(),
+		Secret:               wh.Secret,
+		DisableTLSClientAuth: wh.DisableTlsClientAuth,
+		CertType:             wh.CertType.String(),
+	}
+
+	switch a := wh.GetAuth().(type) {
+	case *linkedca.Webhook_BearerToken:
+		pwh.BearerToken = a.BearerToken.BearerToken
+	case *linkedca.Webhook_BasicAuth:
+		pwh.BasicAuth.Username = a.BasicAuth.Username
+		pwh.BasicAuth.Password = a.BasicAuth.Password
+	}
+
+	return pwh
+}
+
+func provisionerWebhookToLinkedca(pwh *provisioner.Webhook) *linkedca.Webhook {
+	lwh := &linkedca.Webhook{
+		Id:                   pwh.ID,
+		Name:                 pwh.Name,
+		Url:                  pwh.URL,
+		Kind:                 linkedca.Webhook_Kind(linkedca.Webhook_Kind_value[pwh.Kind]),
+		Secret:               pwh.Secret,
+		DisableTlsClientAuth: pwh.DisableTLSClientAuth,
+		CertType:             linkedca.Webhook_CertType(linkedca.Webhook_CertType_value[pwh.CertType]),
+	}
+	if pwh.BearerToken != "" {
+		lwh.Auth = &linkedca.Webhook_BearerToken{
+			BearerToken: &linkedca.BearerToken{
+				BearerToken: pwh.BearerToken,
+			},
+		}
+	} else if pwh.BasicAuth.Username != "" || pwh.BasicAuth.Password != "" {
+		lwh.Auth = &linkedca.Webhook_BasicAuth{
+			BasicAuth: &linkedca.BasicAuth{
+				Username: pwh.BasicAuth.Username,
+				Password: pwh.BasicAuth.Password,
+			},
+		}
+	}
+
+	return lwh
 }
 
 func durationsToCertificates(d *linkedca.Durations) (min, max, def *provisioner.Duration, err error) {
@@ -621,12 +676,12 @@ func claimsToLinkedca(c *provisioner.Claims) *linkedca.Claims {
 	return lc
 }
 
-func provisionerOptionsToLinkedca(p *provisioner.Options) (*linkedca.Template, *linkedca.Template, error) {
+func provisionerOptionsToLinkedca(p *provisioner.Options) (*linkedca.Template, *linkedca.Template, []*linkedca.Webhook, error) {
 	var err error
 	var x509Template, sshTemplate *linkedca.Template
 
 	if p == nil {
-		return nil, nil, nil
+		return nil, nil, nil, nil
 	}
 
 	if p.X509 != nil && p.X509.HasTemplate() {
@@ -640,7 +695,7 @@ func provisionerOptionsToLinkedca(p *provisioner.Options) (*linkedca.Template, *
 		} else if p.X509.TemplateFile != "" {
 			filename := step.Abs(p.X509.TemplateFile)
 			if x509Template.Template, err = os.ReadFile(filename); err != nil {
-				return nil, nil, errors.Wrap(err, "error reading x509 template")
+				return nil, nil, nil, errors.Wrap(err, "error reading x509 template")
 			}
 		}
 	}
@@ -656,12 +711,17 @@ func provisionerOptionsToLinkedca(p *provisioner.Options) (*linkedca.Template, *
 		} else if p.SSH.TemplateFile != "" {
 			filename := step.Abs(p.SSH.TemplateFile)
 			if sshTemplate.Template, err = os.ReadFile(filename); err != nil {
-				return nil, nil, errors.Wrap(err, "error reading ssh template")
+				return nil, nil, nil, errors.Wrap(err, "error reading ssh template")
 			}
 		}
 	}
 
-	return x509Template, sshTemplate, nil
+	var webhooks []*linkedca.Webhook
+	for _, pwh := range p.Webhooks {
+		webhooks = append(webhooks, provisionerWebhookToLinkedca(pwh))
+	}
+
+	return x509Template, sshTemplate, webhooks, nil
 }
 
 func provisionerPEMToLinkedca(b []byte) [][]byte {
@@ -672,6 +732,17 @@ func provisionerPEMToLinkedca(b []byte) [][]byte {
 			break
 		}
 		roots = append(roots, pem.EncodeToMemory(block))
+	}
+	return roots
+}
+
+func provisionerPEMToCertificates(bs [][]byte) []byte {
+	var roots []byte
+	for i, root := range bs {
+		if i > 0 && !bytes.HasSuffix(root, []byte{'\n'}) {
+			roots = append(roots, '\n')
+		}
+		roots = append(roots, root...)
 	}
 	return roots
 }
@@ -755,6 +826,7 @@ func ProvisionerToCertificates(p *linkedca.Provisioner) (provisioner.Interface, 
 			RequireEAB:         cfg.RequireEab,
 			Challenges:         challengesToCertificates(cfg.Challenges),
 			AttestationFormats: attestationFormatsToCertificates(cfg.AttestationFormats),
+			AttestationRoots:   provisionerPEMToCertificates(cfg.AttestationRoots),
 			Claims:             claims,
 			Options:            options,
 		}, nil
@@ -867,7 +939,7 @@ func ProvisionerToCertificates(p *linkedca.Provisioner) (provisioner.Interface, 
 func ProvisionerToLinkedca(p provisioner.Interface) (*linkedca.Provisioner, error) {
 	switch p := p.(type) {
 	case *provisioner.JWK:
-		x509Template, sshTemplate, err := provisionerOptionsToLinkedca(p.Options)
+		x509Template, sshTemplate, webhooks, err := provisionerOptionsToLinkedca(p.Options)
 		if err != nil {
 			return nil, err
 		}
@@ -890,9 +962,10 @@ func ProvisionerToLinkedca(p provisioner.Interface) (*linkedca.Provisioner, erro
 			Claims:       claimsToLinkedca(p.Claims),
 			X509Template: x509Template,
 			SshTemplate:  sshTemplate,
+			Webhooks:     webhooks,
 		}, nil
 	case *provisioner.OIDC:
-		x509Template, sshTemplate, err := provisionerOptionsToLinkedca(p.Options)
+		x509Template, sshTemplate, webhooks, err := provisionerOptionsToLinkedca(p.Options)
 		if err != nil {
 			return nil, err
 		}
@@ -917,9 +990,10 @@ func ProvisionerToLinkedca(p provisioner.Interface) (*linkedca.Provisioner, erro
 			Claims:       claimsToLinkedca(p.Claims),
 			X509Template: x509Template,
 			SshTemplate:  sshTemplate,
+			Webhooks:     webhooks,
 		}, nil
 	case *provisioner.GCP:
-		x509Template, sshTemplate, err := provisionerOptionsToLinkedca(p.Options)
+		x509Template, sshTemplate, webhooks, err := provisionerOptionsToLinkedca(p.Options)
 		if err != nil {
 			return nil, err
 		}
@@ -941,9 +1015,10 @@ func ProvisionerToLinkedca(p provisioner.Interface) (*linkedca.Provisioner, erro
 			Claims:       claimsToLinkedca(p.Claims),
 			X509Template: x509Template,
 			SshTemplate:  sshTemplate,
+			Webhooks:     webhooks,
 		}, nil
 	case *provisioner.AWS:
-		x509Template, sshTemplate, err := provisionerOptionsToLinkedca(p.Options)
+		x509Template, sshTemplate, webhooks, err := provisionerOptionsToLinkedca(p.Options)
 		if err != nil {
 			return nil, err
 		}
@@ -964,9 +1039,10 @@ func ProvisionerToLinkedca(p provisioner.Interface) (*linkedca.Provisioner, erro
 			Claims:       claimsToLinkedca(p.Claims),
 			X509Template: x509Template,
 			SshTemplate:  sshTemplate,
+			Webhooks:     webhooks,
 		}, nil
 	case *provisioner.Azure:
-		x509Template, sshTemplate, err := provisionerOptionsToLinkedca(p.Options)
+		x509Template, sshTemplate, webhooks, err := provisionerOptionsToLinkedca(p.Options)
 		if err != nil {
 			return nil, err
 		}
@@ -990,9 +1066,10 @@ func ProvisionerToLinkedca(p provisioner.Interface) (*linkedca.Provisioner, erro
 			Claims:       claimsToLinkedca(p.Claims),
 			X509Template: x509Template,
 			SshTemplate:  sshTemplate,
+			Webhooks:     webhooks,
 		}, nil
 	case *provisioner.ACME:
-		x509Template, sshTemplate, err := provisionerOptionsToLinkedca(p.Options)
+		x509Template, sshTemplate, webhooks, err := provisionerOptionsToLinkedca(p.Options)
 		if err != nil {
 			return nil, err
 		}
@@ -1006,15 +1083,17 @@ func ProvisionerToLinkedca(p provisioner.Interface) (*linkedca.Provisioner, erro
 						ForceCn:            p.ForceCN,
 						Challenges:         challengesToLinkedca(p.Challenges),
 						AttestationFormats: attestationFormatsToLinkedca(p.AttestationFormats),
+						AttestationRoots:   provisionerPEMToLinkedca(p.AttestationRoots),
 					},
 				},
 			},
 			Claims:       claimsToLinkedca(p.Claims),
 			X509Template: x509Template,
 			SshTemplate:  sshTemplate,
+			Webhooks:     webhooks,
 		}, nil
 	case *provisioner.X5C:
-		x509Template, sshTemplate, err := provisionerOptionsToLinkedca(p.Options)
+		x509Template, sshTemplate, webhooks, err := provisionerOptionsToLinkedca(p.Options)
 		if err != nil {
 			return nil, err
 		}
@@ -1032,9 +1111,10 @@ func ProvisionerToLinkedca(p provisioner.Interface) (*linkedca.Provisioner, erro
 			Claims:       claimsToLinkedca(p.Claims),
 			X509Template: x509Template,
 			SshTemplate:  sshTemplate,
+			Webhooks:     webhooks,
 		}, nil
 	case *provisioner.K8sSA:
-		x509Template, sshTemplate, err := provisionerOptionsToLinkedca(p.Options)
+		x509Template, sshTemplate, webhooks, err := provisionerOptionsToLinkedca(p.Options)
 		if err != nil {
 			return nil, err
 		}
@@ -1052,6 +1132,7 @@ func ProvisionerToLinkedca(p provisioner.Interface) (*linkedca.Provisioner, erro
 			Claims:       claimsToLinkedca(p.Claims),
 			X509Template: x509Template,
 			SshTemplate:  sshTemplate,
+			Webhooks:     webhooks,
 		}, nil
 	case *provisioner.SSHPOP:
 		return &linkedca.Provisioner{
@@ -1066,7 +1147,7 @@ func ProvisionerToLinkedca(p provisioner.Interface) (*linkedca.Provisioner, erro
 			Claims: claimsToLinkedca(p.Claims),
 		}, nil
 	case *provisioner.SCEP:
-		x509Template, sshTemplate, err := provisionerOptionsToLinkedca(p.Options)
+		x509Template, sshTemplate, webhooks, err := provisionerOptionsToLinkedca(p.Options)
 		if err != nil {
 			return nil, err
 		}
@@ -1089,9 +1170,10 @@ func ProvisionerToLinkedca(p provisioner.Interface) (*linkedca.Provisioner, erro
 			Claims:       claimsToLinkedca(p.Claims),
 			X509Template: x509Template,
 			SshTemplate:  sshTemplate,
+			Webhooks:     webhooks,
 		}, nil
 	case *provisioner.Nebula:
-		x509Template, sshTemplate, err := provisionerOptionsToLinkedca(p.Options)
+		x509Template, sshTemplate, webhooks, err := provisionerOptionsToLinkedca(p.Options)
 		if err != nil {
 			return nil, err
 		}
@@ -1109,6 +1191,7 @@ func ProvisionerToLinkedca(p provisioner.Interface) (*linkedca.Provisioner, erro
 			Claims:       claimsToLinkedca(p.Claims),
 			X509Template: x509Template,
 			SshTemplate:  sshTemplate,
+			Webhooks:     webhooks,
 		}, nil
 	default:
 		return nil, fmt.Errorf("provisioner %s not implemented", p.GetType())

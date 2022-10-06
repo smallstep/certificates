@@ -69,6 +69,8 @@ func signSSHCertificate(key crypto.PublicKey, opts SignSSHOptions, signOpts []Si
 			if err := o.Valid(opts); err != nil {
 				return nil, err
 			}
+		// call webhooks
+		case *WebhookController:
 		default:
 			return nil, fmt.Errorf("signSSH: invalid extra option type %T", o)
 		}

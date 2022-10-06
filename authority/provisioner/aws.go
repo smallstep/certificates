@@ -21,6 +21,7 @@ import (
 	"go.step.sm/crypto/jose"
 	"go.step.sm/crypto/sshutil"
 	"go.step.sm/crypto/x509util"
+	"go.step.sm/linkedca"
 
 	"github.com/smallstep/certificates/errs"
 )
@@ -484,6 +485,7 @@ func (p *AWS) AuthorizeSign(ctx context.Context, token string) ([]SignOption, er
 		commonNameValidator(payload.Claims.Subject),
 		newValidityValidator(p.ctl.Claimer.MinTLSCertDuration(), p.ctl.Claimer.MaxTLSCertDuration()),
 		newX509NamePolicyValidator(p.ctl.getPolicy().getX509()),
+		p.ctl.newWebhookController(data, linkedca.Webhook_X509),
 	), nil
 }
 
@@ -765,5 +767,7 @@ func (p *AWS) AuthorizeSSHSign(ctx context.Context, token string) ([]SignOption,
 		&sshCertDefaultValidator{},
 		// Ensure that all principal names are allowed
 		newSSHNamePolicyValidator(p.ctl.getPolicy().getSSHHost(), nil),
+		// Call webhooks
+		p.ctl.newWebhookController(data, linkedca.Webhook_SSH),
 	), nil
 }

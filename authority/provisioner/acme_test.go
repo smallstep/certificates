@@ -269,7 +269,7 @@ func TestACME_AuthorizeSign(t *testing.T) {
 				}
 			} else {
 				if assert.Nil(t, tc.err) && assert.NotNil(t, opts) {
-					assert.Equals(t, 7, len(opts)) // number of SignOptions returned
+					assert.Equals(t, 8, len(opts)) // number of SignOptions returned
 					for _, o := range opts {
 						switch v := o.(type) {
 						case *ACME:
@@ -288,6 +288,8 @@ func TestACME_AuthorizeSign(t *testing.T) {
 							assert.Equals(t, v.max, tc.p.ctl.Claimer.MaxTLSCertDuration())
 						case *x509NamePolicyValidator:
 							assert.Equals(t, nil, v.policyEngine)
+						case *WebhookController:
+							assert.Len(t, 0, v.webhooks)
 						default:
 							assert.FatalError(t, fmt.Errorf("unexpected sign option of type %T", v))
 						}

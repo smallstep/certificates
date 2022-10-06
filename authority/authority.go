@@ -8,6 +8,7 @@ import (
 	"crypto/x509"
 	"encoding/hex"
 	"log"
+	"net/http"
 	"strings"
 	"sync"
 	"time"
@@ -46,6 +47,7 @@ type Authority struct {
 	adminDB       admin.DB
 	templates     *templates.Templates
 	linkedCAToken string
+	webhookClient *http.Client
 
 	// X509 CA
 	password              []byte

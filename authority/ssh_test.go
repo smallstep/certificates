@@ -178,6 +178,17 @@ func TestAuthority_SignSSH(t *testing.T) {
 		}`},
 	}, sshutil.CreateTemplateData(sshutil.UserCert, "key-id", []string{"user"}))
 	assert.FatalError(t, err)
+	enrichTemplateData := sshutil.CreateTemplateData(sshutil.UserCert, "key-id", []string{"user"})
+	enrichTemplate, err := provisioner.TemplateSSHOptions(&provisioner.Options{
+		SSH: &provisioner.SSHOptions{Template: `{
+			"type": "{{ .Type }}",
+			"keyId": "{{ .KeyID }}",
+			"principals": {{ toJson .Webhooks.people.role }},
+			"extensions": {{ set .Extensions "login@github.com" .Insecure.User.username | toJson }},
+			"criticalOptions": {{ toJson .CriticalOptions }}
+		}`},
+	}, enrichTemplateData)
+	assert.FatalError(t, err)
 	userFailTemplate, err := provisioner.TemplateSSHOptions(&provisioner.Options{
 		SSH: &provisioner.SSHOptions{Template: `{{ fail "an error"}}`},
 	}, sshutil.CreateTemplateData(sshutil.UserCert, "key-id", []string{"user"}))
@@ -255,6 +266,7 @@ func TestAuthority_SignSSH(t *testing.T) {
 		{"ok-opts-validator", fields{signer, signer, nil}, args{pub, provisioner.SignSSHOptions{}, []provisioner.SignOption{userTemplate, userOptions, sshTestOptionsValidator("")}}, want{CertType: ssh.UserCert}, false},
 		{"ok-opts-modifier", fields{signer, signer, nil}, args{pub, provisioner.SignSSHOptions{}, []provisioner.SignOption{userTemplate, userOptions, sshTestOptionsModifier("")}}, want{CertType: ssh.UserCert}, false},
 		{"ok-custom-template", fields{signer, signer, nil}, args{pub, provisioner.SignSSHOptions{}, []provisioner.SignOption{userCustomTemplate, userOptions}}, want{CertType: ssh.UserCert, Principals: []string{"user", "admin"}}, false},
+		{"ok-enrich-template", fields{signer, signer, nil}, args{pub, provisioner.SignSSHOptions{}, []provisioner.SignOption{enrichTemplate, userOptions, &mockWebhookController{templateData: enrichTemplateData, respData: map[string]any{"people": map[string]any{"role": []string{"user", "eng"}}}}}}, want{CertType: ssh.UserCert, Principals: []string{"user", "eng"}}, false},
 		{"ok-user-policy", fields{signer, signer, userPolicy}, args{pub, provisioner.SignSSHOptions{CertType: "user", Principals: []string{"user"}}, []provisioner.SignOption{userTemplateWithUser}}, want{CertType: ssh.UserCert, Principals: []string{"user"}}, false},
 		{"ok-host-policy", fields{signer, signer, hostPolicy}, args{pub, provisioner.SignSSHOptions{CertType: "host", Principals: []string{"foo.test.com", "bar.test.com"}}, []provisioner.SignOption{hostTemplateWithHosts}}, want{CertType: ssh.HostCert, Principals: []string{"foo.test.com", "bar.test.com"}}, false},
 		{"fail-opts-type", fields{signer, signer, nil}, args{pub, provisioner.SignSSHOptions{CertType: "foo"}, []provisioner.SignOption{userTemplate}}, want{}, true},
@@ -275,6 +287,8 @@ func TestAuthority_SignSSH(t *testing.T) {
 		{"fail-host-policy", fields{signer, signer, hostPolicy}, args{pub, provisioner.SignSSHOptions{CertType: "host", Principals: []string{"example.com"}}, []provisioner.SignOption{hostTemplateWithExampleDotCom}}, want{}, true},
 		{"fail-host-policy-with-user-cert", fields{signer, signer, hostPolicy}, args{pub, provisioner.SignSSHOptions{CertType: "user", Principals: []string{"user"}}, []provisioner.SignOption{userTemplateWithUser}}, want{}, true},
 		{"fail-host-policy-with-bad-host", fields{signer, signer, hostPolicy}, args{pub, provisioner.SignSSHOptions{CertType: "host", Principals: []string{"example.com"}}, []provisioner.SignOption{badHostTemplate}}, want{}, true},
+		{"fail-enriching-webhooks", fields{signer, signer, nil}, args{pub, provisioner.SignSSHOptions{}, []provisioner.SignOption{userTemplate, userOptions, &mockWebhookController{enrichErr: provisioner.ErrWebhookDenied}}}, want{}, true},
+		{"fail-authorizing-webhooks", fields{signer, signer, nil}, args{pub, provisioner.SignSSHOptions{}, []provisioner.SignOption{userTemplate, userOptions, &mockWebhookController{authorizeErr: provisioner.ErrWebhookDenied}}}, want{}, true},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {

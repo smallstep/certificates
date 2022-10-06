@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"github.com/pkg/errors"
+	"go.step.sm/linkedca"
 )
 
 // SCEP is the SCEP provisioner type, an entity that can authorize the
@@ -128,6 +129,7 @@ func (s *SCEP) AuthorizeSign(ctx context.Context, token string) ([]SignOption, e
 		newPublicKeyMinimumLengthValidator(s.MinimumPublicKeyLength),
 		newValidityValidator(s.ctl.Claimer.MinTLSCertDuration(), s.ctl.Claimer.MaxTLSCertDuration()),
 		newX509NamePolicyValidator(s.ctl.getPolicy().getX509()),
+		s.ctl.newWebhookController(nil, linkedca.Webhook_X509),
 	}, nil
 }
 

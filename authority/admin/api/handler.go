@@ -4,41 +4,47 @@ import (
 	"context"
 	"net/http"
 
-	"github.com/smallstep/certificates/acme"
 	"github.com/smallstep/certificates/api"
 	"github.com/smallstep/certificates/authority"
-	"github.com/smallstep/certificates/authority/admin"
 )
-
-// Handler is the Admin API request handler.
-type Handler struct {
-	acmeResponder   ACMEAdminResponder
-	policyResponder PolicyAdminResponder
-}
-
-// Route traffic and implement the Router interface.
-//
-// Deprecated: use Route(r api.Router, acmeResponder ACMEAdminResponder, policyResponder PolicyAdminResponder)
-func (h *Handler) Route(r api.Router) {
-	Route(r, h.acmeResponder, h.policyResponder)
-}
-
-// NewHandler returns a new Authority Config Handler.
-//
-// Deprecated: use Route(r api.Router, acmeResponder ACMEAdminResponder, policyResponder PolicyAdminResponder)
-func NewHandler(auth adminAuthority, adminDB admin.DB, acmeDB acme.DB, acmeResponder ACMEAdminResponder, policyResponder PolicyAdminResponder) api.RouterHandler {
-	return &Handler{
-		acmeResponder:   acmeResponder,
-		policyResponder: policyResponder,
-	}
-}
 
 var mustAuthority = func(ctx context.Context) adminAuthority {
 	return authority.MustFromContext(ctx)
 }
 
+type router struct {
+	acmeResponder    ACMEAdminResponder
+	policyResponder  PolicyAdminResponder
+	webhookResponder WebhookAdminResponder
+}
+
+type RouterOption func(*router)
+
+func WithACMEResponder(acmeResponder ACMEAdminResponder) RouterOption {
+	return func(r *router) {
+		r.acmeResponder = acmeResponder
+	}
+}
+
+func WithPolicyResponder(policyResponder PolicyAdminResponder) RouterOption {
+	return func(r *router) {
+		r.policyResponder = policyResponder
+	}
+}
+
+func WithWebhookResponder(webhookResponder WebhookAdminResponder) RouterOption {
+	return func(r *router) {
+		r.webhookResponder = webhookResponder
+	}
+}
+
 // Route traffic and implement the Router interface.
-func Route(r api.Router, acmeResponder ACMEAdminResponder, policyResponder PolicyAdminResponder) {
+func Route(r api.Router, options ...RouterOption) {
+	router := &router{}
+	for _, fn := range options {
+		fn(router)
+	}
+
 	authnz := func(next http.HandlerFunc) http.HandlerFunc {
 		return extractAuthorizeTokenAdmin(requireAPIEnabled(next))
 	}
@@ -67,6 +73,10 @@ func Route(r api.Router, acmeResponder ACMEAdminResponder, policyResponder Polic
 		return authnz(disabledInStandalone(loadProvisionerByName(requireEABEnabled(loadExternalAccountKey(next)))))
 	}
 
+	webhookMiddleware := func(next http.HandlerFunc) http.HandlerFunc {
+		return authnz(loadProvisionerByName(next))
+	}
+
 	// Provisioners
 	r.MethodFunc("GET", "/provisioners/{name}", authnz(GetProvisioner))
 	r.MethodFunc("GET", "/provisioners", authnz(GetProvisioners))
@@ -82,36 +92,42 @@ func Route(r api.Router, acmeResponder ACMEAdminResponder, policyResponder Polic
 	r.MethodFunc("DELETE", "/admins/{id}", authnz(DeleteAdmin))
 
 	// ACME responder
-	if acmeResponder != nil {
+	if router.acmeResponder != nil {
 		// ACME External Account Binding Keys
-		r.MethodFunc("GET", "/acme/eab/{provisionerName}/{reference}", acmeEABMiddleware(acmeResponder.GetExternalAccountKeys))
-		r.MethodFunc("GET", "/acme/eab/{provisionerName}", acmeEABMiddleware(acmeResponder.GetExternalAccountKeys))
-		r.MethodFunc("POST", "/acme/eab/{provisionerName}", acmeEABMiddleware(acmeResponder.CreateExternalAccountKey))
-		r.MethodFunc("DELETE", "/acme/eab/{provisionerName}/{id}", acmeEABMiddleware(acmeResponder.DeleteExternalAccountKey))
+		r.MethodFunc("GET", "/acme/eab/{provisionerName}/{reference}", acmeEABMiddleware(router.acmeResponder.GetExternalAccountKeys))
+		r.MethodFunc("GET", "/acme/eab/{provisionerName}", acmeEABMiddleware(router.acmeResponder.GetExternalAccountKeys))
+		r.MethodFunc("POST", "/acme/eab/{provisionerName}", acmeEABMiddleware(router.acmeResponder.CreateExternalAccountKey))
+		r.MethodFunc("DELETE", "/acme/eab/{provisionerName}/{id}", acmeEABMiddleware(router.acmeResponder.DeleteExternalAccountKey))
 	}
 
 	// Policy responder
-	if policyResponder != nil {
+	if router.policyResponder != nil {
 		// Policy - Authority
-		r.MethodFunc("GET", "/policy", authorityPolicyMiddleware(policyResponder.GetAuthorityPolicy))
-		r.MethodFunc("POST", "/policy", authorityPolicyMiddleware(policyResponder.CreateAuthorityPolicy))
-		r.MethodFunc("PUT", "/policy", authorityPolicyMiddleware(policyResponder.UpdateAuthorityPolicy))
-		r.MethodFunc("DELETE", "/policy", authorityPolicyMiddleware(policyResponder.DeleteAuthorityPolicy))
+		r.MethodFunc("GET", "/policy", authorityPolicyMiddleware(router.policyResponder.GetAuthorityPolicy))
+		r.MethodFunc("POST", "/policy", authorityPolicyMiddleware(router.policyResponder.CreateAuthorityPolicy))
+		r.MethodFunc("PUT", "/policy", authorityPolicyMiddleware(router.policyResponder.UpdateAuthorityPolicy))
+		r.MethodFunc("DELETE", "/policy", authorityPolicyMiddleware(router.policyResponder.DeleteAuthorityPolicy))
 
 		// Policy - Provisioner
-		r.MethodFunc("GET", "/provisioners/{provisionerName}/policy", provisionerPolicyMiddleware(policyResponder.GetProvisionerPolicy))
-		r.MethodFunc("POST", "/provisioners/{provisionerName}/policy", provisionerPolicyMiddleware(policyResponder.CreateProvisionerPolicy))
-		r.MethodFunc("PUT", "/provisioners/{provisionerName}/policy", provisionerPolicyMiddleware(policyResponder.UpdateProvisionerPolicy))
-		r.MethodFunc("DELETE", "/provisioners/{provisionerName}/policy", provisionerPolicyMiddleware(policyResponder.DeleteProvisionerPolicy))
+		r.MethodFunc("GET", "/provisioners/{provisionerName}/policy", provisionerPolicyMiddleware(router.policyResponder.GetProvisionerPolicy))
+		r.MethodFunc("POST", "/provisioners/{provisionerName}/policy", provisionerPolicyMiddleware(router.policyResponder.CreateProvisionerPolicy))
+		r.MethodFunc("PUT", "/provisioners/{provisionerName}/policy", provisionerPolicyMiddleware(router.policyResponder.UpdateProvisionerPolicy))
+		r.MethodFunc("DELETE", "/provisioners/{provisionerName}/policy", provisionerPolicyMiddleware(router.policyResponder.DeleteProvisionerPolicy))
 
 		// Policy - ACME Account
-		r.MethodFunc("GET", "/acme/policy/{provisionerName}/reference/{reference}", acmePolicyMiddleware(policyResponder.GetACMEAccountPolicy))
-		r.MethodFunc("GET", "/acme/policy/{provisionerName}/key/{keyID}", acmePolicyMiddleware(policyResponder.GetACMEAccountPolicy))
-		r.MethodFunc("POST", "/acme/policy/{provisionerName}/reference/{reference}", acmePolicyMiddleware(policyResponder.CreateACMEAccountPolicy))
-		r.MethodFunc("POST", "/acme/policy/{provisionerName}/key/{keyID}", acmePolicyMiddleware(policyResponder.CreateACMEAccountPolicy))
-		r.MethodFunc("PUT", "/acme/policy/{provisionerName}/reference/{reference}", acmePolicyMiddleware(policyResponder.UpdateACMEAccountPolicy))
-		r.MethodFunc("PUT", "/acme/policy/{provisionerName}/key/{keyID}", acmePolicyMiddleware(policyResponder.UpdateACMEAccountPolicy))
-		r.MethodFunc("DELETE", "/acme/policy/{provisionerName}/reference/{reference}", acmePolicyMiddleware(policyResponder.DeleteACMEAccountPolicy))
-		r.MethodFunc("DELETE", "/acme/policy/{provisionerName}/key/{keyID}", acmePolicyMiddleware(policyResponder.DeleteACMEAccountPolicy))
+		r.MethodFunc("GET", "/acme/policy/{provisionerName}/reference/{reference}", acmePolicyMiddleware(router.policyResponder.GetACMEAccountPolicy))
+		r.MethodFunc("GET", "/acme/policy/{provisionerName}/key/{keyID}", acmePolicyMiddleware(router.policyResponder.GetACMEAccountPolicy))
+		r.MethodFunc("POST", "/acme/policy/{provisionerName}/reference/{reference}", acmePolicyMiddleware(router.policyResponder.CreateACMEAccountPolicy))
+		r.MethodFunc("POST", "/acme/policy/{provisionerName}/key/{keyID}", acmePolicyMiddleware(router.policyResponder.CreateACMEAccountPolicy))
+		r.MethodFunc("PUT", "/acme/policy/{provisionerName}/reference/{reference}", acmePolicyMiddleware(router.policyResponder.UpdateACMEAccountPolicy))
+		r.MethodFunc("PUT", "/acme/policy/{provisionerName}/key/{keyID}", acmePolicyMiddleware(router.policyResponder.UpdateACMEAccountPolicy))
+		r.MethodFunc("DELETE", "/acme/policy/{provisionerName}/reference/{reference}", acmePolicyMiddleware(router.policyResponder.DeleteACMEAccountPolicy))
+		r.MethodFunc("DELETE", "/acme/policy/{provisionerName}/key/{keyID}", acmePolicyMiddleware(router.policyResponder.DeleteACMEAccountPolicy))
+	}
+
+	if router.webhookResponder != nil {
+		r.MethodFunc("POST", "/provisioners/{provisionerName}/webhooks", webhookMiddleware(router.webhookResponder.CreateProvisionerWebhook))
+		r.MethodFunc("PUT", "/provisioners/{provisionerName}/webhooks/{webhookName}", webhookMiddleware(router.webhookResponder.UpdateProvisionerWebhook))
+		r.MethodFunc("DELETE", "/provisioners/{provisionerName}/webhooks/{webhookName}", webhookMiddleware(router.webhookResponder.DeleteProvisionerWebhook))
 	}
 }

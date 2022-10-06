@@ -297,7 +297,7 @@ func TestJWK_AuthorizeSign(t *testing.T) {
 				}
 			} else {
 				if assert.NotNil(t, got) {
-					assert.Equals(t, 9, len(got))
+					assert.Equals(t, 10, len(got))
 					for _, o := range got {
 						switch v := o.(type) {
 						case *JWK:
@@ -319,6 +319,7 @@ func TestJWK_AuthorizeSign(t *testing.T) {
 							assert.Equals(t, []string(v), tt.sans)
 						case *x509NamePolicyValidator:
 							assert.Equals(t, nil, v.policyEngine)
+						case *WebhookController:
 						default:
 							assert.FatalError(t, fmt.Errorf("unexpected sign option of type %T", v))
 						}

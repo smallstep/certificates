@@ -20,6 +20,7 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
 - Added support for ACME device-attest-01 challenge.
 - Added name constraints evaluation and enforcement when issuing or renewing
   X.509 certificates.
+- Added provisioner webhooks for augmenting template data and authorizing certificate requests before signing.
 
 ## [0.22.1] - 2022-08-31
 ### Fixed
