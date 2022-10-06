@@ -600,20 +600,59 @@ func (a *Authority) init() error {
 			return admin.WrapErrorISE(err, "error loading provisioners to initialize authority")
 		}
 		if len(provs) == 0 && !strings.EqualFold(a.config.AuthorityConfig.DeploymentType, "linked") {
-			// Create First Provisioner
-			prov, err := CreateFirstProvisioner(ctx, a.adminDB, string(a.password))
-			if err != nil {
-				return admin.WrapErrorISE(err, "error creating first provisioner")
+
+			var firstJWKProvisioner *linkedca.Provisioner
+			if len(a.config.AuthorityConfig.Provisioners) > 0 {
+				log.Printf("Starting migration of provisioners")
+				// Existing provisioners detected; try migrating them to DB storage
+				for _, p := range a.config.AuthorityConfig.Provisioners {
+					lp, err := ProvisionerToLinkedca(p)
+					if err != nil {
+						return admin.WrapErrorISE(err, "error transforming provisioner %q while migrating", p.GetName())
+					}
+
+					// Store the provisioner to be migrated
+					if err := a.adminDB.CreateProvisioner(ctx, lp); err != nil {
+						return admin.WrapErrorISE(err, "error creating provisioner %q while migrating", p.GetName())
+					}
+
+					// Mark the first JWK provisioner, so that it can be used for administration purposes
+					if firstJWKProvisioner == nil && lp.Type == linkedca.Provisioner_JWK {
+						firstJWKProvisioner = lp
+						log.Printf("Migrated JWK provisioner %q with admin permissions", p.GetName()) // TODO(hs): change the wording?
+					} else {
+						log.Printf("Migrated %s provisioner %q", p.GetType(), p.GetName())
+					}
+				}
+
+				// TODO(hs): try to update ca.json to remove migrated provisioners from the
+				// file? This may not always be possible though, so we shouldn't fail hard on
+				// every error. The next time the CA runs, it won't have perform the migration,
+				// because there'll be at least a JWK provisioner.
+
+				log.Printf("Finished migrating provisioners")
 			}
 
-			// Create first admin
+			// Create first JWK provisioner for remote administration purposes if none exists yet
+			if firstJWKProvisioner == nil {
+				firstJWKProvisioner, err = CreateFirstProvisioner(ctx, a.adminDB, string(a.password))
+				if err != nil {
+					return admin.WrapErrorISE(err, "error creating first provisioner")
+				}
+				log.Printf("Created JWK provisioner %q with admin permissions", firstJWKProvisioner.GetName()) // TODO(hs): change the wording?
+			}
+
+			// Create first super admin, belonging to the first JWK provisioner
+			firstSuperAdminSubject := "step"
 			if err := a.adminDB.CreateAdmin(ctx, &linkedca.Admin{
-				ProvisionerId: prov.Id,
-				Subject:       "step",
+				ProvisionerId: firstJWKProvisioner.Id,
+				Subject:       firstSuperAdminSubject,
 				Type:          linkedca.Admin_SUPER_ADMIN,
 			}); err != nil {
 				return admin.WrapErrorISE(err, "error creating first admin")
 			}
+
+			log.Printf("Created super admin %q for JWK provisioner %q", firstSuperAdminSubject, firstJWKProvisioner.GetName())
 		}
 	}
 
