@@ -155,6 +155,7 @@ type RevokedCertificateInfo struct {
 type CertificateRevocationListInfo struct {
 	Number    int64
 	ExpiresAt time.Time
+	Duration  time.Duration
 	DER       []byte
 }
 
@@ -471,32 +472,44 @@ func (db *DB) Shutdown() error {
 
 // MockAuthDB mocks the AuthDB interface. //
 type MockAuthDB struct {
-	Err                   error
-	Ret1                  interface{}
-	MIsRevoked            func(string) (bool, error)
-	MIsSSHRevoked         func(string) (bool, error)
-	MRevoke               func(rci *RevokedCertificateInfo) error
-	MRevokeSSH            func(rci *RevokedCertificateInfo) error
-	MGetCertificate       func(serialNumber string) (*x509.Certificate, error)
-	MGetCertificateData   func(serialNumber string) (*CertificateData, error)
-	MStoreCertificate     func(crt *x509.Certificate) error
-	MUseToken             func(id, tok string) (bool, error)
-	MIsSSHHost            func(principal string) (bool, error)
-	MStoreSSHCertificate  func(crt *ssh.Certificate) error
-	MGetSSHHostPrincipals func() ([]string, error)
-	MShutdown             func() error
+	Err                     error
+	Ret1                    interface{}
+	MIsRevoked              func(string) (bool, error)
+	MIsSSHRevoked           func(string) (bool, error)
+	MRevoke                 func(rci *RevokedCertificateInfo) error
+	MRevokeSSH              func(rci *RevokedCertificateInfo) error
+	MGetCertificate         func(serialNumber string) (*x509.Certificate, error)
+	MGetCertificateData     func(serialNumber string) (*CertificateData, error)
+	MStoreCertificate       func(crt *x509.Certificate) error
+	MUseToken               func(id, tok string) (bool, error)
+	MIsSSHHost              func(principal string) (bool, error)
+	MStoreSSHCertificate    func(crt *ssh.Certificate) error
+	MGetSSHHostPrincipals   func() ([]string, error)
+	MShutdown               func() error
+	MGetRevokedCertificates func() (*[]RevokedCertificateInfo, error)
+	MGetCRL                 func() (*CertificateRevocationListInfo, error)
+	MStoreCRL               func(*CertificateRevocationListInfo) error
 }
 
 func (m *MockAuthDB) GetRevokedCertificates() (*[]RevokedCertificateInfo, error) {
-	panic("implement me")
+	if m.MGetRevokedCertificates != nil {
+		return m.MGetRevokedCertificates()
+	}
+	return m.Ret1.(*[]RevokedCertificateInfo), m.Err
 }
 
 func (m *MockAuthDB) GetCRL() (*CertificateRevocationListInfo, error) {
-	panic("implement me")
+	if m.MGetCRL != nil {
+		return m.MGetCRL()
+	}
+	return m.Ret1.(*CertificateRevocationListInfo), m.Err
 }
 
 func (m *MockAuthDB) StoreCRL(info *CertificateRevocationListInfo) error {
-	panic("implement me")
+	if m.MStoreCRL != nil {
+		return m.MStoreCRL(info)
+	}
+	return m.Err
 }
 
 // IsRevoked mock.

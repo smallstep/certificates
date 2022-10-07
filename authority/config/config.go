@@ -111,8 +111,10 @@ type AuthConfig struct {
 
 // CRLConfig represents config options for CRL generation
 type CRLConfig struct {
-	Generate      bool                  `json:"generate,omitempty"`
-	CacheDuration *provisioner.Duration `json:"cacheDuration,omitempty"`
+	Enabled          bool                  `json:"enabled"`
+	CacheDuration    *provisioner.Duration `json:"cacheDuration,omitempty"`
+	GenerateOnRevoke bool                  `json:"generateOnRevoke,omitempty"`
+	RenewPeriod      *provisioner.Duration `json:"renewPeriod,omitempty"`
 }
 
 // init initializes the required fields in the AuthConfig if they are not

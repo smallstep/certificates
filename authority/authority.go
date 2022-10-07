@@ -7,7 +7,6 @@ import (
 	"crypto/sha256"
 	"crypto/x509"
 	"encoding/hex"
-	"fmt"
 	"log"
 	"strings"
 	"sync"
@@ -664,12 +663,22 @@ func (a *Authority) init() error {
 	a.initOnce = true
 
 	// Start the CRL generator
-	if a.config.CRL != nil && a.config.CRL.Generate {
-		if v := a.config.CRL.CacheDuration; v != nil && v.Duration > 0 {
-			err := a.startCRLGenerator()
-			if err != nil {
-				return err
-			}
+	if a.config.CRL != nil && a.config.CRL.Enabled {
+		if v := a.config.CRL.CacheDuration; v != nil && v.Duration < 0 {
+			return errors.New("crl cacheDuration must be >= 0")
+		}
+
+		if v := a.config.CRL.CacheDuration; v != nil && v.Duration == 0 {
+			a.config.CRL.CacheDuration.Duration, _ = time.ParseDuration("24h")
+		}
+
+		if a.config.CRL.CacheDuration == nil {
+			a.config.CRL.CacheDuration, _ = provisioner.NewDuration("24h")
+		}
+
+		err = a.startCRLGenerator()
+		if err != nil {
+			return err
 		}
 	}
 
@@ -797,6 +806,12 @@ func (a *Authority) startCRLGenerator() error {
 		return nil
 	}
 
+	// Make the renewal ticker run ~2/3 of cacheDuration by default, or use renewPeriod if available
+	tickerDuration := (a.config.CRL.CacheDuration.Duration / 3) * 2
+	if v := a.config.CRL.RenewPeriod; v != nil && v.Duration > 0 {
+		tickerDuration = v.Duration
+	}
+
 	// Check that there is a valid CRL in the DB right now. If it doesn't exist
 	// or is expired, generate one now
 	_, ok := a.db.(db.CertificateRevocationListDB)
@@ -811,11 +826,6 @@ func (a *Authority) startCRLGenerator() error {
 		return errors.Wrap(err, "could not generate a CRL")
 	}
 
-	log.Printf("CRL will be auto-generated every %v", a.config.CRL.CacheDuration)
-	tickerDuration := a.config.CRL.CacheDuration.Duration - time.Minute // generate the new CRL 1 minute before it expires
-	if tickerDuration <= 0 {
-		panic(fmt.Sprintf("ERROR: Addition of jitter to CRL generation time %v creates a negative duration (%v). Use a CRL generation time of longer than 1 minute.", a.config.CRL.CacheDuration, tickerDuration))
-	}
 	a.crlTicker = time.NewTicker(tickerDuration)
 
 	go func() {
@@ -831,4 +841,15 @@ func (a *Authority) startCRLGenerator() error {
 	}()
 
 	return nil
+}
+
+func (a *Authority) resetCRLGeneratorTimer() {
+	if a.crlTicker != nil {
+		tickerDuration := (a.config.CRL.CacheDuration.Duration / 3) * 2
+		if v := a.config.CRL.RenewPeriod; v != nil && v.Duration > 0 {
+			tickerDuration = v.Duration
+		}
+
+		a.crlTicker.Reset(tickerDuration)
+	}
 }

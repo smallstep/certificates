@@ -572,10 +572,17 @@ func (a *Authority) Revoke(ctx context.Context, revokeOpts *RevokeOptions) error
 			return errs.Wrap(http.StatusInternalServerError, err, "authority.Revoke", opts...)
 		}
 
-		// Generate a new CRL so CRL requesters will always get an up-to-date CRL whenever they request it
-		err = a.GenerateCertificateRevocationList()
-		if err != nil {
-			return errs.Wrap(http.StatusInternalServerError, err, "authority.Revoke", opts...)
+		if a.config.CRL != nil && a.config.CRL.GenerateOnRevoke {
+			// Generate a new CRL so CRL requesters will always get an up-to-date CRL whenever they request it
+			err = a.GenerateCertificateRevocationList()
+			if err != nil {
+				return errs.Wrap(http.StatusInternalServerError, err, "authority.Revoke", opts...)
+			}
+
+			// the timer only gets reset if CRL is enabled
+			if a.config.CRL.Enabled {
+				a.resetCRLGeneratorTimer()
+			}
 		}
 	}
 	switch {
@@ -693,6 +700,13 @@ func (a *Authority) GenerateCertificateRevocationList() error {
 		})
 	}
 
+	var updateDuration time.Duration
+	if a.config.CRL.CacheDuration != nil {
+		updateDuration = a.config.CRL.CacheDuration.Duration
+	} else if crlInfo != nil {
+		updateDuration = crlInfo.Duration
+	}
+
 	// Create a RevocationList representation ready for the CAS to sign
 	// TODO: allow SignatureAlgorithm to be specified?
 	revocationList := x509.RevocationList{
@@ -700,7 +714,7 @@ func (a *Authority) GenerateCertificateRevocationList() error {
 		RevokedCertificates: revokedCertificates,
 		Number:              &bn,
 		ThisUpdate:          time.Now().UTC(),
-		NextUpdate:          time.Now().UTC().Add(a.config.CRL.CacheDuration.Duration),
+		NextUpdate:          time.Now().UTC().Add(updateDuration),
 		ExtraExtensions:     nil,
 	}
 
@@ -710,11 +724,12 @@ func (a *Authority) GenerateCertificateRevocationList() error {
 	}
 
 	// Create a new db.CertificateRevocationListInfo, which stores the new Number we just generated, the
-	// expiry time, and the DER-encoded CRL
+	// expiry time, duration, and the DER-encoded CRL
 	newCRLInfo := db.CertificateRevocationListInfo{
 		Number:    n,
 		ExpiresAt: revocationList.NextUpdate,
 		DER:       certificateRevocationList.CRL,
+		Duration:  updateDuration,
 	}
 
 	// Store the CRL in the database ready for retrieval by api endpoints
