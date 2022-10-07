@@ -22,6 +22,9 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
   X.509 certificates.
 - Added provisioner webhooks for augmenting template data and authorizing certificate requests before signing.
 
+### Fixed
+- MySQL DSN parsing issues fixed with upgrade to [smallstep/nosql@v0.5.0](https://github.com/smallstep/nosql/releases/tag/v0.5.0).
+
 ## [0.22.1] - 2022-08-31
 ### Fixed
 - Fixed signature algorithm on EC (root) + RSA (intermediate) PKIs.
