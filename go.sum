@@ -798,8 +798,8 @@ go.opentelemetry.io/proto/otlp v0.7.0/go.mod h1:PqfVotwruBrMGOCsRd/89rSnXhoiJIqe
 go.step.sm/cli-utils v0.7.5 h1:jyp6X8k8mN1B0uWJydTid0C++8tQhm2kaaAdXKQQzdk=
 go.step.sm/cli-utils v0.7.5/go.mod h1:taSsY8haLmXoXM3ZkywIyRmVij/4Aj0fQbNTlJvv71I=
 go.step.sm/crypto v0.9.0/go.mod h1:+CYG05Mek1YDqi5WK0ERc6cOpKly2i/a5aZmU1sfGj0=
-go.step.sm/crypto v0.20.0 h1:IMZUjTdol70IxOLZYHt8AHJy9uIHz/PvDOi2S+urpOs=
-go.step.sm/crypto v0.20.0/go.mod h1:diT2XWIHQy0397UI3i78qCKeLLLp2wu0/DIJI66u/MU=
+go.step.sm/crypto v0.21.0 h1:Qwxk5JrqG0Q1t8tOfDM3zKTNECG6J5J24qgWZCRM0Ic=
+go.step.sm/crypto v0.21.0/go.mod h1:diT2XWIHQy0397UI3i78qCKeLLLp2wu0/DIJI66u/MU=
 go.step.sm/linkedca v0.19.0-rc.3 h1:3Uu8j187wm7mby+/pz/aQ0wHKRm7w/2AsVPpvcAn4v8=
 go.step.sm/linkedca v0.19.0-rc.3/go.mod h1:MCZmPIdzElEofZbiw4eyUHayXgFTwa94cNAV34aJ5ew=
 go.uber.org/atomic v1.3.2/go.mod h1:gD2HeocX3+yG+ygLZcrzQJaqmWj9AIm7n08wl/qW/PE=
