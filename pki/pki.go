@@ -307,6 +307,9 @@ type PKI struct {
 
 // New creates a new PKI configuration.
 func New(o apiv1.Options, opts ...Option) (*PKI, error) {
+	// TODO(hs): invoking `New` with a context active will use values from
+	// that CA context while generating the context. Thay may or may not
+	// be fully expected and/or what we want. Check that.
 	currentCtx := step.Contexts().GetCurrent()
 	caService, err := cas.New(context.Background(), o)
 	if err != nil {

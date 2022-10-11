@@ -86,6 +86,12 @@ func TestPKI_WriteHelmTemplate(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			o := tt.fields.casOptions
 			opts := tt.fields.pkiOptions
+			// TODO(hs): invoking `New` doesn't perform all operations that are executed
+			// when `ca init --helm` is executed. The list of provisioners on the authority
+			// is not populated, for example, resulting in this test not being entirely
+			// realistic. Ideally this logic should be handled in one place and probably
+			// inside of the PKI initialization, but if that becomes messy, some more
+			// logic needs to be performed here to get the PKI instance in good shape.
 			p, err := New(o, opts...)
 			assert.NoError(t, err)
 			w := &bytes.Buffer{}
