@@ -2774,3 +2774,97 @@ func Test_doStepAttestationFormat(t *testing.T) {
 		})
 	}
 }
+
+func Test_doStepAttestationFormat_noCAIntermediate(t *testing.T) {
+	ctx := context.Background()
+
+	// This CA simulates a YubiKey v5.2.4, where the attestation intermediate in
+	// the CA does not have the basic constraint extension. With the current
+	// validation of the certificate the test case below returns an error. If
+	// we change the validation to support this use case, the test case below
+	// should change.
+	//
+	// See https://github.com/Yubico/yubikey-manager/issues/522
+	ca, err := minica.New(minica.WithIntermediateTemplate(`{"subject": {{ toJson .Subject }}}`))
+	if err != nil {
+		t.Fatal(err)
+	}
+	caRoot := pem.EncodeToMemory(&pem.Block{Type: "CERTIFICATE", Bytes: ca.Root.Raw})
+
+	makeLeaf := func(signer crypto.Signer, serialNumber []byte) *x509.Certificate {
+		leaf, err := ca.Sign(&x509.Certificate{
+			Subject:   pkix.Name{CommonName: "attestation cert"},
+			PublicKey: signer.Public(),
+			ExtraExtensions: []pkix.Extension{
+				{Id: oidYubicoSerialNumber, Value: serialNumber},
+			},
+		})
+		if err != nil {
+			t.Fatal(err)
+		}
+		return leaf
+	}
+
+	signer, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
+	if err != nil {
+		t.Fatal(err)
+	}
+	serialNumber, err := asn1.Marshal(1234)
+	if err != nil {
+		t.Fatal(err)
+	}
+	leaf := makeLeaf(signer, serialNumber)
+
+	jwk, err := jose.GenerateJWK("EC", "P-256", "ES256", "sig", "", 0)
+	if err != nil {
+		t.Fatal(err)
+	}
+	keyAuth, err := KeyAuthorization("token", jwk)
+	if err != nil {
+		t.Fatal(err)
+	}
+	keyAuthSum := sha256.Sum256([]byte(keyAuth))
+	sig, err := signer.Sign(rand.Reader, keyAuthSum[:], crypto.SHA256)
+	if err != nil {
+		t.Fatal(err)
+	}
+	cborSig, err := cbor.Marshal(sig)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	type args struct {
+		ctx  context.Context
+		prov Provisioner
+		ch   *Challenge
+		jwk  *jose.JSONWebKey
+		att  *AttestationObject
+	}
+	tests := []struct {
+		name    string
+		args    args
+		want    *stepAttestationData
+		wantErr bool
+	}{
+		{"fail no intermediate", args{ctx, mustAttestationProvisioner(t, caRoot), &Challenge{Token: "token"}, jwk, &AttestationObject{
+			Format: "step",
+			AttStatement: map[string]interface{}{
+				"x5c": []interface{}{leaf.Raw, ca.Intermediate.Raw},
+				"alg": -7,
+				"sig": cborSig,
+			},
+		}}, nil, true},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, err := doStepAttestationFormat(tt.args.ctx, tt.args.prov, tt.args.ch, tt.args.jwk, tt.args.att)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("doStepAttestationFormat() error = %#v, wantErr %v", err, tt.wantErr)
+				return
+			}
+			if !reflect.DeepEqual(got, tt.want) {
+				t.Errorf("doStepAttestationFormat() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
