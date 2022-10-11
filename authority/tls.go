@@ -258,6 +258,11 @@ func (a *Authority) Sign(csr *x509.CertificateRequest, signOpts provisioner.Sign
 	}
 
 	fullchain := append([]*x509.Certificate{resp.Certificate}, resp.CertificateChain...)
+
+	// Wrap provisioner with extra information.
+	prov = wrapProvisioner(prov, attData)
+
+	// Store certificate in the db.
 	if err = a.storeCertificate(prov, fullchain); err != nil {
 		if !errors.Is(err, db.ErrNotImplemented) {
 			return nil, errs.Wrap(http.StatusInternalServerError, err,

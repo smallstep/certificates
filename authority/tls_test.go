@@ -18,8 +18,6 @@ import (
 	"testing"
 	"time"
 
-	"gopkg.in/square/go-jose.v2/jwt"
-
 	"go.step.sm/crypto/jose"
 	"go.step.sm/crypto/keyutil"
 	"go.step.sm/crypto/minica"
@@ -57,6 +55,15 @@ func (m *certificateDurationEnforcer) Enforce(cert *x509.Certificate) error {
 	cert.NotBefore = m.NotBefore
 	cert.NotAfter = m.NotAfter
 	return nil
+}
+
+type certificateChainDB struct {
+	db.MockAuthDB
+	MStoreCertificateChain func(provisioner.Interface, ...*x509.Certificate) error
+}
+
+func (d *certificateChainDB) StoreCertificateChain(p provisioner.Interface, certs ...*x509.Certificate) error {
+	return d.MStoreCertificateChain(p, certs...)
 }
 
 func getDefaultIssuer(a *Authority) *x509.Certificate {
@@ -767,7 +774,6 @@ ZYtQ9Ot36qc=
 			aa.config.AuthorityConfig.Template = a.config.AuthorityConfig.Template
 			aa.db = &db.MockAuthDB{
 				MStoreCertificate: func(crt *x509.Certificate) error {
-					fmt.Println(crt.Subject)
 					assert.Equals(t, crt.Subject.CommonName, "smallstep test")
 					return nil
 				},
@@ -787,6 +793,38 @@ ZYtQ9Ot36qc=
 				auth:            aa,
 				csr:             csr,
 				extraOpts:       extraOpts,
+				signOpts:        signOpts,
+				notBefore:       signOpts.NotBefore.Time().Truncate(time.Second),
+				notAfter:        signOpts.NotAfter.Time().Truncate(time.Second),
+				extensionsCount: 6,
+			}
+		},
+		"ok with attestation data": func(t *testing.T) *signTest {
+			csr := getCSR(t, priv)
+			aa := testAuthority(t)
+			aa.config.AuthorityConfig.Template = a.config.AuthorityConfig.Template
+			aa.db = &certificateChainDB{
+				MStoreCertificateChain: func(prov provisioner.Interface, certs ...*x509.Certificate) error {
+					p, ok := prov.(attProvisioner)
+					if assert.True(t, ok) {
+						assert.Equals(t, &provisioner.AttestationData{
+							PermanentIdentifier: "1234567890",
+						}, p.AttestationData())
+					}
+					if assert.Len(t, 2, certs) {
+						assert.Equals(t, certs[0].Subject.CommonName, "smallstep test")
+						assert.Equals(t, certs[1].Subject.CommonName, "smallstep Intermediate CA")
+					}
+					return nil
+				},
+			}
+
+			return &signTest{
+				auth: aa,
+				csr:  csr,
+				extraOpts: append(extraOpts, provisioner.AttestationData{
+					PermanentIdentifier: "1234567890",
+				}),
 				signOpts:        signOpts,
 				notBefore:       signOpts.NotBefore.Time().Truncate(time.Second),
 				notAfter:        signOpts.NotAfter.Time().Truncate(time.Second),
@@ -1401,15 +1439,15 @@ func TestAuthority_Revoke(t *testing.T) {
 			}
 		},
 		"fail/nil-db": func() test {
-			cl := jwt.Claims{
+			cl := jose.Claims{
 				Subject:   "sn",
 				Issuer:    validIssuer,
-				NotBefore: jwt.NewNumericDate(now),
-				Expiry:    jwt.NewNumericDate(now.Add(time.Minute)),
+				NotBefore: jose.NewNumericDate(now),
+				Expiry:    jose.NewNumericDate(now.Add(time.Minute)),
 				Audience:  validAudience,
 				ID:        "44",
 			}
-			raw, err := jwt.Signed(sig).Claims(cl).CompactSerialize()
+			raw, err := jose.Signed(sig).Claims(cl).CompactSerialize()
 			assert.FatalError(t, err)
 
 			return test{
@@ -1441,15 +1479,15 @@ func TestAuthority_Revoke(t *testing.T) {
 				Err: errors.New("force"),
 			}))
 
-			cl := jwt.Claims{
+			cl := jose.Claims{
 				Subject:   "sn",
 				Issuer:    validIssuer,
-				NotBefore: jwt.NewNumericDate(now),
-				Expiry:    jwt.NewNumericDate(now.Add(time.Minute)),
+				NotBefore: jose.NewNumericDate(now),
+				Expiry:    jose.NewNumericDate(now.Add(time.Minute)),
 				Audience:  validAudience,
 				ID:        "44",
 			}
-			raw, err := jwt.Signed(sig).Claims(cl).CompactSerialize()
+			raw, err := jose.Signed(sig).Claims(cl).CompactSerialize()
 			assert.FatalError(t, err)
 
 			return test{
@@ -1481,15 +1519,15 @@ func TestAuthority_Revoke(t *testing.T) {
 				Err: db.ErrAlreadyExists,
 			}))
 
-			cl := jwt.Claims{
+			cl := jose.Claims{
 				Subject:   "sn",
 				Issuer:    validIssuer,
-				NotBefore: jwt.NewNumericDate(now),
-				Expiry:    jwt.NewNumericDate(now.Add(time.Minute)),
+				NotBefore: jose.NewNumericDate(now),
+				Expiry:    jose.NewNumericDate(now.Add(time.Minute)),
 				Audience:  validAudience,
 				ID:        "44",
 			}
-			raw, err := jwt.Signed(sig).Claims(cl).CompactSerialize()
+			raw, err := jose.Signed(sig).Claims(cl).CompactSerialize()
 			assert.FatalError(t, err)
 
 			return test{
@@ -1520,15 +1558,15 @@ func TestAuthority_Revoke(t *testing.T) {
 				},
 			}))
 
-			cl := jwt.Claims{
+			cl := jose.Claims{
 				Subject:   "sn",
 				Issuer:    validIssuer,
-				NotBefore: jwt.NewNumericDate(now),
-				Expiry:    jwt.NewNumericDate(now.Add(time.Minute)),
+				NotBefore: jose.NewNumericDate(now),
+				Expiry:    jose.NewNumericDate(now.Add(time.Minute)),
 				Audience:  validAudience,
 				ID:        "44",
 			}
-			raw, err := jwt.Signed(sig).Claims(cl).CompactSerialize()
+			raw, err := jose.Signed(sig).Claims(cl).CompactSerialize()
 			assert.FatalError(t, err)
 			return test{
 				auth: _a,
@@ -1612,15 +1650,15 @@ func TestAuthority_Revoke(t *testing.T) {
 				},
 			}))
 
-			cl := jwt.Claims{
+			cl := jose.Claims{
 				Subject:   "sn",
 				Issuer:    validIssuer,
-				NotBefore: jwt.NewNumericDate(now),
-				Expiry:    jwt.NewNumericDate(now.Add(time.Minute)),
+				NotBefore: jose.NewNumericDate(now),
+				Expiry:    jose.NewNumericDate(now.Add(time.Minute)),
 				Audience:  validAudience,
 				ID:        "44",
 			}
-			raw, err := jwt.Signed(sig).Claims(cl).CompactSerialize()
+			raw, err := jose.Signed(sig).Claims(cl).CompactSerialize()
 			assert.FatalError(t, err)
 			return test{
 				auth: a,

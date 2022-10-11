@@ -25,6 +25,44 @@ import (
 	"github.com/smallstep/certificates/errs"
 )
 
+type raProvisioner interface {
+	RAInfo() *provisioner.RAInfo
+}
+
+type attProvisioner interface {
+	AttestationData() *provisioner.AttestationData
+}
+
+// wrapProvisioner wraps the given provisioner with RA information and
+// attestation data.
+func wrapProvisioner(p provisioner.Interface, attData *provisioner.AttestationData) *wrappedProvisioner {
+	var raInfo *provisioner.RAInfo
+	if rap, ok := p.(raProvisioner); ok {
+		raInfo = rap.RAInfo()
+	}
+
+	return &wrappedProvisioner{
+		Interface:       p,
+		attestationData: attData,
+		raInfo:          raInfo,
+	}
+}
+
+// wrappedProvisioner implements raProvisioner and attProvisioner.
+type wrappedProvisioner struct {
+	provisioner.Interface
+	attestationData *provisioner.AttestationData
+	raInfo          *provisioner.RAInfo
+}
+
+func (p *wrappedProvisioner) AttestationData() *provisioner.AttestationData {
+	return p.attestationData
+}
+
+func (p *wrappedProvisioner) RAInfo() *provisioner.RAInfo {
+	return p.raInfo
+}
+
 // GetEncryptedKey returns the JWE key corresponding to the given kid argument.
 func (a *Authority) GetEncryptedKey(kid string) (string, error) {
 	a.adminMutex.RLock()
