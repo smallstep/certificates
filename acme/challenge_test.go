@@ -2780,9 +2780,9 @@ func Test_doStepAttestationFormat_noCAIntermediate(t *testing.T) {
 
 	// This CA simulates a YubiKey v5.2.4, where the attestation intermediate in
 	// the CA does not have the basic constraint extension. With the current
-	// validation of the certificate the test case bellow returns an error, if
-	// we change the validation to support this use case, the test case bellow
-	// should change..
+	// validation of the certificate the test case below returns an error. If
+	// we change the validation to support this use case, the test case below
+	// should change.
 	//
 	// See https://github.com/Yubico/yubikey-manager/issues/522
 	ca, err := minica.New(minica.WithIntermediateTemplate(`{"subject": {{ toJson .Subject }}}`))
