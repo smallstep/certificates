@@ -605,8 +605,8 @@ func (a *Authority) init() error {
 		if len(provs) == 0 && !strings.EqualFold(a.config.AuthorityConfig.DeploymentType, "linked") {
 			var firstJWKProvisioner *linkedca.Provisioner
 			if len(a.config.AuthorityConfig.Provisioners) > 0 {
-				a.initLogf("Starting migration of provisioners")
 				// Existing provisioners detected; try migrating them to DB storage
+				a.initLogf("Starting migration of provisioners")
 				for _, p := range a.config.AuthorityConfig.Provisioners {
 					lp, err := ProvisionerToLinkedca(p)
 					if err != nil {
@@ -627,15 +627,28 @@ func (a *Authority) init() error {
 					}
 				}
 
-				// TODO(hs): try to update ca.json to remove migrated provisioners from the
-				// file? This may not always be possible though, so we shouldn't fail hard on
-				// every error. The next time the CA runs, it won't have perform the migration,
-				// because there'll be at least a JWK provisioner.
+				// TODO(hs): test if this works with LinkedCA too. Also could be useful
+				// for printing out where the configuration is read from in case of LinkedCA.
+				c := a.config
+				if c.WasLoadedFromFile() {
+					// TODO(hs): check if prerequisites for writing files look OK (user/group, permission bits, etc) as
+					// extra safety check before trying to write at all?
 
-				// 1. check if prerequisites for writing files look OK (user/group, permission bits, etc)
-				// 2. update the configuration to write (internal representation; do a deep copy first?)
-				// 3. try writing the new ca.json
-				// 4. on failure, perform rollback of the write (restore original in internal representation)
+					// Remove the existing provisioners from the authority configuration
+					// and commit it to the existing configuration file. NOTE: committing
+					// the configuration at this point also writes other properties that
+					// have been initialized with default values, such as the `backdate` and
+					// `template` settings in the `authority`.
+					oldProvisioners := c.AuthorityConfig.Provisioners
+					c.AuthorityConfig.Provisioners = []provisioner.Interface{}
+					if err := c.Commit(); err != nil {
+						// Restore the provisioners in in-memory representation for consistency
+						// when writing the updated configuration fails. This is considered a soft
+						// error, so execution can continue.
+						c.AuthorityConfig.Provisioners = oldProvisioners
+						a.initLogf("Failed removing provisioners from configuration: %v", err)
+					}
+				}
 
 				a.initLogf("Finished migrating provisioners")
 			}

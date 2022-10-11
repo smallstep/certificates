@@ -73,6 +73,9 @@ type Config struct {
 	Templates        *templates.Templates `json:"templates,omitempty"`
 	CommonName       string               `json:"commonName,omitempty"`
 	SkipValidation   bool                 `json:"-"`
+
+	// Keeps record of the filename the Config is read from
+	loadedFromFilename string
 }
 
 // ASN1DN contains ASN1.DN attributes that are used in Subject and Issuer
@@ -163,6 +166,10 @@ func LoadConfiguration(filename string) (*Config, error) {
 		return nil, errors.Wrapf(err, "error parsing %s", filename)
 	}
 
+	// store filename that was read to populate Config
+	c.loadedFromFilename = filename
+
+	// initialize the Config
 	c.Init()
 
 	return &c, nil
@@ -197,6 +204,24 @@ func (c *Config) Save(filename string) error {
 	enc := json.NewEncoder(f)
 	enc.SetIndent("", "\t")
 	return errors.Wrapf(enc.Encode(c), "error writing %s", filename)
+}
+
+// Commit saves the current configuration to the same
+// file it was initially loaded from.
+//
+// TODO(hs): rename Save() to WriteTo() and replace this
+// with Save()? Or is Commit clear enough.
+func (c *Config) Commit() error {
+	if !c.WasLoadedFromFile() {
+		return errors.New("cannot commit configuration if not loaded from file")
+	}
+	return c.Save(c.loadedFromFilename)
+}
+
+// WasLoadedFromFile returns whether or not the Config was
+// read from a file.
+func (c *Config) WasLoadedFromFile() bool {
+	return c.loadedFromFilename != ""
 }
 
 // Validate validates the configuration.
