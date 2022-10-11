@@ -1,0 +1,66 @@
+# Helm template
+inject:
+  enabled: true
+  # Config contains the configuration files ca.json and defaults.json
+  config:
+    files:
+      ca.json:
+        root: /home/step/certs/root_ca.crt
+        federateRoots: []
+        crt: /home/step/certs/intermediate_ca.crt
+        key: /home/step/secrets/intermediate_ca_key
+        address: 127.0.0.1:9000
+        dnsNames:
+          - 127.0.0.1
+        logger:
+          format: json
+        db:
+          type: badgerv2
+          dataSource: /home/step/db
+        authority:
+          enableAdmin: false
+          provisioners:
+        tls:
+          cipherSuites:
+            - TLS_ECDHE_ECDSA_WITH_CHACHA20_POLY1305_SHA256
+            - TLS_ECDHE_ECDSA_WITH_AES_128_GCM_SHA256
+          minVersion: 1.2
+          maxVersion: 1.3
+          renegotiation: false
+
+      defaults.json:
+        ca-url: https://127.0.0.1
+        ca-config: /home/step/config/ca.json
+        fingerprint: 
+        root: /home/step/certs/root_ca.crt
+
+  # Certificates contains the root and intermediate certificate and 
+  # optionally the SSH host and user public keys
+  certificates:
+    # intermediate_ca contains the text of the intermediate CA Certificate
+    intermediate_ca: |
+      
+      
+    # root_ca contains the text of the root CA Certificate
+    root_ca: |
+      
+
+  # Secrets contains the root and intermediate keys and optionally the SSH
+  # private keys
+  secrets:
+    # ca_password contains the password used to encrypt x509.intermediate_ca_key, ssh.host_ca_key and ssh.user_ca_key
+    # This value must be base64 encoded.
+    ca_password: 
+    provisioner_password: 
+
+    x509:
+      # intermediate_ca_key contains the contents of your encrypted intermediate CA key
+      intermediate_ca_key: |
+        
+
+      # root_ca_key contains the contents of your encrypted root CA key
+      # Note that this value can be omitted without impacting the functionality of step-certificates
+      # If supplied, this should be encrypted using a unique password that is not used for encrypting
+      # the intermediate_ca_key, ssh.host_ca_key or ssh.user_ca_key.
+      root_ca_key: |
+        
