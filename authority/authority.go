@@ -73,7 +73,7 @@ type Authority struct {
 	sshCAUserFederatedCerts []ssh.PublicKey
 	sshCAHostFederatedCerts []ssh.PublicKey
 
-	// Do not re-initialize
+	// If true, do not re-initialize
 	initOnce  bool
 	startTime time.Time
 
@@ -91,8 +91,11 @@ type Authority struct {
 
 	adminMutex sync.RWMutex
 
-	// Do Not initialize the authority
+	// If true, do not initialize the authority
 	skipInit bool
+
+	// If true, does not output initialization logs
+	quietInit bool
 }
 
 // Info contains information about the authority.
@@ -600,10 +603,9 @@ func (a *Authority) init() error {
 			return admin.WrapErrorISE(err, "error loading provisioners to initialize authority")
 		}
 		if len(provs) == 0 && !strings.EqualFold(a.config.AuthorityConfig.DeploymentType, "linked") {
-
 			var firstJWKProvisioner *linkedca.Provisioner
 			if len(a.config.AuthorityConfig.Provisioners) > 0 {
-				log.Printf("Starting migration of provisioners")
+				a.initLogf("Starting migration of provisioners")
 				// Existing provisioners detected; try migrating them to DB storage
 				for _, p := range a.config.AuthorityConfig.Provisioners {
 					lp, err := ProvisionerToLinkedca(p)
@@ -619,9 +621,9 @@ func (a *Authority) init() error {
 					// Mark the first JWK provisioner, so that it can be used for administration purposes
 					if firstJWKProvisioner == nil && lp.Type == linkedca.Provisioner_JWK {
 						firstJWKProvisioner = lp
-						log.Printf("Migrated JWK provisioner %q with admin permissions", p.GetName()) // TODO(hs): change the wording?
+						a.initLogf("Migrated JWK provisioner %q with admin permissions", p.GetName()) // TODO(hs): change the wording?
 					} else {
-						log.Printf("Migrated %s provisioner %q", p.GetType(), p.GetName())
+						a.initLogf("Migrated %s provisioner %q", p.GetType(), p.GetName())
 					}
 				}
 
@@ -630,7 +632,12 @@ func (a *Authority) init() error {
 				// every error. The next time the CA runs, it won't have perform the migration,
 				// because there'll be at least a JWK provisioner.
 
-				log.Printf("Finished migrating provisioners")
+				// 1. check if prerequisites for writing files look OK (user/group, permission bits, etc)
+				// 2. update the configuration to write (internal representation; do a deep copy first?)
+				// 3. try writing the new ca.json
+				// 4. on failure, perform rollback of the write (restore original in internal representation)
+
+				a.initLogf("Finished migrating provisioners")
 			}
 
 			// Create first JWK provisioner for remote administration purposes if none exists yet
@@ -639,7 +646,7 @@ func (a *Authority) init() error {
 				if err != nil {
 					return admin.WrapErrorISE(err, "error creating first provisioner")
 				}
-				log.Printf("Created JWK provisioner %q with admin permissions", firstJWKProvisioner.GetName()) // TODO(hs): change the wording?
+				a.initLogf("Created JWK provisioner %q with admin permissions", firstJWKProvisioner.GetName()) // TODO(hs): change the wording?
 			}
 
 			// Create first super admin, belonging to the first JWK provisioner
@@ -652,7 +659,7 @@ func (a *Authority) init() error {
 				return admin.WrapErrorISE(err, "error creating first admin")
 			}
 
-			log.Printf("Created super admin %q for JWK provisioner %q", firstSuperAdminSubject, firstJWKProvisioner.GetName())
+			a.initLogf("Created super admin %q for JWK provisioner %q", firstSuperAdminSubject, firstJWKProvisioner.GetName())
 		}
 	}
 
@@ -700,6 +707,14 @@ func (a *Authority) init() error {
 	a.initOnce = true
 
 	return nil
+}
+
+// initLogf is used to log initialization information. The output
+// can be disabled by starting the CA with the `--quiet` flag.
+func (a *Authority) initLogf(format string, v ...any) {
+	if !a.quietInit {
+		log.Printf(format, v...)
+	}
 }
 
 // GetID returns the define authority id or a zero uuid.

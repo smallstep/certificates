@@ -86,6 +86,14 @@ func WithDatabase(d db.AuthDB) Option {
 	}
 }
 
+// WithQuietInit disables log output when the authority is initialized.
+func WithQuietInit() Option {
+	return func(a *Authority) error {
+		a.quietInit = true
+		return nil
+	}
+}
+
 // WithWebhookClient sets the http.Client to be used for outbound requests.
 func WithWebhookClient(c *http.Client) Option {
 	return func(a *Authority) error {
