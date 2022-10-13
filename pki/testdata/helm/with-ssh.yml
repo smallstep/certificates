@@ -43,10 +43,17 @@ inject:
   certificates:
     # intermediate_ca contains the text of the intermediate CA Certificate
     intermediate_ca: |
+      -----BEGIN CERTIFICATE-----
+      dGhlc2UgYXJlIGp1c3Qgc29tZSBmYWtlIGludGVybWVkaWF0ZSBDQSBjZXJ0IGJ5
+      dGVz
+      -----END CERTIFICATE-----
       
       
     # root_ca contains the text of the root CA Certificate
     root_ca: |
+      -----BEGIN CERTIFICATE-----
+      dGhlc2UgYXJlIGp1c3Qgc29tZSBmYWtlIHJvb3QgQ0EgY2VydCBieXRlcw==
+      -----END CERTIFICATE-----
       
     # ssh_host_ca contains the text of the public ssh key for the SSH root CA
     ssh_host_ca: 

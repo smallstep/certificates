@@ -2,6 +2,7 @@ package pki
 
 import (
 	"bytes"
+	"crypto/x509"
 	"encoding/json"
 	"os"
 	"testing"
@@ -114,13 +115,19 @@ func TestPKI_WriteHelmTemplate(t *testing.T) {
 			p, err := New(o, opts...)
 			assert.NoError(t, err)
 
-			// setKeyPairs sets a predefined JWK and a default JWK provisioner. This is one
+			// setKeyPair sets a predefined JWK and a default JWK provisioner. This is one
 			// of the things performed in the `ca init` code that's not part of `New`, but
 			// performed after that in p.GenerateKeyPairs`. We're currently using the same
 			// JWK for every test to keep test variance small: we're not testing JWK generation
 			// here after all. It's a bit dangerous to redefine the function here, but it's
 			// the simplest way to make this fully testable without refactoring the init now.
-			setKeyPairs(t, p)
+			// The password for the predefined encrypted key is \x01\x03\x03\x07.
+			setKeyPair(t, p)
+
+			// setFiles sets some static intermediate and root CA certificate bytes. It
+			// replaces the logic executed in `p.GenerateRootCertificate`, `p.WriteRootCertificate`,
+			// and `p.GenerateIntermediateCertificate`.
+			setFiles(t, p)
 
 			w := &bytes.Buffer{}
 			if err := p.WriteHelmTemplate(w); (err != nil) != tt.wantErr {
@@ -133,12 +140,14 @@ func TestPKI_WriteHelmTemplate(t *testing.T) {
 			if diff := cmp.Diff(wantBytes, w.Bytes()); diff != "" {
 				t.Logf("Generated Helm template did not match reference %q\n", tt.testFile)
 				t.Errorf("Diff follows:\n%s\n", diff)
+				t.Errorf("Full output:\n%s\n", w.Bytes())
 			}
 		})
 	}
 }
 
-func setKeyPairs(t *testing.T, p *PKI) {
+// setKeyPair sets a predefined JWK and a default JWK provisioner.
+func setKeyPair(t *testing.T, p *PKI) {
 	t.Helper()
 
 	var err error
@@ -184,4 +193,10 @@ func setKeyPairs(t *testing.T, p *PKI) {
 			},
 		},
 	})
+}
+
+// setFiles sets some static, gibberish intermediate and root CA certificate bytes.
+func setFiles(t *testing.T, p *PKI) {
+	p.Files["/home/step/certs/root_ca.crt"] = encodeCertificate(&x509.Certificate{Raw: []byte("these are just some fake root CA cert bytes")})
+	p.Files["/home/step/certs/intermediate_ca.crt"] = encodeCertificate(&x509.Certificate{Raw: []byte("these are just some fake intermediate CA cert bytes")})
 }
