@@ -143,8 +143,9 @@ func (e *Error) UnmarshalJSON(data []byte) error {
 
 // Format implements the fmt.Formatter interface.
 func (e *Error) Format(f fmt.State, c rune) {
-	if err, ok := e.Err.(fmt.Formatter); ok {
-		err.Format(f, c)
+	var fe fmt.Formatter
+	if errors.As(e.Err, &fe) {
+		fe.Format(f, c)
 		return
 	}
 	fmt.Fprint(f, e.Err.Error())
@@ -253,7 +254,8 @@ func NewError(status int, err error, format string, args ...interface{}) error {
 		return err
 	}
 	msg := fmt.Sprintf(format, args...)
-	if _, ok := err.(log.StackTracedError); !ok {
+	var ste log.StackTracedError
+	if !errors.As(err, &ste) {
 		err = errors.Wrap(err, msg)
 	}
 	return &Error{
@@ -268,15 +270,11 @@ func NewError(status int, err error, format string, args ...interface{}) error {
 func NewErr(status int, err error, opts ...Option) error {
 	var e *Error
 	if !errors.As(err, &e) {
-		if sc, ok := err.(render.StatusCodedError); ok {
-			e = &Error{Status: sc.StatusCode(), Err: err}
+		var ste render.StatusCodedError
+		if errors.As(err, &ste) {
+			e = &Error{Status: ste.StatusCode(), Err: err}
 		} else {
-			cause := errors.Cause(err)
-			if sc, ok := cause.(render.StatusCodedError); ok {
-				e = &Error{Status: sc.StatusCode(), Err: err}
-			} else {
-				e = &Error{Status: status, Err: err}
-			}
+			e = &Error{Status: status, Err: err}
 		}
 	}
 	for _, o := range opts {

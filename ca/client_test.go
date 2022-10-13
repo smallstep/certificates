@@ -519,9 +519,10 @@ func TestClient_Renew(t *testing.T) {
 					t.Errorf("Client.Renew() = %v, want nil", got)
 				}
 
-				sc, ok := err.(render.StatusCodedError)
-				assert.Fatal(t, ok, "error does not implement StatusCodedError interface")
-				assert.Equals(t, sc.StatusCode(), tt.responseCode)
+				var sc render.StatusCodedError
+				if assert.True(t, errors.As(err, &sc), "error does not implement StatusCodedError interface") {
+					assert.Equals(t, sc.StatusCode(), tt.responseCode)
+				}
 				assert.HasPrefix(t, err.Error(), tt.err.Error())
 			default:
 				if !reflect.DeepEqual(got, tt.response) {
@@ -587,9 +588,10 @@ func TestClient_RenewWithToken(t *testing.T) {
 					t.Errorf("Client.RenewWithToken() = %v, want nil", got)
 				}
 
-				sc, ok := err.(render.StatusCodedError)
-				assert.Fatal(t, ok, "error does not implement StatusCodedError interface")
-				assert.Equals(t, sc.StatusCode(), tt.responseCode)
+				var sc render.StatusCodedError
+				if assert.True(t, errors.As(err, &sc), "error does not implement StatusCodedError interface") {
+					assert.Equals(t, sc.StatusCode(), tt.responseCode)
+				}
 				assert.HasPrefix(t, err.Error(), tt.err.Error())
 			default:
 				if !reflect.DeepEqual(got, tt.response) {
@@ -656,9 +658,10 @@ func TestClient_Rekey(t *testing.T) {
 					t.Errorf("Client.Renew() = %v, want nil", got)
 				}
 
-				sc, ok := err.(render.StatusCodedError)
-				assert.Fatal(t, ok, "error does not implement StatusCodedError interface")
-				assert.Equals(t, sc.StatusCode(), tt.responseCode)
+				var sc render.StatusCodedError
+				if assert.True(t, errors.As(err, &sc), "error does not implement StatusCodedError interface") {
+					assert.Equals(t, sc.StatusCode(), tt.responseCode)
+				}
 				assert.HasPrefix(t, err.Error(), tt.err.Error())
 			default:
 				if !reflect.DeepEqual(got, tt.response) {
@@ -777,9 +780,10 @@ func TestClient_ProvisionerKey(t *testing.T) {
 					t.Errorf("Client.ProvisionerKey() = %v, want nil", got)
 				}
 
-				sc, ok := err.(render.StatusCodedError)
-				assert.Fatal(t, ok, "error does not implement StatusCodedError interface")
-				assert.Equals(t, sc.StatusCode(), tt.responseCode)
+				var sc render.StatusCodedError
+				if assert.True(t, errors.As(err, &sc), "error does not implement StatusCodedError interface") {
+					assert.Equals(t, sc.StatusCode(), tt.responseCode)
+				}
 				assert.HasPrefix(t, tt.err.Error(), err.Error())
 			default:
 				if !reflect.DeepEqual(got, tt.response) {
@@ -836,9 +840,10 @@ func TestClient_Roots(t *testing.T) {
 				if got != nil {
 					t.Errorf("Client.Roots() = %v, want nil", got)
 				}
-				sc, ok := err.(render.StatusCodedError)
-				assert.Fatal(t, ok, "error does not implement StatusCodedError interface")
-				assert.Equals(t, sc.StatusCode(), tt.responseCode)
+				var sc render.StatusCodedError
+				if assert.True(t, errors.As(err, &sc), "error does not implement StatusCodedError interface") {
+					assert.Equals(t, sc.StatusCode(), tt.responseCode)
+				}
 				assert.HasPrefix(t, err.Error(), tt.err.Error())
 			default:
 				if !reflect.DeepEqual(got, tt.response) {
@@ -894,9 +899,10 @@ func TestClient_Federation(t *testing.T) {
 				if got != nil {
 					t.Errorf("Client.Federation() = %v, want nil", got)
 				}
-				sc, ok := err.(render.StatusCodedError)
-				assert.Fatal(t, ok, "error does not implement StatusCodedError interface")
-				assert.Equals(t, sc.StatusCode(), tt.responseCode)
+				var sc render.StatusCodedError
+				if assert.True(t, errors.As(err, &sc), "error does not implement StatusCodedError interface") {
+					assert.Equals(t, sc.StatusCode(), tt.responseCode)
+				}
 				assert.HasPrefix(t, tt.err.Error(), err.Error())
 			default:
 				if !reflect.DeepEqual(got, tt.response) {
@@ -956,9 +962,10 @@ func TestClient_SSHRoots(t *testing.T) {
 				if got != nil {
 					t.Errorf("Client.SSHKeys() = %v, want nil", got)
 				}
-				sc, ok := err.(render.StatusCodedError)
-				assert.Fatal(t, ok, "error does not implement StatusCodedError interface")
-				assert.Equals(t, sc.StatusCode(), tt.responseCode)
+				var sc render.StatusCodedError
+				if assert.True(t, errors.As(err, &sc), "error does not implement StatusCodedError interface") {
+					assert.Equals(t, sc.StatusCode(), tt.responseCode)
+				}
 				assert.HasPrefix(t, tt.err.Error(), err.Error())
 			default:
 				if !reflect.DeepEqual(got, tt.response) {
@@ -1118,9 +1125,10 @@ func TestClient_SSHBastion(t *testing.T) {
 					t.Errorf("Client.SSHBastion() = %v, want nil", got)
 				}
 				if tt.responseCode != 200 {
-					sc, ok := err.(render.StatusCodedError)
-					assert.Fatal(t, ok, "error does not implement StatusCodedError interface")
-					assert.Equals(t, sc.StatusCode(), tt.responseCode)
+					var sc render.StatusCodedError
+					if assert.True(t, errors.As(err, &sc), "error does not implement StatusCodedError interface") {
+						assert.Equals(t, sc.StatusCode(), tt.responseCode)
+					}
 					assert.HasPrefix(t, err.Error(), tt.err.Error())
 				}
 			default:
