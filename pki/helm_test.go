@@ -129,6 +129,10 @@ func TestPKI_WriteHelmTemplate(t *testing.T) {
 			// and `p.GenerateIntermediateCertificate`.
 			setFiles(t, p)
 
+			// setSSHSigningKeys sets predefined SSH user and host certificate and key bytes.
+			// This replaces the logic in `p.GenerateSSHSigningKeys`
+			setSSHSigningKeys(t, p)
+
 			w := &bytes.Buffer{}
 			if err := p.WriteHelmTemplate(w); (err != nil) != tt.wantErr {
 				t.Errorf("PKI.WriteHelmTemplate() error = %v, wantErr %v", err, tt.wantErr)
@@ -197,6 +201,21 @@ func setKeyPair(t *testing.T, p *PKI) {
 
 // setFiles sets some static, gibberish intermediate and root CA certificate bytes.
 func setFiles(t *testing.T, p *PKI) {
-	p.Files["/home/step/certs/root_ca.crt"] = encodeCertificate(&x509.Certificate{Raw: []byte("these are just some fake root CA cert bytes")})
-	p.Files["/home/step/certs/intermediate_ca.crt"] = encodeCertificate(&x509.Certificate{Raw: []byte("these are just some fake intermediate CA cert bytes")})
+	p.Files[p.Root[0]] = encodeCertificate(&x509.Certificate{Raw: []byte("these are just some fake root CA cert bytes")})
+	p.Files[p.RootKey[0]] = []byte("these are just some fake root CA key bytes")
+	p.Files[p.Intermediate] = encodeCertificate(&x509.Certificate{Raw: []byte("these are just some fake intermediate CA cert bytes")})
+	p.Files[p.IntermediateKey] = []byte("these are just some fake intermediate CA key bytes")
+}
+
+// setSSHSigningKeys sets some static, gibberish ssh user and host CA certificate and key bytes.
+func setSSHSigningKeys(t *testing.T, p *PKI) {
+
+	if !p.options.enableSSH {
+		return
+	}
+
+	p.Files[p.Ssh.HostKey] = []byte("fake ssh host key bytes")
+	p.Files[p.Ssh.HostPublicKey] = []byte("fake ssh host cert bytes")
+	p.Files[p.Ssh.UserKey] = []byte("fake ssh user key bytes")
+	p.Files[p.Ssh.UserPublicKey] = []byte("fake ssh user cert bytes")
 }

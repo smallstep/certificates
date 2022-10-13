@@ -56,10 +56,10 @@ inject:
       -----END CERTIFICATE-----
       
     # ssh_host_ca contains the text of the public ssh key for the SSH root CA
-    ssh_host_ca: 
+    ssh_host_ca: fake ssh host cert bytes
 
     # ssh_user_ca contains the text of the public ssh key for the SSH root CA
-    ssh_user_ca: 
+    ssh_user_ca: fake ssh user cert bytes
 
   # Secrets contains the root and intermediate keys and optionally the SSH
   # private keys
@@ -72,19 +72,19 @@ inject:
     x509:
       # intermediate_ca_key contains the contents of your encrypted intermediate CA key
       intermediate_ca_key: |
-        
+        these are just some fake intermediate CA key bytes
 
       # root_ca_key contains the contents of your encrypted root CA key
       # Note that this value can be omitted without impacting the functionality of step-certificates
       # If supplied, this should be encrypted using a unique password that is not used for encrypting
       # the intermediate_ca_key, ssh.host_ca_key or ssh.user_ca_key.
       root_ca_key: |
-        
+        these are just some fake root CA key bytes
     ssh:
       # ssh_host_ca_key contains the contents of your encrypted SSH Host CA key
       host_ca_key: |
-        
+        fake ssh host key bytes
 
       # ssh_user_ca_key contains the contents of your encrypted SSH User CA key
       user_ca_key: |
-        
+        fake ssh user key bytes
