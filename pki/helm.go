@@ -62,6 +62,9 @@ func (p *PKI) WriteHelmTemplate(w io.Writer) error {
 		}
 	}
 
+	// TODO(hs): add default SSHPOP provisioner if SSH is configured, similar
+	// as the ACME one above.
+
 	if err := tmpl.Execute(w, helmVariables{
 		Configuration: &p.Configuration,
 		Defaults:      &p.Defaults,

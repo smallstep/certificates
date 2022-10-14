@@ -648,7 +648,7 @@ func (p *PKI) GetCertificateAuthority() error {
 // SSH user certificates and a private key used for signing host certificates.
 func (p *PKI) GenerateSSHSigningKeys(password []byte) error {
 	// Enable SSH
-	p.options.enableSSH = true
+	p.options.enableSSH = true // TODO(hs): change this function to not mutate configuration state
 
 	// Create SSH key used to sign host certificates. Using
 	// kmsapi.UnspecifiedSignAlgorithm will default to the default algorithm.

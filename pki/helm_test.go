@@ -2,9 +2,13 @@ package pki
 
 import (
 	"bytes"
+	"crypto/sha256"
 	"crypto/x509"
+	"encoding/hex"
 	"encoding/json"
+	"encoding/pem"
 	"os"
+	"strings"
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
@@ -106,12 +110,12 @@ func TestPKI_WriteHelmTemplate(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			o := tt.fields.casOptions
 			opts := tt.fields.pkiOptions
+
 			// TODO(hs): invoking `New` doesn't perform all operations that are executed
-			// when `ca init --helm` is executed. The list of provisioners on the authority
-			// is not populated, for example, resulting in this test not being entirely
-			// realistic. Ideally this logic should be handled in one place and probably
-			// inside of the PKI initialization, but if that becomes messy, some more
-			// logic needs to be performed here to get the PKI instance in good shape.
+			// when `ca init --helm` is executed. Ideally this logic should be handled
+			// in one place and probably inside of the PKI initialization. For testing
+			// purposes the missing operations to fill a Helm template fully are faked
+			// by `setKeyPair`, `setCertificates` and `setSSHSigningKeys`
 			p, err := New(o, opts...)
 			assert.NoError(t, err)
 
@@ -124,10 +128,10 @@ func TestPKI_WriteHelmTemplate(t *testing.T) {
 			// The password for the predefined encrypted key is \x01\x03\x03\x07.
 			setKeyPair(t, p)
 
-			// setFiles sets some static intermediate and root CA certificate bytes. It
+			// setCertificates sets some static intermediate and root CA certificate bytes. It
 			// replaces the logic executed in `p.GenerateRootCertificate`, `p.WriteRootCertificate`,
 			// and `p.GenerateIntermediateCertificate`.
-			setFiles(t, p)
+			setCertificates(t, p)
 
 			// setSSHSigningKeys sets predefined SSH user and host certificate and key bytes.
 			// This replaces the logic in `p.GenerateSSHSigningKeys`
@@ -175,7 +179,6 @@ func setKeyPair(t *testing.T, p *PKI) {
 		}
 	}
 
-	// Add JWK provisioner to the configuration.
 	publicKey, err := json.Marshal(p.ottPublicKey)
 	if err != nil {
 		t.Fatal(err)
@@ -199,12 +202,21 @@ func setKeyPair(t *testing.T, p *PKI) {
 	})
 }
 
-// setFiles sets some static, gibberish intermediate and root CA certificate bytes.
-func setFiles(t *testing.T, p *PKI) {
-	p.Files[p.Root[0]] = encodeCertificate(&x509.Certificate{Raw: []byte("these are just some fake root CA cert bytes")})
-	p.Files[p.RootKey[0]] = []byte("these are just some fake root CA key bytes")
+// setCertificates sets some static, gibberish intermediate and root CA certificate and key bytes.
+func setCertificates(t *testing.T, p *PKI) {
+	raw := []byte("these are just some fake root CA cert bytes")
+	p.Files[p.Root[0]] = encodeCertificate(&x509.Certificate{Raw: raw})
+	p.Files[p.RootKey[0]] = pem.EncodeToMemory(&pem.Block{
+		Type:  "EC PRIVATE KEY",
+		Bytes: []byte("these are just some fake root CA key bytes"),
+	})
 	p.Files[p.Intermediate] = encodeCertificate(&x509.Certificate{Raw: []byte("these are just some fake intermediate CA cert bytes")})
-	p.Files[p.IntermediateKey] = []byte("these are just some fake intermediate CA key bytes")
+	p.Files[p.IntermediateKey] = pem.EncodeToMemory(&pem.Block{
+		Type:  "EC PRIVATE KEY",
+		Bytes: []byte("these are just some fake intermediate CA key bytes"),
+	})
+	sum := sha256.Sum256(raw)
+	p.Defaults.Fingerprint = strings.ToLower(hex.EncodeToString(sum[:]))
 }
 
 // setSSHSigningKeys sets some static, gibberish ssh user and host CA certificate and key bytes.
@@ -214,8 +226,14 @@ func setSSHSigningKeys(t *testing.T, p *PKI) {
 		return
 	}
 
-	p.Files[p.Ssh.HostKey] = []byte("fake ssh host key bytes")
-	p.Files[p.Ssh.HostPublicKey] = []byte("fake ssh host cert bytes")
-	p.Files[p.Ssh.UserKey] = []byte("fake ssh user key bytes")
-	p.Files[p.Ssh.UserPublicKey] = []byte("fake ssh user cert bytes")
+	p.Files[p.Ssh.HostKey] = pem.EncodeToMemory(&pem.Block{
+		Type:  "EC PRIVATE KEY",
+		Bytes: []byte("fake ssh host key bytes"),
+	})
+	p.Files[p.Ssh.HostPublicKey] = []byte("ecdsa-sha2-nistp256 AAAAE2VjZHNhLXNoYTItbmlzdHAyNTYAAAAIbmlzdHAyNTYAAABBBJ0IdS5sZm6KITBMZLEJD6b5ROVraYHcAOr3feFel8r1Wp4DRPR1oU0W00J/zjNBRBbANlJoYN4x/8WNNVZ49Ms=")
+	p.Files[p.Ssh.UserKey] = pem.EncodeToMemory(&pem.Block{
+		Type:  "EC PRIVATE KEY",
+		Bytes: []byte("fake ssh user key bytes"),
+	})
+	p.Files[p.Ssh.UserPublicKey] = []byte("ecdsa-sha2-nistp256 AAAAE2VjZHNhLXNoYTItbmlzdHAyNTYAAAAIbmlzdHAyNTYAAABBBEWA1qUxaGwVNErsvEOGe2d6TvLMF+aiVpuOiIEvpMJ3JeJmecLQctjWqeIbpSvy6/gRa7c82Ge5rLlapYmOChs=")
 }

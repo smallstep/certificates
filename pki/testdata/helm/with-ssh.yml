@@ -35,7 +35,7 @@ inject:
       defaults.json:
         ca-url: https://127.0.0.1
         ca-config: /home/step/config/ca.json
-        fingerprint: 
+        fingerprint: e543cad8e9f6417076bb5aed3471c588152118aac1e0ca7984a43ee7f76da5e3
         root: /home/step/certs/root_ca.crt
 
   # Certificates contains the root and intermediate certificate and 
@@ -56,10 +56,10 @@ inject:
       -----END CERTIFICATE-----
       
     # ssh_host_ca contains the text of the public ssh key for the SSH root CA
-    ssh_host_ca: fake ssh host cert bytes
+    ssh_host_ca: ecdsa-sha2-nistp256 AAAAE2VjZHNhLXNoYTItbmlzdHAyNTYAAAAIbmlzdHAyNTYAAABBBJ0IdS5sZm6KITBMZLEJD6b5ROVraYHcAOr3feFel8r1Wp4DRPR1oU0W00J/zjNBRBbANlJoYN4x/8WNNVZ49Ms=
 
     # ssh_user_ca contains the text of the public ssh key for the SSH root CA
-    ssh_user_ca: fake ssh user cert bytes
+    ssh_user_ca: ecdsa-sha2-nistp256 AAAAE2VjZHNhLXNoYTItbmlzdHAyNTYAAAAIbmlzdHAyNTYAAABBBEWA1qUxaGwVNErsvEOGe2d6TvLMF+aiVpuOiIEvpMJ3JeJmecLQctjWqeIbpSvy6/gRa7c82Ge5rLlapYmOChs=
 
   # Secrets contains the root and intermediate keys and optionally the SSH
   # private keys
@@ -72,19 +72,32 @@ inject:
     x509:
       # intermediate_ca_key contains the contents of your encrypted intermediate CA key
       intermediate_ca_key: |
-        these are just some fake intermediate CA key bytes
+        -----BEGIN EC PRIVATE KEY-----
+        dGhlc2UgYXJlIGp1c3Qgc29tZSBmYWtlIGludGVybWVkaWF0ZSBDQSBrZXkgYnl0
+        ZXM=
+        -----END EC PRIVATE KEY-----
+        
 
       # root_ca_key contains the contents of your encrypted root CA key
       # Note that this value can be omitted without impacting the functionality of step-certificates
       # If supplied, this should be encrypted using a unique password that is not used for encrypting
       # the intermediate_ca_key, ssh.host_ca_key or ssh.user_ca_key.
       root_ca_key: |
-        these are just some fake root CA key bytes
+        -----BEGIN EC PRIVATE KEY-----
+        dGhlc2UgYXJlIGp1c3Qgc29tZSBmYWtlIHJvb3QgQ0Ega2V5IGJ5dGVz
+        -----END EC PRIVATE KEY-----
+        
     ssh:
       # ssh_host_ca_key contains the contents of your encrypted SSH Host CA key
       host_ca_key: |
-        fake ssh host key bytes
+        -----BEGIN EC PRIVATE KEY-----
+        ZmFrZSBzc2ggaG9zdCBrZXkgYnl0ZXM=
+        -----END EC PRIVATE KEY-----
+        
 
       # ssh_user_ca_key contains the contents of your encrypted SSH User CA key
       user_ca_key: |
-        fake ssh user key bytes
+        -----BEGIN EC PRIVATE KEY-----
+        ZmFrZSBzc2ggdXNlciBrZXkgYnl0ZXM=
+        -----END EC PRIVATE KEY-----
+        

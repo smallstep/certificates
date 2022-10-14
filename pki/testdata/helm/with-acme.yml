@@ -33,7 +33,7 @@ inject:
       defaults.json:
         ca-url: https://127.0.0.1
         ca-config: /home/step/config/ca.json
-        fingerprint: 
+        fingerprint: e543cad8e9f6417076bb5aed3471c588152118aac1e0ca7984a43ee7f76da5e3
         root: /home/step/certs/root_ca.crt
 
   # Certificates contains the root and intermediate certificate and 
@@ -65,11 +65,18 @@ inject:
     x509:
       # intermediate_ca_key contains the contents of your encrypted intermediate CA key
       intermediate_ca_key: |
-        these are just some fake intermediate CA key bytes
+        -----BEGIN EC PRIVATE KEY-----
+        dGhlc2UgYXJlIGp1c3Qgc29tZSBmYWtlIGludGVybWVkaWF0ZSBDQSBrZXkgYnl0
+        ZXM=
+        -----END EC PRIVATE KEY-----
+        
 
       # root_ca_key contains the contents of your encrypted root CA key
       # Note that this value can be omitted without impacting the functionality of step-certificates
       # If supplied, this should be encrypted using a unique password that is not used for encrypting
       # the intermediate_ca_key, ssh.host_ca_key or ssh.user_ca_key.
       root_ca_key: |
-        these are just some fake root CA key bytes
+        -----BEGIN EC PRIVATE KEY-----
+        dGhlc2UgYXJlIGp1c3Qgc29tZSBmYWtlIHJvb3QgQ0Ega2V5IGJ5dGVz
+        -----END EC PRIVATE KEY-----
+        
