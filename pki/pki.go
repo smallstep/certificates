@@ -175,18 +175,19 @@ func GetProvisionerKey(caURL, rootFile, kid string) (string, error) {
 }
 
 type options struct {
-	provisioner        string
-	pkiOnly            bool
-	enableACME         bool
-	enableSSH          bool
-	enableAdmin        bool
-	noDB               bool
-	isHelm             bool
-	deploymentType     DeploymentType
-	rootKeyURI         string
-	intermediateKeyURI string
-	hostKeyURI         string
-	userKeyURI         string
+	provisioner            string
+	firstSuperAdminSubject string
+	pkiOnly                bool
+	enableACME             bool
+	enableSSH              bool
+	enableAdmin            bool
+	noDB                   bool
+	isHelm                 bool
+	deploymentType         DeploymentType
+	rootKeyURI             string
+	intermediateKeyURI     string
+	hostKeyURI             string
+	userKeyURI             string
 }
 
 // Option is the type of a configuration option on the pki constructor.
@@ -217,6 +218,15 @@ func WithDNSNames(s []string) Option {
 func WithProvisioner(s string) Option {
 	return func(p *PKI) {
 		p.options.provisioner = s
+	}
+}
+
+// WithFirstSuperAdminSubject defines the subject of the first
+// super admin for use with the Admin API. The admin will belong
+// to the first JWK provisioner.
+func WithFirstSuperAdminSubject(s string) Option {
+	return func(p *PKI) {
+		p.options.firstSuperAdminSubject = s
 	}
 }
 
@@ -886,6 +896,11 @@ func (p *PKI) GenerateConfig(opt ...ConfigOption) (*authconfig.Config, error) {
 			//
 			// Note that we might want to be able to define the database as a
 			// flag in `step ca init` so we can write to the proper place.
+			//
+			// TODO(hs): the logic for creating the provisioners and the super admin
+			// is similar to what's done when automatically migrating the provisioners.
+			// This is related to the existing comment above. Refactor this to exist in
+			// a single place and ensure it happensonly once.
 			_db, err := db.New(cfg.DB)
 			if err != nil {
 				return nil, err
@@ -909,9 +924,13 @@ func (p *PKI) GenerateConfig(opt ...ConfigOption) (*authconfig.Config, error) {
 				}
 			}
 			// Add the first provisioner as an admin.
+			firstSuperAdminSubject := "step"
+			if p.options.firstSuperAdminSubject != "" {
+				firstSuperAdminSubject = p.options.firstSuperAdminSubject
+			}
 			if err := adminDB.CreateAdmin(context.Background(), &linkedca.Admin{
 				AuthorityId:   admin.DefaultAuthorityID,
-				Subject:       "step",
+				Subject:       firstSuperAdminSubject,
 				Type:          linkedca.Admin_SUPER_ADMIN,
 				ProvisionerId: adminID,
 			}); err != nil {

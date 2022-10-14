@@ -663,6 +663,14 @@ func (a *Authority) init() error {
 			}
 
 			// Create first super admin, belonging to the first JWK provisioner
+			// TODO(hs): pass a user-provided first super admin subject to here. With `ca init` it's
+			// added to the DB immediately if using remote management. But when migrating from
+			// ca.json to the DB, this option doesn't exist. Adding a flag just to do it during
+			// migration isn't nice. We could opt for a user to change it afterwards. There exist
+			// cases in which creation of `step` could lock out a user from API access. This is the
+			// case if `step` isn't allowed to be signed by Name Constraints or the X.509 policy.
+			// We have protection for that when creating and updating a policy, but if a policy or
+			// Name Constraints are in use at the time of migration, that could lock the user out.
 			firstSuperAdminSubject := "step"
 			if err := a.adminDB.CreateAdmin(ctx, &linkedca.Admin{
 				ProvisionerId: firstJWKProvisioner.Id,

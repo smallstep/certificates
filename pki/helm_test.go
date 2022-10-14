@@ -21,148 +21,125 @@ import (
 )
 
 func TestPKI_WriteHelmTemplate(t *testing.T) {
-	type fields struct {
-		casOptions apiv1.Options
-		pkiOptions []Option
+	var preparePKI = func(t *testing.T, opts ...Option) *PKI {
+		o := apiv1.Options{
+			Type:      "softcas",
+			IsCreator: true,
+		}
+
+		// Add default WithHelm option
+		opts = append(opts, WithHelm())
+
+		// TODO(hs): invoking `New` doesn't perform all operations that are executed
+		// when `ca init --helm` is executed. Ideally this logic should be handled
+		// in one place and probably inside of the PKI initialization. For testing
+		// purposes the missing operations to fill a Helm template fully are faked
+		// by `setKeyPair`, `setCertificates` and `setSSHSigningKeys`
+		p, err := New(o, opts...)
+		assert.NoError(t, err)
+
+		// setKeyPair sets a predefined JWK and a default JWK provisioner. This is one
+		// of the things performed in the `ca init` code that's not part of `New`, but
+		// performed after that in p.GenerateKeyPairs`. We're currently using the same
+		// JWK for every test to keep test variance small: we're not testing JWK generation
+		// here after all. It's a bit dangerous to redefine the function here, but it's
+		// the simplest way to make this fully testable without refactoring the init now.
+		// The password for the predefined encrypted key is \x01\x03\x03\x07.
+		setKeyPair(t, p)
+
+		// setCertificates sets some static intermediate and root CA certificate bytes. It
+		// replaces the logic executed in `p.GenerateRootCertificate`, `p.WriteRootCertificate`,
+		// and `p.GenerateIntermediateCertificate`.
+		setCertificates(t, p)
+
+		// setSSHSigningKeys sets predefined SSH user and host certificate and key bytes.
+		// This replaces the logic in `p.GenerateSSHSigningKeys`
+		setSSHSigningKeys(t, p)
+
+		return p
 	}
-	tests := []struct {
-		name     string
-		fields   fields
+	type test struct {
+		pki      *PKI
 		testFile string
 		wantErr  bool
-	}{
-		{
-			name: "ok/simple",
-			fields: fields{
-				pkiOptions: []Option{
-					WithHelm(),
-				},
-				casOptions: apiv1.Options{
-					Type:      "softcas",
-					IsCreator: true,
-				},
-			},
-			testFile: "testdata/helm/simple.yml",
-			wantErr:  false,
+	}
+	var tests = map[string]func(t *testing.T) test{
+		"ok/simple": func(t *testing.T) test {
+			return test{
+				pki:      preparePKI(t),
+				testFile: "testdata/helm/simple.yml",
+				wantErr:  false,
+			}
 		},
-		{
-			name: "ok/with-provisioner",
-			fields: fields{
-				pkiOptions: []Option{
-					WithHelm(),
-					WithProvisioner("a-provisioner"),
-				},
-				casOptions: apiv1.Options{
-					Type:      "softcas",
-					IsCreator: true,
-				},
-			},
-			testFile: "testdata/helm/with-provisioner.yml",
-			wantErr:  false,
+		"ok/with-provisioner": func(t *testing.T) test {
+			return test{
+				pki:      preparePKI(t, WithProvisioner("a-provisioner")),
+				testFile: "testdata/helm/with-provisioner.yml",
+				wantErr:  false,
+			}
 		},
-		{
-			name: "ok/with-acme",
-			fields: fields{
-				pkiOptions: []Option{
-					WithHelm(),
-					WithACME(),
-				},
-				casOptions: apiv1.Options{
-					Type:      "softcas",
-					IsCreator: true,
-				},
-			},
-			testFile: "testdata/helm/with-acme.yml",
-			wantErr:  false,
+		"ok/with-acme": func(t *testing.T) test {
+			return test{
+				pki:      preparePKI(t, WithACME()),
+				testFile: "testdata/helm/with-acme.yml",
+				wantErr:  false,
+			}
 		},
-		{
-			name: "ok/with-admin",
-			fields: fields{
-				pkiOptions: []Option{
-					WithHelm(),
-					WithAdmin(),
-				},
-				casOptions: apiv1.Options{
-					Type:      "softcas",
-					IsCreator: true,
-				},
-			},
-			testFile: "testdata/helm/with-admin.yml",
-			wantErr:  false,
+		"ok/with-admin": func(t *testing.T) test {
+			return test{
+				pki:      preparePKI(t, WithAdmin()),
+				testFile: "testdata/helm/with-admin.yml",
+				wantErr:  false,
+			}
 		},
-		{
-			name: "ok/with-ssh",
-			fields: fields{
-				pkiOptions: []Option{
-					WithHelm(),
-					WithSSH(),
-				},
-				casOptions: apiv1.Options{
-					Type:      "softcas",
-					IsCreator: true,
-				},
-			},
-			testFile: "testdata/helm/with-ssh.yml",
-			wantErr:  false,
+		"ok/with-ssh": func(t *testing.T) test {
+			return test{
+				pki:      preparePKI(t, WithSSH()),
+				testFile: "testdata/helm/with-ssh.yml",
+				wantErr:  false,
+			}
 		},
-		{
-			name: "ok/with-ssh-and-acme",
-			fields: fields{
-				pkiOptions: []Option{
-					WithHelm(),
-					WithACME(),
-					WithSSH(),
+		"ok/with-ssh-and-acme": func(t *testing.T) test {
+			return test{
+				pki:      preparePKI(t, WithSSH(), WithACME()),
+				testFile: "testdata/helm/with-ssh-and-acme.yml",
+				wantErr:  false,
+			}
+		},
+		"fail/authority.ProvisionerToCertificates": func(t *testing.T) test {
+			pki := preparePKI(t)
+			pki.Authority.Provisioners = append(pki.Authority.Provisioners,
+				&linkedca.Provisioner{
+					Type:    linkedca.Provisioner_JWK,
+					Name:    "Broken JWK",
+					Details: nil,
 				},
-				casOptions: apiv1.Options{
-					Type:      "softcas",
-					IsCreator: true,
-				},
-			},
-			testFile: "testdata/helm/with-ssh-and-acme.yml",
-			wantErr:  false,
+			)
+			return test{
+				pki:     pki,
+				wantErr: true,
+			}
 		},
 	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			o := tt.fields.casOptions
-			opts := tt.fields.pkiOptions
-
-			// TODO(hs): invoking `New` doesn't perform all operations that are executed
-			// when `ca init --helm` is executed. Ideally this logic should be handled
-			// in one place and probably inside of the PKI initialization. For testing
-			// purposes the missing operations to fill a Helm template fully are faked
-			// by `setKeyPair`, `setCertificates` and `setSSHSigningKeys`
-			p, err := New(o, opts...)
-			assert.NoError(t, err)
-
-			// setKeyPair sets a predefined JWK and a default JWK provisioner. This is one
-			// of the things performed in the `ca init` code that's not part of `New`, but
-			// performed after that in p.GenerateKeyPairs`. We're currently using the same
-			// JWK for every test to keep test variance small: we're not testing JWK generation
-			// here after all. It's a bit dangerous to redefine the function here, but it's
-			// the simplest way to make this fully testable without refactoring the init now.
-			// The password for the predefined encrypted key is \x01\x03\x03\x07.
-			setKeyPair(t, p)
-
-			// setCertificates sets some static intermediate and root CA certificate bytes. It
-			// replaces the logic executed in `p.GenerateRootCertificate`, `p.WriteRootCertificate`,
-			// and `p.GenerateIntermediateCertificate`.
-			setCertificates(t, p)
-
-			// setSSHSigningKeys sets predefined SSH user and host certificate and key bytes.
-			// This replaces the logic in `p.GenerateSSHSigningKeys`
-			setSSHSigningKeys(t, p)
+	for name, run := range tests {
+		tc := run(t)
+		t.Run(name, func(t *testing.T) {
 
 			w := &bytes.Buffer{}
-			if err := p.WriteHelmTemplate(w); (err != nil) != tt.wantErr {
-				t.Errorf("PKI.WriteHelmTemplate() error = %v, wantErr %v", err, tt.wantErr)
+			if err := tc.pki.WriteHelmTemplate(w); (err != nil) != tc.wantErr {
+				t.Errorf("PKI.WriteHelmTemplate() error = %v, wantErr %v", err, tc.wantErr)
 				return
 			}
 
-			wantBytes, err := os.ReadFile(tt.testFile)
+			if tc.wantErr {
+				// don't compare output if an error was expected on output
+				return
+			}
+
+			wantBytes, err := os.ReadFile(tc.testFile)
 			assert.NoError(t, err)
 			if diff := cmp.Diff(wantBytes, w.Bytes()); diff != "" {
-				t.Logf("Generated Helm template did not match reference %q\n", tt.testFile)
+				t.Logf("Generated Helm template did not match reference %q\n", tc.testFile)
 				t.Errorf("Diff follows:\n%s\n", diff)
 				t.Errorf("Full output:\n%s\n", w.Bytes())
 			}
