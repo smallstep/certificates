@@ -35,18 +35,14 @@ func (p *PKI) WriteHelmTemplate(w io.Writer) error {
 		p.Ssh = nil
 	}
 
-	// Convert provisioner to ca.json
-	numberOfProvisioners := len(p.Authority.Provisioners)
-	if p.options.enableACME {
-		numberOfProvisioners++
-	}
-	provisioners := make([]provisioner.Interface, numberOfProvisioners)
-	for i, p := range p.Authority.Provisioners {
+	// Convert provisioners to ca.json representation
+	provisioners := []provisioner.Interface{}
+	for _, p := range p.Authority.Provisioners {
 		pp, err := authority.ProvisionerToCertificates(p)
 		if err != nil {
 			return err
 		}
-		provisioners[i] = pp
+		provisioners = append(provisioners, pp)
 	}
 
 	// Add default ACME provisioner if enabled. Note that this logic is similar
@@ -56,14 +52,23 @@ func (p *PKI) WriteHelmTemplate(w io.Writer) error {
 	// TODO(hs): consider refactoring the initialization, so that this becomes
 	// easier to reason about and maintain.
 	if p.options.enableACME {
-		provisioners[len(provisioners)-1] = &provisioner.ACME{
+		provisioners = append(provisioners, &provisioner.ACME{
 			Type: "ACME",
 			Name: "acme",
-		}
+		})
 	}
 
-	// TODO(hs): add default SSHPOP provisioner if SSH is configured, similar
-	// as the ACME one above.
+	// Add default SSHPOP provisioner if enabled. Similar to the above, this is
+	// the same as what happens in p.GenerateConfig().
+	if p.options.enableSSH {
+		provisioners = append(provisioners, &provisioner.SSHPOP{
+			Type: "SSHPOP",
+			Name: "sshpop",
+			Claims: &provisioner.Claims{
+				EnableSSHCA: &p.options.enableSSH,
+			},
+		})
+	}
 
 	if err := tmpl.Execute(w, helmVariables{
 		Configuration: &p.Configuration,

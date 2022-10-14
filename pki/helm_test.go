@@ -105,6 +105,22 @@ func TestPKI_WriteHelmTemplate(t *testing.T) {
 			testFile: "testdata/helm/with-ssh.yml",
 			wantErr:  false,
 		},
+		{
+			name: "ok/with-ssh-and-acme",
+			fields: fields{
+				pkiOptions: []Option{
+					WithHelm(),
+					WithACME(),
+					WithSSH(),
+				},
+				casOptions: apiv1.Options{
+					Type:      "softcas",
+					IsCreator: true,
+				},
+			},
+			testFile: "testdata/helm/with-ssh-and-acme.yml",
+			wantErr:  false,
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
