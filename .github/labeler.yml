@@ -1,4 +1,0 @@
-needs triage:
-  - '**'      # index.php | src/main.php
-  - '.*'      # .gitignore
-  - '.*/**'   # .github/workflows/label.yml
