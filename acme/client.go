@@ -72,7 +72,12 @@ func (c *client) Get(url string) (*http.Response, error) {
 }
 
 func (c *client) LookupTxt(name string) ([]string, error) {
-	return net.LookupTXT(name)
+	// chase CNAME records, if any
+	cname, err := net.LookupCNAME(name)
+	if err != nil {
+		return nil, err
+	}
+	return net.LookupTXT(cname)
 }
 
 func (c *client) TLSDial(network, addr string, config *tls.Config) (*tls.Conn, error) {
