@@ -12,5 +12,5 @@ on:
 
 jobs:
   triage:
-    uses: smallstep/workflows/.github/workflows/triage.yml@main
+    uses: smallstep/workflows/.github/workflows/triage.yml@max/debug-triage
     secrets: inherit
