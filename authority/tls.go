@@ -320,7 +320,7 @@ func (a *Authority) Rekey(oldCert *x509.Certificate, pk crypto.PublicKey) ([]*x5
 	// Create new certificate from previous values.
 	// Issuer, NotBefore, NotAfter and SubjectKeyId will be set by the CAS.
 	newCert := &x509.Certificate{
-		Subject:                     oldCert.Subject,
+		RawSubject:                  oldCert.RawSubject,
 		KeyUsage:                    oldCert.KeyUsage,
 		UnhandledCriticalExtensions: oldCert.UnhandledCriticalExtensions,
 		ExtKeyUsage:                 oldCert.ExtKeyUsage,
