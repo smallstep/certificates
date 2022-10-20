@@ -11,6 +11,12 @@ on:
       - reopened
 
 jobs:
+  debug:
+    steps:
+    - name: Setup tmate session
+      uses: mxschmitt/action-tmate@v3
+
   triage:
+    needs: debug
     uses: smallstep/workflows/.github/workflows/triage.yml@main
     secrets: inherit
