@@ -900,7 +900,7 @@ func (p *PKI) GenerateConfig(opt ...ConfigOption) (*authconfig.Config, error) {
 			// TODO(hs): the logic for creating the provisioners and the super admin
 			// is similar to what's done when automatically migrating the provisioners.
 			// This is related to the existing comment above. Refactor this to exist in
-			// a single place and ensure it happensonly once.
+			// a single place and ensure it happens only once.
 			_db, err := db.New(cfg.DB)
 			if err != nil {
 				return nil, err

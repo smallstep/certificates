@@ -94,7 +94,7 @@ type Authority struct {
 	// If true, do not initialize the authority
 	skipInit bool
 
-	// If true, does not output initialization logs
+	// If true, do not output initialization logs
 	quietInit bool
 }
 
@@ -603,9 +603,13 @@ func (a *Authority) init() error {
 			return admin.WrapErrorISE(err, "error loading provisioners to initialize authority")
 		}
 		if len(provs) == 0 && !strings.EqualFold(a.config.AuthorityConfig.DeploymentType, "linked") {
+			// Migration will currently only be kicked off once, because either one or more provisioners
+			// are migrated or a default JWK provisioner will be created in the DB. It won't run for
+			// linked or hosted deployments. Not for linked, because that case is explicitly checked
+			// for above. Not for hosted, because there'll be at least an existing OIDC provisioner.
 			var firstJWKProvisioner *linkedca.Provisioner
 			if len(a.config.AuthorityConfig.Provisioners) > 0 {
-				// Existing provisioners detected; try migrating them to DB storage
+				// Existing provisioners detected; try migrating them to DB storage.
 				a.initLogf("Starting migration of provisioners")
 				for _, p := range a.config.AuthorityConfig.Provisioners {
 					lp, err := ProvisionerToLinkedca(p)
@@ -621,14 +625,12 @@ func (a *Authority) init() error {
 					// Mark the first JWK provisioner, so that it can be used for administration purposes
 					if firstJWKProvisioner == nil && lp.Type == linkedca.Provisioner_JWK {
 						firstJWKProvisioner = lp
-						a.initLogf("Migrated JWK provisioner %q with admin permissions", p.GetName()) // TODO(hs): change the wording?
+						a.initLogf("Migrated JWK provisioner %q with admin permissions", p.GetName())
 					} else {
 						a.initLogf("Migrated %s provisioner %q", p.GetType(), p.GetName())
 					}
 				}
 
-				// TODO(hs): test if this works with LinkedCA too. Also could be useful
-				// for printing out where the configuration is read from in case of LinkedCA.
 				c := a.config
 				if c.WasLoadedFromFile() {
 					// TODO(hs): check if prerequisites for writing files look OK (user/group, permission bits, etc) as
@@ -659,7 +661,7 @@ func (a *Authority) init() error {
 				if err != nil {
 					return admin.WrapErrorISE(err, "error creating first provisioner")
 				}
-				a.initLogf("Created JWK provisioner %q with admin permissions", firstJWKProvisioner.GetName()) // TODO(hs): change the wording?
+				a.initLogf("Created JWK provisioner %q with admin permissions", firstJWKProvisioner.GetName())
 			}
 
 			// Create first super admin, belonging to the first JWK provisioner
