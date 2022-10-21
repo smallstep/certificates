@@ -139,6 +139,13 @@ func generateIntermidiateCertificate(t *testing.T, issuer *x509.Certificate, sig
 	return cert, priv
 }
 
+func withSubject(sub pkix.Name) provisioner.CertificateModifierFunc {
+	return func(crt *x509.Certificate, _ provisioner.SignOptions) error {
+		crt.Subject = sub
+		return nil
+	}
+}
+
 func withProvisionerOID(name, kid string) provisioner.CertificateModifierFunc {
 	return func(crt *x509.Certificate, _ provisioner.SignOptions) error {
 		b, err := asn1.Marshal(stepProvisionerASN1{
@@ -952,6 +959,18 @@ func TestAuthority_Renew(t *testing.T) {
 		withProvisionerOID("Max", a.config.AuthorityConfig.Provisioners[0].(*provisioner.JWK).Key.KeyID),
 		withSigner(issuer, signer))
 
+	certExtraNames := generateCertificate(t, "renew", []string{"test.smallstep.com", "test"},
+		withSubject(pkix.Name{
+			CommonName: "renew",
+			ExtraNames: []pkix.AttributeTypeAndValue{
+				{Type: asn1.ObjectIdentifier{0, 9, 2342, 19200300, 100, 1, 25}, Value: "dc"},
+			},
+		}),
+		withNotBeforeNotAfter(so.NotBefore.Time(), so.NotAfter.Time()),
+		withDefaultASN1DN(a.config.AuthorityConfig.Template),
+		withProvisionerOID("Max", a.config.AuthorityConfig.Provisioners[0].(*provisioner.JWK).Key.KeyID),
+		withSigner(issuer, signer))
+
 	certNoRenew := generateCertificate(t, "renew", []string{"test.smallstep.com", "test"},
 		withNotBeforeNotAfter(so.NotBefore.Time(), so.NotAfter.Time()),
 		withDefaultASN1DN(a.config.AuthorityConfig.Template),
@@ -999,6 +1018,12 @@ func TestAuthority_Renew(t *testing.T) {
 			return &renewTest{
 				auth: a,
 				cert: cert,
+			}, nil
+		},
+		"ok/WithExtraNames": func() (*renewTest, error) {
+			return &renewTest{
+				auth: a,
+				cert: certExtraNames,
 			}, nil
 		},
 		"ok/success-new-intermediate": func() (*renewTest, error) {
@@ -1063,15 +1088,14 @@ func TestAuthority_Renew(t *testing.T) {
 					assert.True(t, leaf.NotAfter.Before(expiry.Add(time.Hour)))
 
 					tmplt := a.config.AuthorityConfig.Template
-					assert.Equals(t, leaf.Subject.String(),
-						pkix.Name{
-							Country:       []string{tmplt.Country},
-							Organization:  []string{tmplt.Organization},
-							Locality:      []string{tmplt.Locality},
-							StreetAddress: []string{tmplt.StreetAddress},
-							Province:      []string{tmplt.Province},
-							CommonName:    tmplt.CommonName,
-						}.String())
+					assert.Equals(t, leaf.RawSubject, tc.cert.RawSubject)
+					assert.Equals(t, leaf.Subject.Country, []string{tmplt.Country})
+					assert.Equals(t, leaf.Subject.Organization, []string{tmplt.Organization})
+					assert.Equals(t, leaf.Subject.Locality, []string{tmplt.Locality})
+					assert.Equals(t, leaf.Subject.StreetAddress, []string{tmplt.StreetAddress})
+					assert.Equals(t, leaf.Subject.Province, []string{tmplt.Province})
+					assert.Equals(t, leaf.Subject.CommonName, tmplt.CommonName)
+
 					assert.Equals(t, leaf.Issuer, intermediate.Subject)
 
 					assert.Equals(t, leaf.SignatureAlgorithm, x509.ECDSAWithSHA256)
