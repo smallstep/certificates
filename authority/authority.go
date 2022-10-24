@@ -637,7 +637,7 @@ func (a *Authority) init() error {
 					// the file by editing it. Automatic rewriting of the file was considered
 					// to be too surprising for users and not the right solution for all
 					// use cases, so we leave it up to users to this themselves.
-					a.initLogf("Provisioners that were migrated can now be removed from `ca.json` by editing it.")
+					a.initLogf("Provisioners that were migrated can now be removed from `ca.json` by editing it")
 				}
 
 				a.initLogf("Finished migrating provisioners")
