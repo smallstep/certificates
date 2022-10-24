@@ -129,7 +129,7 @@ func TestHandler_GetDirectory(t *testing.T) {
 				NewOrder:   fmt.Sprintf("%s/acme/%s/new-order", baseURL.String(), provName),
 				RevokeCert: fmt.Sprintf("%s/acme/%s/revoke-cert", baseURL.String(), provName),
 				KeyChange:  fmt.Sprintf("%s/acme/%s/key-change", baseURL.String(), provName),
-				Meta: Meta{
+				Meta: &Meta{
 					ExternalAccountRequired: true,
 				},
 			}

@@ -205,7 +205,7 @@ type Directory struct {
 	NewOrder   string `json:"newOrder"`
 	RevokeCert string `json:"revokeCert"`
 	KeyChange  string `json:"keyChange"`
-	Meta       Meta   `json:"meta"`
+	Meta       *Meta  `json:"meta,omitempty"`
 }
 
 // ToLog enables response logging for the Directory type.
@@ -228,16 +228,21 @@ func GetDirectory(w http.ResponseWriter, r *http.Request) {
 	}
 
 	linker := acme.MustLinkerFromContext(ctx)
-	render.JSON(w, &Directory{
+	directory := &Directory{
 		NewNonce:   linker.GetLink(ctx, acme.NewNonceLinkType),
 		NewAccount: linker.GetLink(ctx, acme.NewAccountLinkType),
 		NewOrder:   linker.GetLink(ctx, acme.NewOrderLinkType),
 		RevokeCert: linker.GetLink(ctx, acme.RevokeCertLinkType),
 		KeyChange:  linker.GetLink(ctx, acme.KeyChangeLinkType),
-		Meta: Meta{
+	}
+	// Only add the ACME `meta` object when one (or more) of its
+	// properties is set.
+	if acmeProv.RequireEAB {
+		directory.Meta = &Meta{
 			ExternalAccountRequired: acmeProv.RequireEAB,
-		},
-	})
+		}
+	}
+	render.JSON(w, directory)
 }
 
 // NotImplemented returns a 501 and is generally a placeholder for functionality which
