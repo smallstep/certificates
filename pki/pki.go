@@ -175,19 +175,19 @@ func GetProvisionerKey(caURL, rootFile, kid string) (string, error) {
 }
 
 type options struct {
-	provisioner            string
-	firstSuperAdminSubject string
-	pkiOnly                bool
-	enableACME             bool
-	enableSSH              bool
-	enableAdmin            bool
-	noDB                   bool
-	isHelm                 bool
-	deploymentType         DeploymentType
-	rootKeyURI             string
-	intermediateKeyURI     string
-	hostKeyURI             string
-	userKeyURI             string
+	provisioner        string
+	superAdminSubject  string
+	pkiOnly            bool
+	enableACME         bool
+	enableSSH          bool
+	enableAdmin        bool
+	noDB               bool
+	isHelm             bool
+	deploymentType     DeploymentType
+	rootKeyURI         string
+	intermediateKeyURI string
+	hostKeyURI         string
+	userKeyURI         string
 }
 
 // Option is the type of a configuration option on the pki constructor.
@@ -221,12 +221,12 @@ func WithProvisioner(s string) Option {
 	}
 }
 
-// WithFirstSuperAdminSubject defines the subject of the first
+// WithSuperAdminSubject defines the subject of the first
 // super admin for use with the Admin API. The admin will belong
 // to the first JWK provisioner.
-func WithFirstSuperAdminSubject(s string) Option {
+func WithSuperAdminSubject(s string) Option {
 	return func(p *PKI) {
-		p.options.firstSuperAdminSubject = s
+		p.options.superAdminSubject = s
 	}
 }
 
@@ -924,13 +924,13 @@ func (p *PKI) GenerateConfig(opt ...ConfigOption) (*authconfig.Config, error) {
 				}
 			}
 			// Add the first provisioner as an admin.
-			firstSuperAdminSubject := "step"
-			if p.options.firstSuperAdminSubject != "" {
-				firstSuperAdminSubject = p.options.firstSuperAdminSubject
+			superAdminSubject := "step"
+			if p.options.superAdminSubject != "" {
+				superAdminSubject = p.options.superAdminSubject
 			}
 			if err := adminDB.CreateAdmin(context.Background(), &linkedca.Admin{
 				AuthorityId:   admin.DefaultAuthorityID,
-				Subject:       firstSuperAdminSubject,
+				Subject:       superAdminSubject,
 				Type:          linkedca.Admin_SUPER_ADMIN,
 				ProvisionerId: adminID,
 			}); err != nil {

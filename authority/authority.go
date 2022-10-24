@@ -633,23 +633,11 @@ func (a *Authority) init() error {
 
 				c := a.config
 				if c.WasLoadedFromFile() {
-					// TODO(hs): check if prerequisites for writing files look OK (user/group, permission bits, etc) as
-					// extra safety check before trying to write at all?
-
-					// Remove the existing provisioners from the authority configuration
-					// and commit it to the existing configuration file. NOTE: committing
-					// the configuration at this point also writes other properties that
-					// have been initialized with default values, such as the `backdate` and
-					// `template` settings in the `authority`.
-					oldProvisioners := c.AuthorityConfig.Provisioners
-					c.AuthorityConfig.Provisioners = []provisioner.Interface{}
-					if err := c.Commit(); err != nil {
-						// Restore the provisioners in in-memory representation for consistency
-						// when writing the updated configuration fails. This is considered a soft
-						// error, so execution can continue.
-						c.AuthorityConfig.Provisioners = oldProvisioners
-						a.initLogf("Failed removing provisioners from configuration: %v", err)
-					}
+					// The provisioners in the configuration file can be deleted from
+					// the file by editing it. Automatic rewriting of the file was considered
+					// to be too surprising for users and not the right solution for all
+					// use cases, so we leave it up to users to this themselves.
+					a.initLogf("Provisioners that were migrated can now be removed from `ca.json` by editing it.")
 				}
 
 				a.initLogf("Finished migrating provisioners")
@@ -673,16 +661,16 @@ func (a *Authority) init() error {
 			// case if `step` isn't allowed to be signed by Name Constraints or the X.509 policy.
 			// We have protection for that when creating and updating a policy, but if a policy or
 			// Name Constraints are in use at the time of migration, that could lock the user out.
-			firstSuperAdminSubject := "step"
+			superAdminSubject := "step"
 			if err := a.adminDB.CreateAdmin(ctx, &linkedca.Admin{
 				ProvisionerId: firstJWKProvisioner.Id,
-				Subject:       firstSuperAdminSubject,
+				Subject:       superAdminSubject,
 				Type:          linkedca.Admin_SUPER_ADMIN,
 			}); err != nil {
 				return admin.WrapErrorISE(err, "error creating first admin")
 			}
 
-			a.initLogf("Created super admin %q for JWK provisioner %q", firstSuperAdminSubject, firstJWKProvisioner.GetName())
+			a.initLogf("Created super admin %q for JWK provisioner %q", superAdminSubject, firstJWKProvisioner.GetName())
 		}
 	}
 
