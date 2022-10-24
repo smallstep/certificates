@@ -75,7 +75,7 @@ type Config struct {
 	SkipValidation   bool                 `json:"-"`
 
 	// Keeps record of the filename the Config is read from
-	loadedFromFilename string
+	loadedFromFilepath string
 }
 
 // ASN1DN contains ASN1.DN attributes that are used in Subject and Issuer
@@ -167,7 +167,7 @@ func LoadConfiguration(filename string) (*Config, error) {
 	}
 
 	// store filename that was read to populate Config
-	c.loadedFromFilename = filename
+	c.loadedFromFilepath = filename
 
 	// initialize the Config
 	c.Init()
@@ -215,13 +215,19 @@ func (c *Config) Commit() error {
 	if !c.WasLoadedFromFile() {
 		return errors.New("cannot commit configuration if not loaded from file")
 	}
-	return c.Save(c.loadedFromFilename)
+	return c.Save(c.loadedFromFilepath)
 }
 
 // WasLoadedFromFile returns whether or not the Config was
-// read from a file.
+// loaded from a file.
 func (c *Config) WasLoadedFromFile() bool {
-	return c.loadedFromFilename != ""
+	return c.loadedFromFilepath != ""
+}
+
+// Filepath returns the path to the file the Config was
+// loaded from.
+func (c *Config) Filepath() string {
+	return c.loadedFromFilepath
 }
 
 // Validate validates the configuration.
