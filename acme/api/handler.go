@@ -234,15 +234,42 @@ func GetDirectory(w http.ResponseWriter, r *http.Request) {
 		NewOrder:   linker.GetLink(ctx, acme.NewOrderLinkType),
 		RevokeCert: linker.GetLink(ctx, acme.RevokeCertLinkType),
 		KeyChange:  linker.GetLink(ctx, acme.KeyChangeLinkType),
+		Meta:       createMetaObject(acmeProv),
 	}
-	// Only add the ACME `meta` object when one (or more) of its
-	// properties is set.
-	if acmeProv.RequireEAB {
-		directory.Meta = &Meta{
-			ExternalAccountRequired: acmeProv.RequireEAB,
+
+	render.JSON(w, directory)
+}
+
+// createMetaObject creates a Meta object if the ACME provisioner
+// has one or more properties that are written in the ACME directory output.
+// It returns nil if none of the properties are set.
+func createMetaObject(p *provisioner.ACME) *Meta {
+	if shouldAddMetaObject(p) {
+		return &Meta{
+			TermsOfService:          p.TermsOfService,
+			Website:                 p.Website,
+			CaaIdentities:           p.CaaIdentities,
+			ExternalAccountRequired: p.RequireEAB,
 		}
 	}
-	render.JSON(w, directory)
+	return nil
+}
+
+// shouldAddMetaObject returns whether or not the ACME provisioner
+// has properties configured that must be added to the ACME directory object.
+func shouldAddMetaObject(p *provisioner.ACME) bool {
+	switch {
+	case p.TermsOfService != "":
+		return true
+	case p.Website != "":
+		return true
+	case len(p.CaaIdentities) > 0 && p.CaaIdentities[0] != "":
+		return true
+	case p.RequireEAB:
+		return true
+	default:
+		return false
+	}
 }
 
 // NotImplemented returns a 501 and is generally a placeholder for functionality which
