@@ -1013,6 +1013,18 @@ func (p *PKI) Save(opt ...ConfigOption) error {
 			ui.PrintSelected("Default profile configuration", p.profileDefaults)
 		}
 		ui.PrintSelected("Certificate Authority configuration", p.config)
+		if cfg.AuthorityConfig.EnableAdmin && p.options.deploymentType != LinkedDeployment {
+			// TODO(hs): we may want to get this information from the DB, because that's
+			// where the admin and provisioner are stored in this case. Requires some
+			// refactoring.
+			superAdminSubject := "step"
+			if p.options.superAdminSubject != "" {
+				superAdminSubject = p.options.superAdminSubject
+			}
+			ui.PrintSelected("Admin provisioner", fmt.Sprintf("%s (JWK)", p.options.provisioner))
+			ui.PrintSelected("Super admin subject", superAdminSubject)
+		}
+
 		if p.options.deploymentType != LinkedDeployment {
 			ui.Println()
 			if p.casOptions.Is(apiv1.SoftCAS) {
