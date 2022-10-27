@@ -73,6 +73,11 @@ type Authority struct {
 	sshCAUserFederatedCerts []ssh.PublicKey
 	sshCAHostFederatedCerts []ssh.PublicKey
 
+	// CRL vars
+	crlTicker  *time.Ticker
+	crlStopper chan struct{}
+	crlMutex   sync.Mutex
+
 	// If true, do not re-initialize
 	initOnce  bool
 	startTime time.Time
@@ -711,6 +716,18 @@ func (a *Authority) init() error {
 		a.templates.Data["Step"] = tmplVars
 	}
 
+	// Start the CRL generator, we can assume the configuration is validated.
+	if a.config.CRL.IsEnabled() {
+		// Default cache duration to the default one
+		if v := a.config.CRL.CacheDuration; v == nil || v.Duration <= 0 {
+			a.config.CRL.CacheDuration = config.DefaultCRLCacheDuration
+		}
+		// Start CRL generator
+		if err := a.startCRLGenerator(); err != nil {
+			return err
+		}
+	}
+
 	// JWT numeric dates are seconds.
 	a.startTime = time.Now().Truncate(time.Second)
 	// Set flag indicating that initialization has been completed, and should
@@ -777,6 +794,11 @@ func (a *Authority) IsAdminAPIEnabled() bool {
 
 // Shutdown safely shuts down any clients, databases, etc. held by the Authority.
 func (a *Authority) Shutdown() error {
+	if a.crlTicker != nil {
+		a.crlTicker.Stop()
+		close(a.crlStopper)
+	}
+
 	if err := a.keyManager.Close(); err != nil {
 		log.Printf("error closing the key manager: %v", err)
 	}
@@ -785,6 +807,11 @@ func (a *Authority) Shutdown() error {
 
 // CloseForReload closes internal services, to allow a safe reload.
 func (a *Authority) CloseForReload() {
+	if a.crlTicker != nil {
+		a.crlTicker.Stop()
+		close(a.crlStopper)
+	}
+
 	if err := a.keyManager.Close(); err != nil {
 		log.Printf("error closing the key manager: %v", err)
 	}
@@ -825,11 +852,49 @@ func (a *Authority) requiresSCEPService() bool {
 	return false
 }
 
-// GetSCEPService returns the configured SCEP Service
-// TODO: this function is intended to exist temporarily
-// in order to make SCEP work more easily. It can be
-// made more correct by using the right interfaces/abstractions
-// after it works as expected.
+// GetSCEPService returns the configured SCEP Service.
+//
+// TODO: this function is intended to exist temporarily in order to make SCEP
+// work more easily. It can be made more correct by using the right
+// interfaces/abstractions after it works as expected.
 func (a *Authority) GetSCEPService() *scep.Service {
 	return a.scepService
+}
+
+func (a *Authority) startCRLGenerator() error {
+	if !a.config.CRL.IsEnabled() {
+		return nil
+	}
+
+	// Check that there is a valid CRL in the DB right now. If it doesn't exist
+	// or is expired, generate one now
+	_, ok := a.db.(db.CertificateRevocationListDB)
+	if !ok {
+		return errors.Errorf("CRL Generation requested, but database does not support CRL generation")
+	}
+
+	// Always create a new CRL on startup in case the CA has been down and the
+	// time to next expected CRL update is less than the cache duration.
+	if err := a.GenerateCertificateRevocationList(); err != nil {
+		return errors.Wrap(err, "could not generate a CRL")
+	}
+
+	a.crlStopper = make(chan struct{}, 1)
+	a.crlTicker = time.NewTicker(a.config.CRL.TickerDuration())
+
+	go func() {
+		for {
+			select {
+			case <-a.crlTicker.C:
+				log.Println("Regenerating CRL")
+				if err := a.GenerateCertificateRevocationList(); err != nil {
+					log.Printf("error regenerating the CRL: %v", err)
+				}
+			case <-a.crlStopper:
+				return
+			}
+		}
+	}()
+
+	return nil
 }

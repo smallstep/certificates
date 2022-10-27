@@ -49,6 +49,7 @@ type Authority interface {
 	GetRoots() ([]*x509.Certificate, error)
 	GetFederation() ([]*x509.Certificate, error)
 	Version() authority.Version
+	GetCertificateRevocationList() ([]byte, error)
 }
 
 // mustAuthority will be replaced on unit tests.
@@ -267,6 +268,7 @@ func Route(r Router) {
 	r.MethodFunc("POST", "/renew", Renew)
 	r.MethodFunc("POST", "/rekey", Rekey)
 	r.MethodFunc("POST", "/revoke", Revoke)
+	r.MethodFunc("GET", "/crl", CRL)
 	r.MethodFunc("GET", "/provisioners", Provisioners)
 	r.MethodFunc("GET", "/provisioners/{kid}/encrypted-key", ProvisionerKey)
 	r.MethodFunc("GET", "/roots", Roots)

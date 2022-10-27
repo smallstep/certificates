@@ -26,11 +26,13 @@ import (
 
 	"github.com/smallstep/assert"
 	"github.com/smallstep/certificates/api/render"
+	"github.com/smallstep/certificates/authority/config"
 	"github.com/smallstep/certificates/authority/policy"
 	"github.com/smallstep/certificates/authority/provisioner"
 	"github.com/smallstep/certificates/cas/softcas"
 	"github.com/smallstep/certificates/db"
 	"github.com/smallstep/certificates/errs"
+	"github.com/smallstep/nosql/database"
 )
 
 var (
@@ -1498,7 +1500,7 @@ func TestAuthority_Revoke(t *testing.T) {
 					return true, nil
 				},
 				MGetCertificate: func(sn string) (*x509.Certificate, error) {
-					return nil, nil
+					return nil, errors.New("not found")
 				},
 				Err: errors.New("force"),
 			}))
@@ -1538,7 +1540,7 @@ func TestAuthority_Revoke(t *testing.T) {
 					return true, nil
 				},
 				MGetCertificate: func(sn string) (*x509.Certificate, error) {
-					return nil, nil
+					return nil, errors.New("not found")
 				},
 				Err: db.ErrAlreadyExists,
 			}))
@@ -1803,6 +1805,151 @@ func TestAuthority_constraints(t *testing.T) {
 			_, err = auth.Renew(cert)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("Authority.Renew() error = %v, wantErr %v", err, tt.wantErr)
+			}
+		})
+	}
+}
+
+func TestAuthority_CRL(t *testing.T) {
+	reasonCode := 2
+	reason := "bob was let go"
+	validIssuer := "step-cli"
+	validAudience := testAudiences.Revoke
+	now := time.Now().UTC()
+	//
+	jwk, err := jose.ReadKey("testdata/secrets/step_cli_key_priv.jwk", jose.WithPassword([]byte("pass")))
+	assert.FatalError(t, err)
+	//
+	sig, err := jose.NewSigner(jose.SigningKey{Algorithm: jose.ES256, Key: jwk.Key},
+		(&jose.SignerOptions{}).WithType("JWT").WithHeader("kid", jwk.KeyID))
+	assert.FatalError(t, err)
+
+	crlCtx := provisioner.NewContextWithMethod(context.Background(), provisioner.RevokeMethod)
+
+	var crlStore db.CertificateRevocationListInfo
+	var revokedList []db.RevokedCertificateInfo
+
+	type test struct {
+		auth     *Authority
+		ctx      context.Context
+		expected []string
+		err      error
+	}
+	tests := map[string]func() test{
+		"fail/empty-crl": func() test {
+			a := testAuthority(t, WithDatabase(&db.MockAuthDB{
+				MUseToken: func(id, tok string) (bool, error) {
+					return true, nil
+				},
+				MGetCertificate: func(sn string) (*x509.Certificate, error) {
+					return nil, errors.New("not found")
+				},
+				MStoreCRL: func(i *db.CertificateRevocationListInfo) error {
+					crlStore = *i
+					return nil
+				},
+				MGetCRL: func() (*db.CertificateRevocationListInfo, error) {
+					return nil, database.ErrNotFound
+				},
+				MGetRevokedCertificates: func() (*[]db.RevokedCertificateInfo, error) {
+					return &revokedList, nil
+				},
+				MRevoke: func(rci *db.RevokedCertificateInfo) error {
+					revokedList = append(revokedList, *rci)
+					return nil
+				},
+			}))
+			a.config.CRL = &config.CRLConfig{
+				Enabled: true,
+			}
+
+			return test{
+				auth:     a,
+				ctx:      crlCtx,
+				expected: nil,
+				err:      database.ErrNotFound,
+			}
+		},
+		"ok/crl-full": func() test {
+			a := testAuthority(t, WithDatabase(&db.MockAuthDB{
+				MUseToken: func(id, tok string) (bool, error) {
+					return true, nil
+				},
+				MGetCertificate: func(sn string) (*x509.Certificate, error) {
+					return nil, errors.New("not found")
+				},
+				MStoreCRL: func(i *db.CertificateRevocationListInfo) error {
+					crlStore = *i
+					return nil
+				},
+				MGetCRL: func() (*db.CertificateRevocationListInfo, error) {
+					return &crlStore, nil
+				},
+				MGetRevokedCertificates: func() (*[]db.RevokedCertificateInfo, error) {
+					return &revokedList, nil
+				},
+				MRevoke: func(rci *db.RevokedCertificateInfo) error {
+					revokedList = append(revokedList, *rci)
+					return nil
+				},
+			}))
+			a.config.CRL = &config.CRLConfig{
+				Enabled:          true,
+				GenerateOnRevoke: true,
+			}
+
+			var ex []string
+
+			for i := 0; i < 100; i++ {
+				sn := fmt.Sprintf("%v", i)
+
+				cl := jose.Claims{
+					Subject:   fmt.Sprintf("sn-%v", i),
+					Issuer:    validIssuer,
+					NotBefore: jose.NewNumericDate(now),
+					Expiry:    jose.NewNumericDate(now.Add(time.Minute)),
+					Audience:  validAudience,
+					ID:        sn,
+				}
+				raw, err := jose.Signed(sig).Claims(cl).CompactSerialize()
+				assert.FatalError(t, err)
+				err = a.Revoke(crlCtx, &RevokeOptions{
+					Serial:     sn,
+					ReasonCode: reasonCode,
+					Reason:     reason,
+					OTT:        raw,
+				})
+
+				assert.FatalError(t, err)
+
+				ex = append(ex, sn)
+			}
+
+			return test{
+				auth:     a,
+				ctx:      crlCtx,
+				expected: ex,
+			}
+		},
+	}
+	for name, f := range tests {
+		tc := f()
+		t.Run(name, func(t *testing.T) {
+			if crlBytes, err := tc.auth.GetCertificateRevocationList(); err == nil {
+				crl, parseErr := x509.ParseCRL(crlBytes)
+				if parseErr != nil {
+					t.Errorf("x509.ParseCertificateRequest() error = %v, wantErr %v", parseErr, nil)
+					return
+				}
+
+				var cmpList []string
+				for _, c := range crl.TBSCertList.RevokedCertificates {
+					cmpList = append(cmpList, c.SerialNumber.String())
+				}
+
+				assert.Equals(t, cmpList, tc.expected)
+			} else {
+				assert.NotNil(t, tc.err, err.Error())
 			}
 		})
 	}
