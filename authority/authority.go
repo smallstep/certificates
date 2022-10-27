@@ -716,12 +716,6 @@ func (a *Authority) init() error {
 		a.templates.Data["Step"] = tmplVars
 	}
 
-	// JWT numeric dates are seconds.
-	a.startTime = time.Now().Truncate(time.Second)
-	// Set flag indicating that initialization has been completed, and should
-	// not be repeated.
-	a.initOnce = true
-
 	// Start the CRL generator, we can assume the configuration is validated.
 	if a.config.CRL.IsEnabled() {
 		// Default cache duration to the default one
@@ -733,6 +727,12 @@ func (a *Authority) init() error {
 			return err
 		}
 	}
+
+	// JWT numeric dates are seconds.
+	a.startTime = time.Now().Truncate(time.Second)
+	// Set flag indicating that initialization has been completed, and should
+	// not be repeated.
+	a.initOnce = true
 
 	return nil
 }
