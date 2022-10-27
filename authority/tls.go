@@ -706,7 +706,7 @@ func (a *Authority) GenerateCertificateRevocationList() error {
 	// Convert our database db.RevokedCertificateInfo types into the pkix
 	// representation ready for the CAS to sign it
 	var revokedCertificates []pkix.RevokedCertificate
-	skipExpiredTime := now.Add(-config.DefaultCRLExpiredDuration.Abs())
+	skipExpiredTime := now.Add(-config.DefaultCRLExpiredDuration)
 	for _, revokedCert := range *revokedList {
 		// skip expired certificates
 		if !revokedCert.ExpiresAt.IsZero() && revokedCert.ExpiresAt.Before(skipExpiredTime) {
