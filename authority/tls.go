@@ -30,8 +30,8 @@ import (
 	casapi "github.com/smallstep/certificates/cas/apiv1"
 	"github.com/smallstep/certificates/db"
 	"github.com/smallstep/certificates/errs"
-	"github.com/smallstep/nosql/database"
 	"github.com/smallstep/certificates/webhook"
+	"github.com/smallstep/nosql/database"
 )
 
 // GetTLSOptions returns the tls options configured.
@@ -689,7 +689,7 @@ func (a *Authority) GenerateCertificateRevocationList() error {
 		return errors.Wrap(err, "could not retrieve CRL from database")
 	}
 
-	now := time.Now().UTC()
+	now := time.Now().Truncate(time.Second).UTC()
 	revokedList, err := crlDB.GetRevokedCertificates()
 	if err != nil {
 		return errors.Wrap(err, "could not retrieve revoked certificates list from database")
