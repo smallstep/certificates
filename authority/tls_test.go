@@ -1903,15 +1903,15 @@ func TestAuthority_CRL(t *testing.T) {
 			for i := 0; i < 100; i++ {
 				sn := fmt.Sprintf("%v", i)
 
-				cl := jwt.Claims{
+				cl := jose.Claims{
 					Subject:   fmt.Sprintf("sn-%v", i),
 					Issuer:    validIssuer,
-					NotBefore: jwt.NewNumericDate(now),
-					Expiry:    jwt.NewNumericDate(now.Add(time.Minute)),
+					NotBefore: jose.NewNumericDate(now),
+					Expiry:    jose.NewNumericDate(now.Add(time.Minute)),
 					Audience:  validAudience,
 					ID:        sn,
 				}
-				raw, err := jwt.Signed(sig).Claims(cl).CompactSerialize()
+				raw, err := jose.Signed(sig).Claims(cl).CompactSerialize()
 				assert.FatalError(t, err)
 				err = a.Revoke(crlCtx, &RevokeOptions{
 					Serial:     sn,
