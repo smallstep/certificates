@@ -98,4 +98,10 @@ jobs:
         env:
           DOCKER_USERNAME: ${{ secrets.DOCKER_USERNAME }}
           DOCKER_PASSWORD: ${{ secrets.DOCKER_PASSWORD }}
+      - name: Cosign
+        id: cosign
+        run: |
+          DIGEST=$(docker images --digests --format "{{.Digest}}" smallstep/step-ca | head -n 1 | tr -d '[:space:]')
+          cosign sign -r smallstep/step-ca@${DIGEST}
+        env:
           COSIGN_EXPERIMENTAL: 1
