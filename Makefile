@@ -79,8 +79,6 @@ $(info    DEB_VERSION is $(DEB_VERSION))
 $(info    PUSHTYPE is $(PUSHTYPE))
 endif
 
-include make/docker.mk
-
 #########################################
 # Build
 #########################################
@@ -232,11 +230,3 @@ debian: changelog
 distclean: clean
 
 .PHONY: changelog debian distclean
-
-#################################################
-# Targets for creating step artifacts
-#################################################
-
-docker-artifacts: docker-$(PUSHTYPE)
-
-.PHONY: docker-artifacts
