@@ -248,29 +248,12 @@ func (db *DB) GetRevokedCertificates() (*[]RevokedCertificateInfo, error) {
 		return nil, err
 	}
 	var revokedCerts []RevokedCertificateInfo
-	now := time.Now().Truncate(time.Second)
-
 	for _, e := range entries {
 		var data RevokedCertificateInfo
 		if err := json.Unmarshal(e.Value, &data); err != nil {
 			return nil, err
 		}
-
-		if !data.RevokedAt.IsZero() {
-			revokedCerts = append(revokedCerts, data)
-		} else if data.RevokedAt.IsZero() {
-			cert, err := db.GetCertificate(data.Serial)
-			if err != nil {
-				revokedCerts = append(revokedCerts, data) // a revoked certificate may not be in the database,
-				// so its expiry date is undiscoverable and will need
-				// to be added to the crl always
-				continue
-			}
-
-			if cert.NotAfter.After(now) {
-				revokedCerts = append(revokedCerts, data)
-			}
-		}
+		revokedCerts = append(revokedCerts, data)
 	}
 	return &revokedCerts, nil
 }
