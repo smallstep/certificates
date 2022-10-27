@@ -17,6 +17,7 @@ type helmVariables struct {
 	Defaults     *linkedca.Defaults
 	Password     string
 	EnableSSH    bool
+	EnableAdmin  bool
 	TLS          authconfig.TLSOptions
 	Provisioners []provisioner.Interface
 }
@@ -34,14 +35,39 @@ func (p *PKI) WriteHelmTemplate(w io.Writer) error {
 		p.Ssh = nil
 	}
 
-	// Convert provisioner to ca.json
-	provisioners := make([]provisioner.Interface, len(p.Authority.Provisioners))
-	for i, p := range p.Authority.Provisioners {
+	// Convert provisioners to ca.json representation
+	provisioners := []provisioner.Interface{}
+	for _, p := range p.Authority.Provisioners {
 		pp, err := authority.ProvisionerToCertificates(p)
 		if err != nil {
 			return err
 		}
-		provisioners[i] = pp
+		provisioners = append(provisioners, pp)
+	}
+
+	// Add default ACME provisioner if enabled. Note that this logic is similar
+	// to what's in p.GenerateConfig(), but that codepath isn't taken when
+	// writing the Helm template. The default JWK provisioner is added earlier in
+	// the process and that's part of the provisioners above.
+	// TODO(hs): consider refactoring the initialization, so that this becomes
+	// easier to reason about and maintain.
+	if p.options.enableACME {
+		provisioners = append(provisioners, &provisioner.ACME{
+			Type: "ACME",
+			Name: "acme",
+		})
+	}
+
+	// Add default SSHPOP provisioner if enabled. Similar to the above, this is
+	// the same as what happens in p.GenerateConfig().
+	if p.options.enableSSH {
+		provisioners = append(provisioners, &provisioner.SSHPOP{
+			Type: "SSHPOP",
+			Name: "sshpop",
+			Claims: &provisioner.Claims{
+				EnableSSHCA: &p.options.enableSSH,
+			},
+		})
 	}
 
 	if err := tmpl.Execute(w, helmVariables{
@@ -49,6 +75,7 @@ func (p *PKI) WriteHelmTemplate(w io.Writer) error {
 		Defaults:      &p.Defaults,
 		Password:      "",
 		EnableSSH:     p.options.enableSSH,
+		EnableAdmin:   p.options.enableAdmin,
 		TLS:           authconfig.DefaultTLSOptions,
 		Provisioners:  provisioners,
 	}); err != nil {
@@ -88,6 +115,7 @@ inject:
           type: badgerv2
           dataSource: /home/step/db
         authority:
+          enableAdmin: {{ .EnableAdmin }}
           provisioners:
           {{- range .Provisioners }}
             - {{ . | toJson }}

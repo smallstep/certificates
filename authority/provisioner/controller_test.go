@@ -8,6 +8,8 @@ import (
 	"testing"
 	"time"
 
+	"go.step.sm/crypto/x509util"
+	"go.step.sm/linkedca"
 	"golang.org/x/crypto/ssh"
 
 	"github.com/smallstep/certificates/authority/policy"
@@ -443,5 +445,20 @@ func TestDefaultAuthorizeSSHRenew(t *testing.T) {
 				t.Errorf("DefaultAuthorizeSSHRenew() error = %v, wantErr %v", err, tt.wantErr)
 			}
 		})
+	}
+}
+
+func Test_newWebhookController(t *testing.T) {
+	c := &Controller{}
+	data := x509util.TemplateData{"foo": "bar"}
+	ctl := c.newWebhookController(data, linkedca.Webhook_X509)
+	if !reflect.DeepEqual(ctl.TemplateData, data) {
+		t.Error("Failed to set templateData")
+	}
+	if ctl.certType != linkedca.Webhook_X509 {
+		t.Error("Failed to set certType")
+	}
+	if ctl.client == nil {
+		t.Error("Failed to set client")
 	}
 }

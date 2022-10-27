@@ -8,25 +8,17 @@ on:
 
 jobs:
   ci:
-    uses: smallstep/certificates/.github/workflows/ci.yml@main
+    uses: smallstep/certificates/.github/workflows/ci.yml@master
     secrets: inherit
 
   create_release:
     name: Create Release
-    needs: ci
+      #needs: ci
     runs-on: ubuntu-20.04
     outputs:
-      debversion: ${{ steps.extract-tag.outputs.DEB_VERSION }}
       is_prerelease: ${{ steps.is_prerelease.outputs.IS_PRERELEASE }}
     steps:
-      -
-        name: Extract Tag Names
-        id: extract-tag
-        run: |
-          DEB_VERSION=$(echo ${GITHUB_REF#refs/tags/v} | sed 's/-/./')
-          echo "::set-output name=DEB_VERSION::${DEB_VERSION}"
-      -
-        name: Is Pre-release
+      - name: Is Pre-release
         id: is_prerelease
         run: |
           set +e
@@ -34,8 +26,7 @@ jobs:
           OUT=$?
           if [ $OUT -eq 0 ]; then IS_PRERELEASE=true; else IS_PRERELEASE=false; fi
           echo "::set-output name=IS_PRERELEASE::${IS_PRERELEASE}"
-      -
-        name: Create Release
+      - name: Create Release
         id: create_release
         uses: actions/create-release@v1
         env:
@@ -51,54 +42,33 @@ jobs:
     runs-on: ubuntu-20.04
     needs: create_release
     steps:
-      -
-        name: Checkout
-        uses: actions/checkout@v2
-        with:
-          fetch-depth: 0
-      -
-        name: Set up Go
-        uses: actions/setup-go@v2
+      - name: Checkout
+        uses: actions/checkout@v3
+      - name: Set up Go
+        uses: actions/setup-go@v3
         with:
           go-version: 1.19
-      -
-        name: APT Install
-        id: aptInstall
-        run: sudo apt-get -y install build-essential debhelper fakeroot
-      -
-        name: Build Debian package
-        id: make_debian
-        run: |
-          PATH=$PATH:/usr/local/go/bin:/home/admin/go/bin
-          make debian
-          # need to restore the git state otherwise goreleaser fails due to dirty state
-          git restore debian/changelog
-          git clean -fd
-      -
-        name: Install cosign
-        uses: sigstore/cosign-installer@v1.1.0
+          check-latest: true
+      - name: Install cosign
+        uses: sigstore/cosign-installer@v2.7.0
         with:
-          cosign-release: 'v1.1.0'
-      -
-        name: Write cosign key to disk
+          cosign-release: 'v1.12.1'
+      - name: Write cosign key to disk
         id: write_key
         run: echo "${{ secrets.COSIGN_KEY }}" > "/tmp/cosign.key"
-      -
-        name: Get Release Date
+      - name: Get Release Date
         id: release_date
         run: |
           RELEASE_DATE=$(date +"%y-%m-%d")
           echo "::set-output name=RELEASE_DATE::${RELEASE_DATE}"
-      -
-        name: Run GoReleaser
-        uses: goreleaser/goreleaser-action@5a54d7e660bda43b405e8463261b3d25631ffe86 # v2.7.0
+      - name: Run GoReleaser
+        uses: goreleaser/goreleaser-action@v3
         with:
-          version: 'v1.7.0'
+          version: 'latest'
           args: release --rm-dist
         env:
-          GITHUB_TOKEN: ${{ secrets.PAT }}
+          GITHUB_TOKEN: ${{ secrets.GORELEASER_PAT }}
           COSIGN_PWD: ${{ secrets.COSIGN_PWD }}
-          DEB_VERSION: ${{ needs.create_release.outputs.debversion }}
           RELEASE_DATE: ${{ steps.release_date.outputs.RELEASE_DATE }}
 
   build_upload_docker:
@@ -106,25 +76,21 @@ jobs:
     runs-on: ubuntu-20.04
     needs: ci
     steps:
-      -
-        name: Checkout
-        uses: actions/checkout@v2
-      -
-        name: Setup Go
-        uses: actions/setup-go@v2
+      - name: Checkout
+        uses: actions/checkout@v3
+      - name: Setup Go
+        uses: actions/setup-go@v3
         with:
           go-version: '1.19'
-      -
-        name: Install cosign
+          check-latest: true
+      - name: Install cosign
         uses: sigstore/cosign-installer@v1.1.0
         with:
           cosign-release: 'v1.1.0'
-      -
-        name: Write cosign key to disk
+      - name: Write cosign key to disk
         id: write_key
         run: echo "${{ secrets.COSIGN_KEY }}" > "/tmp/cosign.key"
-      -
-        name: Build
+      - name: Build
         id: build
         run: |
           PATH=$PATH:/usr/local/go/bin:/home/admin/go/bin

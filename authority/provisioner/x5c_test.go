@@ -389,9 +389,10 @@ lgsqsR63is+0YQ==
 			tc := tt(t)
 			if claims, err := tc.p.authorizeToken(tc.token, testAudiences.Sign); err != nil {
 				if assert.NotNil(t, tc.err) {
-					sc, ok := err.(render.StatusCodedError)
-					assert.Fatal(t, ok, "error does not implement StatusCodedError interface")
-					assert.Equals(t, sc.StatusCode(), tc.code)
+					var sc render.StatusCodedError
+					if assert.True(t, errors.As(err, &sc), "error does not implement StatusCodedError interface") {
+						assert.Equals(t, sc.StatusCode(), tc.code)
+					}
 					assert.HasPrefix(t, err.Error(), tc.err.Error())
 				}
 			} else {
@@ -460,15 +461,16 @@ func TestX5C_AuthorizeSign(t *testing.T) {
 			tc := tt(t)
 			if opts, err := tc.p.AuthorizeSign(context.Background(), tc.token); err != nil {
 				if assert.NotNil(t, tc.err) {
-					sc, ok := err.(render.StatusCodedError)
-					assert.Fatal(t, ok, "error does not implement StatusCoder interface")
-					assert.Equals(t, sc.StatusCode(), tc.code)
+					var sc render.StatusCodedError
+					if assert.True(t, errors.As(err, &sc), "error does not implement StatusCodedError interface") {
+						assert.Equals(t, sc.StatusCode(), tc.code)
+					}
 					assert.HasPrefix(t, err.Error(), tc.err.Error())
 				}
 			} else {
 				if assert.Nil(t, tc.err) {
 					if assert.NotNil(t, opts) {
-						assert.Equals(t, 9, len(opts))
+						assert.Equals(t, 10, len(opts))
 						for _, o := range opts {
 							switch v := o.(type) {
 							case *X5C:
@@ -493,6 +495,8 @@ func TestX5C_AuthorizeSign(t *testing.T) {
 								assert.Equals(t, v.max, tc.p.ctl.Claimer.MaxTLSCertDuration())
 							case *x509NamePolicyValidator:
 								assert.Equals(t, nil, v.policyEngine)
+							case *WebhookController:
+								assert.Len(t, 0, v.webhooks)
 							default:
 								assert.FatalError(t, fmt.Errorf("unexpected sign option of type %T", v))
 							}
@@ -545,9 +549,10 @@ func TestX5C_AuthorizeRevoke(t *testing.T) {
 			tc := tt(t)
 			if err := tc.p.AuthorizeRevoke(context.Background(), tc.token); err != nil {
 				if assert.NotNil(t, tc.err) {
-					sc, ok := err.(render.StatusCodedError)
-					assert.Fatal(t, ok, "error does not implement StatusCodedError interface")
-					assert.Equals(t, sc.StatusCode(), tc.code)
+					var sc render.StatusCodedError
+					if assert.True(t, errors.As(err, &sc), "error does not implement StatusCodedError interface") {
+						assert.Equals(t, sc.StatusCode(), tc.code)
+					}
 					assert.HasPrefix(t, err.Error(), tc.err.Error())
 				}
 			} else {
@@ -595,9 +600,10 @@ func TestX5C_AuthorizeRenew(t *testing.T) {
 				NotAfter:  now.Add(time.Hour),
 			}); err != nil {
 				if assert.NotNil(t, tc.err) {
-					sc, ok := err.(render.StatusCodedError)
-					assert.Fatal(t, ok, "error does not implement StatusCodedError interface")
-					assert.Equals(t, sc.StatusCode(), tc.code)
+					var sc render.StatusCodedError
+					if assert.True(t, errors.As(err, &sc), "error does not implement StatusCodedError interface") {
+						assert.Equals(t, sc.StatusCode(), tc.code)
+					}
 					assert.HasPrefix(t, err.Error(), tc.err.Error())
 				}
 			} else {
@@ -756,9 +762,10 @@ func TestX5C_AuthorizeSSHSign(t *testing.T) {
 			tc := tt(t)
 			if opts, err := tc.p.AuthorizeSSHSign(context.Background(), tc.token); err != nil {
 				if assert.NotNil(t, tc.err) {
-					sc, ok := err.(render.StatusCodedError)
-					assert.Fatal(t, ok, "error does not implement StatusCoder interface")
-					assert.Equals(t, sc.StatusCode(), tc.code)
+					var sc render.StatusCodedError
+					if assert.True(t, errors.As(err, &sc), "error does not implement StatusCodedError interface") {
+						assert.Equals(t, sc.StatusCode(), tc.code)
+					}
 					assert.HasPrefix(t, err.Error(), tc.err.Error())
 				}
 			} else {
@@ -794,15 +801,17 @@ func TestX5C_AuthorizeSSHSign(t *testing.T) {
 								assert.Equals(t, nil, v.userPolicyEngine)
 								assert.Equals(t, nil, v.hostPolicyEngine)
 							case *sshDefaultPublicKeyValidator, *sshCertDefaultValidator, sshCertificateOptionsFunc:
+							case *WebhookController:
+								assert.Len(t, 0, v.webhooks)
 							default:
 								assert.FatalError(t, fmt.Errorf("unexpected sign option of type %T", v))
 							}
 							tot++
 						}
 						if len(tc.claims.Step.SSH.CertType) > 0 {
-							assert.Equals(t, tot, 11)
+							assert.Equals(t, tot, 12)
 						} else {
-							assert.Equals(t, tot, 9)
+							assert.Equals(t, tot, 10)
 						}
 					}
 				}

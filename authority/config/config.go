@@ -79,6 +79,9 @@ type Config struct {
 	CommonName       string               `json:"commonName,omitempty"`
 	CRL              *CRLConfig           `json:"crl,omitempty"`
 	SkipValidation   bool                 `json:"-"`
+
+	// Keeps record of the filename the Config is read from
+	loadedFromFilepath string
 }
 
 // CRLConfig represents config options for CRL generation
@@ -218,6 +221,10 @@ func LoadConfiguration(filename string) (*Config, error) {
 		return nil, errors.Wrapf(err, "error parsing %s", filename)
 	}
 
+	// store filename that was read to populate Config
+	c.loadedFromFilepath = filename
+
+	// initialize the Config
 	c.Init()
 
 	return &c, nil
@@ -255,6 +262,30 @@ func (c *Config) Save(filename string) error {
 	enc := json.NewEncoder(f)
 	enc.SetIndent("", "\t")
 	return errors.Wrapf(enc.Encode(c), "error writing %s", filename)
+}
+
+// Commit saves the current configuration to the same
+// file it was initially loaded from.
+//
+// TODO(hs): rename Save() to WriteTo() and replace this
+// with Save()? Or is Commit clear enough.
+func (c *Config) Commit() error {
+	if !c.WasLoadedFromFile() {
+		return errors.New("cannot commit configuration if not loaded from file")
+	}
+	return c.Save(c.loadedFromFilepath)
+}
+
+// WasLoadedFromFile returns whether or not the Config was
+// loaded from a file.
+func (c *Config) WasLoadedFromFile() bool {
+	return c.loadedFromFilepath != ""
+}
+
+// Filepath returns the path to the file the Config was
+// loaded from.
+func (c *Config) Filepath() string {
+	return c.loadedFromFilepath
 }
 
 // Validate validates the configuration.

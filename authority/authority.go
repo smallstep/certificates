@@ -8,6 +8,7 @@ import (
 	"crypto/x509"
 	"encoding/hex"
 	"log"
+	"net/http"
 	"strings"
 	"sync"
 	"time"
@@ -46,6 +47,7 @@ type Authority struct {
 	adminDB       admin.DB
 	templates     *templates.Templates
 	linkedCAToken string
+	webhookClient *http.Client
 
 	// X509 CA
 	password              []byte
@@ -76,7 +78,7 @@ type Authority struct {
 	crlStopper chan struct{}
 	crlMutex   sync.Mutex
 
-	// Do not re-initialize
+	// If true, do not re-initialize
 	initOnce  bool
 	startTime time.Time
 
@@ -94,8 +96,11 @@ type Authority struct {
 
 	adminMutex sync.RWMutex
 
-	// Do Not initialize the authority
+	// If true, do not initialize the authority
 	skipInit bool
+
+	// If true, do not output initialization logs
+	quietInit bool
 }
 
 // Info contains information about the authority.
@@ -603,20 +608,74 @@ func (a *Authority) init() error {
 			return admin.WrapErrorISE(err, "error loading provisioners to initialize authority")
 		}
 		if len(provs) == 0 && !strings.EqualFold(a.config.AuthorityConfig.DeploymentType, "linked") {
-			// Create First Provisioner
-			prov, err := CreateFirstProvisioner(ctx, a.adminDB, string(a.password))
-			if err != nil {
-				return admin.WrapErrorISE(err, "error creating first provisioner")
+			// Migration will currently only be kicked off once, because either one or more provisioners
+			// are migrated or a default JWK provisioner will be created in the DB. It won't run for
+			// linked or hosted deployments. Not for linked, because that case is explicitly checked
+			// for above. Not for hosted, because there'll be at least an existing OIDC provisioner.
+			var firstJWKProvisioner *linkedca.Provisioner
+			if len(a.config.AuthorityConfig.Provisioners) > 0 {
+				// Existing provisioners detected; try migrating them to DB storage.
+				a.initLogf("Starting migration of provisioners")
+				for _, p := range a.config.AuthorityConfig.Provisioners {
+					lp, err := ProvisionerToLinkedca(p)
+					if err != nil {
+						return admin.WrapErrorISE(err, "error transforming provisioner %q while migrating", p.GetName())
+					}
+
+					// Store the provisioner to be migrated
+					if err := a.adminDB.CreateProvisioner(ctx, lp); err != nil {
+						return admin.WrapErrorISE(err, "error creating provisioner %q while migrating", p.GetName())
+					}
+
+					// Mark the first JWK provisioner, so that it can be used for administration purposes
+					if firstJWKProvisioner == nil && lp.Type == linkedca.Provisioner_JWK {
+						firstJWKProvisioner = lp
+						a.initLogf("Migrated JWK provisioner %q with admin permissions", p.GetName())
+					} else {
+						a.initLogf("Migrated %s provisioner %q", p.GetType(), p.GetName())
+					}
+				}
+
+				c := a.config
+				if c.WasLoadedFromFile() {
+					// The provisioners in the configuration file can be deleted from
+					// the file by editing it. Automatic rewriting of the file was considered
+					// to be too surprising for users and not the right solution for all
+					// use cases, so we leave it up to users to this themselves.
+					a.initLogf("Provisioners that were migrated can now be removed from `ca.json` by editing it")
+				}
+
+				a.initLogf("Finished migrating provisioners")
 			}
 
-			// Create first admin
+			// Create first JWK provisioner for remote administration purposes if none exists yet
+			if firstJWKProvisioner == nil {
+				firstJWKProvisioner, err = CreateFirstProvisioner(ctx, a.adminDB, string(a.password))
+				if err != nil {
+					return admin.WrapErrorISE(err, "error creating first provisioner")
+				}
+				a.initLogf("Created JWK provisioner %q with admin permissions", firstJWKProvisioner.GetName())
+			}
+
+			// Create first super admin, belonging to the first JWK provisioner
+			// TODO(hs): pass a user-provided first super admin subject to here. With `ca init` it's
+			// added to the DB immediately if using remote management. But when migrating from
+			// ca.json to the DB, this option doesn't exist. Adding a flag just to do it during
+			// migration isn't nice. We could opt for a user to change it afterwards. There exist
+			// cases in which creation of `step` could lock out a user from API access. This is the
+			// case if `step` isn't allowed to be signed by Name Constraints or the X.509 policy.
+			// We have protection for that when creating and updating a policy, but if a policy or
+			// Name Constraints are in use at the time of migration, that could lock the user out.
+			superAdminSubject := "step"
 			if err := a.adminDB.CreateAdmin(ctx, &linkedca.Admin{
-				ProvisionerId: prov.Id,
-				Subject:       "step",
+				ProvisionerId: firstJWKProvisioner.Id,
+				Subject:       superAdminSubject,
 				Type:          linkedca.Admin_SUPER_ADMIN,
 			}); err != nil {
 				return admin.WrapErrorISE(err, "error creating first admin")
 			}
+
+			a.initLogf("Created super admin %q for JWK provisioner %q", superAdminSubject, firstJWKProvisioner.GetName())
 		}
 	}
 
@@ -676,6 +735,14 @@ func (a *Authority) init() error {
 	}
 
 	return nil
+}
+
+// initLogf is used to log initialization information. The output
+// can be disabled by starting the CA with the `--quiet` flag.
+func (a *Authority) initLogf(format string, v ...any) {
+	if !a.quietInit {
+		log.Printf(format, v...)
+	}
 }
 
 // GetID returns the define authority id or a zero uuid.

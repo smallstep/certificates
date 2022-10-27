@@ -5,6 +5,7 @@ COPY . .
 
 RUN apk add --no-cache curl git make
 RUN apk add --no-cache gcc musl-dev pkgconf pcsc-lite-dev
+RUN make V=1 download
 RUN make V=1 GOFLAGS="" build
 
 

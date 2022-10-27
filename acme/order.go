@@ -194,6 +194,14 @@ func (o *Order) Finalize(ctx context.Context, db DB, csr *x509.CertificateReques
 	if err != nil {
 		return WrapErrorISE(err, "error retrieving authorization options from ACME provisioner")
 	}
+	// Unlike most of the provisioners, ACME's AuthorizeSign method doesn't
+	// define the templates, and the template data used in WebHooks is not
+	// available.
+	for _, signOp := range signOps {
+		if wc, ok := signOp.(*provisioner.WebhookController); ok {
+			wc.TemplateData = data
+		}
+	}
 
 	templateOptions, err := provisioner.CustomTemplateOptions(p.GetOptions(), data, defaultTemplate)
 	if err != nil {

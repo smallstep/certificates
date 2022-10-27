@@ -16,6 +16,7 @@ import (
 	"github.com/smallstep/certificates/db"
 	"go.step.sm/crypto/jose"
 	"go.step.sm/crypto/keyutil"
+	"go.step.sm/linkedca"
 )
 
 func TestGetEncryptedKey(t *testing.T) {
@@ -57,9 +58,10 @@ func TestGetEncryptedKey(t *testing.T) {
 			ek, err := tc.a.GetEncryptedKey(tc.kid)
 			if err != nil {
 				if assert.NotNil(t, tc.err) {
-					sc, ok := err.(render.StatusCodedError)
-					assert.Fatal(t, ok, "error does not implement StatusCodedError interface")
-					assert.Equals(t, sc.StatusCode(), tc.code)
+					var sc render.StatusCodedError
+					if assert.True(t, errors.As(err, &sc), "error does not implement StatusCodedError interface") {
+						assert.Equals(t, sc.StatusCode(), tc.code)
+					}
 					assert.HasPrefix(t, err.Error(), tc.err.Error())
 				}
 			} else {
@@ -107,9 +109,10 @@ func TestGetProvisioners(t *testing.T) {
 			ps, next, err := tc.a.GetProvisioners("", 0)
 			if err != nil {
 				if assert.NotNil(t, tc.err) {
-					sc, ok := err.(render.StatusCodedError)
-					assert.Fatal(t, ok, "error does not implement StatusCodedError interface")
-					assert.Equals(t, sc.StatusCode(), tc.code)
+					var sc render.StatusCodedError
+					if assert.True(t, errors.As(err, &sc), "error does not implement StatusCodedError interface") {
+						assert.Equals(t, sc.StatusCode(), tc.code)
+					}
 					assert.HasPrefix(t, err.Error(), tc.err.Error())
 				}
 			} else {
@@ -248,6 +251,85 @@ func TestAuthority_LoadProvisionerByCertificate(t *testing.T) {
 			if !reflect.DeepEqual(got, tt.want) {
 				t.Errorf("Authority.LoadProvisionerByCertificate() = %v, want %v", got, tt.want)
 			}
+		})
+	}
+}
+
+func TestProvisionerWebhookToLinkedca(t *testing.T) {
+	type test struct {
+		lwh *linkedca.Webhook
+		pwh *provisioner.Webhook
+	}
+	tests := map[string]test{
+		"empty": test{
+			lwh: &linkedca.Webhook{},
+			pwh: &provisioner.Webhook{Kind: "NO_KIND", CertType: "ALL"},
+		},
+		"enriching ssh basic auth": test{
+			lwh: &linkedca.Webhook{
+				Id:     "abc123",
+				Name:   "people",
+				Url:    "https://localhost",
+				Kind:   linkedca.Webhook_ENRICHING,
+				Secret: "secret",
+				Auth: &linkedca.Webhook_BasicAuth{
+					BasicAuth: &linkedca.BasicAuth{
+						Username: "user",
+						Password: "pass",
+					},
+				},
+				DisableTlsClientAuth: true,
+				CertType:             linkedca.Webhook_SSH,
+			},
+			pwh: &provisioner.Webhook{
+				ID:     "abc123",
+				Name:   "people",
+				URL:    "https://localhost",
+				Kind:   "ENRICHING",
+				Secret: "secret",
+				BasicAuth: struct {
+					Username string
+					Password string
+				}{
+					Username: "user",
+					Password: "pass",
+				},
+				DisableTLSClientAuth: true,
+				CertType:             "SSH",
+			},
+		},
+		"authorizing x509 bearer auth": test{
+			lwh: &linkedca.Webhook{
+				Id:     "abc123",
+				Name:   "people",
+				Url:    "https://localhost",
+				Kind:   linkedca.Webhook_AUTHORIZING,
+				Secret: "secret",
+				Auth: &linkedca.Webhook_BearerToken{
+					BearerToken: &linkedca.BearerToken{
+						BearerToken: "tkn",
+					},
+				},
+				CertType: linkedca.Webhook_X509,
+			},
+			pwh: &provisioner.Webhook{
+				ID:          "abc123",
+				Name:        "people",
+				URL:         "https://localhost",
+				Kind:        "AUTHORIZING",
+				Secret:      "secret",
+				BearerToken: "tkn",
+				CertType:    "X509",
+			},
+		},
+	}
+	for name, test := range tests {
+		t.Run(name, func(t *testing.T) {
+			gotLWH := provisionerWebhookToLinkedca(test.pwh)
+			assert.Equals(t, test.lwh, gotLWH)
+
+			gotPWH := webhookToCertificates(test.lwh)
+			assert.Equals(t, test.pwh, gotPWH)
 		})
 	}
 }

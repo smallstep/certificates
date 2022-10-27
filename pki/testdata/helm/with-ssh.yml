@@ -1,0 +1,104 @@
+# Helm template
+inject:
+  enabled: true
+  # Config contains the configuration files ca.json and defaults.json
+  config:
+    files:
+      ca.json:
+        root: /home/step/certs/root_ca.crt
+        federateRoots: []
+        crt: /home/step/certs/intermediate_ca.crt
+        key: /home/step/secrets/intermediate_ca_key
+        ssh:
+          hostKey: /home/step/secrets/ssh_host_ca_key
+          userKey: /home/step/secrets/ssh_user_ca_key
+        address: 127.0.0.1:9000
+        dnsNames:
+          - 127.0.0.1
+        logger:
+          format: json
+        db:
+          type: badgerv2
+          dataSource: /home/step/db
+        authority:
+          enableAdmin: false
+          provisioners:
+            - {"type":"JWK","name":"step-cli","key":{"use":"sig","kty":"EC","kid":"zsUmysmDVoGJ71YoPHyZ-68tNihDaDaO5Mu7xX3M-_I","crv":"P-256","alg":"ES256","x":"Pqnua4CzqKz6ua41J3yeWZ1sRkGt0UlCkbHv8H2DGuY","y":"UhoZ_2ItDen9KQTcjay-ph-SBXH0mwqhHyvrrqIFDOI"},"encryptedKey":"eyJhbGciOiJQQkVTMi1IUzI1NitBMTI4S1ciLCJjdHkiOiJqd2sranNvbiIsImVuYyI6IkEyNTZHQ00iLCJwMmMiOjEwMDAwMCwicDJzIjoiZjVvdGVRS2hvOXl4MmQtSGlMZi05QSJ9.eYA6tt3fNuUpoxKWDT7P0Lbn2juxhEbTxEnwEMbjlYLLQ3sxL-dYTA.ven-FhmdjlC9itH0.a2jRTarN9vPd6F_mWnNBlOn6KbfMjCApmci2t65XbAsLzYFzhI_79Ykm5ueMYTupWLTjBJctl-g51ZHmsSB55pStbpoyyLNAsUX2E1fTmHe-Ni8bRrspwLv15FoN1Xo1g0mpR-ufWIFxOsW-QIfnMmMIIkygVuHFXmg2tFpzTNNG5aS29K3dN2nyk0WJrdIq79hZSTqVkkBU25Yu3A46sgjcM86XcIJJ2XUEih_KWEa6T1YrkixGu96pebjVqbO0R6dbDckfPF7FqNnwPHVtb1ACFpEYoOJVIbUCMaARBpWsxYhjJZlEM__XA46l8snFQDkNY3CdN0p1_gF3ckA.JLmq9nmu1h9oUi1S8ZxYjA","claims":{"enableSSHCA":true,"disableRenewal":false,"allowRenewalAfterExpiry":false},"options":{"x509":{},"ssh":{}}}
+            - {"type":"SSHPOP","name":"sshpop","claims":{"enableSSHCA":true}}
+        tls:
+          cipherSuites:
+            - TLS_ECDHE_ECDSA_WITH_CHACHA20_POLY1305_SHA256
+            - TLS_ECDHE_ECDSA_WITH_AES_128_GCM_SHA256
+          minVersion: 1.2
+          maxVersion: 1.3
+          renegotiation: false
+
+      defaults.json:
+        ca-url: https://127.0.0.1
+        ca-config: /home/step/config/ca.json
+        fingerprint: e543cad8e9f6417076bb5aed3471c588152118aac1e0ca7984a43ee7f76da5e3
+        root: /home/step/certs/root_ca.crt
+
+  # Certificates contains the root and intermediate certificate and 
+  # optionally the SSH host and user public keys
+  certificates:
+    # intermediate_ca contains the text of the intermediate CA Certificate
+    intermediate_ca: |
+      -----BEGIN CERTIFICATE-----
+      dGhlc2UgYXJlIGp1c3Qgc29tZSBmYWtlIGludGVybWVkaWF0ZSBDQSBjZXJ0IGJ5
+      dGVz
+      -----END CERTIFICATE-----
+      
+      
+    # root_ca contains the text of the root CA Certificate
+    root_ca: |
+      -----BEGIN CERTIFICATE-----
+      dGhlc2UgYXJlIGp1c3Qgc29tZSBmYWtlIHJvb3QgQ0EgY2VydCBieXRlcw==
+      -----END CERTIFICATE-----
+      
+    # ssh_host_ca contains the text of the public ssh key for the SSH root CA
+    ssh_host_ca: ecdsa-sha2-nistp256 AAAAE2VjZHNhLXNoYTItbmlzdHAyNTYAAAAIbmlzdHAyNTYAAABBBJ0IdS5sZm6KITBMZLEJD6b5ROVraYHcAOr3feFel8r1Wp4DRPR1oU0W00J/zjNBRBbANlJoYN4x/8WNNVZ49Ms=
+
+    # ssh_user_ca contains the text of the public ssh key for the SSH root CA
+    ssh_user_ca: ecdsa-sha2-nistp256 AAAAE2VjZHNhLXNoYTItbmlzdHAyNTYAAAAIbmlzdHAyNTYAAABBBEWA1qUxaGwVNErsvEOGe2d6TvLMF+aiVpuOiIEvpMJ3JeJmecLQctjWqeIbpSvy6/gRa7c82Ge5rLlapYmOChs=
+
+  # Secrets contains the root and intermediate keys and optionally the SSH
+  # private keys
+  secrets:
+    # ca_password contains the password used to encrypt x509.intermediate_ca_key, ssh.host_ca_key and ssh.user_ca_key
+    # This value must be base64 encoded.
+    ca_password: 
+    provisioner_password: 
+
+    x509:
+      # intermediate_ca_key contains the contents of your encrypted intermediate CA key
+      intermediate_ca_key: |
+        -----BEGIN EC PRIVATE KEY-----
+        dGhlc2UgYXJlIGp1c3Qgc29tZSBmYWtlIGludGVybWVkaWF0ZSBDQSBrZXkgYnl0
+        ZXM=
+        -----END EC PRIVATE KEY-----
+        
+
+      # root_ca_key contains the contents of your encrypted root CA key
+      # Note that this value can be omitted without impacting the functionality of step-certificates
+      # If supplied, this should be encrypted using a unique password that is not used for encrypting
+      # the intermediate_ca_key, ssh.host_ca_key or ssh.user_ca_key.
+      root_ca_key: |
+        -----BEGIN EC PRIVATE KEY-----
+        dGhlc2UgYXJlIGp1c3Qgc29tZSBmYWtlIHJvb3QgQ0Ega2V5IGJ5dGVz
+        -----END EC PRIVATE KEY-----
+        
+    ssh:
+      # ssh_host_ca_key contains the contents of your encrypted SSH Host CA key
+      host_ca_key: |
+        -----BEGIN EC PRIVATE KEY-----
+        ZmFrZSBzc2ggaG9zdCBrZXkgYnl0ZXM=
+        -----END EC PRIVATE KEY-----
+        
+
+      # ssh_user_ca_key contains the contents of your encrypted SSH User CA key
+      user_ca_key: |
+        -----BEGIN EC PRIVATE KEY-----
+        ZmFrZSBzc2ggdXNlciBrZXkgYnl0ZXM=
+        -----END EC PRIVATE KEY-----
+        

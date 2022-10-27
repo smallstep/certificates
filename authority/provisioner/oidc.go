@@ -16,6 +16,7 @@ import (
 	"go.step.sm/crypto/jose"
 	"go.step.sm/crypto/sshutil"
 	"go.step.sm/crypto/x509util"
+	"go.step.sm/linkedca"
 
 	"github.com/smallstep/certificates/errs"
 )
@@ -356,6 +357,8 @@ func (o *OIDC) AuthorizeSign(ctx context.Context, token string) ([]SignOption, e
 		defaultPublicKeyValidator{},
 		newValidityValidator(o.ctl.Claimer.MinTLSCertDuration(), o.ctl.Claimer.MaxTLSCertDuration()),
 		newX509NamePolicyValidator(o.ctl.getPolicy().getX509()),
+		// webhooks
+		o.ctl.newWebhookController(data, linkedca.Webhook_X509),
 	}, nil
 }
 
@@ -460,6 +463,8 @@ func (o *OIDC) AuthorizeSSHSign(ctx context.Context, token string) ([]SignOption
 		&sshCertDefaultValidator{},
 		// Ensure that all principal names are allowed
 		newSSHNamePolicyValidator(o.ctl.getPolicy().getSSHHost(), o.ctl.getPolicy().getSSHUser()),
+		// Call webhooks
+		o.ctl.newWebhookController(data, linkedca.Webhook_SSH),
 	), nil
 }
 

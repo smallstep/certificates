@@ -281,6 +281,14 @@ func (a *Authority) SignCSR(ctx context.Context, csr *x509.CertificateRequest, m
 	if err != nil {
 		return nil, fmt.Errorf("error retrieving authorization options from SCEP provisioner: %w", err)
 	}
+	// Unlike most of the provisioners, scep's AuthorizeSign method doesn't
+	// define the templates, and the template data used in WebHooks is not
+	// available.
+	for _, signOp := range signOps {
+		if wc, ok := signOp.(*provisioner.WebhookController); ok {
+			wc.TemplateData = data
+		}
+	}
 
 	opts := provisioner.SignOptions{}
 	templateOptions, err := provisioner.TemplateOptions(p.GetOptions(), data)

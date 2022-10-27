@@ -4,26 +4,13 @@ on:
   issues:
     types:
       - opened
+      - reopened
   pull_request_target:
     types:
       - opened
+      - reopened
 
 jobs:
-
-  label:
-    name: Label PR
-    runs-on: ubuntu-latest
-    if: github.event_name == 'pull_request_target'
-    steps:
-    - uses: actions/labeler@v3.0.2
-      with:
-        repo-token: "${{ secrets.GITHUB_TOKEN }}"
-
-  add-to-project:
-    name: Add to Triage Project
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/add-to-project@v0.3.0
-        with:
-          project-url: https://github.com/orgs/smallstep/projects/94
-          github-token: ${{ secrets.TRIAGE_PAT }}
+  triage:
+    uses: smallstep/workflows/.github/workflows/triage.yml@main
+    secrets: inherit

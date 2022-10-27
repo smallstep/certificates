@@ -20,6 +20,7 @@ import (
 	"github.com/smallstep/certificates/db"
 	"github.com/smallstep/certificates/errs"
 	"github.com/smallstep/certificates/templates"
+	"github.com/smallstep/certificates/webhook"
 )
 
 const (
@@ -161,6 +162,7 @@ func (a *Authority) SignSSH(ctx context.Context, key ssh.PublicKey, opts provisi
 	opts.Backdate = a.config.AuthorityConfig.Backdate.Duration
 
 	var prov provisioner.Interface
+	var webhookCtl webhookController
 	for _, op := range signOpts {
 		switch o := op.(type) {
 		// Capture current provisioner
@@ -185,6 +187,10 @@ func (a *Authority) SignSSH(ctx context.Context, key ssh.PublicKey, opts provisi
 				return nil, errs.BadRequestErr(err, "error validating ssh certificate options")
 			}
 
+		// call webhooks
+		case webhookController:
+			webhookCtl = o
+
 		default:
 			return nil, errs.InternalServer("authority.SignSSH: invalid extra option type %T", o)
 		}
@@ -196,6 +202,14 @@ func (a *Authority) SignSSH(ctx context.Context, key ssh.PublicKey, opts provisi
 		KeyID:      opts.KeyID,
 		Principals: opts.Principals,
 		Key:        key,
+	}
+
+	// Call enriching webhooks
+	if err := callEnrichingWebhooksSSH(webhookCtl, cr); err != nil {
+		return nil, errs.ApplyOptions(
+			errs.ForbiddenErr(err, err.Error()),
+			errs.WithKeyVal("signOptions", signOpts),
+		)
 	}
 
 	// Create certificate from template.
@@ -259,6 +273,13 @@ func (a *Authority) SignSSH(ctx context.Context, key ssh.PublicKey, opts provisi
 		}
 		return nil, errs.InternalServerErr(err,
 			errs.WithMessage("authority.SignSSH: error creating ssh certificate"),
+		)
+	}
+
+	// Send certificate to webhooks for authorization
+	if err := callAuthorizingWebhooksSSH(webhookCtl, certificate, certTpl); err != nil {
+		return nil, errs.ApplyOptions(
+			errs.ForbiddenErr(err, "authority.SignSSH: error signing certificate"),
 		)
 	}
 
@@ -630,4 +651,38 @@ func (a *Authority) getAddUserCommand(principal string) string {
 		cmd = a.config.SSH.AddUserCommand
 	}
 	return strings.ReplaceAll(cmd, "<principal>", principal)
+}
+
+func callEnrichingWebhooksSSH(webhookCtl webhookController, cr sshutil.CertificateRequest) error {
+	if webhookCtl == nil {
+		return nil
+	}
+	whEnrichReq, err := webhook.NewRequestBody(
+		webhook.WithSSHCertificateRequest(cr),
+	)
+	if err != nil {
+		return err
+	}
+	if err := webhookCtl.Enrich(whEnrichReq); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func callAuthorizingWebhooksSSH(webhookCtl webhookController, cert *sshutil.Certificate, certTpl *ssh.Certificate) error {
+	if webhookCtl == nil {
+		return nil
+	}
+	whAuthBody, err := webhook.NewRequestBody(
+		webhook.WithSSHCertificate(cert, certTpl),
+	)
+	if err != nil {
+		return err
+	}
+	if err := webhookCtl.Authorize(whAuthBody); err != nil {
+		return err
+	}
+
+	return nil
 }
