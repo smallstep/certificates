@@ -80,12 +80,6 @@ func testAuthority(t *testing.T, opts ...Option) *Authority {
 		AuthorityConfig: &AuthConfig{
 			Provisioners: p,
 		},
-		CRL: &config.CRLConfig{
-			Enabled:          true,
-			CacheDuration:    nil,
-			GenerateOnRevoke: true,
-			RenewPeriod:      nil,
-		},
 	}
 	a, err := New(c, opts...)
 	assert.FatalError(t, err)

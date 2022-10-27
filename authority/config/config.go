@@ -37,8 +37,11 @@ var (
 	DefaultEnableSSHCA = false
 	// DefaultCRLCacheDuration is the default cache duration for the CRL.
 	DefaultCRLCacheDuration = &provisioner.Duration{Duration: 24 * time.Hour}
-	// GlobalProvisionerClaims default claims for the Authority. Can be overridden
-	// by provisioner specific claims.
+	// DefaultCRLExpiredDuration is the default duration in which expired
+	// certificates will remain in the CRL after expiration.
+	DefaultCRLExpiredDuration = time.Hour
+	// GlobalProvisionerClaims is the default duration that expired certificates
+	// remain in the CRL after expiration.
 	GlobalProvisionerClaims = provisioner.Claims{
 		MinTLSDur:               &provisioner.Duration{Duration: 5 * time.Minute}, // TLS certs
 		MaxTLSDur:               &provisioner.Duration{Duration: 24 * time.Hour},
@@ -78,6 +81,55 @@ type Config struct {
 	SkipValidation   bool                 `json:"-"`
 }
 
+// CRLConfig represents config options for CRL generation
+type CRLConfig struct {
+	Enabled          bool                  `json:"enabled"`
+	GenerateOnRevoke bool                  `json:"generateOnRevoke,omitempty"`
+	CacheDuration    *provisioner.Duration `json:"cacheDuration,omitempty"`
+	RenewPeriod      *provisioner.Duration `json:"renewPeriod,omitempty"`
+}
+
+// IsEnabled returns if the CRL is enabled.
+func (c *CRLConfig) IsEnabled() bool {
+	return c != nil && c.Enabled
+}
+
+// Validate validates the CRL configuration.
+func (c *CRLConfig) Validate() error {
+	if c == nil {
+		return nil
+	}
+
+	if c.CacheDuration != nil && c.CacheDuration.Duration < 0 {
+		return errors.New("crl.cacheDuration must be greater than or equal to 0")
+	}
+
+	if c.RenewPeriod != nil && c.RenewPeriod.Duration < 0 {
+		return errors.New("crl.renewPeriod must be greater than or equal to 0")
+	}
+
+	if c.RenewPeriod != nil && c.CacheDuration != nil &&
+		c.RenewPeriod.Duration > c.CacheDuration.Duration {
+		return errors.New("crl.cacheDuration must be greater than or equal to crl.renewPeriod")
+	}
+
+	return nil
+}
+
+// TickerDuration the renewal ticker duration. This is set by renewPeriod, of it
+// is not set is ~2/3 of cacheDuration.
+func (c *CRLConfig) TickerDuration() time.Duration {
+	if !c.IsEnabled() {
+		return 0
+	}
+
+	if c.RenewPeriod != nil && c.RenewPeriod.Duration > 0 {
+		return c.RenewPeriod.Duration
+	}
+
+	return (c.CacheDuration.Duration / 3) * 2
+}
+
 // ASN1DN contains ASN1.DN attributes that are used in Subject and Issuer
 // x509 Certificate blocks.
 type ASN1DN struct {
@@ -107,14 +159,6 @@ type AuthConfig struct {
 	Backdate             *provisioner.Duration `json:"backdate,omitempty"`
 	EnableAdmin          bool                  `json:"enableAdmin,omitempty"`
 	DisableGetSSHHosts   bool                  `json:"disableGetSSHHosts,omitempty"`
-}
-
-// CRLConfig represents config options for CRL generation
-type CRLConfig struct {
-	Enabled          bool                  `json:"enabled"`
-	CacheDuration    *provisioner.Duration `json:"cacheDuration,omitempty"`
-	GenerateOnRevoke bool                  `json:"generateOnRevoke,omitempty"`
-	RenewPeriod      *provisioner.Duration `json:"renewPeriod,omitempty"`
 }
 
 // init initializes the required fields in the AuthConfig if they are not
@@ -194,7 +238,7 @@ func (c *Config) Init() {
 	if c.CommonName == "" {
 		c.CommonName = "Step Online CA"
 	}
-	if c.CRL != nil && c.CRL.CacheDuration == nil {
+	if c.CRL != nil && c.CRL.Enabled && c.CRL.CacheDuration == nil {
 		c.CRL.CacheDuration = DefaultCRLCacheDuration
 	}
 	c.AuthorityConfig.init()
@@ -280,6 +324,11 @@ func (c *Config) Validate() error {
 
 	// Validate templates: nil is ok
 	if err := c.Templates.Validate(); err != nil {
+		return err
+	}
+
+	// Validate crl config: nil is ok
+	if err := c.CRL.Validate(); err != nil {
 		return err
 	}
 

@@ -28,11 +28,13 @@ import (
 
 	"github.com/smallstep/assert"
 	"github.com/smallstep/certificates/api/render"
+	"github.com/smallstep/certificates/authority/config"
 	"github.com/smallstep/certificates/authority/policy"
 	"github.com/smallstep/certificates/authority/provisioner"
 	"github.com/smallstep/certificates/cas/softcas"
 	"github.com/smallstep/certificates/db"
 	"github.com/smallstep/certificates/errs"
+	"github.com/smallstep/nosql/database"
 )
 
 var (
@@ -1364,7 +1366,7 @@ func TestAuthority_Revoke(t *testing.T) {
 					return true, nil
 				},
 				MGetCertificate: func(sn string) (*x509.Certificate, error) {
-					return nil, nil
+					return nil, errors.New("not found")
 				},
 				Err: errors.New("force"),
 			}))
@@ -1404,7 +1406,7 @@ func TestAuthority_Revoke(t *testing.T) {
 					return true, nil
 				},
 				MGetCertificate: func(sn string) (*x509.Certificate, error) {
-					return nil, nil
+					return nil, errors.New("not found")
 				},
 				Err: db.ErrAlreadyExists,
 			}))
@@ -1698,11 +1700,10 @@ func TestAuthority_CRL(t *testing.T) {
 		ctx      context.Context
 		expected []string
 		err      error
-		code     int
 	}
 	tests := map[string]func() test{
-		"ok/empty-crl": func() test {
-			_a := testAuthority(t, WithDatabase(&db.MockAuthDB{
+		"fail/empty-crl": func() test {
+			a := testAuthority(t, WithDatabase(&db.MockAuthDB{
 				MUseToken: func(id, tok string) (bool, error) {
 					return true, nil
 				},
@@ -1714,7 +1715,7 @@ func TestAuthority_CRL(t *testing.T) {
 					return nil
 				},
 				MGetCRL: func() (*db.CertificateRevocationListInfo, error) {
-					return &crlStore, nil
+					return nil, database.ErrNotFound
 				},
 				MGetRevokedCertificates: func() (*[]db.RevokedCertificateInfo, error) {
 					return &revokedList, nil
@@ -1724,15 +1725,19 @@ func TestAuthority_CRL(t *testing.T) {
 					return nil
 				},
 			}))
+			a.config.CRL = &config.CRLConfig{
+				Enabled: true,
+			}
 
 			return test{
-				auth:     _a,
+				auth:     a,
 				ctx:      crlCtx,
 				expected: nil,
+				err:      database.ErrNotFound,
 			}
 		},
 		"ok/crl-full": func() test {
-			_a := testAuthority(t, WithDatabase(&db.MockAuthDB{
+			a := testAuthority(t, WithDatabase(&db.MockAuthDB{
 				MUseToken: func(id, tok string) (bool, error) {
 					return true, nil
 				},
@@ -1754,6 +1759,10 @@ func TestAuthority_CRL(t *testing.T) {
 					return nil
 				},
 			}))
+			a.config.CRL = &config.CRLConfig{
+				Enabled:          true,
+				GenerateOnRevoke: true,
+			}
 
 			var ex []string
 
@@ -1770,7 +1779,7 @@ func TestAuthority_CRL(t *testing.T) {
 				}
 				raw, err := jwt.Signed(sig).Claims(cl).CompactSerialize()
 				assert.FatalError(t, err)
-				err = _a.Revoke(crlCtx, &RevokeOptions{
+				err = a.Revoke(crlCtx, &RevokeOptions{
 					Serial:     sn,
 					ReasonCode: reasonCode,
 					Reason:     reason,
@@ -1783,7 +1792,7 @@ func TestAuthority_CRL(t *testing.T) {
 			}
 
 			return test{
-				auth:     _a,
+				auth:     a,
 				ctx:      crlCtx,
 				expected: ex,
 			}
@@ -1792,10 +1801,11 @@ func TestAuthority_CRL(t *testing.T) {
 	for name, f := range tests {
 		tc := f()
 		t.Run(name, func(t *testing.T) {
-			if crlBytes, _err := tc.auth.GetCertificateRevocationList(); _err == nil {
+			if crlBytes, err := tc.auth.GetCertificateRevocationList(); err == nil {
 				crl, parseErr := x509.ParseCRL(crlBytes)
 				if parseErr != nil {
 					t.Errorf("x509.ParseCertificateRequest() error = %v, wantErr %v", parseErr, nil)
+					return
 				}
 
 				var cmpList []string
@@ -1804,9 +1814,8 @@ func TestAuthority_CRL(t *testing.T) {
 				}
 
 				assert.Equals(t, cmpList, tc.expected)
-
 			} else {
-				assert.NotNil(t, tc.err)
+				assert.NotNil(t, tc.err, err.Error())
 			}
 		})
 	}

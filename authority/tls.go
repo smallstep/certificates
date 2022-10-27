@@ -30,6 +30,7 @@ import (
 	casapi "github.com/smallstep/certificates/cas/apiv1"
 	"github.com/smallstep/certificates/db"
 	"github.com/smallstep/certificates/errs"
+	"github.com/smallstep/nosql/database"
 )
 
 // GetTLSOptions returns the tls options configured.
@@ -37,8 +38,11 @@ func (a *Authority) GetTLSOptions() *config.TLSOptions {
 	return a.config.TLS
 }
 
-var oidAuthorityKeyIdentifier = asn1.ObjectIdentifier{2, 5, 29, 35}
-var oidSubjectKeyIdentifier = asn1.ObjectIdentifier{2, 5, 29, 14}
+var (
+	oidAuthorityKeyIdentifier            = asn1.ObjectIdentifier{2, 5, 29, 35}
+	oidSubjectKeyIdentifier              = asn1.ObjectIdentifier{2, 5, 29, 14}
+	oidExtensionIssuingDistributionPoint = asn1.ObjectIdentifier{2, 5, 29, 28}
+)
 
 func withDefaultASN1DN(def *config.ASN1DN) provisioner.CertificateModifierFunc {
 	return func(crt *x509.Certificate, opts provisioner.SignOptions) error {
@@ -488,19 +492,15 @@ func (a *Authority) Revoke(ctx context.Context, revokeOpts *RevokeOptions) error
 		RevokedAt:  time.Now().UTC(),
 	}
 
-	var (
-		p   provisioner.Interface
-		err error
-	)
-
-	if revokeOpts.Crt == nil {
-		// Attempt to get the certificate expiry using the serial number.
-		cert, err := a.db.GetCertificate(revokeOpts.Serial)
-
-		// Revocation of a certificate not in the database may be requested, so fill in the expiry only
-		// if we can
-		if err == nil {
-			rci.ExpiresAt = cert.NotAfter
+	// For X509 CRLs attempt to get the expiration date of the certificate.
+	if provisioner.MethodFromContext(ctx) == provisioner.RevokeMethod {
+		if revokeOpts.Crt == nil {
+			cert, err := a.db.GetCertificate(revokeOpts.Serial)
+			if err == nil {
+				rci.ExpiresAt = cert.NotAfter
+			}
+		} else {
+			rci.ExpiresAt = revokeOpts.Crt.NotAfter
 		}
 	}
 
@@ -508,8 +508,7 @@ func (a *Authority) Revoke(ctx context.Context, revokeOpts *RevokeOptions) error
 	if !(revokeOpts.MTLS || revokeOpts.ACME) {
 		token, err := jose.ParseSigned(revokeOpts.OTT)
 		if err != nil {
-			return errs.Wrap(http.StatusUnauthorized, err,
-				"authority.Revoke; error parsing token", opts...)
+			return errs.Wrap(http.StatusUnauthorized, err, "authority.Revoke; error parsing token", opts...)
 		}
 
 		// Get claims w/out verification.
@@ -519,28 +518,43 @@ func (a *Authority) Revoke(ctx context.Context, revokeOpts *RevokeOptions) error
 		}
 
 		// This method will also validate the audiences for JWK provisioners.
-		p, err = a.LoadProvisionerByToken(token, &claims.Claims)
+		p, err := a.LoadProvisionerByToken(token, &claims.Claims)
 		if err != nil {
 			return err
 		}
 		rci.ProvisionerID = p.GetID()
 		rci.TokenID, err = p.GetTokenID(revokeOpts.OTT)
 		if err != nil && !errors.Is(err, provisioner.ErrAllowTokenReuse) {
-			return errs.Wrap(http.StatusInternalServerError, err,
-				"authority.Revoke; could not get ID for token")
+			return errs.Wrap(http.StatusInternalServerError, err, "authority.Revoke; could not get ID for token")
 		}
 		opts = append(opts,
 			errs.WithKeyVal("provisionerID", rci.ProvisionerID),
 			errs.WithKeyVal("tokenID", rci.TokenID),
 		)
-	} else if p, err = a.LoadProvisionerByCertificate(revokeOpts.Crt); err == nil {
+	} else if p, err := a.LoadProvisionerByCertificate(revokeOpts.Crt); err == nil {
 		// Load the Certificate provisioner if one exists.
 		rci.ProvisionerID = p.GetID()
 		opts = append(opts, errs.WithKeyVal("provisionerID", rci.ProvisionerID))
 	}
 
+	failRevoke := func(err error) error {
+		switch {
+		case errors.Is(err, db.ErrNotImplemented):
+			return errs.NotImplemented("authority.Revoke; no persistence layer configured", opts...)
+		case errors.Is(err, db.ErrAlreadyExists):
+			return errs.ApplyOptions(
+				errs.BadRequest("certificate with serial number '%s' is already revoked", rci.Serial),
+				opts...,
+			)
+		default:
+			return errs.Wrap(http.StatusInternalServerError, err, "authority.Revoke", opts...)
+		}
+	}
+
 	if provisioner.MethodFromContext(ctx) == provisioner.SSHRevokeMethod {
-		err = a.revokeSSH(nil, rci)
+		if err := a.revokeSSH(nil, rci); err != nil {
+			return failRevoke(err)
+		}
 	} else {
 		// Revoke an X.509 certificate using CAS. If the certificate is not
 		// provided we will try to read it from the db. If the read fails we
@@ -555,7 +569,7 @@ func (a *Authority) Revoke(ctx context.Context, revokeOpts *RevokeOptions) error
 
 		// CAS operation, note that SoftCAS (default) is a noop.
 		// The revoke happens when this is stored in the db.
-		_, err = a.x509CAService.RevokeCertificate(&casapi.RevokeCertificateRequest{
+		_, err := a.x509CAService.RevokeCertificate(&casapi.RevokeCertificateRequest{
 			Certificate:  revokedCert,
 			SerialNumber: rci.Serial,
 			Reason:       rci.Reason,
@@ -567,37 +581,20 @@ func (a *Authority) Revoke(ctx context.Context, revokeOpts *RevokeOptions) error
 		}
 
 		// Save as revoked in the Db.
-		err = a.revoke(revokedCert, rci)
-		if err != nil {
-			return errs.Wrap(http.StatusInternalServerError, err, "authority.Revoke", opts...)
+		if err := a.revoke(revokedCert, rci); err != nil {
+			return failRevoke(err)
 		}
 
-		if a.config.CRL != nil && a.config.CRL.GenerateOnRevoke {
-			// Generate a new CRL so CRL requesters will always get an up-to-date CRL whenever they request it
-			err = a.GenerateCertificateRevocationList()
-			if err != nil {
+		// Generate a new CRL so CRL requesters will always get an up-to-date
+		// CRL whenever they request it.
+		if a.config.CRL.IsEnabled() && a.config.CRL.GenerateOnRevoke {
+			if err := a.GenerateCertificateRevocationList(); err != nil {
 				return errs.Wrap(http.StatusInternalServerError, err, "authority.Revoke", opts...)
 			}
-
-			// the timer only gets reset if CRL is enabled
-			if a.config.CRL.Enabled {
-				a.resetCRLGeneratorTimer()
-			}
 		}
 	}
-	switch {
-	case err == nil:
-		return nil
-	case errors.Is(err, db.ErrNotImplemented):
-		return errs.NotImplemented("authority.Revoke; no persistence layer configured", opts...)
-	case errors.Is(err, db.ErrAlreadyExists):
-		return errs.ApplyOptions(
-			errs.BadRequest("certificate with serial number '%s' is already revoked", rci.Serial),
-			opts...,
-		)
-	default:
-		return errs.Wrap(http.StatusInternalServerError, err, "authority.Revoke", opts...)
-	}
+
+	return nil
 }
 
 func (a *Authority) revoke(crt *x509.Certificate, rci *db.RevokedCertificateInfo) error {
@@ -621,7 +618,7 @@ func (a *Authority) revokeSSH(crt *ssh.Certificate, rci *db.RevokedCertificateIn
 // GetCertificateRevocationList will return the currently generated CRL from the DB, or a not implemented
 // error if the underlying AuthDB does not support CRLs
 func (a *Authority) GetCertificateRevocationList() ([]byte, error) {
-	if a.config.CRL == nil {
+	if !a.config.CRL.IsEnabled() {
 		return nil, errs.Wrap(http.StatusNotFound, errors.Errorf("Certificate Revocation Lists are not enabled"), "authority.GetCertificateRevocationList")
 	}
 
@@ -633,11 +630,6 @@ func (a *Authority) GetCertificateRevocationList() ([]byte, error) {
 	crlInfo, err := crlDB.GetCRL()
 	if err != nil {
 		return nil, errs.Wrap(http.StatusInternalServerError, err, "authority.GetCertificateRevocationList")
-
-	}
-
-	if crlInfo == nil {
-		return nil, nil
 	}
 
 	return crlInfo.DER, nil
@@ -646,9 +638,7 @@ func (a *Authority) GetCertificateRevocationList() ([]byte, error) {
 // GenerateCertificateRevocationList generates a DER representation of a signed CRL and stores it in the
 // database. Returns nil if CRL generation has been disabled in the config
 func (a *Authority) GenerateCertificateRevocationList() error {
-
-	if a.config.CRL == nil {
-		// CRL is disabled
+	if !a.config.CRL.IsEnabled() {
 		return nil
 	}
 
@@ -663,34 +653,40 @@ func (a *Authority) GenerateCertificateRevocationList() error {
 		return errors.Errorf("CA does not support CRL Generation")
 	}
 
-	a.crlMutex.Lock() // use a mutex to ensure only one CRL is generated at a time to avoid concurrency issues
+	// use a mutex to ensure only one CRL is generated at a time to avoid
+	// concurrency issues
+	a.crlMutex.Lock()
 	defer a.crlMutex.Unlock()
 
 	crlInfo, err := crlDB.GetCRL()
-	if err != nil {
+	if err != nil && !database.IsErrNotFound(err) {
 		return errors.Wrap(err, "could not retrieve CRL from database")
 	}
 
+	now := time.Now().UTC()
 	revokedList, err := crlDB.GetRevokedCertificates()
 	if err != nil {
 		return errors.Wrap(err, "could not retrieve revoked certificates list from database")
 	}
 
-	// Number is a monotonically increasing integer (essentially the CRL version number) that we need to
-	// keep track of and increase every time we generate a new CRL
-	var n int64
+	// Number is a monotonically increasing integer (essentially the CRL version
+	// number) that we need to keep track of and increase every time we generate
+	// a new CRL
 	var bn big.Int
-
 	if crlInfo != nil {
-		n = crlInfo.Number + 1
+		bn.SetInt64(crlInfo.Number + 1)
 	}
-	bn.SetInt64(n)
 
-	// Convert our database db.RevokedCertificateInfo types into the pkix representation ready for the
-	// CAS to sign it
+	// Convert our database db.RevokedCertificateInfo types into the pkix
+	// representation ready for the CAS to sign it
 	var revokedCertificates []pkix.RevokedCertificate
-
+	skipExpiredTime := now.Add(-config.DefaultCRLExpiredDuration.Abs())
 	for _, revokedCert := range *revokedList {
+		// skip expired certificates
+		if !revokedCert.ExpiresAt.IsZero() && revokedCert.ExpiresAt.Before(skipExpiredTime) {
+			continue
+		}
+
 		var sn big.Int
 		sn.SetString(revokedCert.Serial, 10)
 		revokedCertificates = append(revokedCertificates, pkix.RevokedCertificate{
@@ -713,9 +709,18 @@ func (a *Authority) GenerateCertificateRevocationList() error {
 		SignatureAlgorithm:  0,
 		RevokedCertificates: revokedCertificates,
 		Number:              &bn,
-		ThisUpdate:          time.Now().UTC(),
-		NextUpdate:          time.Now().UTC().Add(updateDuration),
-		ExtraExtensions:     nil,
+		ThisUpdate:          now,
+		NextUpdate:          now.Add(updateDuration),
+	}
+
+	// Add distribution point.
+	//
+	// Note that this is currently using the port 443 by default.
+	fullName := a.config.Audience("/1.0/crl")[0]
+	if b, err := marshalDistributionPoint(fullName, false); err == nil {
+		revocationList.ExtraExtensions = []pkix.Extension{
+			{Id: oidExtensionIssuingDistributionPoint, Value: b},
+		}
 	}
 
 	certificateRevocationList, err := caCRLGenerator.CreateCRL(&casapi.CreateCRLRequest{RevocationList: &revocationList})
@@ -726,7 +731,7 @@ func (a *Authority) GenerateCertificateRevocationList() error {
 	// Create a new db.CertificateRevocationListInfo, which stores the new Number we just generated, the
 	// expiry time, duration, and the DER-encoded CRL
 	newCRLInfo := db.CertificateRevocationListInfo{
-		Number:    n,
+		Number:    bn.Int64(),
 		ExpiresAt: revocationList.NextUpdate,
 		DER:       certificateRevocationList.CRL,
 		Duration:  updateDuration,
@@ -832,6 +837,33 @@ func (a *Authority) GetTLSCertificate() (*tls.Certificate, error) {
 	// Set leaf certificate
 	tlsCrt.Leaf = resp.Certificate
 	return &tlsCrt, nil
+}
+
+// RFC 5280, 5.2.5
+type distributionPoint struct {
+	DistributionPoint          distributionPointName `asn1:"optional,tag:0"`
+	OnlyContainsUserCerts      bool                  `asn1:"optional,tag:1"`
+	OnlyContainsCACerts        bool                  `asn1:"optional,tag:2"`
+	OnlySomeReasons            asn1.BitString        `asn1:"optional,tag:3"`
+	IndirectCRL                bool                  `asn1:"optional,tag:4"`
+	OnlyContainsAttributeCerts bool                  `asn1:"optional,tag:5"`
+}
+
+type distributionPointName struct {
+	FullName     []asn1.RawValue  `asn1:"optional,tag:0"`
+	RelativeName pkix.RDNSequence `asn1:"optional,tag:1"`
+}
+
+func marshalDistributionPoint(fullName string, isCA bool) ([]byte, error) {
+	return asn1.Marshal(distributionPoint{
+		DistributionPoint: distributionPointName{
+			FullName: []asn1.RawValue{
+				{Class: 2, Tag: 6, Bytes: []byte(fullName)},
+			},
+		},
+		OnlyContainsUserCerts: !isCA,
+		OnlyContainsCACerts:   isCA,
+	})
 }
 
 // templatingError tries to extract more information about the cause of

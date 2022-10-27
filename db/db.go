@@ -271,14 +271,12 @@ func (db *DB) GetRevokedCertificates() (*[]RevokedCertificateInfo, error) {
 				revokedCerts = append(revokedCerts, data)
 			}
 		}
-
 	}
 	return &revokedCerts, nil
 }
 
 // StoreCRL stores a CRL in the DB
 func (db *DB) StoreCRL(crlInfo *CertificateRevocationListInfo) error {
-
 	crlInfoBytes, err := json.Marshal(crlInfo)
 	if err != nil {
 		return errors.Wrap(err, "json Marshal error")
@@ -293,11 +291,6 @@ func (db *DB) StoreCRL(crlInfo *CertificateRevocationListInfo) error {
 // GetCRL gets the existing CRL from the database
 func (db *DB) GetCRL() (*CertificateRevocationListInfo, error) {
 	crlInfoBytes, err := db.Get(crlTable, crlKey)
-
-	if database.IsErrNotFound(err) {
-		return nil, nil
-	}
-
 	if err != nil {
 		return nil, errors.Wrap(err, "database Get error")
 	}

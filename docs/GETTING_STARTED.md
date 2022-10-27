@@ -119,11 +119,6 @@ starting the CA.
 * `address`: e.g. `127.0.0.1:8080` - address and port on which the CA will bind
 and respond to requests.
 
-* `crl`: Certificate Revocation List settings:
-    - generate: Enable/Disable CRL generation (`true` to generate, `false` to disable)
-
-    - cacheDuration: Time between CRL regeneration task. E.g if set to `5m`, step-ca will regenerate the CRL every 5 minutes.
-
 * `dnsNames`: comma separated list of DNS Name(s) for the CA.
 
 * `logger`: the default logging format for the CA is `text`. The other option
@@ -131,17 +126,20 @@ is `json`.
 
 * `db`: data persistence layer. See [database documentation](./database.md) for more
 info.
+  * `type`: `badger`, `bbolt`, `mysql`, etc.
+  * `dataSource`: string that can be interpreted differently depending on the
+    type of the database. Usually a path to where the data is stored. See the
+    [database configuration docs](./database.md#configuration) for more info.
+  * `database`: name of the database. Used for backends that may have multiple
+    databases. e.g. MySQL
+  * `valueDir`: directory to store the value log in (Badger specific).
 
-    - type: `badger`, `bbolt`, `mysql`, etc.
-
-    - dataSource: `string` that can be interpreted differently depending on the
-    type of the database. Usually a path to where the data is stored. See
-    the [database configuration docs](./database.md#configuration) for more info.
-
-    - database: name of the database. Used for backends that may have
-    multiple databases. e.g. MySQL
-
-    - valueDir: directory to store the value log in (Badger specific).
+* `crl`: Certificate Revocation List settings:
+  * `enable`: enables CRL generation (`true` to generate, `false` to disable)
+  * `generateOnRevoke`: a revoke will generate a new CRL if the crl is enabled.
+  * `cacheDuration`: the duration until next update of the CRL, defaults to 24h.
+  * `renewPeriod`: the time between CRL regeneration. If not set ~2/3 of the
+    cacheDuration will be used.
 
 * `tls`: settings for negotiating communication with the CA; includes acceptable
 ciphersuites, min/max TLS version, etc.

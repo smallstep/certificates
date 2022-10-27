@@ -72,8 +72,9 @@ type Authority struct {
 	sshCAHostFederatedCerts []ssh.PublicKey
 
 	// CRL vars
-	crlTicker *time.Ticker
-	crlMutex  sync.Mutex
+	crlTicker  *time.Ticker
+	crlStopper chan struct{}
+	crlMutex   sync.Mutex
 
 	// Do not re-initialize
 	initOnce  bool
@@ -662,22 +663,14 @@ func (a *Authority) init() error {
 	// not be repeated.
 	a.initOnce = true
 
-	// Start the CRL generator
-	if a.config.CRL != nil && a.config.CRL.Enabled {
-		if v := a.config.CRL.CacheDuration; v != nil && v.Duration < 0 {
-			return errors.New("crl cacheDuration must be >= 0")
+	// Start the CRL generator, we can assume the configuration is validated.
+	if a.config.CRL.IsEnabled() {
+		// Default cache duration to the default one
+		if v := a.config.CRL.CacheDuration; v == nil || v.Duration <= 0 {
+			a.config.CRL.CacheDuration = config.DefaultCRLCacheDuration
 		}
-
-		if v := a.config.CRL.CacheDuration; v != nil && v.Duration == 0 {
-			a.config.CRL.CacheDuration.Duration, _ = time.ParseDuration("24h")
-		}
-
-		if a.config.CRL.CacheDuration == nil {
-			a.config.CRL.CacheDuration, _ = provisioner.NewDuration("24h")
-		}
-
-		err = a.startCRLGenerator()
-		if err != nil {
+		// Start CRL generator
+		if err := a.startCRLGenerator(); err != nil {
 			return err
 		}
 	}
@@ -736,6 +729,7 @@ func (a *Authority) IsAdminAPIEnabled() bool {
 func (a *Authority) Shutdown() error {
 	if a.crlTicker != nil {
 		a.crlTicker.Stop()
+		close(a.crlStopper)
 	}
 
 	if err := a.keyManager.Close(); err != nil {
@@ -746,9 +740,9 @@ func (a *Authority) Shutdown() error {
 
 // CloseForReload closes internal services, to allow a safe reload.
 func (a *Authority) CloseForReload() {
-
 	if a.crlTicker != nil {
 		a.crlTicker.Stop()
+		close(a.crlStopper)
 	}
 
 	if err := a.keyManager.Close(); err != nil {
@@ -791,25 +785,18 @@ func (a *Authority) requiresSCEPService() bool {
 	return false
 }
 
-// GetSCEPService returns the configured SCEP Service
-// TODO: this function is intended to exist temporarily
-// in order to make SCEP work more easily. It can be
-// made more correct by using the right interfaces/abstractions
-// after it works as expected.
+// GetSCEPService returns the configured SCEP Service.
+//
+// TODO: this function is intended to exist temporarily in order to make SCEP
+// work more easily. It can be made more correct by using the right
+// interfaces/abstractions after it works as expected.
 func (a *Authority) GetSCEPService() *scep.Service {
 	return a.scepService
 }
 
 func (a *Authority) startCRLGenerator() error {
-
-	if a.config.CRL.CacheDuration.Duration <= 0 {
+	if !a.config.CRL.IsEnabled() {
 		return nil
-	}
-
-	// Make the renewal ticker run ~2/3 of cacheDuration by default, or use renewPeriod if available
-	tickerDuration := (a.config.CRL.CacheDuration.Duration / 3) * 2
-	if v := a.config.CRL.RenewPeriod; v != nil && v.Duration > 0 {
-		tickerDuration = v.Duration
 	}
 
 	// Check that there is a valid CRL in the DB right now. If it doesn't exist
@@ -819,37 +806,28 @@ func (a *Authority) startCRLGenerator() error {
 		return errors.Errorf("CRL Generation requested, but database does not support CRL generation")
 	}
 
-	// Always create a new CRL on startup in case the CA has been down and the time to next expected CRL
-	// update is less than the cache duration.
-	err := a.GenerateCertificateRevocationList()
-	if err != nil {
+	// Always create a new CRL on startup in case the CA has been down and the
+	// time to next expected CRL update is less than the cache duration.
+	if err := a.GenerateCertificateRevocationList(); err != nil {
 		return errors.Wrap(err, "could not generate a CRL")
 	}
 
-	a.crlTicker = time.NewTicker(tickerDuration)
+	a.crlStopper = make(chan struct{}, 1)
+	a.crlTicker = time.NewTicker(a.config.CRL.TickerDuration())
 
 	go func() {
 		for {
-			<-a.crlTicker.C
-			log.Println("Regenerating CRL")
-			err := a.GenerateCertificateRevocationList()
-			if err != nil {
-				log.Printf("ERROR: authority.crlGenerator encountered an error when regenerating the CRL: %v", err)
+			select {
+			case <-a.crlTicker.C:
+				log.Println("Regenerating CRL")
+				if err := a.GenerateCertificateRevocationList(); err != nil {
+					log.Printf("error regenerating the CRL: %v", err)
+				}
+			case <-a.crlStopper:
+				return
 			}
-
 		}
 	}()
 
 	return nil
-}
-
-func (a *Authority) resetCRLGeneratorTimer() {
-	if a.crlTicker != nil {
-		tickerDuration := (a.config.CRL.CacheDuration.Duration / 3) * 2
-		if v := a.config.CRL.RenewPeriod; v != nil && v.Duration > 0 {
-			tickerDuration = v.Duration
-		}
-
-		a.crlTicker.Reset(tickerDuration)
-	}
 }
