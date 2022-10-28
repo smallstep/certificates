@@ -96,4 +96,5 @@ jobs:
       platforms: linux/amd64,linux/386,linux/arm,linux/arm64
       tags: ${{ needs.create_release.outputs.docker_tags }}
       docker_image: smallstep/step-ca
+      docker_file: docker/Dockerfile.step-ca
     secrets: inherit
