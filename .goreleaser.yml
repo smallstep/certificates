@@ -87,8 +87,9 @@ checksum:
 
 signs:
 - cmd: cosign
-  stdin: '{{ .Env.COSIGN_PWD }}'
-  args: ["sign-blob", "-key=/tmp/cosign.key", "-output-signature=${signature}", "${artifact}"]
+  signature: "${artifact}.sig"
+  certificate: "${artifact}.pem"
+  args: ["sign-blob", "--oidc-issuer=https://token.actions.githubusercontent.com", "--output-certificate=${certificate}", "--output-signature=${signature}", "${artifact}"]
   artifacts: all
 
 snapshot:
@@ -154,8 +155,8 @@ release:
 
     ```
     cosign verify-blob \
-      -key https://raw.githubusercontent.com/smallstep/certificates/master/cosign.pub \
-      -signature ~/Downloads/step-ca_darwin_{{ .Version }}_amd64.tar.gz.sig
+      --certificate ~/Downloads/step-ca_darwin_{{ .Version }}_amd64.tar.gz.sig.pem \
+      --signature ~/Downloads/step-ca_darwin_{{ .Version }}_amd64.tar.gz.sig \
       ~/Downloads/step-ca_darwin_{{ .Version }}_amd64.tar.gz
     ```
 
