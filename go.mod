@@ -4,7 +4,7 @@ go 1.18
 
 require (
 	cloud.google.com/go v0.104.0
-	cloud.google.com/go/security v1.8.0
+	cloud.google.com/go/security v1.9.0
 	github.com/Azure/azure-sdk-for-go v65.0.0+incompatible // indirect
 	github.com/Azure/go-autorest/autorest v0.11.28 // indirect
 	github.com/Azure/go-autorest/autorest/azure/auth v0.5.11 // indirect
