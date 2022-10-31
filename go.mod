@@ -4,6 +4,7 @@ go 1.18
 
 require (
 	cloud.google.com/go v0.105.0 // indirect
+	cloud.google.com/go/longrunning v0.2.1
 	cloud.google.com/go/security v1.9.0
 	github.com/Azure/azure-sdk-for-go v67.0.0+incompatible // indirect
 	github.com/Azure/go-autorest/autorest v0.11.28 // indirect
@@ -54,8 +55,6 @@ require (
 	google.golang.org/protobuf v1.28.1
 	gopkg.in/square/go-jose.v2 v2.6.0
 )
-
-require cloud.google.com/go/longrunning v0.2.1
 
 require (
 	cloud.google.com/go/compute v1.10.0 // indirect
