@@ -154,7 +154,7 @@ release:
     Below is an example using `cosign` to verify a release artifact:
 
     ```
-    cosign verify-blob \
+    COSIGN_EXPERIMENTAL=1 cosign verify-blob \
       --certificate ~/Downloads/step-ca_darwin_{{ .Version }}_amd64.tar.gz.sig.pem \
       --signature ~/Downloads/step-ca_darwin_{{ .Version }}_amd64.tar.gz.sig \
       ~/Downloads/step-ca_darwin_{{ .Version }}_amd64.tar.gz
