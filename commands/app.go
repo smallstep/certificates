@@ -69,7 +69,7 @@ certificate issuer private key used in the RA mode.`,
 		},
 		cli.StringFlag{
 			Name:   "context",
-			Usage:  "the name of the authority's context.",
+			Usage:  "the <name> of the authority's context.",
 			EnvVar: "STEP_CA_CONTEXT",
 		},
 		cli.IntFlag{
