@@ -69,21 +69,22 @@ certificate issuer private key used in the RA mode.`,
 		},
 		cli.StringFlag{
 			Name:   "context",
-			Usage:  "The name of the authority's context.",
+			Usage:  "the name of the authority's context.",
 			EnvVar: "STEP_CA_CONTEXT",
 		},
 		cli.IntFlag{
 			Name: "acme-http-port",
-			Usage: `The port used on http-01 challenges. It can be changed for testing purposes.
+			Usage: `the <port> used on http-01 challenges. It can be changed for testing purposes.
 Requires **--insecure** flag.`,
 		},
 		cli.IntFlag{
 			Name: "acme-tls-port",
-			Usage: `The port used on tls-alpn-01 challenges. It can be changed for testing purposes.
+			Usage: `the <port> used on tls-alpn-01 challenges. It can be changed for testing purposes.
 Requires **--insecure** flag.`,
 		},
 		cli.BoolFlag{
-			Name: "insecure",
+			Name:  "insecure",
+			Usage: "enable insecure flags.",
 		},
 	},
 }
