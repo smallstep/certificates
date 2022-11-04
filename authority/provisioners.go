@@ -48,6 +48,22 @@ func wrapProvisioner(p provisioner.Interface, attData *provisioner.AttestationDa
 	}
 }
 
+// wrapRAProvisioner wraps the given provisioner with RA information.
+func wrapRAProvisioner(p provisioner.Interface, raInfo *provisioner.RAInfo) *wrappedProvisioner {
+	return &wrappedProvisioner{
+		Interface: p,
+		raInfo:    raInfo,
+	}
+}
+
+// isRAProvisioner returns if the given provisioner is an RA provisioner.
+func isRAProvisioner(p provisioner.Interface) bool {
+	if rap, ok := p.(raProvisioner); ok {
+		return rap.RAInfo() != nil
+	}
+	return false
+}
+
 // wrappedProvisioner implements raProvisioner and attProvisioner.
 type wrappedProvisioner struct {
 	provisioner.Interface
@@ -119,6 +135,9 @@ func (a *Authority) unsafeLoadProvisionerFromDatabase(crt *x509.Certificate) (pr
 	}
 	if err == nil && data != nil && data.Provisioner != nil {
 		if p, ok := a.provisioners.Load(data.Provisioner.ID); ok {
+			if data.RaInfo != nil {
+				return wrapRAProvisioner(p, data.RaInfo), nil
+			}
 			return p, nil
 		}
 	}

@@ -876,7 +876,7 @@ func TestAuthority_authorizeRenew(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			tc := genTestCase(t)
 
-			err := tc.auth.authorizeRenew(tc.cert)
+			err := tc.auth.authorizeRenew(context.Background(), tc.cert)
 			if err != nil {
 				if assert.NotNil(t, tc.err) {
 					var sc render.StatusCodedError
@@ -1459,6 +1459,37 @@ func TestAuthority_AuthorizeRenewToken(t *testing.T) {
 		})
 		return nil
 	}))
+	a4 := testAuthority(t)
+	a4.db = &db.MockAuthDB{
+		MUseToken: func(id, tok string) (bool, error) {
+			return true, nil
+		},
+		MGetCertificateData: func(serialNumber string) (*db.CertificateData, error) {
+			return &db.CertificateData{
+				Provisioner: &db.ProvisionerData{ID: "Max:IMi94WBNI6gP5cNHXlZYNUzvMjGdHyBRmFoo-lCEaqk", Name: "Max"},
+				RaInfo:      &provisioner.RAInfo{ProvisionerName: "ra"},
+			}, nil
+		},
+	}
+	t4, c4 := generateX5cToken(a1, signer, jose.Claims{
+		Audience:  []string{"https://ra.example.com/1.0/renew"},
+		Subject:   "test.example.com",
+		Issuer:    "step-ca-client/1.0",
+		NotBefore: jose.NewNumericDate(now),
+		Expiry:    jose.NewNumericDate(now.Add(5 * time.Minute)),
+	}, provisioner.CertificateEnforcerFunc(func(cert *x509.Certificate) error {
+		cert.NotBefore = now
+		cert.NotAfter = now.Add(time.Hour)
+		b, err := asn1.Marshal(stepProvisionerASN1{int(provisioner.TypeJWK), []byte("step-cli"), nil, nil})
+		if err != nil {
+			return err
+		}
+		cert.ExtraExtensions = append(cert.ExtraExtensions, pkix.Extension{
+			Id:    asn1.ObjectIdentifier{1, 3, 6, 1, 4, 1, 37476, 9000, 64, 1},
+			Value: b,
+		})
+		return nil
+	}))
 	badSigner, _ := generateX5cToken(a1, otherSigner, jose.Claims{
 		Audience:  []string{"https://example.com/1.0/renew"},
 		Subject:   "test.example.com",
@@ -1627,6 +1658,7 @@ func TestAuthority_AuthorizeRenewToken(t *testing.T) {
 		{"ok", a1, args{ctx, t1}, c1, false},
 		{"ok expired cert", a1, args{ctx, t2}, c2, false},
 		{"ok provisioner issuer", a1, args{ctx, t3}, c3, false},
+		{"ok ra provisioner", a4, args{ctx, t4}, c4, false},
 		{"fail token", a1, args{ctx, "not.a.token"}, nil, true},
 		{"fail token reuse", a1, args{ctx, t1}, nil, true},
 		{"fail token signature", a1, args{ctx, badSigner}, nil, true},

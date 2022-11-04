@@ -28,8 +28,9 @@ var (
 	sshHostPrincipalsTable = []byte("ssh_host_principals")
 )
 
-var crlKey = []byte("crl") //TODO: at the moment we store a single CRL in the database, in a dedicated table.
-//      is this acceptable? probably not....
+// TODO: at the moment we store a single CRL in the database, in a dedicated table.
+// is this acceptable? probably not....
+var crlKey = []byte("crl")
 
 // ErrAlreadyExists can be returned if the DB attempts to set a key that has
 // been previously set.
@@ -323,7 +324,8 @@ func (db *DB) StoreCertificate(crt *x509.Certificate) error {
 // CertificateData is the JSON representation of the data stored in
 // x509_certs_data table.
 type CertificateData struct {
-	Provisioner *ProvisionerData `json:"provisioner,omitempty"`
+	Provisioner *ProvisionerData    `json:"provisioner,omitempty"`
+	RaInfo      *provisioner.RAInfo `json:"ra,omitempty"`
 }
 
 // ProvisionerData is the JSON representation of the provisioner stored in the
@@ -332,6 +334,10 @@ type ProvisionerData struct {
 	ID   string `json:"id"`
 	Name string `json:"name"`
 	Type string `json:"type"`
+}
+
+type raProvisioner interface {
+	RAInfo() *provisioner.RAInfo
 }
 
 // StoreCertificateChain stores the leaf certificate and the provisioner that
@@ -346,6 +352,9 @@ func (db *DB) StoreCertificateChain(p provisioner.Interface, chain ...*x509.Cert
 			Name: p.GetName(),
 			Type: p.GetType().String(),
 		}
+		if rap, ok := p.(raProvisioner); ok {
+			data.RaInfo = rap.RAInfo()
+		}
 	}
 	b, err := json.Marshal(data)
 	if err != nil {
@@ -355,6 +364,31 @@ func (db *DB) StoreCertificateChain(p provisioner.Interface, chain ...*x509.Cert
 	tx := new(database.Tx)
 	tx.Set(certsTable, serialNumber, leaf.Raw)
 	tx.Set(certsDataTable, serialNumber, b)
+	if err := db.Update(tx); err != nil {
+		return errors.Wrap(err, "database Update error")
+	}
+	return nil
+}
+
+// StoreRenewedCertificate stores the leaf certificate and the provisioner that
+// authorized the old certificate if available.
+func (db *DB) StoreRenewedCertificate(oldCert *x509.Certificate, chain ...*x509.Certificate) error {
+	var certificateData []byte
+	if data, err := db.GetCertificateData(oldCert.SerialNumber.String()); err == nil {
+		if b, err := json.Marshal(data); err == nil {
+			certificateData = b
+		}
+	}
+
+	leaf := chain[0]
+	serialNumber := []byte(leaf.SerialNumber.String())
+
+	// Add certificate and certificate data in one transaction.
+	tx := new(database.Tx)
+	tx.Set(certsTable, serialNumber, leaf.Raw)
+	if certificateData != nil {
+		tx.Set(certsDataTable, serialNumber, certificateData)
+	}
 	if err := db.Update(tx); err != nil {
 		return errors.Wrap(err, "database Update error")
 	}

@@ -34,6 +34,19 @@ import (
 	"github.com/smallstep/nosql/database"
 )
 
+type tokenKey struct{}
+
+// NewTokenContext adds the given token to the context.
+func NewTokenContext(ctx context.Context, token string) context.Context {
+	return context.WithValue(ctx, tokenKey{}, token)
+}
+
+// TokenFromContext returns the token from the given context.
+func TokenFromContext(ctx context.Context) (token string, ok bool) {
+	token, ok = ctx.Value(tokenKey{}).(string)
+	return
+}
+
 // GetTLSOptions returns the tls options configured.
 func (a *Authority) GetTLSOptions() *config.TLSOptions {
 	return a.config.TLS
@@ -294,28 +307,44 @@ func (a *Authority) AreSANsAllowed(ctx context.Context, sans []string) error {
 	return a.policyEngine.AreSANsAllowed(sans)
 }
 
-// Renew creates a new Certificate identical to the old certificate, except
-// with a validity window that begins 'now'.
+// Renew creates a new Certificate identical to the old certificate, except with
+// a validity window that begins 'now'.
 func (a *Authority) Renew(oldCert *x509.Certificate) ([]*x509.Certificate, error) {
-	return a.Rekey(oldCert, nil)
+	return a.RenewContext(context.Background(), oldCert, nil)
 }
 
-// Rekey is used for rekeying and renewing based on the public key.
-// If the public key is 'nil' then it's assumed that the cert should be renewed
-// using the existing public key. If the public key is not 'nil' then it's
-// assumed that the cert should be rekeyed.
+// Rekey is used for rekeying and renewing based on the public key. If the
+// public key is 'nil' then it's assumed that the cert should be renewed using
+// the existing public key. If the public key is not 'nil' then it's assumed
+// that the cert should be rekeyed.
+//
 // For both Rekey and Renew all other attributes of the new certificate should
 // match the old certificate. The exceptions are 'AuthorityKeyId' (which may
 // have changed), 'SubjectKeyId' (different in case of rekey), and
 // 'NotBefore/NotAfter' (the validity duration of the new certificate should be
 // equal to the old one, but starting 'now').
 func (a *Authority) Rekey(oldCert *x509.Certificate, pk crypto.PublicKey) ([]*x509.Certificate, error) {
+	return a.RenewContext(context.Background(), oldCert, pk)
+}
+
+// RenewContext creates a new certificate identical to the old one, but it can
+// optionally replace the public key with the given one. When running on RA
+// mode, it can only renew a certificate using a renew token instead.
+//
+// For both rekey and renew operations, all other attributes of the new
+// certificate should match the old certificate. The exceptions are
+// 'AuthorityKeyId' (which may have changed), 'SubjectKeyId' (different in case
+// of rekey), and 'NotBefore/NotAfter' (the validity duration of the new
+// certificate should be equal to the old one, but starting 'now').
+func (a *Authority) RenewContext(ctx context.Context, oldCert *x509.Certificate, pk crypto.PublicKey) ([]*x509.Certificate, error) {
 	isRekey := (pk != nil)
-	opts := []interface{}{errs.WithKeyVal("serialNumber", oldCert.SerialNumber.String())}
+	opts := []errs.Option{
+		errs.WithKeyVal("serialNumber", oldCert.SerialNumber.String()),
+	}
 
 	// Check step provisioner extensions
-	if err := a.authorizeRenew(oldCert); err != nil {
-		return nil, errs.Wrap(http.StatusInternalServerError, err, "authority.Rekey", opts...)
+	if err := a.authorizeRenew(ctx, oldCert); err != nil {
+		return nil, errs.StatusCodeError(http.StatusInternalServerError, err, opts...)
 	}
 
 	// Durations
@@ -388,7 +417,7 @@ func (a *Authority) Rekey(oldCert *x509.Certificate, pk crypto.PublicKey) ([]*x5
 	if err := a.constraintsEngine.ValidateCertificate(newCert); err != nil {
 		var ee *errs.Error
 		if errors.As(err, &ee) {
-			return nil, errs.ApplyOptions(ee, opts...)
+			return nil, errs.StatusCodeError(ee.StatusCode(), err, opts...)
 		}
 		return nil, errs.InternalServerErr(err,
 			errs.WithKeyVal("serialNumber", oldCert.SerialNumber.String()),
@@ -396,19 +425,24 @@ func (a *Authority) Rekey(oldCert *x509.Certificate, pk crypto.PublicKey) ([]*x5
 		)
 	}
 
+	// The token can optionally be in the context. If the CA is running in RA
+	// mode, this can be used to renew a certificate.
+	token, _ := TokenFromContext(ctx)
+
 	resp, err := a.x509CAService.RenewCertificate(&casapi.RenewCertificateRequest{
 		Template: newCert,
 		Lifetime: lifetime,
 		Backdate: backdate,
+		Token:    token,
 	})
 	if err != nil {
-		return nil, errs.Wrap(http.StatusInternalServerError, err, "authority.Rekey", opts...)
+		return nil, errs.StatusCodeError(http.StatusInternalServerError, err, opts...)
 	}
 
 	fullchain := append([]*x509.Certificate{resp.Certificate}, resp.CertificateChain...)
 	if err = a.storeRenewedCertificate(oldCert, fullchain); err != nil {
 		if !errors.Is(err, db.ErrNotImplemented) {
-			return nil, errs.Wrap(http.StatusInternalServerError, err, "authority.Rekey; error storing certificate in db", opts...)
+			return nil, errs.StatusCodeError(http.StatusInternalServerError, err, opts...)
 		}
 	}
 
