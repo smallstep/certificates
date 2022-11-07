@@ -992,14 +992,14 @@ func TestAuthority_Renew(t *testing.T) {
 			return &renewTest{
 				auth: _a,
 				cert: cert,
-				err:  errors.New("authority.Rekey: error creating certificate"),
+				err:  errors.New("error creating certificate"),
 				code: http.StatusInternalServerError,
 			}, nil
 		},
 		"fail/unauthorized": func() (*renewTest, error) {
 			return &renewTest{
 				cert: certNoRenew,
-				err:  errors.New("authority.Rekey: authority.authorizeRenew: renew is disabled for provisioner 'dev'"),
+				err:  errors.New("authority.authorizeRenew: renew is disabled for provisioner 'dev'"),
 				code: http.StatusUnauthorized,
 			}, nil
 		},
@@ -1012,7 +1012,7 @@ func TestAuthority_Renew(t *testing.T) {
 			return &renewTest{
 				auth: aa,
 				cert: cert,
-				err:  errors.New("authority.Rekey: authority.authorizeRenew: not authorized"),
+				err:  errors.New("authority.authorizeRenew: not authorized"),
 				code: http.StatusUnauthorized,
 			}, nil
 		},
@@ -1221,14 +1221,14 @@ func TestAuthority_Rekey(t *testing.T) {
 			return &renewTest{
 				auth: _a,
 				cert: cert,
-				err:  errors.New("authority.Rekey: error creating certificate"),
+				err:  errors.New("error creating certificate"),
 				code: http.StatusInternalServerError,
 			}, nil
 		},
 		"fail/unauthorized": func() (*renewTest, error) {
 			return &renewTest{
 				cert: certNoRenew,
-				err:  errors.New("authority.Rekey: authority.authorizeRenew: renew is disabled for provisioner 'dev'"),
+				err:  errors.New("authority.authorizeRenew: renew is disabled for provisioner 'dev'"),
 				code: http.StatusUnauthorized,
 			}, nil
 		},

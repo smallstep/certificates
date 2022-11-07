@@ -1,6 +1,7 @@
 package db
 
 import (
+	"bytes"
 	"crypto/x509"
 	"errors"
 	"math/big"
@@ -164,11 +165,29 @@ func TestUseToken(t *testing.T) {
 	}
 }
 
+// wrappedProvisioner implements raProvisioner and attProvisioner.
+type wrappedProvisioner struct {
+	provisioner.Interface
+	raInfo *provisioner.RAInfo
+}
+
+func (p *wrappedProvisioner) RAInfo() *provisioner.RAInfo {
+	return p.raInfo
+}
+
 func TestDB_StoreCertificateChain(t *testing.T) {
 	p := &provisioner.JWK{
 		ID:   "some-id",
 		Name: "admin",
 		Type: "JWK",
+	}
+	rap := &wrappedProvisioner{
+		Interface: p,
+		raInfo: &provisioner.RAInfo{
+			ProvisionerID:   "ra-id",
+			ProvisionerType: "JWK",
+			ProvisionerName: "ra",
+		},
 	}
 	chain := []*x509.Certificate{
 		{Raw: []byte("the certificate"), SerialNumber: big.NewInt(1234)},
@@ -201,6 +220,21 @@ func TestDB_StoreCertificateChain(t *testing.T) {
 				return nil
 			},
 		}, true}, args{p, chain}, false},
+		{"ok ra provisioner", fields{&MockNoSQLDB{
+			MUpdate: func(tx *database.Tx) error {
+				if len(tx.Operations) != 2 {
+					t.Fatal("unexpected number of operations")
+				}
+				assert.Equals(t, []byte("x509_certs"), tx.Operations[0].Bucket)
+				assert.Equals(t, []byte("1234"), tx.Operations[0].Key)
+				assert.Equals(t, []byte("the certificate"), tx.Operations[0].Value)
+				assert.Equals(t, []byte("x509_certs_data"), tx.Operations[1].Bucket)
+				assert.Equals(t, []byte("1234"), tx.Operations[1].Key)
+				assert.Equals(t, []byte(`{"provisioner":{"id":"some-id","name":"admin","type":"JWK"},"ra":{"provisionerId":"ra-id","provisionerType":"JWK","provisionerName":"ra"}}`), tx.Operations[1].Value)
+				assert.Equals(t, `{"provisioner":{"id":"some-id","name":"admin","type":"JWK"},"ra":{"provisionerId":"ra-id","provisionerType":"JWK","provisionerName":"ra"}}`, string(tx.Operations[1].Value))
+				return nil
+			},
+		}, true}, args{rap, chain}, false},
 		{"ok no provisioner", fields{&MockNoSQLDB{
 			MUpdate: func(tx *database.Tx) error {
 				if len(tx.Operations) != 2 {
@@ -289,6 +323,114 @@ func TestDB_GetCertificateData(t *testing.T) {
 			}
 			if !reflect.DeepEqual(got, tt.want) {
 				t.Errorf("DB.GetCertificateData() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
+func TestDB_StoreRenewedCertificate(t *testing.T) {
+	oldCert := &x509.Certificate{SerialNumber: big.NewInt(1)}
+	chain := []*x509.Certificate{
+		&x509.Certificate{SerialNumber: big.NewInt(2), Raw: []byte("raw")},
+		&x509.Certificate{SerialNumber: big.NewInt(0)},
+	}
+
+	testErr := errors.New("test error")
+	certsData := []byte(`{"provisioner":{"id":"p","name":"name","type":"JWK"},"ra":{"provisionerId":"rap","provisionerType":"JWK","provisionerName":"rapname"}}`)
+	matchOperation := func(op *database.TxEntry, bucket, key, value []byte) bool {
+		return bytes.Equal(op.Bucket, bucket) && bytes.Equal(op.Key, key) && bytes.Equal(op.Value, value)
+	}
+
+	type fields struct {
+		DB   nosql.DB
+		isUp bool
+	}
+	type args struct {
+		oldCert *x509.Certificate
+		chain   []*x509.Certificate
+	}
+	tests := []struct {
+		name    string
+		fields  fields
+		args    args
+		wantErr bool
+	}{
+		{"ok", fields{&MockNoSQLDB{
+			MGet: func(bucket, key []byte) ([]byte, error) {
+				if bytes.Equal(bucket, certsDataTable) && bytes.Equal(key, []byte("1")) {
+					return certsData, nil
+				}
+				t.Error("ok failed: unexpected get")
+				return nil, testErr
+			},
+			MUpdate: func(tx *database.Tx) error {
+				if len(tx.Operations) != 2 {
+					t.Error("ok failed: unexpected number of operations")
+					return testErr
+				}
+				op0, op1 := tx.Operations[0], tx.Operations[1]
+				if !matchOperation(op0, certsTable, []byte("2"), []byte("raw")) {
+					t.Errorf("ok failed: unexpected entry 0, %s[%s]=%s", op0.Bucket, op0.Key, op0.Value)
+					return testErr
+				}
+				if !matchOperation(op1, certsDataTable, []byte("2"), certsData) {
+					t.Errorf("ok failed: unexpected entry 1, %s[%s]=%s", op1.Bucket, op1.Key, op1.Value)
+					return testErr
+				}
+				return nil
+			},
+		}, true}, args{oldCert, chain}, false},
+		{"ok no data", fields{&MockNoSQLDB{
+			MGet: func(bucket, key []byte) ([]byte, error) {
+				return nil, database.ErrNotFound
+			},
+			MUpdate: func(tx *database.Tx) error {
+				if len(tx.Operations) != 1 {
+					t.Error("ok failed: unexpected number of operations")
+					return testErr
+				}
+				op0 := tx.Operations[0]
+				if !matchOperation(op0, certsTable, []byte("2"), []byte("raw")) {
+					t.Errorf("ok failed: unexpected entry 0, %s[%s]=%s", op0.Bucket, op0.Key, op0.Value)
+					return testErr
+				}
+				return nil
+			},
+		}, true}, args{oldCert, chain}, false},
+		{"ok fail marshal", fields{&MockNoSQLDB{
+			MGet: func(bucket, key []byte) ([]byte, error) {
+				return []byte(`{"bad":"json"`), nil
+			},
+			MUpdate: func(tx *database.Tx) error {
+				if len(tx.Operations) != 1 {
+					t.Error("ok failed: unexpected number of operations")
+					return testErr
+				}
+				op0 := tx.Operations[0]
+				if !matchOperation(op0, certsTable, []byte("2"), []byte("raw")) {
+					t.Errorf("ok failed: unexpected entry 0, %s[%s]=%s", op0.Bucket, op0.Key, op0.Value)
+					return testErr
+				}
+				return nil
+			},
+		}, true}, args{oldCert, chain}, false},
+		{"fail", fields{&MockNoSQLDB{
+			MGet: func(bucket, key []byte) ([]byte, error) {
+				return certsData, nil
+			},
+			MUpdate: func(tx *database.Tx) error {
+				return testErr
+			},
+		}, true}, args{oldCert, chain}, true},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			db := &DB{
+				DB:   tt.fields.DB,
+				isUp: tt.fields.isUp,
+			}
+			if err := db.StoreRenewedCertificate(tt.args.oldCert, tt.args.chain...); (err != nil) != tt.wantErr {
+				t.Errorf("DB.StoreRenewedCertificate() error = %v, wantErr %v", err, tt.wantErr)
 			}
 		})
 	}

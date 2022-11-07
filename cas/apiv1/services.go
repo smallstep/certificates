@@ -83,3 +83,23 @@ func (e NotImplementedError) Error() string {
 func (e NotImplementedError) StatusCode() int {
 	return http.StatusNotImplemented
 }
+
+// ValidationError is the type of error returned if request is not properly
+// validated.
+type ValidationError struct {
+	Message string
+}
+
+// NotImplementedError implements the error interface.
+func (e ValidationError) Error() string {
+	if e.Message != "" {
+		return e.Message
+	}
+	return "bad request"
+}
+
+// StatusCode implements the StatusCoder interface and returns the HTTP 400
+// error.
+func (e ValidationError) StatusCode() int {
+	return http.StatusBadRequest
+}

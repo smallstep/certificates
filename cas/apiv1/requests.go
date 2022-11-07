@@ -81,6 +81,7 @@ type RenewCertificateRequest struct {
 	CSR       *x509.CertificateRequest
 	Lifetime  time.Duration
 	Backdate  time.Duration
+	Token     string
 	RequestID string
 }
 

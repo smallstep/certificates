@@ -286,7 +286,7 @@ func (a *Authority) authorizeRevoke(ctx context.Context, token string) error {
 // extra extension cannot be found, authorize the renewal by default.
 //
 // TODO(mariano): should we authorize by default?
-func (a *Authority) authorizeRenew(cert *x509.Certificate) error {
+func (a *Authority) authorizeRenew(ctx context.Context, cert *x509.Certificate) error {
 	serial := cert.SerialNumber.String()
 	var opts = []interface{}{errs.WithKeyVal("serialNumber", serial)}
 
@@ -308,7 +308,7 @@ func (a *Authority) authorizeRenew(cert *x509.Certificate) error {
 			return errs.Unauthorized("authority.authorizeRenew: provisioner not found", opts...)
 		}
 	}
-	if err := p.AuthorizeRenew(context.Background(), cert); err != nil {
+	if err := p.AuthorizeRenew(ctx, cert); err != nil {
 		return errs.Wrap(http.StatusInternalServerError, err, "authority.authorizeRenew", opts...)
 	}
 	return nil
@@ -434,7 +434,7 @@ func (a *Authority) AuthorizeRenewToken(ctx context.Context, ott string) (*x509.
 	}
 
 	audiences := a.config.GetAudiences().Renew
-	if !matchesAudience(claims.Audience, audiences) {
+	if !matchesAudience(claims.Audience, audiences) && !isRAProvisioner(p) {
 		return nil, errs.InternalServerErr(jose.ErrInvalidAudience, errs.WithMessage("error validating renew token: invalid audience claim (aud)"))
 	}
 

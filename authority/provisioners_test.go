@@ -333,3 +333,54 @@ func TestProvisionerWebhookToLinkedca(t *testing.T) {
 		})
 	}
 }
+
+func Test_wrapRAProvisioner(t *testing.T) {
+	type args struct {
+		p      provisioner.Interface
+		raInfo *provisioner.RAInfo
+	}
+	tests := []struct {
+		name string
+		args args
+		want *wrappedProvisioner
+	}{
+		{"ok", args{&provisioner.JWK{Name: "jwt"}, &provisioner.RAInfo{ProvisionerName: "ra"}}, &wrappedProvisioner{
+			Interface: &provisioner.JWK{Name: "jwt"},
+			raInfo:    &provisioner.RAInfo{ProvisionerName: "ra"},
+		}},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := wrapRAProvisioner(tt.args.p, tt.args.raInfo); !reflect.DeepEqual(got, tt.want) {
+				t.Errorf("wrapRAProvisioner() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
+func Test_isRAProvisioner(t *testing.T) {
+	type args struct {
+		p provisioner.Interface
+	}
+	tests := []struct {
+		name string
+		args args
+		want bool
+	}{
+		{"true", args{&wrappedProvisioner{
+			Interface: &provisioner.JWK{Name: "jwt"},
+			raInfo:    &provisioner.RAInfo{ProvisionerName: "ra"},
+		}}, true},
+		{"nil ra", args{&wrappedProvisioner{
+			Interface: &provisioner.JWK{Name: "jwt"},
+		}}, false},
+		{"not ra", args{&provisioner.JWK{Name: "jwt"}}, false},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := isRAProvisioner(tt.args.p); got != tt.want {
+				t.Errorf("isRAProvisioner() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
