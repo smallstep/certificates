@@ -5,37 +5,38 @@
 package cloudcas
 
 import (
-	longrunningpb "cloud.google.com/go/longrunning/autogen/longrunningpb"
 	context "context"
+	reflect "reflect"
+
+	longrunningpb "cloud.google.com/go/longrunning/autogen/longrunningpb"
 	gomock "github.com/golang/mock/gomock"
 	emptypb "google.golang.org/protobuf/types/known/emptypb"
-	reflect "reflect"
 )
 
-// MockOperationsServer is a mock of OperationsServer interface
+// MockOperationsServer is a mock of OperationsServer interface.
 type MockOperationsServer struct {
 	ctrl     *gomock.Controller
 	recorder *MockOperationsServerMockRecorder
 }
 
-// MockOperationsServerMockRecorder is the mock recorder for MockOperationsServer
+// MockOperationsServerMockRecorder is the mock recorder for MockOperationsServer.
 type MockOperationsServerMockRecorder struct {
 	mock *MockOperationsServer
 }
 
-// NewMockOperationsServer creates a new mock instance
+// NewMockOperationsServer creates a new mock instance.
 func NewMockOperationsServer(ctrl *gomock.Controller) *MockOperationsServer {
 	mock := &MockOperationsServer{ctrl: ctrl}
 	mock.recorder = &MockOperationsServerMockRecorder{mock}
 	return mock
 }
 
-// EXPECT returns an object that allows the caller to indicate expected use
+// EXPECT returns an object that allows the caller to indicate expected use.
 func (m *MockOperationsServer) EXPECT() *MockOperationsServerMockRecorder {
 	return m.recorder
 }
 
-// CancelOperation mocks base method
+// CancelOperation mocks base method.
 func (m *MockOperationsServer) CancelOperation(arg0 context.Context, arg1 *longrunningpb.CancelOperationRequest) (*emptypb.Empty, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "CancelOperation", arg0, arg1)
@@ -44,13 +45,13 @@ func (m *MockOperationsServer) CancelOperation(arg0 context.Context, arg1 *longr
 	return ret0, ret1
 }
 
-// CancelOperation indicates an expected call of CancelOperation
+// CancelOperation indicates an expected call of CancelOperation.
 func (mr *MockOperationsServerMockRecorder) CancelOperation(arg0, arg1 interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "CancelOperation", reflect.TypeOf((*MockOperationsServer)(nil).CancelOperation), arg0, arg1)
 }
 
-// DeleteOperation mocks base method
+// DeleteOperation mocks base method.
 func (m *MockOperationsServer) DeleteOperation(arg0 context.Context, arg1 *longrunningpb.DeleteOperationRequest) (*emptypb.Empty, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "DeleteOperation", arg0, arg1)
@@ -59,13 +60,13 @@ func (m *MockOperationsServer) DeleteOperation(arg0 context.Context, arg1 *longr
 	return ret0, ret1
 }
 
-// DeleteOperation indicates an expected call of DeleteOperation
+// DeleteOperation indicates an expected call of DeleteOperation.
 func (mr *MockOperationsServerMockRecorder) DeleteOperation(arg0, arg1 interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "DeleteOperation", reflect.TypeOf((*MockOperationsServer)(nil).DeleteOperation), arg0, arg1)
 }
 
-// GetOperation mocks base method
+// GetOperation mocks base method.
 func (m *MockOperationsServer) GetOperation(arg0 context.Context, arg1 *longrunningpb.GetOperationRequest) (*longrunningpb.Operation, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "GetOperation", arg0, arg1)
@@ -74,13 +75,13 @@ func (m *MockOperationsServer) GetOperation(arg0 context.Context, arg1 *longrunn
 	return ret0, ret1
 }
 
-// GetOperation indicates an expected call of GetOperation
+// GetOperation indicates an expected call of GetOperation.
 func (mr *MockOperationsServerMockRecorder) GetOperation(arg0, arg1 interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetOperation", reflect.TypeOf((*MockOperationsServer)(nil).GetOperation), arg0, arg1)
 }
 
-// ListOperations mocks base method
+// ListOperations mocks base method.
 func (m *MockOperationsServer) ListOperations(arg0 context.Context, arg1 *longrunningpb.ListOperationsRequest) (*longrunningpb.ListOperationsResponse, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "ListOperations", arg0, arg1)
@@ -89,13 +90,13 @@ func (m *MockOperationsServer) ListOperations(arg0 context.Context, arg1 *longru
 	return ret0, ret1
 }
 
-// ListOperations indicates an expected call of ListOperations
+// ListOperations indicates an expected call of ListOperations.
 func (mr *MockOperationsServerMockRecorder) ListOperations(arg0, arg1 interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ListOperations", reflect.TypeOf((*MockOperationsServer)(nil).ListOperations), arg0, arg1)
 }
 
-// WaitOperation mocks base method
+// WaitOperation mocks base method.
 func (m *MockOperationsServer) WaitOperation(arg0 context.Context, arg1 *longrunningpb.WaitOperationRequest) (*longrunningpb.Operation, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "WaitOperation", arg0, arg1)
@@ -104,7 +105,7 @@ func (m *MockOperationsServer) WaitOperation(arg0 context.Context, arg1 *longrun
 	return ret0, ret1
 }
 
-// WaitOperation indicates an expected call of WaitOperation
+// WaitOperation indicates an expected call of WaitOperation.
 func (mr *MockOperationsServerMockRecorder) WaitOperation(arg0, arg1 interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "WaitOperation", reflect.TypeOf((*MockOperationsServer)(nil).WaitOperation), arg0, arg1)
