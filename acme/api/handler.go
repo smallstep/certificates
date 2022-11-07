@@ -228,16 +228,15 @@ func GetDirectory(w http.ResponseWriter, r *http.Request) {
 	}
 
 	linker := acme.MustLinkerFromContext(ctx)
-	directory := &Directory{
+
+	render.JSON(w, &Directory{
 		NewNonce:   linker.GetLink(ctx, acme.NewNonceLinkType),
 		NewAccount: linker.GetLink(ctx, acme.NewAccountLinkType),
 		NewOrder:   linker.GetLink(ctx, acme.NewOrderLinkType),
 		RevokeCert: linker.GetLink(ctx, acme.RevokeCertLinkType),
 		KeyChange:  linker.GetLink(ctx, acme.KeyChangeLinkType),
 		Meta:       createMetaObject(acmeProv),
-	}
-
-	render.JSON(w, directory)
+	})
 }
 
 // createMetaObject creates a Meta object if the ACME provisioner
@@ -263,7 +262,7 @@ func shouldAddMetaObject(p *provisioner.ACME) bool {
 		return true
 	case p.Website != "":
 		return true
-	case len(p.CaaIdentities) > 0 && p.CaaIdentities[0] != "":
+	case len(p.CaaIdentities) > 0:
 		return true
 	case p.RequireEAB:
 		return true
