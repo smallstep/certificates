@@ -3,6 +3,7 @@ package softcas
 import (
 	"context"
 	"crypto"
+	"crypto/rand"
 	"crypto/rsa"
 	"crypto/x509"
 	"time"
@@ -130,6 +131,20 @@ func (c *SoftCAS) RevokeCertificate(req *apiv1.RevokeCertificateRequest) (*apiv1
 		Certificate:      req.Certificate,
 		CertificateChain: chain,
 	}, nil
+}
+
+// CreateCRL will create a new CRL based on the RevocationList passed to it
+func (c *SoftCAS) CreateCRL(req *apiv1.CreateCRLRequest) (*apiv1.CreateCRLResponse, error) {
+	certChain, signer, err := c.getCertSigner()
+	if err != nil {
+		return nil, err
+	}
+	revocationListBytes, err := x509.CreateRevocationList(rand.Reader, req.RevocationList, certChain[0], signer)
+	if err != nil {
+		return nil, err
+	}
+
+	return &apiv1.CreateCRLResponse{CRL: revocationListBytes}, nil
 }
 
 // CreateCertificateAuthority creates a root or an intermediate certificate.

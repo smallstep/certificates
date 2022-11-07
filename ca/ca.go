@@ -156,6 +156,10 @@ func (ca *CA) Init(cfg *config.Config) (*CA, error) {
 		opts = append(opts, authority.WithDatabase(ca.opts.database))
 	}
 
+	if ca.opts.quiet {
+		opts = append(opts, authority.WithQuietInit())
+	}
+
 	webhookTransport := http.DefaultTransport.(*http.Transport).Clone()
 	opts = append(opts, authority.WithWebhookClient(&http.Client{Transport: webhookTransport}))
 
@@ -345,7 +349,7 @@ func (ca *CA) Run() error {
 		if step.Contexts().GetCurrent() != nil {
 			log.Printf("Current context: %s", step.Contexts().GetCurrent().Name)
 		}
-		log.Printf("Config file: %s", ca.opts.configFile)
+		log.Printf("Config file: %s", ca.getConfigFileOutput())
 		baseURL := fmt.Sprintf("https://%s%s",
 			authorityInfo.DNSNames[0],
 			ca.config.Address[strings.LastIndex(ca.config.Address, ":"):])
@@ -564,4 +568,11 @@ func dumpRoutes(mux chi.Routes) {
 	if err := chi.Walk(mux, walkFunc); err != nil {
 		fmt.Printf("Logging err: %s\n", err.Error())
 	}
+}
+
+func (ca *CA) getConfigFileOutput() string {
+	if ca.config.WasLoadedFromFile() {
+		return ca.config.Filepath()
+	}
+	return "loaded from token"
 }

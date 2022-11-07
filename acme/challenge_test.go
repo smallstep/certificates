@@ -24,6 +24,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"reflect"
+	"strconv"
 	"strings"
 	"testing"
 	"time"
@@ -370,6 +371,47 @@ func TestChallenge_Validate(t *testing.T) {
 				},
 			}
 		},
+		"ok/http-01-insecure": func(t *testing.T) test {
+			t.Cleanup(func() {
+				InsecurePortHTTP01 = 0
+			})
+
+			ch := &Challenge{
+				ID:     "chID",
+				Status: StatusPending,
+				Type:   "http-01",
+				Token:  "token",
+				Value:  "zap.internal",
+			}
+
+			InsecurePortHTTP01 = 8080
+
+			return test{
+				ch: ch,
+				vc: &mockClient{
+					get: func(url string) (*http.Response, error) {
+						return nil, errors.New("force")
+					},
+				},
+				db: &MockDB{
+					MockUpdateChallenge: func(ctx context.Context, updch *Challenge) error {
+						assert.Equals(t, updch.ID, ch.ID)
+						assert.Equals(t, updch.Token, ch.Token)
+						assert.Equals(t, updch.Type, ch.Type)
+						assert.Equals(t, updch.Status, ch.Status)
+						assert.Equals(t, updch.Value, ch.Value)
+
+						err := NewError(ErrorConnectionType, "error doing http GET for url http://zap.internal:8080/.well-known/acme-challenge/%s: force", ch.Token)
+						assert.HasPrefix(t, updch.Error.Err.Error(), err.Err.Error())
+						assert.Equals(t, updch.Error.Type, err.Type)
+						assert.Equals(t, updch.Error.Detail, err.Detail)
+						assert.Equals(t, updch.Error.Status, err.Status)
+						assert.Equals(t, updch.Error.Detail, err.Detail)
+						return nil
+					},
+				},
+			}
+		},
 		"fail/dns-01": func(t *testing.T) test {
 			ch := &Challenge{
 				ID:     "chID",
@@ -499,6 +541,72 @@ func TestChallenge_Validate(t *testing.T) {
 			assert.FatalError(t, err)
 
 			srv, tlsDial := newTestTLSALPNServer(cert)
+			srv.Start()
+
+			return test{
+				ch: ch,
+				vc: &mockClient{
+					tlsDial: tlsDial,
+				},
+				db: &MockDB{
+					MockUpdateChallenge: func(ctx context.Context, updch *Challenge) error {
+						assert.Equals(t, updch.ID, ch.ID)
+						assert.Equals(t, updch.Token, ch.Token)
+						assert.Equals(t, updch.Status, ch.Status)
+						assert.Equals(t, updch.Type, ch.Type)
+						assert.Equals(t, updch.Value, ch.Value)
+						assert.Equals(t, updch.Error, nil)
+						return nil
+					},
+				},
+				srv: srv,
+				jwk: jwk,
+			}
+		},
+		"ok/tls-alpn-01-insecure": func(t *testing.T) test {
+			t.Cleanup(func() {
+				InsecurePortTLSALPN01 = 0
+			})
+
+			ch := &Challenge{
+				ID:     "chID",
+				Token:  "token",
+				Type:   "tls-alpn-01",
+				Status: StatusPending,
+				Value:  "zap.internal",
+			}
+
+			jwk, err := jose.GenerateJWK("EC", "P-256", "ES256", "sig", "", 0)
+			assert.FatalError(t, err)
+
+			expKeyAuth, err := KeyAuthorization(ch.Token, jwk)
+			assert.FatalError(t, err)
+			expKeyAuthHash := sha256.Sum256([]byte(expKeyAuth))
+
+			cert, err := newTLSALPNValidationCert(expKeyAuthHash[:], false, true, ch.Value)
+			assert.FatalError(t, err)
+
+			l, err := net.Listen("tcp", "127.0.0.1:0")
+			if err != nil {
+				if l, err = net.Listen("tcp6", "[::1]:0"); err != nil {
+					t.Fatalf("failed to listen on a port: %v", err)
+				}
+			}
+			_, port, err := net.SplitHostPort(l.Addr().String())
+			if err != nil {
+				t.Fatalf("failed to split host port: %v", err)
+			}
+
+			// Use an insecure port
+			InsecurePortTLSALPN01, err = strconv.Atoi(port)
+			if err != nil {
+				t.Fatalf("failed to convert port to int: %v", err)
+			}
+
+			srv, tlsDial := newTestTLSALPNServer(cert, func(srv *httptest.Server) {
+				srv.Listener.Close()
+				srv.Listener = l
+			})
 			srv.Start()
 
 			return test{
@@ -1248,7 +1356,7 @@ func TestDNS01Validate(t *testing.T) {
 
 type tlsDialer func(network, addr string, config *tls.Config) (conn *tls.Conn, err error)
 
-func newTestTLSALPNServer(validationCert *tls.Certificate) (*httptest.Server, tlsDialer) {
+func newTestTLSALPNServer(validationCert *tls.Certificate, opts ...func(*httptest.Server)) (*httptest.Server, tlsDialer) {
 	srv := httptest.NewUnstartedServer(http.NewServeMux())
 
 	srv.Config.TLSNextProto = map[string]func(*http.Server, *tls.Conn, http.Handler){
@@ -1271,6 +1379,11 @@ func newTestTLSALPNServer(validationCert *tls.Certificate) (*httptest.Server, tl
 			"acme-tls/1",
 			"http/1.1",
 		},
+	}
+
+	// Apply options
+	for _, fn := range opts {
+		fn(srv)
 	}
 
 	srv.Listener = tls.NewListener(srv.Listener, srv.TLS)

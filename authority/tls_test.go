@@ -26,11 +26,13 @@ import (
 
 	"github.com/smallstep/assert"
 	"github.com/smallstep/certificates/api/render"
+	"github.com/smallstep/certificates/authority/config"
 	"github.com/smallstep/certificates/authority/policy"
 	"github.com/smallstep/certificates/authority/provisioner"
 	"github.com/smallstep/certificates/cas/softcas"
 	"github.com/smallstep/certificates/db"
 	"github.com/smallstep/certificates/errs"
+	"github.com/smallstep/nosql/database"
 )
 
 var (
@@ -137,6 +139,13 @@ func generateIntermidiateCertificate(t *testing.T, issuer *x509.Certificate, sig
 	cert, err = x509util.CreateCertificate(cert, issuer, priv.Public(), signer)
 	assert.FatalError(t, err)
 	return cert, priv
+}
+
+func withSubject(sub pkix.Name) provisioner.CertificateModifierFunc {
+	return func(crt *x509.Certificate, _ provisioner.SignOptions) error {
+		crt.Subject = sub
+		return nil
+	}
 }
 
 func withProvisionerOID(name, kid string) provisioner.CertificateModifierFunc {
@@ -952,6 +961,18 @@ func TestAuthority_Renew(t *testing.T) {
 		withProvisionerOID("Max", a.config.AuthorityConfig.Provisioners[0].(*provisioner.JWK).Key.KeyID),
 		withSigner(issuer, signer))
 
+	certExtraNames := generateCertificate(t, "renew", []string{"test.smallstep.com", "test"},
+		withSubject(pkix.Name{
+			CommonName: "renew",
+			ExtraNames: []pkix.AttributeTypeAndValue{
+				{Type: asn1.ObjectIdentifier{0, 9, 2342, 19200300, 100, 1, 25}, Value: "dc"},
+			},
+		}),
+		withNotBeforeNotAfter(so.NotBefore.Time(), so.NotAfter.Time()),
+		withDefaultASN1DN(a.config.AuthorityConfig.Template),
+		withProvisionerOID("Max", a.config.AuthorityConfig.Provisioners[0].(*provisioner.JWK).Key.KeyID),
+		withSigner(issuer, signer))
+
 	certNoRenew := generateCertificate(t, "renew", []string{"test.smallstep.com", "test"},
 		withNotBeforeNotAfter(so.NotBefore.Time(), so.NotAfter.Time()),
 		withDefaultASN1DN(a.config.AuthorityConfig.Template),
@@ -999,6 +1020,12 @@ func TestAuthority_Renew(t *testing.T) {
 			return &renewTest{
 				auth: a,
 				cert: cert,
+			}, nil
+		},
+		"ok/WithExtraNames": func() (*renewTest, error) {
+			return &renewTest{
+				auth: a,
+				cert: certExtraNames,
 			}, nil
 		},
 		"ok/success-new-intermediate": func() (*renewTest, error) {
@@ -1063,15 +1090,14 @@ func TestAuthority_Renew(t *testing.T) {
 					assert.True(t, leaf.NotAfter.Before(expiry.Add(time.Hour)))
 
 					tmplt := a.config.AuthorityConfig.Template
-					assert.Equals(t, leaf.Subject.String(),
-						pkix.Name{
-							Country:       []string{tmplt.Country},
-							Organization:  []string{tmplt.Organization},
-							Locality:      []string{tmplt.Locality},
-							StreetAddress: []string{tmplt.StreetAddress},
-							Province:      []string{tmplt.Province},
-							CommonName:    tmplt.CommonName,
-						}.String())
+					assert.Equals(t, leaf.RawSubject, tc.cert.RawSubject)
+					assert.Equals(t, leaf.Subject.Country, []string{tmplt.Country})
+					assert.Equals(t, leaf.Subject.Organization, []string{tmplt.Organization})
+					assert.Equals(t, leaf.Subject.Locality, []string{tmplt.Locality})
+					assert.Equals(t, leaf.Subject.StreetAddress, []string{tmplt.StreetAddress})
+					assert.Equals(t, leaf.Subject.Province, []string{tmplt.Province})
+					assert.Equals(t, leaf.Subject.CommonName, tmplt.CommonName)
+
 					assert.Equals(t, leaf.Issuer, intermediate.Subject)
 
 					assert.Equals(t, leaf.SignatureAlgorithm, x509.ECDSAWithSHA256)
@@ -1474,7 +1500,7 @@ func TestAuthority_Revoke(t *testing.T) {
 					return true, nil
 				},
 				MGetCertificate: func(sn string) (*x509.Certificate, error) {
-					return nil, nil
+					return nil, errors.New("not found")
 				},
 				Err: errors.New("force"),
 			}))
@@ -1514,7 +1540,7 @@ func TestAuthority_Revoke(t *testing.T) {
 					return true, nil
 				},
 				MGetCertificate: func(sn string) (*x509.Certificate, error) {
-					return nil, nil
+					return nil, errors.New("not found")
 				},
 				Err: db.ErrAlreadyExists,
 			}))
@@ -1779,6 +1805,151 @@ func TestAuthority_constraints(t *testing.T) {
 			_, err = auth.Renew(cert)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("Authority.Renew() error = %v, wantErr %v", err, tt.wantErr)
+			}
+		})
+	}
+}
+
+func TestAuthority_CRL(t *testing.T) {
+	reasonCode := 2
+	reason := "bob was let go"
+	validIssuer := "step-cli"
+	validAudience := testAudiences.Revoke
+	now := time.Now().UTC()
+	//
+	jwk, err := jose.ReadKey("testdata/secrets/step_cli_key_priv.jwk", jose.WithPassword([]byte("pass")))
+	assert.FatalError(t, err)
+	//
+	sig, err := jose.NewSigner(jose.SigningKey{Algorithm: jose.ES256, Key: jwk.Key},
+		(&jose.SignerOptions{}).WithType("JWT").WithHeader("kid", jwk.KeyID))
+	assert.FatalError(t, err)
+
+	crlCtx := provisioner.NewContextWithMethod(context.Background(), provisioner.RevokeMethod)
+
+	var crlStore db.CertificateRevocationListInfo
+	var revokedList []db.RevokedCertificateInfo
+
+	type test struct {
+		auth     *Authority
+		ctx      context.Context
+		expected []string
+		err      error
+	}
+	tests := map[string]func() test{
+		"fail/empty-crl": func() test {
+			a := testAuthority(t, WithDatabase(&db.MockAuthDB{
+				MUseToken: func(id, tok string) (bool, error) {
+					return true, nil
+				},
+				MGetCertificate: func(sn string) (*x509.Certificate, error) {
+					return nil, errors.New("not found")
+				},
+				MStoreCRL: func(i *db.CertificateRevocationListInfo) error {
+					crlStore = *i
+					return nil
+				},
+				MGetCRL: func() (*db.CertificateRevocationListInfo, error) {
+					return nil, database.ErrNotFound
+				},
+				MGetRevokedCertificates: func() (*[]db.RevokedCertificateInfo, error) {
+					return &revokedList, nil
+				},
+				MRevoke: func(rci *db.RevokedCertificateInfo) error {
+					revokedList = append(revokedList, *rci)
+					return nil
+				},
+			}))
+			a.config.CRL = &config.CRLConfig{
+				Enabled: true,
+			}
+
+			return test{
+				auth:     a,
+				ctx:      crlCtx,
+				expected: nil,
+				err:      database.ErrNotFound,
+			}
+		},
+		"ok/crl-full": func() test {
+			a := testAuthority(t, WithDatabase(&db.MockAuthDB{
+				MUseToken: func(id, tok string) (bool, error) {
+					return true, nil
+				},
+				MGetCertificate: func(sn string) (*x509.Certificate, error) {
+					return nil, errors.New("not found")
+				},
+				MStoreCRL: func(i *db.CertificateRevocationListInfo) error {
+					crlStore = *i
+					return nil
+				},
+				MGetCRL: func() (*db.CertificateRevocationListInfo, error) {
+					return &crlStore, nil
+				},
+				MGetRevokedCertificates: func() (*[]db.RevokedCertificateInfo, error) {
+					return &revokedList, nil
+				},
+				MRevoke: func(rci *db.RevokedCertificateInfo) error {
+					revokedList = append(revokedList, *rci)
+					return nil
+				},
+			}))
+			a.config.CRL = &config.CRLConfig{
+				Enabled:          true,
+				GenerateOnRevoke: true,
+			}
+
+			var ex []string
+
+			for i := 0; i < 100; i++ {
+				sn := fmt.Sprintf("%v", i)
+
+				cl := jose.Claims{
+					Subject:   fmt.Sprintf("sn-%v", i),
+					Issuer:    validIssuer,
+					NotBefore: jose.NewNumericDate(now),
+					Expiry:    jose.NewNumericDate(now.Add(time.Minute)),
+					Audience:  validAudience,
+					ID:        sn,
+				}
+				raw, err := jose.Signed(sig).Claims(cl).CompactSerialize()
+				assert.FatalError(t, err)
+				err = a.Revoke(crlCtx, &RevokeOptions{
+					Serial:     sn,
+					ReasonCode: reasonCode,
+					Reason:     reason,
+					OTT:        raw,
+				})
+
+				assert.FatalError(t, err)
+
+				ex = append(ex, sn)
+			}
+
+			return test{
+				auth:     a,
+				ctx:      crlCtx,
+				expected: ex,
+			}
+		},
+	}
+	for name, f := range tests {
+		tc := f()
+		t.Run(name, func(t *testing.T) {
+			if crlBytes, err := tc.auth.GetCertificateRevocationList(); err == nil {
+				crl, parseErr := x509.ParseCRL(crlBytes)
+				if parseErr != nil {
+					t.Errorf("x509.ParseCertificateRequest() error = %v, wantErr %v", parseErr, nil)
+					return
+				}
+
+				var cmpList []string
+				for _, c := range crl.TBSCertList.RevokedCertificates {
+					cmpList = append(cmpList, c.SerialNumber.String())
+				}
+
+				assert.Equals(t, cmpList, tc.expected)
+			} else {
+				assert.NotNil(t, tc.err, err.Error())
 			}
 		})
 	}

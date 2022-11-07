@@ -4,6 +4,7 @@ WORKDIR /src
 COPY . .
 
 RUN apk add --no-cache curl git make
+RUN make V=1 download
 RUN make V=1 bin/step-ca bin/step-awskms-init bin/step-cloudkms-init
 
 

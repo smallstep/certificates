@@ -12,6 +12,7 @@ import (
 	"unicode"
 
 	"github.com/pkg/errors"
+	"github.com/smallstep/certificates/acme"
 	"github.com/smallstep/certificates/authority/config"
 	"github.com/smallstep/certificates/authority/provisioner"
 	"github.com/smallstep/certificates/ca"
@@ -68,8 +69,22 @@ certificate issuer private key used in the RA mode.`,
 		},
 		cli.StringFlag{
 			Name:   "context",
-			Usage:  "The name of the authority's context.",
+			Usage:  "the <name> of the authority's context.",
 			EnvVar: "STEP_CA_CONTEXT",
+		},
+		cli.IntFlag{
+			Name: "acme-http-port",
+			Usage: `the <port> used on http-01 challenges. It can be changed for testing purposes.
+Requires **--insecure** flag.`,
+		},
+		cli.IntFlag{
+			Name: "acme-tls-port",
+			Usage: `the <port> used on tls-alpn-01 challenges. It can be changed for testing purposes.
+Requires **--insecure** flag.`,
+		},
+		cli.BoolFlag{
+			Name:  "insecure",
+			Usage: "enable insecure flags.",
 		},
 	},
 }
@@ -88,6 +103,23 @@ func appAction(ctx *cli.Context) error {
 		return errs.TooManyArguments(ctx)
 	}
 
+	// Allow custom ACME ports with insecure
+	if acmePort := ctx.Int("acme-http-port"); acmePort != 0 {
+		if ctx.Bool("insecure") {
+			acme.InsecurePortHTTP01 = acmePort
+		} else {
+			return fmt.Errorf("flag '--acme-http-port' requires the '--insecure' flag")
+		}
+	}
+	if acmePort := ctx.Int("acme-tls-port"); acmePort != 0 {
+		if ctx.Bool("insecure") {
+			acme.InsecurePortTLSALPN01 = acmePort
+		} else {
+			return fmt.Errorf("flag '--acme-tls-port' requires the '--insecure' flag")
+		}
+	}
+
+	// Allow custom contexts.
 	if caCtx := ctx.String("context"); caCtx != "" {
 		if err := step.Contexts().SetCurrent(caCtx); err != nil {
 			return err
