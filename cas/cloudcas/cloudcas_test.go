@@ -1,3 +1,6 @@
+//go:generate mockgen -package cloudcas -mock_names=CertificateAuthorityClient=MockCertificateAuthorityClient -destination mock_client_test.go github.com/smallstep/certificates/cas/cloudcas CertificateAuthorityClient
+//go:generate mockgen -package cloudcas -mock_names=OperationsServer=MockOperationsServer -destination mock_operation_server_test.go cloud.google.com/go/longrunning/autogen/longrunningpb OperationsServer
+
 package cloudcas
 
 import (

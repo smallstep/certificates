@@ -5,13 +5,12 @@
 package cloudcas
 
 import (
-	context "context"
-	reflect "reflect"
-
 	privateca "cloud.google.com/go/security/privateca/apiv1"
+	privatecapb "cloud.google.com/go/security/privateca/apiv1/privatecapb"
+	context "context"
 	gomock "github.com/golang/mock/gomock"
 	gax "github.com/googleapis/gax-go/v2"
-	privateca0 "google.golang.org/genproto/googleapis/cloud/security/privateca/v1"
+	reflect "reflect"
 )
 
 // MockCertificateAuthorityClient is a mock of CertificateAuthorityClient interface
@@ -38,7 +37,7 @@ func (m *MockCertificateAuthorityClient) EXPECT() *MockCertificateAuthorityClien
 }
 
 // ActivateCertificateAuthority mocks base method
-func (m *MockCertificateAuthorityClient) ActivateCertificateAuthority(arg0 context.Context, arg1 *privateca0.ActivateCertificateAuthorityRequest, arg2 ...gax.CallOption) (*privateca.ActivateCertificateAuthorityOperation, error) {
+func (m *MockCertificateAuthorityClient) ActivateCertificateAuthority(arg0 context.Context, arg1 *privatecapb.ActivateCertificateAuthorityRequest, arg2 ...gax.CallOption) (*privateca.ActivateCertificateAuthorityOperation, error) {
 	m.ctrl.T.Helper()
 	varargs := []interface{}{arg0, arg1}
 	for _, a := range arg2 {
@@ -58,7 +57,7 @@ func (mr *MockCertificateAuthorityClientMockRecorder) ActivateCertificateAuthori
 }
 
 // CreateCaPool mocks base method
-func (m *MockCertificateAuthorityClient) CreateCaPool(arg0 context.Context, arg1 *privateca0.CreateCaPoolRequest, arg2 ...gax.CallOption) (*privateca.CreateCaPoolOperation, error) {
+func (m *MockCertificateAuthorityClient) CreateCaPool(arg0 context.Context, arg1 *privatecapb.CreateCaPoolRequest, arg2 ...gax.CallOption) (*privateca.CreateCaPoolOperation, error) {
 	m.ctrl.T.Helper()
 	varargs := []interface{}{arg0, arg1}
 	for _, a := range arg2 {
@@ -78,14 +77,14 @@ func (mr *MockCertificateAuthorityClientMockRecorder) CreateCaPool(arg0, arg1 in
 }
 
 // CreateCertificate mocks base method
-func (m *MockCertificateAuthorityClient) CreateCertificate(arg0 context.Context, arg1 *privateca0.CreateCertificateRequest, arg2 ...gax.CallOption) (*privateca0.Certificate, error) {
+func (m *MockCertificateAuthorityClient) CreateCertificate(arg0 context.Context, arg1 *privatecapb.CreateCertificateRequest, arg2 ...gax.CallOption) (*privatecapb.Certificate, error) {
 	m.ctrl.T.Helper()
 	varargs := []interface{}{arg0, arg1}
 	for _, a := range arg2 {
 		varargs = append(varargs, a)
 	}
 	ret := m.ctrl.Call(m, "CreateCertificate", varargs...)
-	ret0, _ := ret[0].(*privateca0.Certificate)
+	ret0, _ := ret[0].(*privatecapb.Certificate)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
@@ -98,7 +97,7 @@ func (mr *MockCertificateAuthorityClientMockRecorder) CreateCertificate(arg0, ar
 }
 
 // CreateCertificateAuthority mocks base method
-func (m *MockCertificateAuthorityClient) CreateCertificateAuthority(arg0 context.Context, arg1 *privateca0.CreateCertificateAuthorityRequest, arg2 ...gax.CallOption) (*privateca.CreateCertificateAuthorityOperation, error) {
+func (m *MockCertificateAuthorityClient) CreateCertificateAuthority(arg0 context.Context, arg1 *privatecapb.CreateCertificateAuthorityRequest, arg2 ...gax.CallOption) (*privateca.CreateCertificateAuthorityOperation, error) {
 	m.ctrl.T.Helper()
 	varargs := []interface{}{arg0, arg1}
 	for _, a := range arg2 {
@@ -118,7 +117,7 @@ func (mr *MockCertificateAuthorityClientMockRecorder) CreateCertificateAuthority
 }
 
 // EnableCertificateAuthority mocks base method
-func (m *MockCertificateAuthorityClient) EnableCertificateAuthority(arg0 context.Context, arg1 *privateca0.EnableCertificateAuthorityRequest, arg2 ...gax.CallOption) (*privateca.EnableCertificateAuthorityOperation, error) {
+func (m *MockCertificateAuthorityClient) EnableCertificateAuthority(arg0 context.Context, arg1 *privatecapb.EnableCertificateAuthorityRequest, arg2 ...gax.CallOption) (*privateca.EnableCertificateAuthorityOperation, error) {
 	m.ctrl.T.Helper()
 	varargs := []interface{}{arg0, arg1}
 	for _, a := range arg2 {
@@ -138,14 +137,14 @@ func (mr *MockCertificateAuthorityClientMockRecorder) EnableCertificateAuthority
 }
 
 // FetchCertificateAuthorityCsr mocks base method
-func (m *MockCertificateAuthorityClient) FetchCertificateAuthorityCsr(arg0 context.Context, arg1 *privateca0.FetchCertificateAuthorityCsrRequest, arg2 ...gax.CallOption) (*privateca0.FetchCertificateAuthorityCsrResponse, error) {
+func (m *MockCertificateAuthorityClient) FetchCertificateAuthorityCsr(arg0 context.Context, arg1 *privatecapb.FetchCertificateAuthorityCsrRequest, arg2 ...gax.CallOption) (*privatecapb.FetchCertificateAuthorityCsrResponse, error) {
 	m.ctrl.T.Helper()
 	varargs := []interface{}{arg0, arg1}
 	for _, a := range arg2 {
 		varargs = append(varargs, a)
 	}
 	ret := m.ctrl.Call(m, "FetchCertificateAuthorityCsr", varargs...)
-	ret0, _ := ret[0].(*privateca0.FetchCertificateAuthorityCsrResponse)
+	ret0, _ := ret[0].(*privatecapb.FetchCertificateAuthorityCsrResponse)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
@@ -158,14 +157,14 @@ func (mr *MockCertificateAuthorityClientMockRecorder) FetchCertificateAuthorityC
 }
 
 // GetCaPool mocks base method
-func (m *MockCertificateAuthorityClient) GetCaPool(arg0 context.Context, arg1 *privateca0.GetCaPoolRequest, arg2 ...gax.CallOption) (*privateca0.CaPool, error) {
+func (m *MockCertificateAuthorityClient) GetCaPool(arg0 context.Context, arg1 *privatecapb.GetCaPoolRequest, arg2 ...gax.CallOption) (*privatecapb.CaPool, error) {
 	m.ctrl.T.Helper()
 	varargs := []interface{}{arg0, arg1}
 	for _, a := range arg2 {
 		varargs = append(varargs, a)
 	}
 	ret := m.ctrl.Call(m, "GetCaPool", varargs...)
-	ret0, _ := ret[0].(*privateca0.CaPool)
+	ret0, _ := ret[0].(*privatecapb.CaPool)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
@@ -178,14 +177,14 @@ func (mr *MockCertificateAuthorityClientMockRecorder) GetCaPool(arg0, arg1 inter
 }
 
 // GetCertificateAuthority mocks base method
-func (m *MockCertificateAuthorityClient) GetCertificateAuthority(arg0 context.Context, arg1 *privateca0.GetCertificateAuthorityRequest, arg2 ...gax.CallOption) (*privateca0.CertificateAuthority, error) {
+func (m *MockCertificateAuthorityClient) GetCertificateAuthority(arg0 context.Context, arg1 *privatecapb.GetCertificateAuthorityRequest, arg2 ...gax.CallOption) (*privatecapb.CertificateAuthority, error) {
 	m.ctrl.T.Helper()
 	varargs := []interface{}{arg0, arg1}
 	for _, a := range arg2 {
 		varargs = append(varargs, a)
 	}
 	ret := m.ctrl.Call(m, "GetCertificateAuthority", varargs...)
-	ret0, _ := ret[0].(*privateca0.CertificateAuthority)
+	ret0, _ := ret[0].(*privatecapb.CertificateAuthority)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
@@ -198,14 +197,14 @@ func (mr *MockCertificateAuthorityClientMockRecorder) GetCertificateAuthority(ar
 }
 
 // RevokeCertificate mocks base method
-func (m *MockCertificateAuthorityClient) RevokeCertificate(arg0 context.Context, arg1 *privateca0.RevokeCertificateRequest, arg2 ...gax.CallOption) (*privateca0.Certificate, error) {
+func (m *MockCertificateAuthorityClient) RevokeCertificate(arg0 context.Context, arg1 *privatecapb.RevokeCertificateRequest, arg2 ...gax.CallOption) (*privatecapb.Certificate, error) {
 	m.ctrl.T.Helper()
 	varargs := []interface{}{arg0, arg1}
 	for _, a := range arg2 {
 		varargs = append(varargs, a)
 	}
 	ret := m.ctrl.Call(m, "RevokeCertificate", varargs...)
-	ret0, _ := ret[0].(*privateca0.Certificate)
+	ret0, _ := ret[0].(*privatecapb.Certificate)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
