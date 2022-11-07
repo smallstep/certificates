@@ -70,7 +70,7 @@ type NotImplementedError struct {
 	Message string
 }
 
-// NotImplementedError implements the error interface.
+// Error implements the error interface.
 func (e NotImplementedError) Error() string {
 	if e.Message != "" {
 		return e.Message
