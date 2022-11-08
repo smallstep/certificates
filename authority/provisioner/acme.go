@@ -84,6 +84,17 @@ type ACME struct {
 	Type    string `json:"type"`
 	Name    string `json:"name"`
 	ForceCN bool   `json:"forceCN,omitempty"`
+	// TermsOfService contains a URL pointing to the ACME server's
+	// terms of service. Defaults to empty.
+	TermsOfService string `json:"termsOfService,omitempty"`
+	// Website contains an URL pointing to more information about
+	// the ACME server. Defaults to empty.
+	Website string `json:"website,omitempty"`
+	// CaaIdentities is an array of hostnames that the ACME server
+	// identifies itself with. These hostnames can be used by ACME
+	// clients to determine the correct issuer domain name to use
+	// when configuring CAA records. Defaults to empty array.
+	CaaIdentities []string `json:"caaIdentities,omitempty"`
 	// RequireEAB makes the provisioner require ACME EAB to be provided
 	// by clients when creating a new Account. If set to true, the provided
 	// EAB will be verified. If set to false and an EAB is provided, it is

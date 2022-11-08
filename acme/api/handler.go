@@ -205,7 +205,7 @@ type Directory struct {
 	NewOrder   string `json:"newOrder"`
 	RevokeCert string `json:"revokeCert"`
 	KeyChange  string `json:"keyChange"`
-	Meta       Meta   `json:"meta"`
+	Meta       *Meta  `json:"meta,omitempty"`
 }
 
 // ToLog enables response logging for the Directory type.
@@ -228,16 +228,47 @@ func GetDirectory(w http.ResponseWriter, r *http.Request) {
 	}
 
 	linker := acme.MustLinkerFromContext(ctx)
+
 	render.JSON(w, &Directory{
 		NewNonce:   linker.GetLink(ctx, acme.NewNonceLinkType),
 		NewAccount: linker.GetLink(ctx, acme.NewAccountLinkType),
 		NewOrder:   linker.GetLink(ctx, acme.NewOrderLinkType),
 		RevokeCert: linker.GetLink(ctx, acme.RevokeCertLinkType),
 		KeyChange:  linker.GetLink(ctx, acme.KeyChangeLinkType),
-		Meta: Meta{
-			ExternalAccountRequired: acmeProv.RequireEAB,
-		},
+		Meta:       createMetaObject(acmeProv),
 	})
+}
+
+// createMetaObject creates a Meta object if the ACME provisioner
+// has one or more properties that are written in the ACME directory output.
+// It returns nil if none of the properties are set.
+func createMetaObject(p *provisioner.ACME) *Meta {
+	if shouldAddMetaObject(p) {
+		return &Meta{
+			TermsOfService:          p.TermsOfService,
+			Website:                 p.Website,
+			CaaIdentities:           p.CaaIdentities,
+			ExternalAccountRequired: p.RequireEAB,
+		}
+	}
+	return nil
+}
+
+// shouldAddMetaObject returns whether or not the ACME provisioner
+// has properties configured that must be added to the ACME directory object.
+func shouldAddMetaObject(p *provisioner.ACME) bool {
+	switch {
+	case p.TermsOfService != "":
+		return true
+	case p.Website != "":
+		return true
+	case len(p.CaaIdentities) > 0:
+		return true
+	case p.RequireEAB:
+		return true
+	default:
+		return false
+	}
 }
 
 // NotImplemented returns a 501 and is generally a placeholder for functionality which
