@@ -265,8 +265,20 @@ func (c *linkedCaClient) GetCertificateData(serial string) (*db.CertificateData,
 			ID: p.Id, Name: p.Name, Type: p.Type.String(),
 		}
 	}
+
+	var raInfo *provisioner.RAInfo
+	if p := resp.RaProvisioner; p != nil && p.Provisioner != nil {
+		raInfo = &provisioner.RAInfo{
+			AuthorityID:     p.AuthorityId,
+			ProvisionerID:   p.Provisioner.Id,
+			ProvisionerType: p.Provisioner.Type.String(),
+			ProvisionerName: p.Provisioner.Name,
+		}
+	}
+
 	return &db.CertificateData{
 		Provisioner: pd,
+		RaInfo:      raInfo,
 	}, nil
 }
 
