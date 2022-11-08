@@ -18,10 +18,13 @@ import (
 	"github.com/go-chi/chi"
 	"github.com/google/go-cmp/cmp"
 	"github.com/pkg/errors"
-	"github.com/smallstep/assert"
-	"github.com/smallstep/certificates/acme"
+
 	"go.step.sm/crypto/jose"
 	"go.step.sm/crypto/pemutil"
+
+	"github.com/smallstep/assert"
+	"github.com/smallstep/certificates/acme"
+	"github.com/smallstep/certificates/authority/provisioner"
 )
 
 type mockClient struct {
@@ -129,7 +132,35 @@ func TestHandler_GetDirectory(t *testing.T) {
 				NewOrder:   fmt.Sprintf("%s/acme/%s/new-order", baseURL.String(), provName),
 				RevokeCert: fmt.Sprintf("%s/acme/%s/revoke-cert", baseURL.String(), provName),
 				KeyChange:  fmt.Sprintf("%s/acme/%s/key-change", baseURL.String(), provName),
-				Meta: Meta{
+				Meta: &Meta{
+					ExternalAccountRequired: true,
+				},
+			}
+			return test{
+				ctx:        ctx,
+				dir:        expDir,
+				statusCode: 200,
+			}
+		},
+		"ok/full-meta": func(t *testing.T) test {
+			prov := newACMEProv(t)
+			prov.TermsOfService = "https://terms.ca.local/"
+			prov.Website = "https://ca.local/"
+			prov.CaaIdentities = []string{"ca.local"}
+			prov.RequireEAB = true
+			provName := url.PathEscape(prov.GetName())
+			baseURL := &url.URL{Scheme: "https", Host: "test.ca.smallstep.com"}
+			ctx := acme.NewProvisionerContext(context.Background(), prov)
+			expDir := Directory{
+				NewNonce:   fmt.Sprintf("%s/acme/%s/new-nonce", baseURL.String(), provName),
+				NewAccount: fmt.Sprintf("%s/acme/%s/new-account", baseURL.String(), provName),
+				NewOrder:   fmt.Sprintf("%s/acme/%s/new-order", baseURL.String(), provName),
+				RevokeCert: fmt.Sprintf("%s/acme/%s/revoke-cert", baseURL.String(), provName),
+				KeyChange:  fmt.Sprintf("%s/acme/%s/key-change", baseURL.String(), provName),
+				Meta: &Meta{
+					TermsOfService:          "https://terms.ca.local/",
+					Website:                 "https://ca.local/",
+					CaaIdentities:           []string{"ca.local"},
 					ExternalAccountRequired: true,
 				},
 			}
@@ -747,6 +778,92 @@ func TestHandler_GetChallenge(t *testing.T) {
 				assert.Equals(t, res.Header["Link"], []string{fmt.Sprintf("<%s/acme/%s/authz/%s>;rel=\"up\"", baseURL, provName, "authzID")})
 				assert.Equals(t, res.Header["Location"], []string{u})
 				assert.Equals(t, res.Header["Content-Type"], []string{"application/json"})
+			}
+		})
+	}
+}
+
+func Test_createMetaObject(t *testing.T) {
+	tests := []struct {
+		name string
+		p    *provisioner.ACME
+		want *Meta
+	}{
+		{
+			name: "no-meta",
+			p: &provisioner.ACME{
+				Type: "ACME",
+				Name: "acme",
+			},
+			want: nil,
+		},
+		{
+			name: "terms-of-service",
+			p: &provisioner.ACME{
+				Type:           "ACME",
+				Name:           "acme",
+				TermsOfService: "https://terms.ca.local",
+			},
+			want: &Meta{
+				TermsOfService: "https://terms.ca.local",
+			},
+		},
+		{
+			name: "website",
+			p: &provisioner.ACME{
+				Type:    "ACME",
+				Name:    "acme",
+				Website: "https://ca.local",
+			},
+			want: &Meta{
+				Website: "https://ca.local",
+			},
+		},
+		{
+			name: "caa",
+			p: &provisioner.ACME{
+				Type:          "ACME",
+				Name:          "acme",
+				CaaIdentities: []string{"ca.local", "ca.remote"},
+			},
+			want: &Meta{
+				CaaIdentities: []string{"ca.local", "ca.remote"},
+			},
+		},
+		{
+			name: "require-eab",
+			p: &provisioner.ACME{
+				Type:       "ACME",
+				Name:       "acme",
+				RequireEAB: true,
+			},
+			want: &Meta{
+				ExternalAccountRequired: true,
+			},
+		},
+		{
+			name: "full-meta",
+			p: &provisioner.ACME{
+				Type:           "ACME",
+				Name:           "acme",
+				TermsOfService: "https://terms.ca.local",
+				Website:        "https://ca.local",
+				CaaIdentities:  []string{"ca.local", "ca.remote"},
+				RequireEAB:     true,
+			},
+			want: &Meta{
+				TermsOfService:          "https://terms.ca.local",
+				Website:                 "https://ca.local",
+				CaaIdentities:           []string{"ca.local", "ca.remote"},
+				ExternalAccountRequired: true,
+			},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := createMetaObject(tt.p)
+			if !cmp.Equal(tt.want, got) {
+				t.Errorf("createMetaObject() diff =\n%s", cmp.Diff(tt.want, got))
 			}
 		})
 	}
