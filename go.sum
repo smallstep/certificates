@@ -687,8 +687,8 @@ go.step.sm/cli-utils v0.7.5/go.mod h1:taSsY8haLmXoXM3ZkywIyRmVij/4Aj0fQbNTlJvv71
 go.step.sm/crypto v0.9.0/go.mod h1:+CYG05Mek1YDqi5WK0ERc6cOpKly2i/a5aZmU1sfGj0=
 go.step.sm/crypto v0.23.1 h1:Yr9vlzjGqIKVi88KcpZtEcNTcpDkt1nVR7tumW4h+CU=
 go.step.sm/crypto v0.23.1/go.mod h1:djAhDYpNAuWF2LkzbCVcf0JDy1UWgrxR3eQ7pQ8EQ/w=
-go.step.sm/linkedca v0.19.0-rc.3 h1:3Uu8j187wm7mby+/pz/aQ0wHKRm7w/2AsVPpvcAn4v8=
-go.step.sm/linkedca v0.19.0-rc.3/go.mod h1:MCZmPIdzElEofZbiw4eyUHayXgFTwa94cNAV34aJ5ew=
+go.step.sm/linkedca v0.19.0-rc.4 h1:kaBW+xHkRRgMNDa4gWiIj7gBq5yjbJKGlTWYYo5z2KQ=
+go.step.sm/linkedca v0.19.0-rc.4/go.mod h1:b7vWPrHfYLEOTSUZitFEcztVCpTc+ileIN85CwEAluM=
 go.uber.org/atomic v1.3.2/go.mod h1:gD2HeocX3+yG+ygLZcrzQJaqmWj9AIm7n08wl/qW/PE=
 go.uber.org/atomic v1.4.0/go.mod h1:gD2HeocX3+yG+ygLZcrzQJaqmWj9AIm7n08wl/qW/PE=
 go.uber.org/atomic v1.5.0/go.mod h1:sABNBOSYdrvTF6hTgEIbc7YasKWGhgEQZyfxyTvoXHQ=
