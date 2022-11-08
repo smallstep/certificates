@@ -35,8 +35,13 @@ var (
 	// DefaultEnableSSHCA enable SSH CA features per provisioner or globally
 	// for all provisioners.
 	DefaultEnableSSHCA = false
-	// GlobalProvisionerClaims default claims for the Authority. Can be overridden
-	// by provisioner specific claims.
+	// DefaultCRLCacheDuration is the default cache duration for the CRL.
+	DefaultCRLCacheDuration = &provisioner.Duration{Duration: 24 * time.Hour}
+	// DefaultCRLExpiredDuration is the default duration in which expired
+	// certificates will remain in the CRL after expiration.
+	DefaultCRLExpiredDuration = time.Hour
+	// GlobalProvisionerClaims is the default duration that expired certificates
+	// remain in the CRL after expiration.
 	GlobalProvisionerClaims = provisioner.Claims{
 		MinTLSDur:               &provisioner.Duration{Duration: 5 * time.Minute}, // TLS certs
 		MaxTLSDur:               &provisioner.Duration{Duration: 24 * time.Hour},
@@ -72,7 +77,60 @@ type Config struct {
 	Password         string               `json:"password,omitempty"`
 	Templates        *templates.Templates `json:"templates,omitempty"`
 	CommonName       string               `json:"commonName,omitempty"`
+	CRL              *CRLConfig           `json:"crl,omitempty"`
 	SkipValidation   bool                 `json:"-"`
+
+	// Keeps record of the filename the Config is read from
+	loadedFromFilepath string
+}
+
+// CRLConfig represents config options for CRL generation
+type CRLConfig struct {
+	Enabled          bool                  `json:"enabled"`
+	GenerateOnRevoke bool                  `json:"generateOnRevoke,omitempty"`
+	CacheDuration    *provisioner.Duration `json:"cacheDuration,omitempty"`
+	RenewPeriod      *provisioner.Duration `json:"renewPeriod,omitempty"`
+}
+
+// IsEnabled returns if the CRL is enabled.
+func (c *CRLConfig) IsEnabled() bool {
+	return c != nil && c.Enabled
+}
+
+// Validate validates the CRL configuration.
+func (c *CRLConfig) Validate() error {
+	if c == nil {
+		return nil
+	}
+
+	if c.CacheDuration != nil && c.CacheDuration.Duration < 0 {
+		return errors.New("crl.cacheDuration must be greater than or equal to 0")
+	}
+
+	if c.RenewPeriod != nil && c.RenewPeriod.Duration < 0 {
+		return errors.New("crl.renewPeriod must be greater than or equal to 0")
+	}
+
+	if c.RenewPeriod != nil && c.CacheDuration != nil &&
+		c.RenewPeriod.Duration > c.CacheDuration.Duration {
+		return errors.New("crl.cacheDuration must be greater than or equal to crl.renewPeriod")
+	}
+
+	return nil
+}
+
+// TickerDuration the renewal ticker duration. This is set by renewPeriod, of it
+// is not set is ~2/3 of cacheDuration.
+func (c *CRLConfig) TickerDuration() time.Duration {
+	if !c.IsEnabled() {
+		return 0
+	}
+
+	if c.RenewPeriod != nil && c.RenewPeriod.Duration > 0 {
+		return c.RenewPeriod.Duration
+	}
+
+	return (c.CacheDuration.Duration / 3) * 2
 }
 
 // ASN1DN contains ASN1.DN attributes that are used in Subject and Issuer
@@ -163,6 +221,10 @@ func LoadConfiguration(filename string) (*Config, error) {
 		return nil, errors.Wrapf(err, "error parsing %s", filename)
 	}
 
+	// store filename that was read to populate Config
+	c.loadedFromFilepath = filename
+
+	// initialize the Config
 	c.Init()
 
 	return &c, nil
@@ -183,6 +245,9 @@ func (c *Config) Init() {
 	if c.CommonName == "" {
 		c.CommonName = "Step Online CA"
 	}
+	if c.CRL != nil && c.CRL.Enabled && c.CRL.CacheDuration == nil {
+		c.CRL.CacheDuration = DefaultCRLCacheDuration
+	}
 	c.AuthorityConfig.init()
 }
 
@@ -197,6 +262,30 @@ func (c *Config) Save(filename string) error {
 	enc := json.NewEncoder(f)
 	enc.SetIndent("", "\t")
 	return errors.Wrapf(enc.Encode(c), "error writing %s", filename)
+}
+
+// Commit saves the current configuration to the same
+// file it was initially loaded from.
+//
+// TODO(hs): rename Save() to WriteTo() and replace this
+// with Save()? Or is Commit clear enough.
+func (c *Config) Commit() error {
+	if !c.WasLoadedFromFile() {
+		return errors.New("cannot commit configuration if not loaded from file")
+	}
+	return c.Save(c.loadedFromFilepath)
+}
+
+// WasLoadedFromFile returns whether or not the Config was
+// loaded from a file.
+func (c *Config) WasLoadedFromFile() bool {
+	return c.loadedFromFilepath != ""
+}
+
+// Filepath returns the path to the file the Config was
+// loaded from.
+func (c *Config) Filepath() string {
+	return c.loadedFromFilepath
 }
 
 // Validate validates the configuration.
@@ -266,6 +355,11 @@ func (c *Config) Validate() error {
 
 	// Validate templates: nil is ok
 	if err := c.Templates.Validate(); err != nil {
+		return err
+	}
+
+	// Validate crl config: nil is ok
+	if err := c.CRL.Validate(); err != nil {
 		return err
 	}
 

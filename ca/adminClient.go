@@ -116,7 +116,6 @@ func (c *AdminClient) generateAdminToken(aud *url.URL) (string, error) {
 	}
 
 	return tok.SignedString(c.x5cJWK.Algorithm, c.x5cJWK.Key)
-
 }
 
 func (c *AdminClient) retryOnError(r *http.Response) bool {
@@ -1088,6 +1087,103 @@ func (c *AdminClient) RemoveACMEPolicy(provisionerName, reference, keyID string)
 	}
 	req.Header.Add("Authorization", tok)
 retry:
+	resp, err := c.client.Do(req)
+	if err != nil {
+		return fmt.Errorf("client DELETE %s failed: %w", u, err)
+	}
+	if resp.StatusCode >= 400 {
+		if !retried && c.retryOnError(resp) {
+			retried = true
+			goto retry
+		}
+		return readAdminError(resp.Body)
+	}
+	return nil
+}
+
+func (c *AdminClient) CreateProvisionerWebhook(provisionerName string, wh *linkedca.Webhook) (*linkedca.Webhook, error) {
+	var retried bool
+	body, err := protojson.Marshal(wh)
+	if err != nil {
+		return nil, fmt.Errorf("error marshaling request: %w", err)
+	}
+	u := c.endpoint.ResolveReference(&url.URL{Path: path.Join(adminURLPrefix, "provisioners", provisionerName, "webhooks")})
+	tok, err := c.generateAdminToken(u)
+	if err != nil {
+		return nil, fmt.Errorf("error generating admin token: %w", err)
+	}
+retry:
+	req, err := http.NewRequest(http.MethodPost, u.String(), bytes.NewReader(body))
+	if err != nil {
+		return nil, fmt.Errorf("creating POST %s request failed: %w", u, err)
+	}
+	req.Header.Add("Authorization", tok)
+	resp, err := c.client.Do(req)
+	if err != nil {
+		return nil, fmt.Errorf("client POST %s failed: %w", u, err)
+	}
+	if resp.StatusCode >= 400 {
+		if !retried && c.retryOnError(resp) {
+			retried = true
+			goto retry
+		}
+		return nil, readAdminError(resp.Body)
+	}
+	var webhook = new(linkedca.Webhook)
+	if err := readProtoJSON(resp.Body, webhook); err != nil {
+		return nil, fmt.Errorf("error reading %s: %w", u, err)
+	}
+	return webhook, nil
+}
+
+func (c *AdminClient) UpdateProvisionerWebhook(provisionerName string, wh *linkedca.Webhook) (*linkedca.Webhook, error) {
+	var retried bool
+	body, err := protojson.Marshal(wh)
+	if err != nil {
+		return nil, fmt.Errorf("error marshaling request: %w", err)
+	}
+	u := c.endpoint.ResolveReference(&url.URL{Path: path.Join(adminURLPrefix, "provisioners", provisionerName, "webhooks", wh.Name)})
+	tok, err := c.generateAdminToken(u)
+	if err != nil {
+		return nil, fmt.Errorf("error generating admin token: %w", err)
+	}
+retry:
+	req, err := http.NewRequest(http.MethodPut, u.String(), bytes.NewReader(body))
+	if err != nil {
+		return nil, fmt.Errorf("creating PUT %s request failed: %w", u, err)
+	}
+	req.Header.Add("Authorization", tok)
+	resp, err := c.client.Do(req)
+	if err != nil {
+		return nil, fmt.Errorf("client PUT %s failed: %w", u, err)
+	}
+	if resp.StatusCode >= 400 {
+		if !retried && c.retryOnError(resp) {
+			retried = true
+			goto retry
+		}
+		return nil, readAdminError(resp.Body)
+	}
+	var webhook = new(linkedca.Webhook)
+	if err := readProtoJSON(resp.Body, webhook); err != nil {
+		return nil, fmt.Errorf("error reading %s: %w", u, err)
+	}
+	return webhook, nil
+}
+
+func (c *AdminClient) DeleteProvisionerWebhook(provisionerName, webhookName string) error {
+	var retried bool
+	u := c.endpoint.ResolveReference(&url.URL{Path: path.Join(adminURLPrefix, "provisioners", provisionerName, "webhooks", webhookName)})
+	tok, err := c.generateAdminToken(u)
+	if err != nil {
+		return fmt.Errorf("error generating admin token: %w", err)
+	}
+retry:
+	req, err := http.NewRequest(http.MethodDelete, u.String(), http.NoBody)
+	if err != nil {
+		return fmt.Errorf("creating DELETE %s request failed: %w", u, err)
+	}
+	req.Header.Add("Authorization", tok)
 	resp, err := c.client.Do(req)
 	if err != nil {
 		return fmt.Errorf("client DELETE %s failed: %w", u, err)

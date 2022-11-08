@@ -156,16 +156,25 @@ func (ca *CA) Init(cfg *config.Config) (*CA, error) {
 		opts = append(opts, authority.WithDatabase(ca.opts.database))
 	}
 
+	if ca.opts.quiet {
+		opts = append(opts, authority.WithQuietInit())
+	}
+
+	webhookTransport := http.DefaultTransport.(*http.Transport).Clone()
+	opts = append(opts, authority.WithWebhookClient(&http.Client{Transport: webhookTransport}))
+
 	auth, err := authority.New(cfg, opts...)
 	if err != nil {
 		return nil, err
 	}
 	ca.auth = auth
 
-	tlsConfig, err := ca.getTLSConfig(auth)
+	tlsConfig, clientTLSConfig, err := ca.getTLSConfig(auth)
 	if err != nil {
 		return nil, err
 	}
+
+	webhookTransport.TLSClientConfig = clientTLSConfig
 
 	// Using chi as the main router
 	mux := chi.NewRouter()
@@ -220,8 +229,14 @@ func (ca *CA) Init(cfg *config.Config) (*CA, error) {
 		if adminDB != nil {
 			acmeAdminResponder := adminAPI.NewACMEAdminResponder()
 			policyAdminResponder := adminAPI.NewPolicyAdminResponder()
+			webhookAdminResponder := adminAPI.NewWebhookAdminResponder()
 			mux.Route("/admin", func(r chi.Router) {
-				adminAPI.Route(r, acmeAdminResponder, policyAdminResponder)
+				adminAPI.Route(
+					r,
+					adminAPI.WithACMEResponder(acmeAdminResponder),
+					adminAPI.WithPolicyResponder(policyAdminResponder),
+					adminAPI.WithWebhookResponder(webhookAdminResponder),
+				)
 			})
 		}
 	}
@@ -334,7 +349,7 @@ func (ca *CA) Run() error {
 		if step.Contexts().GetCurrent() != nil {
 			log.Printf("Current context: %s", step.Contexts().GetCurrent().Name)
 		}
-		log.Printf("Config file: %s", ca.opts.configFile)
+		log.Printf("Config file: %s", ca.getConfigFileOutput())
 		baseURL := fmt.Sprintf("https://%s%s",
 			authorityInfo.DNSNames[0],
 			ca.config.Address[strings.LastIndex(ca.config.Address, ":"):])
@@ -456,13 +471,13 @@ func (ca *CA) Reload() error {
 	return nil
 }
 
-// getTLSConfig returns a TLSConfig for the CA server with a self-renewing
-// server certificate.
-func (ca *CA) getTLSConfig(auth *authority.Authority) (*tls.Config, error) {
+// get TLSConfig returns separate TLSConfigs for server and client with the
+// same self-renewing certificate.
+func (ca *CA) getTLSConfig(auth *authority.Authority) (*tls.Config, *tls.Config, error) {
 	// Create initial TLS certificate
 	tlsCrt, err := auth.GetTLSCertificate()
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
 	// Start tls renewer with the new certificate.
@@ -473,15 +488,15 @@ func (ca *CA) getTLSConfig(auth *authority.Authority) (*tls.Config, error) {
 
 	ca.renewer, err = NewTLSRenewer(tlsCrt, auth.GetTLSCertificate)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 	ca.renewer.Run()
 
-	var tlsConfig *tls.Config
+	var serverTLSConfig *tls.Config
 	if ca.config.TLS != nil {
-		tlsConfig = ca.config.TLS.TLSConfig()
+		serverTLSConfig = ca.config.TLS.TLSConfig()
 	} else {
-		tlsConfig = &tls.Config{
+		serverTLSConfig = &tls.Config{
 			MinVersion: tls.VersionTLS12,
 		}
 	}
@@ -493,13 +508,24 @@ func (ca *CA) getTLSConfig(auth *authority.Authority) (*tls.Config, error) {
 	// first entry in the Certificates attribute; by setting the attribute to
 	// empty we are implicitly forcing GetCertificate to be the only mechanism
 	// by which the server can find it's own leaf Certificate.
-	tlsConfig.Certificates = []tls.Certificate{}
-	tlsConfig.GetCertificate = ca.renewer.GetCertificateForCA
+	serverTLSConfig.Certificates = []tls.Certificate{}
+
+	clientTLSConfig := serverTLSConfig.Clone()
+
+	serverTLSConfig.GetCertificate = ca.renewer.GetCertificateForCA
+	clientTLSConfig.GetClientCertificate = ca.renewer.GetClientCertificate
 
 	// initialize a certificate pool with root CA certificates to trust when doing mTLS.
 	certPool := x509.NewCertPool()
+	// initialize a certificate pool with root CA certificates to trust when connecting
+	// to webhook servers
+	rootCAsPool, err := x509.SystemCertPool()
+	if err != nil {
+		return nil, nil, err
+	}
 	for _, crt := range auth.GetRootCertificates() {
 		certPool.AddCert(crt)
+		rootCAsPool.AddCert(crt)
 	}
 
 	// adding the intermediate CA certificates to the pool will allow clients that
@@ -509,16 +535,19 @@ func (ca *CA) getTLSConfig(auth *authority.Authority) (*tls.Config, error) {
 	for _, certBytes := range intermediates {
 		cert, err := x509.ParseCertificate(certBytes)
 		if err != nil {
-			return nil, err
+			return nil, nil, err
 		}
 		certPool.AddCert(cert)
+		rootCAsPool.AddCert(cert)
 	}
 
 	// Add support for mutual tls to renew certificates
-	tlsConfig.ClientAuth = tls.VerifyClientCertIfGiven
-	tlsConfig.ClientCAs = certPool
+	serverTLSConfig.ClientAuth = tls.VerifyClientCertIfGiven
+	serverTLSConfig.ClientCAs = certPool
 
-	return tlsConfig, nil
+	clientTLSConfig.RootCAs = rootCAsPool
+
+	return serverTLSConfig, clientTLSConfig, nil
 }
 
 // shouldServeSCEPEndpoints returns if the CA should be
@@ -529,9 +558,9 @@ func (ca *CA) shouldServeSCEPEndpoints() bool {
 	return ca.auth.GetSCEPService() != nil
 }
 
-// nolint // ignore linters to allow keeping this function around for debugging
+//nolint:unused // useful for debugging
 func dumpRoutes(mux chi.Routes) {
-	// helpful routine for logging all routes //
+	// helpful routine for logging all routes
 	walkFunc := func(method string, route string, handler http.Handler, middlewares ...func(http.Handler) http.Handler) error {
 		fmt.Printf("%s %s\n", method, route)
 		return nil
@@ -539,4 +568,11 @@ func dumpRoutes(mux chi.Routes) {
 	if err := chi.Walk(mux, walkFunc); err != nil {
 		fmt.Printf("Logging err: %s\n", err.Error())
 	}
+}
+
+func (ca *CA) getConfigFileOutput() string {
+	if ca.config.WasLoadedFromFile() {
+		return ca.config.Filepath()
+	}
+	return "loaded from token"
 }

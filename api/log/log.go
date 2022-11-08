@@ -38,14 +38,10 @@ func Error(rw http.ResponseWriter, err error) {
 		return
 	}
 
-	e, ok := err.(StackTracedError)
-	if !ok {
-		e, ok = errors.Cause(err).(StackTracedError)
-	}
-
-	if ok {
+	var st StackTracedError
+	if !errors.As(err, &st) {
 		rl.WithFields(map[string]interface{}{
-			"stack-trace": fmt.Sprintf("%+v", e.StackTrace()),
+			"stack-trace": fmt.Sprintf("%+v", st.StackTrace()),
 		})
 	}
 }

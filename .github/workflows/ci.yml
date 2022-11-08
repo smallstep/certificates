@@ -1,0 +1,26 @@
+name: CI
+
+on:
+  push:
+    tags-ignore:
+    - 'v*'
+    branches:
+    - "master"
+  pull_request:
+  workflow_call:
+    secrets:
+      CODECOV_TOKEN:
+        required: true
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  ci:
+    uses: smallstep/workflows/.github/workflows/goCI.yml@main
+    with:
+      os-dependencies: "libpcsclite-dev"
+      run-gitleaks: true
+      run-codeql: true
+    secrets: inherit

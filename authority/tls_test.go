@@ -6,7 +6,7 @@ import (
 	"crypto/ecdsa"
 	"crypto/elliptic"
 	"crypto/rand"
-	"crypto/sha1" // nolint:gosec // used to create the Subject Key Identifier by RFC 5280
+	"crypto/sha1" //nolint:gosec // used to create the Subject Key Identifier by RFC 5280
 	"crypto/x509"
 	"crypto/x509/pkix"
 	"encoding/asn1"
@@ -18,20 +18,21 @@ import (
 	"testing"
 	"time"
 
-	"gopkg.in/square/go-jose.v2/jwt"
-
 	"go.step.sm/crypto/jose"
 	"go.step.sm/crypto/keyutil"
+	"go.step.sm/crypto/minica"
 	"go.step.sm/crypto/pemutil"
 	"go.step.sm/crypto/x509util"
 
 	"github.com/smallstep/assert"
 	"github.com/smallstep/certificates/api/render"
+	"github.com/smallstep/certificates/authority/config"
 	"github.com/smallstep/certificates/authority/policy"
 	"github.com/smallstep/certificates/authority/provisioner"
 	"github.com/smallstep/certificates/cas/softcas"
 	"github.com/smallstep/certificates/db"
 	"github.com/smallstep/certificates/errs"
+	"github.com/smallstep/nosql/database"
 )
 
 var (
@@ -56,6 +57,15 @@ func (m *certificateDurationEnforcer) Enforce(cert *x509.Certificate) error {
 	cert.NotBefore = m.NotBefore
 	cert.NotAfter = m.NotAfter
 	return nil
+}
+
+type certificateChainDB struct {
+	db.MockAuthDB
+	MStoreCertificateChain func(provisioner.Interface, ...*x509.Certificate) error
+}
+
+func (d *certificateChainDB) StoreCertificateChain(p provisioner.Interface, certs ...*x509.Certificate) error {
+	return d.MStoreCertificateChain(p, certs...)
 }
 
 func getDefaultIssuer(a *Authority) *x509.Certificate {
@@ -131,6 +141,13 @@ func generateIntermidiateCertificate(t *testing.T, issuer *x509.Certificate, sig
 	return cert, priv
 }
 
+func withSubject(sub pkix.Name) provisioner.CertificateModifierFunc {
+	return func(crt *x509.Certificate, _ provisioner.SignOptions) error {
+		crt.Subject = sub
+		return nil
+	}
+}
+
 func withProvisionerOID(name, kid string) provisioner.CertificateModifierFunc {
 	return func(crt *x509.Certificate, _ provisioner.SignOptions) error {
 		b, err := asn1.Marshal(stepProvisionerASN1{
@@ -199,7 +216,7 @@ func generateSubjectKeyID(pub crypto.PublicKey) ([]byte, error) {
 	if _, err = asn1.Unmarshal(b, &info); err != nil {
 		return nil, fmt.Errorf("error unmarshaling public key: %w", err)
 	}
-	// nolint:gosec // used to create the Subject Key Identifier by RFC 5280
+	//nolint:gosec // used to create the Subject Key Identifier by RFC 5280
 	hash := sha1.Sum(info.SubjectPublicKey.Bytes)
 	return hash[:], nil
 }
@@ -542,8 +559,38 @@ ZYtQ9Ot36qc=
 				notBefore:       signOpts.NotBefore.Time().Truncate(time.Second),
 				notAfter:        signOpts.NotAfter.Time().Truncate(time.Second),
 				extensionsCount: 6,
-				err:             errors.New("authority not allowed to sign"),
+				err:             errors.New("dns name \"test.smallstep.com\" not allowed"),
 				code:            http.StatusForbidden,
+			}
+		},
+		"fail enriching webhooks": func(t *testing.T) *signTest {
+			csr := getCSR(t, priv)
+			csr.Raw = []byte("foo")
+			return &signTest{
+				auth:            a,
+				csr:             csr,
+				extensionsCount: 7,
+				extraOpts: append(extraOpts, &mockWebhookController{
+					enrichErr: provisioner.ErrWebhookDenied,
+				}),
+				signOpts: signOpts,
+				err:      provisioner.ErrWebhookDenied,
+				code:     http.StatusForbidden,
+			}
+		},
+		"fail authorizing webhooks": func(t *testing.T) *signTest {
+			csr := getCSR(t, priv)
+			csr.Raw = []byte("foo")
+			return &signTest{
+				auth:            a,
+				csr:             csr,
+				extensionsCount: 7,
+				extraOpts: append(extraOpts, &mockWebhookController{
+					authorizeErr: provisioner.ErrWebhookDenied,
+				}),
+				signOpts: signOpts,
+				err:      provisioner.ErrWebhookDenied,
+				code:     http.StatusForbidden,
 			}
 		},
 		"ok": func(t *testing.T) *signTest {
@@ -577,7 +624,7 @@ ZYtQ9Ot36qc=
 				{Id: stepOIDProvisioner, Value: []byte("foo")},
 				{Id: []int{1, 1, 1}, Value: []byte("bar")}}))
 			now := time.Now().UTC()
-			// nolint:gocritic
+			//nolint:gocritic
 			enforcedExtraOptions := append(extraOpts, &certificateDurationEnforcer{
 				NotBefore: now,
 				NotAfter:  now.Add(365 * 24 * time.Hour),
@@ -622,6 +669,48 @@ ZYtQ9Ot36qc=
 					assert.Equals(t, crt.Subject.CommonName, "smallstep test")
 					return nil
 				},
+			}
+			return &signTest{
+				auth:            testAuthority,
+				csr:             csr,
+				extraOpts:       testExtraOpts,
+				signOpts:        signOpts,
+				notBefore:       signOpts.NotBefore.Time().Truncate(time.Second),
+				notAfter:        signOpts.NotAfter.Time().Truncate(time.Second),
+				extensionsCount: 6,
+			}
+		},
+		"ok with enriching webhook": func(t *testing.T) *signTest {
+			csr := getCSR(t, priv)
+			testAuthority := testAuthority(t)
+			testAuthority.config.AuthorityConfig.Template = a.config.AuthorityConfig.Template
+			p, ok := testAuthority.provisioners.Load("step-cli:4UELJx8e0aS9m0CH3fZ0EB7D5aUPICb759zALHFejvc")
+			if !ok {
+				t.Fatal("provisioner not found")
+			}
+			p.(*provisioner.JWK).Options = &provisioner.Options{
+				X509: &provisioner.X509Options{Template: `{
+					"subject": {"commonName": {{ toJson .Webhooks.people.role }} },
+					"dnsNames": {{ toJson .Insecure.CR.DNSNames }},
+					"keyUsage": ["digitalSignature"],
+					"extKeyUsage": ["serverAuth","clientAuth"]
+				}`},
+			}
+			testExtraOpts, err := testAuthority.Authorize(ctx, token)
+			assert.FatalError(t, err)
+			testAuthority.db = &db.MockAuthDB{
+				MStoreCertificate: func(crt *x509.Certificate) error {
+					assert.Equals(t, crt.Subject.CommonName, "smallstep test")
+					return nil
+				},
+			}
+			for i, o := range testExtraOpts {
+				if wc, ok := o.(*provisioner.WebhookController); ok {
+					testExtraOpts[i] = &mockWebhookController{
+						templateData: wc.TemplateData,
+						respData:     map[string]any{"people": map[string]any{"role": "smallstep test"}},
+					}
+				}
 			}
 			return &signTest{
 				auth:            testAuthority,
@@ -694,7 +783,6 @@ ZYtQ9Ot36qc=
 			aa.config.AuthorityConfig.Template = a.config.AuthorityConfig.Template
 			aa.db = &db.MockAuthDB{
 				MStoreCertificate: func(crt *x509.Certificate) error {
-					fmt.Println(crt.Subject)
 					assert.Equals(t, crt.Subject.CommonName, "smallstep test")
 					return nil
 				},
@@ -720,6 +808,38 @@ ZYtQ9Ot36qc=
 				extensionsCount: 6,
 			}
 		},
+		"ok with attestation data": func(t *testing.T) *signTest {
+			csr := getCSR(t, priv)
+			aa := testAuthority(t)
+			aa.config.AuthorityConfig.Template = a.config.AuthorityConfig.Template
+			aa.db = &certificateChainDB{
+				MStoreCertificateChain: func(prov provisioner.Interface, certs ...*x509.Certificate) error {
+					p, ok := prov.(attProvisioner)
+					if assert.True(t, ok) {
+						assert.Equals(t, &provisioner.AttestationData{
+							PermanentIdentifier: "1234567890",
+						}, p.AttestationData())
+					}
+					if assert.Len(t, 2, certs) {
+						assert.Equals(t, certs[0].Subject.CommonName, "smallstep test")
+						assert.Equals(t, certs[1].Subject.CommonName, "smallstep Intermediate CA")
+					}
+					return nil
+				},
+			}
+
+			return &signTest{
+				auth: aa,
+				csr:  csr,
+				extraOpts: append(extraOpts, provisioner.AttestationData{
+					PermanentIdentifier: "1234567890",
+				}),
+				signOpts:        signOpts,
+				notBefore:       signOpts.NotBefore.Time().Truncate(time.Second),
+				notAfter:        signOpts.NotAfter.Time().Truncate(time.Second),
+				extensionsCount: 6,
+			}
+		},
 	}
 
 	for name, genTestCase := range tests {
@@ -730,13 +850,13 @@ ZYtQ9Ot36qc=
 			if err != nil {
 				if assert.NotNil(t, tc.err, fmt.Sprintf("unexpected error: %s", err)) {
 					assert.Nil(t, certChain)
-					sc, ok := err.(render.StatusCodedError)
-					assert.Fatal(t, ok, "error does not implement StatusCodedError interface")
+					var sc render.StatusCodedError
+					assert.Fatal(t, errors.As(err, &sc), "error does not implement StatusCodedError interface")
 					assert.Equals(t, sc.StatusCode(), tc.code)
 					assert.HasPrefix(t, err.Error(), tc.err.Error())
 
-					ctxErr, ok := err.(*errs.Error)
-					assert.Fatal(t, ok, "error is not of type *errs.Error")
+					var ctxErr *errs.Error
+					assert.Fatal(t, errors.As(err, &ctxErr), "error is not of type *errs.Error")
 					assert.Equals(t, ctxErr.Details["csr"], tc.csr)
 					assert.Equals(t, ctxErr.Details["signOptions"], tc.signOpts)
 				}
@@ -841,6 +961,18 @@ func TestAuthority_Renew(t *testing.T) {
 		withProvisionerOID("Max", a.config.AuthorityConfig.Provisioners[0].(*provisioner.JWK).Key.KeyID),
 		withSigner(issuer, signer))
 
+	certExtraNames := generateCertificate(t, "renew", []string{"test.smallstep.com", "test"},
+		withSubject(pkix.Name{
+			CommonName: "renew",
+			ExtraNames: []pkix.AttributeTypeAndValue{
+				{Type: asn1.ObjectIdentifier{0, 9, 2342, 19200300, 100, 1, 25}, Value: "dc"},
+			},
+		}),
+		withNotBeforeNotAfter(so.NotBefore.Time(), so.NotAfter.Time()),
+		withDefaultASN1DN(a.config.AuthorityConfig.Template),
+		withProvisionerOID("Max", a.config.AuthorityConfig.Provisioners[0].(*provisioner.JWK).Key.KeyID),
+		withSigner(issuer, signer))
+
 	certNoRenew := generateCertificate(t, "renew", []string{"test.smallstep.com", "test"},
 		withNotBeforeNotAfter(so.NotBefore.Time(), so.NotAfter.Time()),
 		withDefaultASN1DN(a.config.AuthorityConfig.Template),
@@ -860,14 +992,14 @@ func TestAuthority_Renew(t *testing.T) {
 			return &renewTest{
 				auth: _a,
 				cert: cert,
-				err:  errors.New("authority.Rekey: error creating certificate"),
+				err:  errors.New("error creating certificate"),
 				code: http.StatusInternalServerError,
 			}, nil
 		},
 		"fail/unauthorized": func() (*renewTest, error) {
 			return &renewTest{
 				cert: certNoRenew,
-				err:  errors.New("authority.Rekey: authority.authorizeRenew: renew is disabled for provisioner 'dev'"),
+				err:  errors.New("authority.authorizeRenew: renew is disabled for provisioner 'dev'"),
 				code: http.StatusUnauthorized,
 			}, nil
 		},
@@ -880,7 +1012,7 @@ func TestAuthority_Renew(t *testing.T) {
 			return &renewTest{
 				auth: aa,
 				cert: cert,
-				err:  errors.New("authority.Rekey: authority.authorizeRenew: not authorized"),
+				err:  errors.New("authority.authorizeRenew: not authorized"),
 				code: http.StatusUnauthorized,
 			}, nil
 		},
@@ -888,6 +1020,12 @@ func TestAuthority_Renew(t *testing.T) {
 			return &renewTest{
 				auth: a,
 				cert: cert,
+			}, nil
+		},
+		"ok/WithExtraNames": func() (*renewTest, error) {
+			return &renewTest{
+				auth: a,
+				cert: certExtraNames,
 			}, nil
 		},
 		"ok/success-new-intermediate": func() (*renewTest, error) {
@@ -929,13 +1067,13 @@ func TestAuthority_Renew(t *testing.T) {
 			if err != nil {
 				if assert.NotNil(t, tc.err, fmt.Sprintf("unexpected error: %s", err)) {
 					assert.Nil(t, certChain)
-					sc, ok := err.(render.StatusCodedError)
-					assert.Fatal(t, ok, "error does not implement StatusCodedError interface")
+					var sc render.StatusCodedError
+					assert.Fatal(t, errors.As(err, &sc), "error does not implement StatusCodedError interface")
 					assert.Equals(t, sc.StatusCode(), tc.code)
 					assert.HasPrefix(t, err.Error(), tc.err.Error())
 
-					ctxErr, ok := err.(*errs.Error)
-					assert.Fatal(t, ok, "error is not of type *errs.Error")
+					var ctxErr *errs.Error
+					assert.Fatal(t, errors.As(err, &ctxErr), "error is not of type *errs.Error")
 					assert.Equals(t, ctxErr.Details["serialNumber"], tc.cert.SerialNumber.String())
 				}
 			} else {
@@ -952,15 +1090,14 @@ func TestAuthority_Renew(t *testing.T) {
 					assert.True(t, leaf.NotAfter.Before(expiry.Add(time.Hour)))
 
 					tmplt := a.config.AuthorityConfig.Template
-					assert.Equals(t, leaf.Subject.String(),
-						pkix.Name{
-							Country:       []string{tmplt.Country},
-							Organization:  []string{tmplt.Organization},
-							Locality:      []string{tmplt.Locality},
-							StreetAddress: []string{tmplt.StreetAddress},
-							Province:      []string{tmplt.Province},
-							CommonName:    tmplt.CommonName,
-						}.String())
+					assert.Equals(t, leaf.RawSubject, tc.cert.RawSubject)
+					assert.Equals(t, leaf.Subject.Country, []string{tmplt.Country})
+					assert.Equals(t, leaf.Subject.Organization, []string{tmplt.Organization})
+					assert.Equals(t, leaf.Subject.Locality, []string{tmplt.Locality})
+					assert.Equals(t, leaf.Subject.StreetAddress, []string{tmplt.StreetAddress})
+					assert.Equals(t, leaf.Subject.Province, []string{tmplt.Province})
+					assert.Equals(t, leaf.Subject.CommonName, tmplt.CommonName)
+
 					assert.Equals(t, leaf.Issuer, intermediate.Subject)
 
 					assert.Equals(t, leaf.SignatureAlgorithm, x509.ECDSAWithSHA256)
@@ -1084,14 +1221,14 @@ func TestAuthority_Rekey(t *testing.T) {
 			return &renewTest{
 				auth: _a,
 				cert: cert,
-				err:  errors.New("authority.Rekey: error creating certificate"),
+				err:  errors.New("error creating certificate"),
 				code: http.StatusInternalServerError,
 			}, nil
 		},
 		"fail/unauthorized": func() (*renewTest, error) {
 			return &renewTest{
 				cert: certNoRenew,
-				err:  errors.New("authority.Rekey: authority.authorizeRenew: renew is disabled for provisioner 'dev'"),
+				err:  errors.New("authority.authorizeRenew: renew is disabled for provisioner 'dev'"),
 				code: http.StatusUnauthorized,
 			}, nil
 		},
@@ -1136,13 +1273,13 @@ func TestAuthority_Rekey(t *testing.T) {
 			if err != nil {
 				if assert.NotNil(t, tc.err, fmt.Sprintf("unexpected error: %s", err)) {
 					assert.Nil(t, certChain)
-					sc, ok := err.(render.StatusCodedError)
-					assert.Fatal(t, ok, "error does not implement StatusCodedError interface")
+					var sc render.StatusCodedError
+					assert.Fatal(t, errors.As(err, &sc), "error does not implement StatusCodedError interface")
 					assert.Equals(t, sc.StatusCode(), tc.code)
 					assert.HasPrefix(t, err.Error(), tc.err.Error())
 
-					ctxErr, ok := err.(*errs.Error)
-					assert.Fatal(t, ok, "error is not of type *errs.Error")
+					var ctxErr *errs.Error
+					assert.Fatal(t, errors.As(err, &ctxErr), "error is not of type *errs.Error")
 					assert.Equals(t, ctxErr.Details["serialNumber"], tc.cert.SerialNumber.String())
 				}
 			} else {
@@ -1328,15 +1465,15 @@ func TestAuthority_Revoke(t *testing.T) {
 			}
 		},
 		"fail/nil-db": func() test {
-			cl := jwt.Claims{
+			cl := jose.Claims{
 				Subject:   "sn",
 				Issuer:    validIssuer,
-				NotBefore: jwt.NewNumericDate(now),
-				Expiry:    jwt.NewNumericDate(now.Add(time.Minute)),
+				NotBefore: jose.NewNumericDate(now),
+				Expiry:    jose.NewNumericDate(now.Add(time.Minute)),
 				Audience:  validAudience,
 				ID:        "44",
 			}
-			raw, err := jwt.Signed(sig).Claims(cl).CompactSerialize()
+			raw, err := jose.Signed(sig).Claims(cl).CompactSerialize()
 			assert.FatalError(t, err)
 
 			return test{
@@ -1363,20 +1500,20 @@ func TestAuthority_Revoke(t *testing.T) {
 					return true, nil
 				},
 				MGetCertificate: func(sn string) (*x509.Certificate, error) {
-					return nil, nil
+					return nil, errors.New("not found")
 				},
 				Err: errors.New("force"),
 			}))
 
-			cl := jwt.Claims{
+			cl := jose.Claims{
 				Subject:   "sn",
 				Issuer:    validIssuer,
-				NotBefore: jwt.NewNumericDate(now),
-				Expiry:    jwt.NewNumericDate(now.Add(time.Minute)),
+				NotBefore: jose.NewNumericDate(now),
+				Expiry:    jose.NewNumericDate(now.Add(time.Minute)),
 				Audience:  validAudience,
 				ID:        "44",
 			}
-			raw, err := jwt.Signed(sig).Claims(cl).CompactSerialize()
+			raw, err := jose.Signed(sig).Claims(cl).CompactSerialize()
 			assert.FatalError(t, err)
 
 			return test{
@@ -1403,20 +1540,20 @@ func TestAuthority_Revoke(t *testing.T) {
 					return true, nil
 				},
 				MGetCertificate: func(sn string) (*x509.Certificate, error) {
-					return nil, nil
+					return nil, errors.New("not found")
 				},
 				Err: db.ErrAlreadyExists,
 			}))
 
-			cl := jwt.Claims{
+			cl := jose.Claims{
 				Subject:   "sn",
 				Issuer:    validIssuer,
-				NotBefore: jwt.NewNumericDate(now),
-				Expiry:    jwt.NewNumericDate(now.Add(time.Minute)),
+				NotBefore: jose.NewNumericDate(now),
+				Expiry:    jose.NewNumericDate(now.Add(time.Minute)),
 				Audience:  validAudience,
 				ID:        "44",
 			}
-			raw, err := jwt.Signed(sig).Claims(cl).CompactSerialize()
+			raw, err := jose.Signed(sig).Claims(cl).CompactSerialize()
 			assert.FatalError(t, err)
 
 			return test{
@@ -1447,15 +1584,15 @@ func TestAuthority_Revoke(t *testing.T) {
 				},
 			}))
 
-			cl := jwt.Claims{
+			cl := jose.Claims{
 				Subject:   "sn",
 				Issuer:    validIssuer,
-				NotBefore: jwt.NewNumericDate(now),
-				Expiry:    jwt.NewNumericDate(now.Add(time.Minute)),
+				NotBefore: jose.NewNumericDate(now),
+				Expiry:    jose.NewNumericDate(now.Add(time.Minute)),
 				Audience:  validAudience,
 				ID:        "44",
 			}
-			raw, err := jwt.Signed(sig).Claims(cl).CompactSerialize()
+			raw, err := jose.Signed(sig).Claims(cl).CompactSerialize()
 			assert.FatalError(t, err)
 			return test{
 				auth: _a,
@@ -1539,15 +1676,15 @@ func TestAuthority_Revoke(t *testing.T) {
 				},
 			}))
 
-			cl := jwt.Claims{
+			cl := jose.Claims{
 				Subject:   "sn",
 				Issuer:    validIssuer,
-				NotBefore: jwt.NewNumericDate(now),
-				Expiry:    jwt.NewNumericDate(now.Add(time.Minute)),
+				NotBefore: jose.NewNumericDate(now),
+				Expiry:    jose.NewNumericDate(now.Add(time.Minute)),
 				Audience:  validAudience,
 				ID:        "44",
 			}
-			raw, err := jwt.Signed(sig).Claims(cl).CompactSerialize()
+			raw, err := jose.Signed(sig).Claims(cl).CompactSerialize()
 			assert.FatalError(t, err)
 			return test{
 				auth: a,
@@ -1566,13 +1703,13 @@ func TestAuthority_Revoke(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			if err := tc.auth.Revoke(tc.ctx, tc.opts); err != nil {
 				if assert.NotNil(t, tc.err, fmt.Sprintf("unexpected error: %s", err)) {
-					sc, ok := err.(render.StatusCodedError)
-					assert.Fatal(t, ok, "error does not implement StatusCodedError interface")
+					var sc render.StatusCodedError
+					assert.Fatal(t, errors.As(err, &sc), "error does not implement StatusCodedError interface")
 					assert.Equals(t, sc.StatusCode(), tc.code)
 					assert.HasPrefix(t, err.Error(), tc.err.Error())
 
-					ctxErr, ok := err.(*errs.Error)
-					assert.Fatal(t, ok, "error is not of type *errs.Error")
+					var ctxErr *errs.Error
+					assert.Fatal(t, errors.As(err, &ctxErr), "error is not of type *errs.Error")
 					assert.Equals(t, ctxErr.Details["serialNumber"], tc.opts.Serial)
 					assert.Equals(t, ctxErr.Details["reasonCode"], tc.opts.ReasonCode)
 					assert.Equals(t, ctxErr.Details["reason"], tc.opts.Reason)
@@ -1585,6 +1722,234 @@ func TestAuthority_Revoke(t *testing.T) {
 				}
 			} else {
 				assert.Nil(t, tc.err)
+			}
+		})
+	}
+}
+
+func TestAuthority_constraints(t *testing.T) {
+	ca, err := minica.New(
+		minica.WithIntermediateTemplate(`{
+				"subject": {{ toJson .Subject }},
+				"keyUsage": ["certSign", "crlSign"],
+				"basicConstraints": {
+					"isCA": true,
+					"maxPathLen": 0
+				},
+				"nameConstraints": {
+					"critical": true,
+					"permittedDNSDomains": ["internal.example.org"],
+					"excludedDNSDomains": ["internal.example.com"],
+					"permittedIPRanges": ["192.168.1.0/24", "192.168.2.1/32"],
+					"excludedIPRanges": ["192.168.3.0/24", "192.168.4.0/28"],
+					"permittedEmailAddresses": ["root@example.org", "example.org", ".acme.org"],
+					"excludedEmailAddresses": ["root@example.com", "example.com", ".acme.com"],
+					"permittedURIDomains": ["uuid.example.org", ".acme.org"],
+					"excludedURIDomains": ["uuid.example.com", ".acme.com"]
+				}
+			}`),
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	auth, err := NewEmbedded(WithX509RootCerts(ca.Root), WithX509Signer(ca.Intermediate, ca.Signer))
+	if err != nil {
+		t.Fatal(err)
+	}
+	signer, err := keyutil.GenerateDefaultSigner()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	tests := []struct {
+		name    string
+		sans    []string
+		wantErr bool
+	}{
+		{"ok dns", []string{"internal.example.org", "host.internal.example.org"}, false},
+		{"ok ip", []string{"192.168.1.10", "192.168.2.1"}, false},
+		{"ok email", []string{"root@example.org", "info@example.org", "info@www.acme.org"}, false},
+		{"ok uri", []string{"https://uuid.example.org/b908d973-5167-4a62-abe3-6beda358d82a", "https://uuid.acme.org/1724aae1-1bb3-44fb-83c3-9a1a18df67c8"}, false},
+		{"fail permitted dns", []string{"internal.acme.org"}, true},
+		{"fail excluded dns", []string{"internal.example.com"}, true},
+		{"fail permitted ips", []string{"192.168.2.10"}, true},
+		{"fail excluded ips", []string{"192.168.3.1"}, true},
+		{"fail permitted emails", []string{"root@acme.org"}, true},
+		{"fail excluded emails", []string{"root@example.com"}, true},
+		{"fail permitted uris", []string{"https://acme.org/uuid/7848819c-9d0b-4e12-bbff-cd66079a3444"}, true},
+		{"fail excluded uris", []string{"https://uuid.example.com/d325eda7-6356-4d60-b8f6-3d64724afeb3"}, true},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			csr, err := x509util.CreateCertificateRequest(tt.sans[0], tt.sans, signer)
+			if err != nil {
+				t.Fatal(err)
+			}
+			cert, err := ca.SignCSR(csr)
+			if err != nil {
+				t.Fatal(err)
+			}
+
+			data := x509util.CreateTemplateData(tt.sans[0], tt.sans)
+			templateOption, err := provisioner.TemplateOptions(nil, data)
+			if err != nil {
+				t.Fatal(err)
+			}
+
+			_, err = auth.Sign(csr, provisioner.SignOptions{}, templateOption)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("Authority.Sign() error = %v, wantErr %v", err, tt.wantErr)
+			}
+
+			_, err = auth.Renew(cert)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("Authority.Renew() error = %v, wantErr %v", err, tt.wantErr)
+			}
+		})
+	}
+}
+
+func TestAuthority_CRL(t *testing.T) {
+	reasonCode := 2
+	reason := "bob was let go"
+	validIssuer := "step-cli"
+	validAudience := testAudiences.Revoke
+	now := time.Now().UTC()
+	//
+	jwk, err := jose.ReadKey("testdata/secrets/step_cli_key_priv.jwk", jose.WithPassword([]byte("pass")))
+	assert.FatalError(t, err)
+	//
+	sig, err := jose.NewSigner(jose.SigningKey{Algorithm: jose.ES256, Key: jwk.Key},
+		(&jose.SignerOptions{}).WithType("JWT").WithHeader("kid", jwk.KeyID))
+	assert.FatalError(t, err)
+
+	crlCtx := provisioner.NewContextWithMethod(context.Background(), provisioner.RevokeMethod)
+
+	var crlStore db.CertificateRevocationListInfo
+	var revokedList []db.RevokedCertificateInfo
+
+	type test struct {
+		auth     *Authority
+		ctx      context.Context
+		expected []string
+		err      error
+	}
+	tests := map[string]func() test{
+		"fail/empty-crl": func() test {
+			a := testAuthority(t, WithDatabase(&db.MockAuthDB{
+				MUseToken: func(id, tok string) (bool, error) {
+					return true, nil
+				},
+				MGetCertificate: func(sn string) (*x509.Certificate, error) {
+					return nil, errors.New("not found")
+				},
+				MStoreCRL: func(i *db.CertificateRevocationListInfo) error {
+					crlStore = *i
+					return nil
+				},
+				MGetCRL: func() (*db.CertificateRevocationListInfo, error) {
+					return nil, database.ErrNotFound
+				},
+				MGetRevokedCertificates: func() (*[]db.RevokedCertificateInfo, error) {
+					return &revokedList, nil
+				},
+				MRevoke: func(rci *db.RevokedCertificateInfo) error {
+					revokedList = append(revokedList, *rci)
+					return nil
+				},
+			}))
+			a.config.CRL = &config.CRLConfig{
+				Enabled: true,
+			}
+
+			return test{
+				auth:     a,
+				ctx:      crlCtx,
+				expected: nil,
+				err:      database.ErrNotFound,
+			}
+		},
+		"ok/crl-full": func() test {
+			a := testAuthority(t, WithDatabase(&db.MockAuthDB{
+				MUseToken: func(id, tok string) (bool, error) {
+					return true, nil
+				},
+				MGetCertificate: func(sn string) (*x509.Certificate, error) {
+					return nil, errors.New("not found")
+				},
+				MStoreCRL: func(i *db.CertificateRevocationListInfo) error {
+					crlStore = *i
+					return nil
+				},
+				MGetCRL: func() (*db.CertificateRevocationListInfo, error) {
+					return &crlStore, nil
+				},
+				MGetRevokedCertificates: func() (*[]db.RevokedCertificateInfo, error) {
+					return &revokedList, nil
+				},
+				MRevoke: func(rci *db.RevokedCertificateInfo) error {
+					revokedList = append(revokedList, *rci)
+					return nil
+				},
+			}))
+			a.config.CRL = &config.CRLConfig{
+				Enabled:          true,
+				GenerateOnRevoke: true,
+			}
+
+			var ex []string
+
+			for i := 0; i < 100; i++ {
+				sn := fmt.Sprintf("%v", i)
+
+				cl := jose.Claims{
+					Subject:   fmt.Sprintf("sn-%v", i),
+					Issuer:    validIssuer,
+					NotBefore: jose.NewNumericDate(now),
+					Expiry:    jose.NewNumericDate(now.Add(time.Minute)),
+					Audience:  validAudience,
+					ID:        sn,
+				}
+				raw, err := jose.Signed(sig).Claims(cl).CompactSerialize()
+				assert.FatalError(t, err)
+				err = a.Revoke(crlCtx, &RevokeOptions{
+					Serial:     sn,
+					ReasonCode: reasonCode,
+					Reason:     reason,
+					OTT:        raw,
+				})
+
+				assert.FatalError(t, err)
+
+				ex = append(ex, sn)
+			}
+
+			return test{
+				auth:     a,
+				ctx:      crlCtx,
+				expected: ex,
+			}
+		},
+	}
+	for name, f := range tests {
+		tc := f()
+		t.Run(name, func(t *testing.T) {
+			if crlBytes, err := tc.auth.GetCertificateRevocationList(); err == nil {
+				crl, parseErr := x509.ParseCRL(crlBytes)
+				if parseErr != nil {
+					t.Errorf("x509.ParseCertificateRequest() error = %v, wantErr %v", parseErr, nil)
+					return
+				}
+
+				var cmpList []string
+				for _, c := range crl.TBSCertList.RevokedCertificates {
+					cmpList = append(cmpList, c.SerialNumber.String())
+				}
+
+				assert.Equals(t, cmpList, tc.expected)
+			} else {
+				assert.NotNil(t, tc.err, err.Error())
 			}
 		})
 	}

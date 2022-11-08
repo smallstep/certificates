@@ -119,7 +119,6 @@ func (a *Authority) RemoveAuthorityPolicy(ctx context.Context) error {
 }
 
 func (a *Authority) checkAuthorityPolicy(ctx context.Context, currentAdmin *linkedca.Admin, p *linkedca.Policy) error {
-
 	// no policy and thus nothing to evaluate; return early
 	if p == nil {
 		return nil
@@ -138,7 +137,6 @@ func (a *Authority) checkAuthorityPolicy(ctx context.Context, currentAdmin *link
 }
 
 func (a *Authority) checkProvisionerPolicy(ctx context.Context, provName string, p *linkedca.Policy) error {
-
 	// no policy and thus nothing to evaluate; return early
 	if p == nil {
 		return nil
@@ -157,7 +155,6 @@ func (a *Authority) checkProvisionerPolicy(ctx context.Context, provName string,
 // checkPolicy checks if a new or updated policy configuration results in the user
 // locking themselves or other admins out of the CA.
 func (a *Authority) checkPolicy(ctx context.Context, currentAdmin *linkedca.Admin, otherAdmins []*linkedca.Admin, p *linkedca.Policy) error {
-
 	// convert the policy; return early if nil
 	policyOptions := authPolicy.LinkedToCertificates(p)
 	if policyOptions == nil {
@@ -216,7 +213,6 @@ func (a *Authority) reloadPolicyEngines(ctx context.Context) error {
 	)
 
 	if a.config.AuthorityConfig.EnableAdmin {
-
 		// temporarily disable policy loading when LinkedCA is in use
 		if _, ok := a.adminDB.(*linkedCaClient); ok {
 			return nil

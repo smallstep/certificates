@@ -126,17 +126,20 @@ is `json`.
 
 * `db`: data persistence layer. See [database documentation](./database.md) for more
 info.
+  * `type`: `badger`, `bbolt`, `mysql`, etc.
+  * `dataSource`: string that can be interpreted differently depending on the
+    type of the database. Usually a path to where the data is stored. See the
+    [database configuration docs](./database.md#configuration) for more info.
+  * `database`: name of the database. Used for backends that may have multiple
+    databases. e.g. MySQL
+  * `valueDir`: directory to store the value log in (Badger specific).
 
-    - type: `badger`, `bbolt`, `mysql`, etc.
-
-    - dataSource: `string` that can be interpreted differently depending on the
-    type of the database. Usually a path to where the data is stored. See
-    the [database configuration docs](./database.md#configuration) for more info.
-
-    - database: name of the database. Used for backends that may have
-    multiple databases. e.g. MySQL
-
-    - valueDir: directory to store the value log in (Badger specific).
+* `crl`: Certificate Revocation List settings:
+  * `enable`: enables CRL generation (`true` to generate, `false` to disable)
+  * `generateOnRevoke`: a revoke will generate a new CRL if the crl is enabled.
+  * `cacheDuration`: the duration until next update of the CRL, defaults to 24h.
+  * `renewPeriod`: the time between CRL regeneration. If not set ~2/3 of the
+    cacheDuration will be used.
 
 * `tls`: settings for negotiating communication with the CA; includes acceptable
 ciphersuites, min/max TLS version, etc.

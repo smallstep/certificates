@@ -71,7 +71,6 @@ type SignAuthority interface {
 
 // New returns a new Authority that implements the SCEP interface.
 func New(signAuth SignAuthority, ops AuthorityOptions) (*Authority, error) {
-
 	authority := &Authority{
 		prefix:   ops.Prefix,
 		dns:      ops.DNS,
@@ -145,7 +144,6 @@ func (a *Authority) getLinkExplicit(provisionerName string, abs bool, baseURL *u
 
 // GetCACertificates returns the certificate (chain) for the CA
 func (a *Authority) GetCACertificates(ctx context.Context) ([]*x509.Certificate, error) {
-
 	// TODO: this should return: the "SCEP Server (RA)" certificate, the issuing CA up to and excl. the root
 	// Some clients do need the root certificate however; also see: https://github.com/openxpki/openxpki/issues/73
 	//
@@ -283,6 +281,14 @@ func (a *Authority) SignCSR(ctx context.Context, csr *x509.CertificateRequest, m
 	if err != nil {
 		return nil, fmt.Errorf("error retrieving authorization options from SCEP provisioner: %w", err)
 	}
+	// Unlike most of the provisioners, scep's AuthorizeSign method doesn't
+	// define the templates, and the template data used in WebHooks is not
+	// available.
+	for _, signOp := range signOps {
+		if wc, ok := signOp.(*provisioner.WebhookController); ok {
+			wc.TemplateData = data
+		}
+	}
 
 	opts := provisioner.SignOptions{}
 	templateOptions, err := provisioner.TemplateOptions(p.GetOptions(), data)
@@ -385,7 +391,6 @@ func (a *Authority) SignCSR(ctx context.Context, csr *x509.CertificateRequest, m
 
 // CreateFailureResponse creates an appropriately signed reply for PKI operations
 func (a *Authority) CreateFailureResponse(ctx context.Context, csr *x509.CertificateRequest, msg *PKIMessage, info FailInfoName, infoText string) (*PKIMessage, error) {
-
 	config := pkcs7.SignerInfoConfig{
 		ExtraSignedAttributes: []pkcs7.Attribute{
 			{
@@ -471,7 +476,6 @@ func (a *Authority) MatchChallengePassword(ctx context.Context, password string)
 
 // GetCACaps returns the CA capabilities
 func (a *Authority) GetCACaps(ctx context.Context) []string {
-
 	p, err := provisionerFromContext(ctx)
 	if err != nil {
 		return defaultCapabilities

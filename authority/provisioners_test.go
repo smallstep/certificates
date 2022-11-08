@@ -16,6 +16,7 @@ import (
 	"github.com/smallstep/certificates/db"
 	"go.step.sm/crypto/jose"
 	"go.step.sm/crypto/keyutil"
+	"go.step.sm/linkedca"
 )
 
 func TestGetEncryptedKey(t *testing.T) {
@@ -57,9 +58,10 @@ func TestGetEncryptedKey(t *testing.T) {
 			ek, err := tc.a.GetEncryptedKey(tc.kid)
 			if err != nil {
 				if assert.NotNil(t, tc.err) {
-					sc, ok := err.(render.StatusCodedError)
-					assert.Fatal(t, ok, "error does not implement StatusCodedError interface")
-					assert.Equals(t, sc.StatusCode(), tc.code)
+					var sc render.StatusCodedError
+					if assert.True(t, errors.As(err, &sc), "error does not implement StatusCodedError interface") {
+						assert.Equals(t, sc.StatusCode(), tc.code)
+					}
 					assert.HasPrefix(t, err.Error(), tc.err.Error())
 				}
 			} else {
@@ -107,9 +109,10 @@ func TestGetProvisioners(t *testing.T) {
 			ps, next, err := tc.a.GetProvisioners("", 0)
 			if err != nil {
 				if assert.NotNil(t, tc.err) {
-					sc, ok := err.(render.StatusCodedError)
-					assert.Fatal(t, ok, "error does not implement StatusCodedError interface")
-					assert.Equals(t, sc.StatusCode(), tc.code)
+					var sc render.StatusCodedError
+					if assert.True(t, errors.As(err, &sc), "error does not implement StatusCodedError interface") {
+						assert.Equals(t, sc.StatusCode(), tc.code)
+					}
 					assert.HasPrefix(t, err.Error(), tc.err.Error())
 				}
 			} else {
@@ -247,6 +250,136 @@ func TestAuthority_LoadProvisionerByCertificate(t *testing.T) {
 			}
 			if !reflect.DeepEqual(got, tt.want) {
 				t.Errorf("Authority.LoadProvisionerByCertificate() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
+func TestProvisionerWebhookToLinkedca(t *testing.T) {
+	type test struct {
+		lwh *linkedca.Webhook
+		pwh *provisioner.Webhook
+	}
+	tests := map[string]test{
+		"empty": test{
+			lwh: &linkedca.Webhook{},
+			pwh: &provisioner.Webhook{Kind: "NO_KIND", CertType: "ALL"},
+		},
+		"enriching ssh basic auth": test{
+			lwh: &linkedca.Webhook{
+				Id:     "abc123",
+				Name:   "people",
+				Url:    "https://localhost",
+				Kind:   linkedca.Webhook_ENRICHING,
+				Secret: "secret",
+				Auth: &linkedca.Webhook_BasicAuth{
+					BasicAuth: &linkedca.BasicAuth{
+						Username: "user",
+						Password: "pass",
+					},
+				},
+				DisableTlsClientAuth: true,
+				CertType:             linkedca.Webhook_SSH,
+			},
+			pwh: &provisioner.Webhook{
+				ID:     "abc123",
+				Name:   "people",
+				URL:    "https://localhost",
+				Kind:   "ENRICHING",
+				Secret: "secret",
+				BasicAuth: struct {
+					Username string
+					Password string
+				}{
+					Username: "user",
+					Password: "pass",
+				},
+				DisableTLSClientAuth: true,
+				CertType:             "SSH",
+			},
+		},
+		"authorizing x509 bearer auth": test{
+			lwh: &linkedca.Webhook{
+				Id:     "abc123",
+				Name:   "people",
+				Url:    "https://localhost",
+				Kind:   linkedca.Webhook_AUTHORIZING,
+				Secret: "secret",
+				Auth: &linkedca.Webhook_BearerToken{
+					BearerToken: &linkedca.BearerToken{
+						BearerToken: "tkn",
+					},
+				},
+				CertType: linkedca.Webhook_X509,
+			},
+			pwh: &provisioner.Webhook{
+				ID:          "abc123",
+				Name:        "people",
+				URL:         "https://localhost",
+				Kind:        "AUTHORIZING",
+				Secret:      "secret",
+				BearerToken: "tkn",
+				CertType:    "X509",
+			},
+		},
+	}
+	for name, test := range tests {
+		t.Run(name, func(t *testing.T) {
+			gotLWH := provisionerWebhookToLinkedca(test.pwh)
+			assert.Equals(t, test.lwh, gotLWH)
+
+			gotPWH := webhookToCertificates(test.lwh)
+			assert.Equals(t, test.pwh, gotPWH)
+		})
+	}
+}
+
+func Test_wrapRAProvisioner(t *testing.T) {
+	type args struct {
+		p      provisioner.Interface
+		raInfo *provisioner.RAInfo
+	}
+	tests := []struct {
+		name string
+		args args
+		want *wrappedProvisioner
+	}{
+		{"ok", args{&provisioner.JWK{Name: "jwt"}, &provisioner.RAInfo{ProvisionerName: "ra"}}, &wrappedProvisioner{
+			Interface: &provisioner.JWK{Name: "jwt"},
+			raInfo:    &provisioner.RAInfo{ProvisionerName: "ra"},
+		}},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := wrapRAProvisioner(tt.args.p, tt.args.raInfo); !reflect.DeepEqual(got, tt.want) {
+				t.Errorf("wrapRAProvisioner() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
+func Test_isRAProvisioner(t *testing.T) {
+	type args struct {
+		p provisioner.Interface
+	}
+	tests := []struct {
+		name string
+		args args
+		want bool
+	}{
+		{"true", args{&wrappedProvisioner{
+			Interface: &provisioner.JWK{Name: "jwt"},
+			raInfo:    &provisioner.RAInfo{ProvisionerName: "ra"},
+		}}, true},
+		{"nil ra", args{&wrappedProvisioner{
+			Interface: &provisioner.JWK{Name: "jwt"},
+		}}, false},
+		{"not ra", args{&provisioner.JWK{Name: "jwt"}}, false},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := isRAProvisioner(tt.args.p); got != tt.want {
+				t.Errorf("isRAProvisioner() = %v, want %v", got, tt.want)
 			}
 		})
 	}

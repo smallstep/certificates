@@ -20,7 +20,6 @@ type Options struct {
 
 // Validate checks the fields in Options.
 func (o *Options) Validate() error {
-
 	if o.CertificateChain == nil {
 		return errors.New("certificate chain not configured correctly")
 	}

@@ -12,6 +12,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/pkg/errors"
 	"github.com/smallstep/certificates/authority/admin"
 	"github.com/smallstep/certificates/authority/provisioner"
 	"github.com/smallstep/certificates/errs"
@@ -285,7 +286,7 @@ func (a *Authority) authorizeRevoke(ctx context.Context, token string) error {
 // extra extension cannot be found, authorize the renewal by default.
 //
 // TODO(mariano): should we authorize by default?
-func (a *Authority) authorizeRenew(cert *x509.Certificate) error {
+func (a *Authority) authorizeRenew(ctx context.Context, cert *x509.Certificate) error {
 	serial := cert.SerialNumber.String()
 	var opts = []interface{}{errs.WithKeyVal("serialNumber", serial)}
 
@@ -307,7 +308,7 @@ func (a *Authority) authorizeRenew(cert *x509.Certificate) error {
 			return errs.Unauthorized("authority.authorizeRenew: provisioner not found", opts...)
 		}
 	}
-	if err := p.AuthorizeRenew(context.Background(), cert); err != nil {
+	if err := p.AuthorizeRenew(ctx, cert); err != nil {
 		return errs.Wrap(http.StatusInternalServerError, err, "authority.authorizeRenew", opts...)
 	}
 	return nil
@@ -416,16 +417,16 @@ func (a *Authority) AuthorizeRenewToken(ctx context.Context, ott string) (*x509.
 		Subject: leaf.Subject.CommonName,
 		Time:    time.Now().UTC(),
 	}, time.Minute); err != nil {
-		switch err {
-		case jose.ErrInvalidIssuer:
+		switch {
+		case errors.Is(err, jose.ErrInvalidIssuer):
 			return nil, errs.UnauthorizedErr(err, errs.WithMessage("error validating renew token: invalid issuer claim (iss)"))
-		case jose.ErrInvalidSubject:
+		case errors.Is(err, jose.ErrInvalidSubject):
 			return nil, errs.UnauthorizedErr(err, errs.WithMessage("error validating renew token: invalid subject claim (sub)"))
-		case jose.ErrNotValidYet:
+		case errors.Is(err, jose.ErrNotValidYet):
 			return nil, errs.UnauthorizedErr(err, errs.WithMessage("error validating renew token: token not valid yet (nbf)"))
-		case jose.ErrExpired:
+		case errors.Is(err, jose.ErrExpired):
 			return nil, errs.UnauthorizedErr(err, errs.WithMessage("error validating renew token: token is expired (exp)"))
-		case jose.ErrIssuedInTheFuture:
+		case errors.Is(err, jose.ErrIssuedInTheFuture):
 			return nil, errs.UnauthorizedErr(err, errs.WithMessage("error validating renew token: token issued in the future (iat)"))
 		default:
 			return nil, errs.UnauthorizedErr(err, errs.WithMessage("error validating renew token"))
@@ -433,7 +434,7 @@ func (a *Authority) AuthorizeRenewToken(ctx context.Context, ott string) (*x509.
 	}
 
 	audiences := a.config.GetAudiences().Renew
-	if !matchesAudience(claims.Audience, audiences) {
+	if !matchesAudience(claims.Audience, audiences) && !isRAProvisioner(p) {
 		return nil, errs.InternalServerErr(jose.ErrInvalidAudience, errs.WithMessage("error validating renew token: invalid audience claim (aud)"))
 	}
 

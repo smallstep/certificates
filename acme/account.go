@@ -33,7 +33,7 @@ func (a *Account) ToLog() (interface{}, error) {
 
 // IsValid returns true if the Account is valid.
 func (a *Account) IsValid() bool {
-	return Status(a.Status) == StatusValid
+	return a.Status == StatusValid
 }
 
 // KeyToID converts a JWK to a thumbprint.

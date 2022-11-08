@@ -24,7 +24,7 @@ func TestType_String(t *testing.T) {
 	}
 }
 
-func TestErrNotImplemented_Error(t *testing.T) {
+func TestNotImplementedError_Error(t *testing.T) {
 	type fields struct {
 		Message string
 	}
@@ -38,17 +38,17 @@ func TestErrNotImplemented_Error(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			e := ErrNotImplemented{
+			e := NotImplementedError{
 				Message: tt.fields.Message,
 			}
 			if got := e.Error(); got != tt.want {
-				t.Errorf("ErrNotImplemented.Error() = %v, want %v", got, tt.want)
+				t.Errorf("NotImplementedError.Error() = %v, want %v", got, tt.want)
 			}
 		})
 	}
 }
 
-func TestErrNotImplemented_StatusCode(t *testing.T) {
+func TestNotImplementedError_StatusCode(t *testing.T) {
 	type fields struct {
 		Message string
 	}
@@ -62,11 +62,59 @@ func TestErrNotImplemented_StatusCode(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			s := ErrNotImplemented{
+			s := NotImplementedError{
 				Message: tt.fields.Message,
 			}
 			if got := s.StatusCode(); got != tt.want {
-				t.Errorf("ErrNotImplemented.StatusCode() = %v, want %v", got, tt.want)
+				t.Errorf("NotImplementedError.StatusCode() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
+func TestValidationError_Error(t *testing.T) {
+	type fields struct {
+		Message string
+	}
+	tests := []struct {
+		name   string
+		fields fields
+		want   string
+	}{
+		{"default", fields{""}, "bad request"},
+		{"with message", fields{"token is empty"}, "token is empty"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			e := ValidationError{
+				Message: tt.fields.Message,
+			}
+			if got := e.Error(); got != tt.want {
+				t.Errorf("ValidationError.Error() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
+func TestValidationError_StatusCode(t *testing.T) {
+	type fields struct {
+		Message string
+	}
+	tests := []struct {
+		name   string
+		fields fields
+		want   int
+	}{
+		{"default", fields{""}, 400},
+		{"with message", fields{"token is empty"}, 400},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			e := ValidationError{
+				Message: tt.fields.Message,
+			}
+			if got := e.StatusCode(); got != tt.want {
+				t.Errorf("ValidationError.StatusCode() = %v, want %v", got, tt.want)
 			}
 		})
 	}

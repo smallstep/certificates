@@ -391,8 +391,8 @@ func TestGCP_authorizeToken(t *testing.T) {
 			tc := tt(t)
 			if claims, err := tc.p.authorizeToken(tc.token); err != nil {
 				if assert.NotNil(t, tc.err) {
-					sc, ok := err.(render.StatusCodedError)
-					assert.Fatal(t, ok, "error does not implement StatusCodedError interface")
+					var sc render.StatusCodedError
+					assert.Fatal(t, errors.As(err, &sc), "error does not implement StatusCodedError interface")
 					assert.Equals(t, sc.StatusCode(), tc.code)
 					assert.HasPrefix(t, err.Error(), tc.err.Error())
 				}
@@ -516,9 +516,9 @@ func TestGCP_AuthorizeSign(t *testing.T) {
 		code    int
 		wantErr bool
 	}{
-		{"ok", p1, args{t1}, 7, http.StatusOK, false},
-		{"ok", p2, args{t2}, 12, http.StatusOK, false},
-		{"ok", p3, args{t3}, 7, http.StatusOK, false},
+		{"ok", p1, args{t1}, 8, http.StatusOK, false},
+		{"ok", p2, args{t2}, 13, http.StatusOK, false},
+		{"ok", p3, args{t3}, 8, http.StatusOK, false},
 		{"fail token", p1, args{"token"}, 0, http.StatusUnauthorized, true},
 		{"fail key", p1, args{failKey}, 0, http.StatusUnauthorized, true},
 		{"fail iss", p1, args{failIss}, 0, http.StatusUnauthorized, true},
@@ -541,8 +541,8 @@ func TestGCP_AuthorizeSign(t *testing.T) {
 				t.Errorf("GCP.AuthorizeSign() error = %v, wantErr %v", err, tt.wantErr)
 				return
 			case err != nil:
-				sc, ok := err.(render.StatusCodedError)
-				assert.Fatal(t, ok, "error does not implement StatusCodedError interface")
+				var sc render.StatusCodedError
+				assert.Fatal(t, errors.As(err, &sc), "error does not implement StatusCodedError interface")
 				assert.Equals(t, sc.StatusCode(), tt.code)
 			default:
 				assert.Equals(t, tt.wantLen, len(got))
@@ -573,6 +573,8 @@ func TestGCP_AuthorizeSign(t *testing.T) {
 						assert.Equals(t, []string(v), []string{"instance-name.c.project-id.internal", "instance-name.zone.c.project-id.internal"})
 					case *x509NamePolicyValidator:
 						assert.Equals(t, nil, v.policyEngine)
+					case *WebhookController:
+						assert.Len(t, 0, v.webhooks)
 					default:
 						assert.FatalError(t, fmt.Errorf("unexpected sign option of type %T", v))
 					}
@@ -623,7 +625,7 @@ func TestGCP_AuthorizeSSHSign(t *testing.T) {
 	pub := key.Public().Key
 	rsa2048, err := rsa.GenerateKey(rand.Reader, 2048)
 	assert.FatalError(t, err)
-	// nolint:gosec // tests minimum size of the key
+	//nolint:gosec // tests minimum size of the key
 	rsa1024, err := rsa.GenerateKey(rand.Reader, 1024)
 	assert.FatalError(t, err)
 
@@ -682,8 +684,8 @@ func TestGCP_AuthorizeSSHSign(t *testing.T) {
 				return
 			}
 			if err != nil {
-				sc, ok := err.(render.StatusCodedError)
-				assert.Fatal(t, ok, "error does not implement StatusCodedError interface")
+				var sc render.StatusCodedError
+				assert.Fatal(t, errors.As(err, &sc), "error does not implement StatusCodedError interface")
 				assert.Equals(t, sc.StatusCode(), tt.code)
 				assert.Nil(t, got)
 			} else if assert.NotNil(t, got) {
@@ -739,8 +741,8 @@ func TestGCP_AuthorizeRenew(t *testing.T) {
 			if err := tt.prov.AuthorizeRenew(context.Background(), tt.args.cert); (err != nil) != tt.wantErr {
 				t.Errorf("GCP.AuthorizeRenew() error = %v, wantErr %v", err, tt.wantErr)
 			} else if err != nil {
-				sc, ok := err.(render.StatusCodedError)
-				assert.Fatal(t, ok, "error does not implement StatusCoder interface")
+				var sc render.StatusCodedError
+				assert.Fatal(t, errors.As(err, &sc), "error does not implement StatusCodedError interface")
 				assert.Equals(t, sc.StatusCode(), tt.code)
 			}
 		})

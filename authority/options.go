@@ -5,6 +5,7 @@ import (
 	"crypto"
 	"crypto/x509"
 	"encoding/pem"
+	"net/http"
 
 	"github.com/pkg/errors"
 	"golang.org/x/crypto/ssh"
@@ -85,6 +86,22 @@ func WithDatabase(d db.AuthDB) Option {
 	}
 }
 
+// WithQuietInit disables log output when the authority is initialized.
+func WithQuietInit() Option {
+	return func(a *Authority) error {
+		a.quietInit = true
+		return nil
+	}
+}
+
+// WithWebhookClient sets the http.Client to be used for outbound requests.
+func WithWebhookClient(c *http.Client) Option {
+	return func(a *Authority) error {
+		a.webhookClient = c
+		return nil
+	}
+}
+
 // WithGetIdentityFunc sets a custom function to retrieve the identity from
 // an external resource.
 func WithGetIdentityFunc(fn func(ctx context.Context, p provisioner.Interface, email string) (*provisioner.Identity, error)) Option {
@@ -151,16 +168,23 @@ func WithKeyManager(k kms.KeyManager) Option {
 
 // WithX509Signer defines the signer used to sign X509 certificates.
 func WithX509Signer(crt *x509.Certificate, s crypto.Signer) Option {
+	return WithX509SignerChain([]*x509.Certificate{crt}, s)
+}
+
+// WithX509SignerChain defines the signer used to sign X509 certificates. This
+// option is similar to WithX509Signer but it supports a chain of intermediates.
+func WithX509SignerChain(issuerChain []*x509.Certificate, s crypto.Signer) Option {
 	return func(a *Authority) error {
 		srv, err := cas.New(context.Background(), casapi.Options{
 			Type:             casapi.SoftCAS,
 			Signer:           s,
-			CertificateChain: []*x509.Certificate{crt},
+			CertificateChain: issuerChain,
 		})
 		if err != nil {
 			return err
 		}
 		a.x509CAService = srv
+		a.intermediateX509Certs = append(a.intermediateX509Certs, issuerChain...)
 		return nil
 	}
 }
@@ -229,6 +253,25 @@ func WithX509RootCerts(rootCerts ...*x509.Certificate) Option {
 func WithX509FederatedCerts(certs ...*x509.Certificate) Option {
 	return func(a *Authority) error {
 		a.federatedX509Certs = certs
+		return nil
+	}
+}
+
+// WithX509IntermediateCerts is an option that allows to define the list of
+// intermediate certificates that the CA will be using. This option will replace
+// any intermediate certificate defined before.
+//
+// Note that these certificates will not be bundled with the certificates signed
+// by the CA, because the CAS service will take care of that. They should match,
+// but that's not guaranteed. These certificates will be mainly used for name
+// constraint validation before a certificate is issued.
+//
+// This option should only be used on specific configurations, for example when
+// WithX509SignerFunc is used, as we don't know the list of intermediates in
+// advance.
+func WithX509IntermediateCerts(intermediateCerts ...*x509.Certificate) Option {
+	return func(a *Authority) error {
+		a.intermediateX509Certs = intermediateCerts
 		return nil
 	}
 }

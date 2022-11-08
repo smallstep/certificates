@@ -82,7 +82,6 @@ func LoadClient() (*Client, error) {
 			Transport: tr,
 		},
 	}, nil
-
 }
 
 type defaultsConfig struct {

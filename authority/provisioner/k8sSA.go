@@ -15,6 +15,7 @@ import (
 	"go.step.sm/crypto/pemutil"
 	"go.step.sm/crypto/sshutil"
 	"go.step.sm/crypto/x509util"
+	"go.step.sm/linkedca"
 
 	"github.com/smallstep/certificates/errs"
 )
@@ -93,7 +94,6 @@ func (p *K8sSA) GetEncryptedKey() (string, string, bool) {
 
 // Init initializes and validates the fields of a K8sSA type.
 func (p *K8sSA) Init(config Config) (err error) {
-
 	switch {
 	case p.Type == "":
 		return errors.New("provisioner type cannot be empty")
@@ -243,6 +243,7 @@ func (p *K8sSA) AuthorizeSign(ctx context.Context, token string) ([]SignOption, 
 		defaultPublicKeyValidator{},
 		newValidityValidator(p.ctl.Claimer.MinTLSCertDuration(), p.ctl.Claimer.MaxTLSCertDuration()),
 		newX509NamePolicyValidator(p.ctl.getPolicy().getX509()),
+		p.ctl.newWebhookController(data, linkedca.Webhook_X509),
 	}, nil
 }
 
@@ -288,6 +289,8 @@ func (p *K8sSA) AuthorizeSSHSign(ctx context.Context, token string) ([]SignOptio
 		&sshCertDefaultValidator{},
 		// Ensure that all principal names are allowed
 		newSSHNamePolicyValidator(p.ctl.getPolicy().getSSHHost(), p.ctl.getPolicy().getSSHUser()),
+		// Call webhooks
+		p.ctl.newWebhookController(data, linkedca.Webhook_SSH),
 	), nil
 }
 

@@ -3,6 +3,7 @@ package softcas
 import (
 	"context"
 	"crypto"
+	"crypto/rand"
 	"crypto/rsa"
 	"crypto/x509"
 	"time"
@@ -132,6 +133,20 @@ func (c *SoftCAS) RevokeCertificate(req *apiv1.RevokeCertificateRequest) (*apiv1
 	}, nil
 }
 
+// CreateCRL will create a new CRL based on the RevocationList passed to it
+func (c *SoftCAS) CreateCRL(req *apiv1.CreateCRLRequest) (*apiv1.CreateCRLResponse, error) {
+	certChain, signer, err := c.getCertSigner()
+	if err != nil {
+		return nil, err
+	}
+	revocationListBytes, err := x509.CreateRevocationList(rand.Reader, req.RevocationList, certChain[0], signer)
+	if err != nil {
+		return nil, err
+	}
+
+	return &apiv1.CreateCRLResponse{CRL: revocationListBytes}, nil
+}
+
 // CreateCertificateAuthority creates a root or an intermediate certificate.
 func (c *SoftCAS) CreateCertificateAuthority(req *apiv1.CreateCertificateAuthorityRequest) (*apiv1.CreateCertificateAuthorityResponse, error) {
 	switch {
@@ -215,7 +230,6 @@ func (c *SoftCAS) getCertSigner() ([]*x509.Certificate, crypto.Signer, error) {
 		return c.CertificateSigner()
 	}
 	return c.CertificateChain, c.Signer, nil
-
 }
 
 // createKey uses the configured kms to create a key.

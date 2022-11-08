@@ -48,6 +48,18 @@ const (
 	DEVICEATTEST01 ChallengeType = "device-attest-01"
 )
 
+var (
+	// InsecurePortHTTP01 is the port used to verify http-01 challenges. If not set it
+	// defaults to 80.
+	InsecurePortHTTP01 int
+
+	// InsecurePortTLSALPN01 is the port used to verify tls-alpn-01 challenges. If not
+	// set it defaults to 443.
+	//
+	// This variable can be used for testing purposes.
+	InsecurePortTLSALPN01 int
+)
+
 // Challenge represents an ACME response Challenge type.
 type Challenge struct {
 	ID              string        `json:"-"`
@@ -96,6 +108,12 @@ func (ch *Challenge) Validate(ctx context.Context, db DB, jwk *jose.JSONWebKey, 
 
 func http01Validate(ctx context.Context, ch *Challenge, db DB, jwk *jose.JSONWebKey) error {
 	u := &url.URL{Scheme: "http", Host: http01ChallengeHost(ch.Value), Path: fmt.Sprintf("/.well-known/acme-challenge/%s", ch.Token)}
+
+	// Append insecure port if set.
+	// Only used for testing purposes.
+	if InsecurePortHTTP01 != 0 {
+		u.Host += ":" + strconv.Itoa(InsecurePortHTTP01)
+	}
 
 	vc := MustClientFromContext(ctx)
 	resp, err := vc.Get(u.String())
@@ -166,10 +184,17 @@ func tlsalpn01Validate(ctx context.Context, ch *Challenge, db DB, jwk *jose.JSON
 		// [RFC5246] or higher when connecting to clients for validation.
 		MinVersion:         tls.VersionTLS12,
 		ServerName:         serverName(ch),
-		InsecureSkipVerify: true, // nolint:gosec // we expect a self-signed challenge certificate
+		InsecureSkipVerify: true, //nolint:gosec // we expect a self-signed challenge certificate
 	}
 
-	hostPort := net.JoinHostPort(ch.Value, "443")
+	var hostPort string
+
+	// Allow to change TLS port for testing purposes.
+	if port := InsecurePortTLSALPN01; port == 0 {
+		hostPort = net.JoinHostPort(ch.Value, "443")
+	} else {
+		hostPort = net.JoinHostPort(ch.Value, strconv.Itoa(port))
+	}
 
 	vc := MustClientFromContext(ctx)
 	conn, err := vc.TLSDial("tcp", hostPort, config)

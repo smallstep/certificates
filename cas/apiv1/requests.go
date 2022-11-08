@@ -81,6 +81,7 @@ type RenewCertificateRequest struct {
 	CSR       *x509.CertificateRequest
 	Lifetime  time.Duration
 	Backdate  time.Duration
+	Token     string
 	RequestID string
 }
 
@@ -153,4 +154,14 @@ type CreateCertificateAuthorityResponse struct {
 	PublicKey        crypto.PublicKey
 	PrivateKey       crypto.PrivateKey
 	Signer           crypto.Signer
+}
+
+// CreateCRLRequest is the request to create a Certificate Revocation List.
+type CreateCRLRequest struct {
+	RevocationList *x509.RevocationList
+}
+
+// CreateCRLResponse is the response to a Certificate Revocation List request.
+type CreateCRLResponse struct {
+	CRL []byte //the CRL in DER format
 }

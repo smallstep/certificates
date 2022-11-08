@@ -1,0 +1,9 @@
+on:
+  schedule:
+    - cron: '0 0 * * *'
+
+jobs:
+  code-scan:
+    uses: smallstep/workflows/.github/workflows/code-scan.yml@main
+    secrets:
+      GITLEAKS_LICENSE_KEY: ${{ secrets.GITLEAKS_LICENSE_KEY }}

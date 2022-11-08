@@ -176,6 +176,7 @@ func GetProvisionerKey(caURL, rootFile, kid string) (string, error) {
 
 type options struct {
 	provisioner        string
+	superAdminSubject  string
 	pkiOnly            bool
 	enableACME         bool
 	enableSSH          bool
@@ -217,6 +218,15 @@ func WithDNSNames(s []string) Option {
 func WithProvisioner(s string) Option {
 	return func(p *PKI) {
 		p.options.provisioner = s
+	}
+}
+
+// WithSuperAdminSubject defines the subject of the first
+// super admin for use with the Admin API. The admin will belong
+// to the first JWK provisioner.
+func WithSuperAdminSubject(s string) Option {
+	return func(p *PKI) {
+		p.options.superAdminSubject = s
 	}
 }
 
@@ -307,6 +317,9 @@ type PKI struct {
 
 // New creates a new PKI configuration.
 func New(o apiv1.Options, opts ...Option) (*PKI, error) {
+	// TODO(hs): invoking `New` with a context active will use values from
+	// that CA context while generating the context. Thay may or may not
+	// be fully expected and/or what we want. Check that.
 	currentCtx := step.Contexts().GetCurrent()
 	caService, err := cas.New(context.Background(), o)
 	if err != nil {
@@ -389,7 +402,7 @@ func New(o apiv1.Options, opts ...Option) (*PKI, error) {
 		if port == "443" || p.options.isHelm {
 			p.Defaults.CaUrl = fmt.Sprintf("https://%s", p.Defaults.CaUrl)
 		} else {
-			p.Defaults.CaUrl = fmt.Sprintf("https://%s:%s", p.Defaults.CaUrl, port)
+			p.Defaults.CaUrl = fmt.Sprintf("https://%s", net.JoinHostPort(p.Defaults.CaUrl, port))
 		}
 	}
 
@@ -645,7 +658,7 @@ func (p *PKI) GetCertificateAuthority() error {
 // SSH user certificates and a private key used for signing host certificates.
 func (p *PKI) GenerateSSHSigningKeys(password []byte) error {
 	// Enable SSH
-	p.options.enableSSH = true
+	p.options.enableSSH = true // TODO(hs): change this function to not mutate configuration state
 
 	// Create SSH key used to sign host certificates. Using
 	// kmsapi.UnspecifiedSignAlgorithm will default to the default algorithm.
@@ -883,6 +896,11 @@ func (p *PKI) GenerateConfig(opt ...ConfigOption) (*authconfig.Config, error) {
 			//
 			// Note that we might want to be able to define the database as a
 			// flag in `step ca init` so we can write to the proper place.
+			//
+			// TODO(hs): the logic for creating the provisioners and the super admin
+			// is similar to what's done when automatically migrating the provisioners.
+			// This is related to the existing comment above. Refactor this to exist in
+			// a single place and ensure it happens only once.
 			_db, err := db.New(cfg.DB)
 			if err != nil {
 				return nil, err
@@ -906,9 +924,13 @@ func (p *PKI) GenerateConfig(opt ...ConfigOption) (*authconfig.Config, error) {
 				}
 			}
 			// Add the first provisioner as an admin.
+			superAdminSubject := "step"
+			if p.options.superAdminSubject != "" {
+				superAdminSubject = p.options.superAdminSubject
+			}
 			if err := adminDB.CreateAdmin(context.Background(), &linkedca.Admin{
 				AuthorityId:   admin.DefaultAuthorityID,
-				Subject:       "step",
+				Subject:       superAdminSubject,
 				Type:          linkedca.Admin_SUPER_ADMIN,
 				ProvisionerId: adminID,
 			}); err != nil {
@@ -991,6 +1013,18 @@ func (p *PKI) Save(opt ...ConfigOption) error {
 			ui.PrintSelected("Default profile configuration", p.profileDefaults)
 		}
 		ui.PrintSelected("Certificate Authority configuration", p.config)
+		if cfg.AuthorityConfig.EnableAdmin && p.options.deploymentType != LinkedDeployment {
+			// TODO(hs): we may want to get this information from the DB, because that's
+			// where the admin and provisioner are stored in this case. Requires some
+			// refactoring.
+			superAdminSubject := "step"
+			if p.options.superAdminSubject != "" {
+				superAdminSubject = p.options.superAdminSubject
+			}
+			ui.PrintSelected("Admin provisioner", fmt.Sprintf("%s (JWK)", p.options.provisioner))
+			ui.PrintSelected("Super admin subject", superAdminSubject)
+		}
+
 		if p.options.deploymentType != LinkedDeployment {
 			ui.Println()
 			if p.casOptions.Is(apiv1.SoftCAS) {

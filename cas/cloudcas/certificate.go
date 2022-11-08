@@ -10,9 +10,9 @@ import (
 	"encoding/pem"
 	"fmt"
 
+	pb "cloud.google.com/go/security/privateca/apiv1/privatecapb"
 	"github.com/pkg/errors"
 	kmsapi "go.step.sm/crypto/kms/apiv1"
-	pb "google.golang.org/genproto/googleapis/cloud/security/privateca/v1"
 )
 
 var (

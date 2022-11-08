@@ -24,6 +24,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"reflect"
+	"strconv"
 	"strings"
 	"testing"
 	"time"
@@ -188,14 +189,14 @@ func Test_storeError(t *testing.T) {
 			tc := run(t)
 			if err := storeError(context.Background(), tc.db, tc.ch, tc.markInvalid, err); err != nil {
 				if assert.NotNil(t, tc.err) {
-					switch k := err.(type) {
-					case *Error:
+					var k *Error
+					if errors.As(err, &k) {
 						assert.Equals(t, k.Type, tc.err.Type)
 						assert.Equals(t, k.Detail, tc.err.Detail)
 						assert.Equals(t, k.Status, tc.err.Status)
 						assert.Equals(t, k.Err.Error(), tc.err.Err.Error())
 						assert.Equals(t, k.Detail, tc.err.Detail)
-					default:
+					} else {
 						assert.FatalError(t, errors.New("unexpected error type"))
 					}
 				}
@@ -243,14 +244,14 @@ func TestKeyAuthorization(t *testing.T) {
 			tc := run(t)
 			if ka, err := KeyAuthorization(tc.token, tc.jwk); err != nil {
 				if assert.NotNil(t, tc.err) {
-					switch k := err.(type) {
-					case *Error:
+					var k *Error
+					if errors.As(err, &k) {
 						assert.Equals(t, k.Type, tc.err.Type)
 						assert.Equals(t, k.Detail, tc.err.Detail)
 						assert.Equals(t, k.Status, tc.err.Status)
 						assert.Equals(t, k.Err.Error(), tc.err.Err.Error())
 						assert.Equals(t, k.Detail, tc.err.Detail)
-					default:
+					} else {
 						assert.FatalError(t, errors.New("unexpected error type"))
 					}
 				}
@@ -360,6 +361,47 @@ func TestChallenge_Validate(t *testing.T) {
 						assert.Equals(t, updch.Value, ch.Value)
 
 						err := NewError(ErrorConnectionType, "error doing http GET for url http://zap.internal/.well-known/acme-challenge/%s: force", ch.Token)
+						assert.HasPrefix(t, updch.Error.Err.Error(), err.Err.Error())
+						assert.Equals(t, updch.Error.Type, err.Type)
+						assert.Equals(t, updch.Error.Detail, err.Detail)
+						assert.Equals(t, updch.Error.Status, err.Status)
+						assert.Equals(t, updch.Error.Detail, err.Detail)
+						return nil
+					},
+				},
+			}
+		},
+		"ok/http-01-insecure": func(t *testing.T) test {
+			t.Cleanup(func() {
+				InsecurePortHTTP01 = 0
+			})
+
+			ch := &Challenge{
+				ID:     "chID",
+				Status: StatusPending,
+				Type:   "http-01",
+				Token:  "token",
+				Value:  "zap.internal",
+			}
+
+			InsecurePortHTTP01 = 8080
+
+			return test{
+				ch: ch,
+				vc: &mockClient{
+					get: func(url string) (*http.Response, error) {
+						return nil, errors.New("force")
+					},
+				},
+				db: &MockDB{
+					MockUpdateChallenge: func(ctx context.Context, updch *Challenge) error {
+						assert.Equals(t, updch.ID, ch.ID)
+						assert.Equals(t, updch.Token, ch.Token)
+						assert.Equals(t, updch.Type, ch.Type)
+						assert.Equals(t, updch.Status, ch.Status)
+						assert.Equals(t, updch.Value, ch.Value)
+
+						err := NewError(ErrorConnectionType, "error doing http GET for url http://zap.internal:8080/.well-known/acme-challenge/%s: force", ch.Token)
 						assert.HasPrefix(t, updch.Error.Err.Error(), err.Err.Error())
 						assert.Equals(t, updch.Error.Type, err.Type)
 						assert.Equals(t, updch.Error.Detail, err.Detail)
@@ -521,6 +563,72 @@ func TestChallenge_Validate(t *testing.T) {
 				jwk: jwk,
 			}
 		},
+		"ok/tls-alpn-01-insecure": func(t *testing.T) test {
+			t.Cleanup(func() {
+				InsecurePortTLSALPN01 = 0
+			})
+
+			ch := &Challenge{
+				ID:     "chID",
+				Token:  "token",
+				Type:   "tls-alpn-01",
+				Status: StatusPending,
+				Value:  "zap.internal",
+			}
+
+			jwk, err := jose.GenerateJWK("EC", "P-256", "ES256", "sig", "", 0)
+			assert.FatalError(t, err)
+
+			expKeyAuth, err := KeyAuthorization(ch.Token, jwk)
+			assert.FatalError(t, err)
+			expKeyAuthHash := sha256.Sum256([]byte(expKeyAuth))
+
+			cert, err := newTLSALPNValidationCert(expKeyAuthHash[:], false, true, ch.Value)
+			assert.FatalError(t, err)
+
+			l, err := net.Listen("tcp", "127.0.0.1:0")
+			if err != nil {
+				if l, err = net.Listen("tcp6", "[::1]:0"); err != nil {
+					t.Fatalf("failed to listen on a port: %v", err)
+				}
+			}
+			_, port, err := net.SplitHostPort(l.Addr().String())
+			if err != nil {
+				t.Fatalf("failed to split host port: %v", err)
+			}
+
+			// Use an insecure port
+			InsecurePortTLSALPN01, err = strconv.Atoi(port)
+			if err != nil {
+				t.Fatalf("failed to convert port to int: %v", err)
+			}
+
+			srv, tlsDial := newTestTLSALPNServer(cert, func(srv *httptest.Server) {
+				srv.Listener.Close()
+				srv.Listener = l
+			})
+			srv.Start()
+
+			return test{
+				ch: ch,
+				vc: &mockClient{
+					tlsDial: tlsDial,
+				},
+				db: &MockDB{
+					MockUpdateChallenge: func(ctx context.Context, updch *Challenge) error {
+						assert.Equals(t, updch.ID, ch.ID)
+						assert.Equals(t, updch.Token, ch.Token)
+						assert.Equals(t, updch.Status, ch.Status)
+						assert.Equals(t, updch.Type, ch.Type)
+						assert.Equals(t, updch.Value, ch.Value)
+						assert.Equals(t, updch.Error, nil)
+						return nil
+					},
+				},
+				srv: srv,
+				jwk: jwk,
+			}
+		},
 	}
 	for name, run := range tests {
 		t.Run(name, func(t *testing.T) {
@@ -533,14 +641,14 @@ func TestChallenge_Validate(t *testing.T) {
 			ctx := NewClientContext(context.Background(), tc.vc)
 			if err := tc.ch.Validate(ctx, tc.db, tc.jwk, nil); err != nil {
 				if assert.NotNil(t, tc.err) {
-					switch k := err.(type) {
-					case *Error:
+					var k *Error
+					if errors.As(err, &k) {
 						assert.Equals(t, k.Type, tc.err.Type)
 						assert.Equals(t, k.Detail, tc.err.Detail)
 						assert.Equals(t, k.Status, tc.err.Status)
 						assert.Equals(t, k.Err.Error(), tc.err.Err.Error())
 						assert.Equals(t, k.Detail, tc.err.Detail)
-					default:
+					} else {
 						assert.FatalError(t, errors.New("unexpected error type"))
 					}
 				}
@@ -928,14 +1036,14 @@ func TestHTTP01Validate(t *testing.T) {
 			ctx := NewClientContext(context.Background(), tc.vc)
 			if err := http01Validate(ctx, tc.ch, tc.db, tc.jwk); err != nil {
 				if assert.NotNil(t, tc.err) {
-					switch k := err.(type) {
-					case *Error:
+					var k *Error
+					if errors.As(err, &k) {
 						assert.Equals(t, k.Type, tc.err.Type)
 						assert.Equals(t, k.Detail, tc.err.Detail)
 						assert.Equals(t, k.Status, tc.err.Status)
 						assert.Equals(t, k.Err.Error(), tc.err.Err.Error())
 						assert.Equals(t, k.Detail, tc.err.Detail)
-					default:
+					} else {
 						assert.FatalError(t, errors.New("unexpected error type"))
 					}
 				}
@@ -1228,14 +1336,14 @@ func TestDNS01Validate(t *testing.T) {
 			ctx := NewClientContext(context.Background(), tc.vc)
 			if err := dns01Validate(ctx, tc.ch, tc.db, tc.jwk); err != nil {
 				if assert.NotNil(t, tc.err) {
-					switch k := err.(type) {
-					case *Error:
+					var k *Error
+					if errors.As(err, &k) {
 						assert.Equals(t, k.Type, tc.err.Type)
 						assert.Equals(t, k.Detail, tc.err.Detail)
 						assert.Equals(t, k.Status, tc.err.Status)
 						assert.Equals(t, k.Err.Error(), tc.err.Err.Error())
 						assert.Equals(t, k.Detail, tc.err.Detail)
-					default:
+					} else {
 						assert.FatalError(t, errors.New("unexpected error type"))
 					}
 				}
@@ -1248,7 +1356,7 @@ func TestDNS01Validate(t *testing.T) {
 
 type tlsDialer func(network, addr string, config *tls.Config) (conn *tls.Conn, err error)
 
-func newTestTLSALPNServer(validationCert *tls.Certificate) (*httptest.Server, tlsDialer) {
+func newTestTLSALPNServer(validationCert *tls.Certificate, opts ...func(*httptest.Server)) (*httptest.Server, tlsDialer) {
 	srv := httptest.NewUnstartedServer(http.NewServeMux())
 
 	srv.Config.TLSNextProto = map[string]func(*http.Server, *tls.Conn, http.Handler){
@@ -1271,6 +1379,11 @@ func newTestTLSALPNServer(validationCert *tls.Certificate) (*httptest.Server, tl
 			"acme-tls/1",
 			"http/1.1",
 		},
+	}
+
+	// Apply options
+	for _, fn := range opts {
+		fn(srv)
 	}
 
 	srv.Listener = tls.NewListener(srv.Listener, srv.TLS)
@@ -2298,14 +2411,14 @@ func TestTLSALPN01Validate(t *testing.T) {
 			ctx := NewClientContext(context.Background(), tc.vc)
 			if err := tlsalpn01Validate(ctx, tc.ch, tc.db, tc.jwk); err != nil {
 				if assert.NotNil(t, tc.err) {
-					switch k := err.(type) {
-					case *Error:
+					var k *Error
+					if errors.As(err, &k) {
 						assert.Equals(t, k.Type, tc.err.Type)
 						assert.Equals(t, k.Detail, tc.err.Detail)
 						assert.Equals(t, k.Status, tc.err.Status)
 						assert.Equals(t, k.Err.Error(), tc.err.Err.Error())
 						assert.Equals(t, k.Detail, tc.err.Detail)
-					default:
+					} else {
 						assert.FatalError(t, errors.New("unexpected error type"))
 					}
 				}
@@ -2756,6 +2869,100 @@ func Test_doStepAttestationFormat(t *testing.T) {
 			Format: "step",
 			AttStatement: map[string]interface{}{
 				"x5c": []interface{}{makeLeaf(signer, []byte("bad-serial")).Raw, ca.Intermediate.Raw},
+				"alg": -7,
+				"sig": cborSig,
+			},
+		}}, nil, true},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, err := doStepAttestationFormat(tt.args.ctx, tt.args.prov, tt.args.ch, tt.args.jwk, tt.args.att)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("doStepAttestationFormat() error = %#v, wantErr %v", err, tt.wantErr)
+				return
+			}
+			if !reflect.DeepEqual(got, tt.want) {
+				t.Errorf("doStepAttestationFormat() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
+func Test_doStepAttestationFormat_noCAIntermediate(t *testing.T) {
+	ctx := context.Background()
+
+	// This CA simulates a YubiKey v5.2.4, where the attestation intermediate in
+	// the CA does not have the basic constraint extension. With the current
+	// validation of the certificate the test case below returns an error. If
+	// we change the validation to support this use case, the test case below
+	// should change.
+	//
+	// See https://github.com/Yubico/yubikey-manager/issues/522
+	ca, err := minica.New(minica.WithIntermediateTemplate(`{"subject": {{ toJson .Subject }}}`))
+	if err != nil {
+		t.Fatal(err)
+	}
+	caRoot := pem.EncodeToMemory(&pem.Block{Type: "CERTIFICATE", Bytes: ca.Root.Raw})
+
+	makeLeaf := func(signer crypto.Signer, serialNumber []byte) *x509.Certificate {
+		leaf, err := ca.Sign(&x509.Certificate{
+			Subject:   pkix.Name{CommonName: "attestation cert"},
+			PublicKey: signer.Public(),
+			ExtraExtensions: []pkix.Extension{
+				{Id: oidYubicoSerialNumber, Value: serialNumber},
+			},
+		})
+		if err != nil {
+			t.Fatal(err)
+		}
+		return leaf
+	}
+
+	signer, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
+	if err != nil {
+		t.Fatal(err)
+	}
+	serialNumber, err := asn1.Marshal(1234)
+	if err != nil {
+		t.Fatal(err)
+	}
+	leaf := makeLeaf(signer, serialNumber)
+
+	jwk, err := jose.GenerateJWK("EC", "P-256", "ES256", "sig", "", 0)
+	if err != nil {
+		t.Fatal(err)
+	}
+	keyAuth, err := KeyAuthorization("token", jwk)
+	if err != nil {
+		t.Fatal(err)
+	}
+	keyAuthSum := sha256.Sum256([]byte(keyAuth))
+	sig, err := signer.Sign(rand.Reader, keyAuthSum[:], crypto.SHA256)
+	if err != nil {
+		t.Fatal(err)
+	}
+	cborSig, err := cbor.Marshal(sig)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	type args struct {
+		ctx  context.Context
+		prov Provisioner
+		ch   *Challenge
+		jwk  *jose.JSONWebKey
+		att  *AttestationObject
+	}
+	tests := []struct {
+		name    string
+		args    args
+		want    *stepAttestationData
+		wantErr bool
+	}{
+		{"fail no intermediate", args{ctx, mustAttestationProvisioner(t, caRoot), &Challenge{Token: "token"}, jwk, &AttestationObject{
+			Format: "step",
+			AttStatement: map[string]interface{}{
+				"x5c": []interface{}{leaf.Raw, ca.Intermediate.Raw},
 				"alg": -7,
 				"sig": cborSig,
 			},

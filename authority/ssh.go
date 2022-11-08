@@ -6,7 +6,6 @@ import (
 	"crypto/x509"
 	"encoding/binary"
 	"errors"
-	"fmt"
 	"net/http"
 	"strings"
 	"time"
@@ -20,8 +19,8 @@ import (
 	"github.com/smallstep/certificates/authority/provisioner"
 	"github.com/smallstep/certificates/db"
 	"github.com/smallstep/certificates/errs"
-	policy "github.com/smallstep/certificates/policy"
 	"github.com/smallstep/certificates/templates"
+	"github.com/smallstep/certificates/webhook"
 )
 
 const (
@@ -140,6 +139,7 @@ func (a *Authority) GetSSHBastion(ctx context.Context, user, hostname string) (*
 				return a.config.SSH.Bastion, nil
 			}
 		}
+		//nolint:nilnil // legacy
 		return nil, nil
 	}
 	return nil, errs.NotFound("authority.GetSSHBastion; ssh is not configured")
@@ -162,6 +162,7 @@ func (a *Authority) SignSSH(ctx context.Context, key ssh.PublicKey, opts provisi
 	opts.Backdate = a.config.AuthorityConfig.Backdate.Duration
 
 	var prov provisioner.Interface
+	var webhookCtl webhookController
 	for _, op := range signOpts {
 		switch o := op.(type) {
 		// Capture current provisioner
@@ -186,6 +187,10 @@ func (a *Authority) SignSSH(ctx context.Context, key ssh.PublicKey, opts provisi
 				return nil, errs.BadRequestErr(err, "error validating ssh certificate options")
 			}
 
+		// call webhooks
+		case webhookController:
+			webhookCtl = o
+
 		default:
 			return nil, errs.InternalServer("authority.SignSSH: invalid extra option type %T", o)
 		}
@@ -199,10 +204,19 @@ func (a *Authority) SignSSH(ctx context.Context, key ssh.PublicKey, opts provisi
 		Key:        key,
 	}
 
+	// Call enriching webhooks
+	if err := callEnrichingWebhooksSSH(webhookCtl, cr); err != nil {
+		return nil, errs.ApplyOptions(
+			errs.ForbiddenErr(err, err.Error()),
+			errs.WithKeyVal("signOptions", signOpts),
+		)
+	}
+
 	// Create certificate from template.
 	certificate, err := sshutil.NewCertificate(cr, certOptions...)
 	if err != nil {
-		if _, ok := err.(*sshutil.TemplateError); ok {
+		var te *sshutil.TemplateError
+		if errors.As(err, &te) {
 			return nil, errs.ApplyOptions(
 				errs.BadRequestErr(err, err.Error()),
 				errs.WithKeyVal("signOptions", signOpts),
@@ -253,18 +267,19 @@ func (a *Authority) SignSSH(ctx context.Context, key ssh.PublicKey, opts provisi
 
 	// Check if authority is allowed to sign the certificate
 	if err := a.isAllowedToSignSSHCertificate(certTpl); err != nil {
-		var pe *policy.NamePolicyError
-		if errors.As(err, &pe) && pe.Reason == policy.NotAllowed {
-			return nil, &errs.Error{
-				// NOTE: custom forbidden error, so that denied name is sent to client
-				// as well as shown in the logs.
-				Status: http.StatusForbidden,
-				Err:    fmt.Errorf("authority not allowed to sign: %w", err),
-				Msg:    fmt.Sprintf("The request was forbidden by the certificate authority: %s", err.Error()),
-			}
+		var ee *errs.Error
+		if errors.As(err, &ee) {
+			return nil, ee
 		}
 		return nil, errs.InternalServerErr(err,
 			errs.WithMessage("authority.SignSSH: error creating ssh certificate"),
+		)
+	}
+
+	// Send certificate to webhooks for authorization
+	if err := callAuthorizingWebhooksSSH(webhookCtl, certificate, certTpl); err != nil {
+		return nil, errs.ApplyOptions(
+			errs.ForbiddenErr(err, "authority.SignSSH: error signing certificate"),
 		)
 	}
 
@@ -281,7 +296,7 @@ func (a *Authority) SignSSH(ctx context.Context, key ssh.PublicKey, opts provisi
 		}
 	}
 
-	if err = a.storeSSHCertificate(prov, cert); err != nil && err != db.ErrNotImplemented {
+	if err = a.storeSSHCertificate(prov, cert); err != nil && !errors.Is(err, db.ErrNotImplemented) {
 		return nil, errs.Wrap(http.StatusInternalServerError, err, "authority.SignSSH: error storing certificate in db")
 	}
 
@@ -351,7 +366,7 @@ func (a *Authority) RenewSSH(ctx context.Context, oldCert *ssh.Certificate) (*ss
 		return nil, errs.Wrap(http.StatusInternalServerError, err, "signSSH: error signing certificate")
 	}
 
-	if err = a.storeRenewedSSHCertificate(prov, oldCert, cert); err != nil && err != db.ErrNotImplemented {
+	if err = a.storeRenewedSSHCertificate(prov, oldCert, cert); err != nil && !errors.Is(err, db.ErrNotImplemented) {
 		return nil, errs.Wrap(http.StatusInternalServerError, err, "renewSSH: error storing certificate in db")
 	}
 
@@ -434,7 +449,7 @@ func (a *Authority) RekeySSH(ctx context.Context, oldCert *ssh.Certificate, pub 
 		}
 	}
 
-	if err = a.storeRenewedSSHCertificate(prov, oldCert, cert); err != nil && err != db.ErrNotImplemented {
+	if err = a.storeRenewedSSHCertificate(prov, oldCert, cert); err != nil && !errors.Is(err, db.ErrNotImplemented) {
 		return nil, errs.Wrap(http.StatusInternalServerError, err, "rekeySSH; error storing certificate in db")
 	}
 
@@ -570,7 +585,7 @@ func (a *Authority) SignSSHAddUser(ctx context.Context, key ssh.PublicKey, subje
 	}
 	cert.Signature = sig
 
-	if err = a.storeRenewedSSHCertificate(prov, subject, cert); err != nil && err != db.ErrNotImplemented {
+	if err = a.storeRenewedSSHCertificate(prov, subject, cert); err != nil && !errors.Is(err, db.ErrNotImplemented) {
 		return nil, errs.Wrap(http.StatusInternalServerError, err, "signSSHAddUser: error storing certificate in db")
 	}
 
@@ -589,7 +604,7 @@ func (a *Authority) CheckSSHHost(ctx context.Context, principal, token string) (
 	}
 	exists, err := a.db.IsSSHHost(principal)
 	if err != nil {
-		if err == db.ErrNotImplemented {
+		if errors.Is(err, db.ErrNotImplemented) {
 			return false, errs.Wrap(http.StatusNotImplemented, err,
 				"checkSSHHost: isSSHHost is not implemented")
 		}
@@ -636,4 +651,38 @@ func (a *Authority) getAddUserCommand(principal string) string {
 		cmd = a.config.SSH.AddUserCommand
 	}
 	return strings.ReplaceAll(cmd, "<principal>", principal)
+}
+
+func callEnrichingWebhooksSSH(webhookCtl webhookController, cr sshutil.CertificateRequest) error {
+	if webhookCtl == nil {
+		return nil
+	}
+	whEnrichReq, err := webhook.NewRequestBody(
+		webhook.WithSSHCertificateRequest(cr),
+	)
+	if err != nil {
+		return err
+	}
+	if err := webhookCtl.Enrich(whEnrichReq); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func callAuthorizingWebhooksSSH(webhookCtl webhookController, cert *sshutil.Certificate, certTpl *ssh.Certificate) error {
+	if webhookCtl == nil {
+		return nil
+	}
+	whAuthBody, err := webhook.NewRequestBody(
+		webhook.WithSSHCertificate(cert, certTpl),
+	)
+	if err != nil {
+		return err
+	}
+	if err := webhookCtl.Authorize(whAuthBody); err != nil {
+		return err
+	}
+
+	return nil
 }

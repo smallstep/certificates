@@ -3,7 +3,7 @@ package api
 import (
 	"context"
 	"crypto"
-	"crypto/dsa" //nolint
+	"crypto/dsa" //nolint:staticcheck // support legacy algorithms
 	"crypto/ecdsa"
 	"crypto/ed25519"
 	"crypto/rsa"
@@ -40,6 +40,7 @@ type Authority interface {
 	Root(shasum string) (*x509.Certificate, error)
 	Sign(cr *x509.CertificateRequest, opts provisioner.SignOptions, signOpts ...provisioner.SignOption) ([]*x509.Certificate, error)
 	Renew(peer *x509.Certificate) ([]*x509.Certificate, error)
+	RenewContext(ctx context.Context, peer *x509.Certificate, pk crypto.PublicKey) ([]*x509.Certificate, error)
 	Rekey(peer *x509.Certificate, pk crypto.PublicKey) ([]*x509.Certificate, error)
 	LoadProvisionerByCertificate(*x509.Certificate) (provisioner.Interface, error)
 	LoadProvisionerByName(string) (provisioner.Interface, error)
@@ -49,6 +50,7 @@ type Authority interface {
 	GetRoots() ([]*x509.Certificate, error)
 	GetFederation() ([]*x509.Certificate, error)
 	Version() authority.Version
+	GetCertificateRevocationList() ([]byte, error)
 }
 
 // mustAuthority will be replaced on unit tests.
@@ -267,6 +269,7 @@ func Route(r Router) {
 	r.MethodFunc("POST", "/renew", Renew)
 	r.MethodFunc("POST", "/rekey", Rekey)
 	r.MethodFunc("POST", "/revoke", Revoke)
+	r.MethodFunc("GET", "/crl", CRL)
 	r.MethodFunc("GET", "/provisioners", Provisioners)
 	r.MethodFunc("GET", "/provisioners/{kid}/encrypted-key", ProvisionerKey)
 	r.MethodFunc("GET", "/roots", Roots)

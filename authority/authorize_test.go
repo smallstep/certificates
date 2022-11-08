@@ -313,8 +313,8 @@ func TestAuthority_authorizeToken(t *testing.T) {
 			p, err := tc.auth.authorizeToken(context.Background(), tc.token)
 			if err != nil {
 				if assert.NotNil(t, tc.err) {
-					sc, ok := err.(render.StatusCodedError)
-					assert.Fatal(t, ok, "error does not implement StatusCodedError interface")
+					var sc render.StatusCodedError
+					assert.Fatal(t, errors.As(err, &sc), "error does not implement StatusCodedError interface")
 					assert.Equals(t, sc.StatusCode(), tc.code)
 					assert.HasPrefix(t, err.Error(), tc.err.Error())
 				}
@@ -399,8 +399,8 @@ func TestAuthority_authorizeRevoke(t *testing.T) {
 
 			if err := tc.auth.authorizeRevoke(context.Background(), tc.token); err != nil {
 				if assert.NotNil(t, tc.err) {
-					sc, ok := err.(render.StatusCodedError)
-					assert.Fatal(t, ok, "error does not implement StatusCodedError interface")
+					var sc render.StatusCodedError
+					assert.Fatal(t, errors.As(err, &sc), "error does not implement StatusCodedError interface")
 					assert.Equals(t, sc.StatusCode(), tc.code)
 					assert.HasPrefix(t, err.Error(), tc.err.Error())
 				}
@@ -484,14 +484,14 @@ func TestAuthority_authorizeSign(t *testing.T) {
 			got, err := tc.auth.authorizeSign(context.Background(), tc.token)
 			if err != nil {
 				if assert.NotNil(t, tc.err) {
-					sc, ok := err.(render.StatusCodedError)
-					assert.Fatal(t, ok, "error does not implement StatusCodedError interface")
+					var sc render.StatusCodedError
+					assert.Fatal(t, errors.As(err, &sc), "error does not implement StatusCodedError interface")
 					assert.Equals(t, sc.StatusCode(), tc.code)
 					assert.HasPrefix(t, err.Error(), tc.err.Error())
 				}
 			} else {
 				if assert.Nil(t, tc.err) {
-					assert.Equals(t, 9, len(got)) // number of provisioner.SignOptions returned
+					assert.Equals(t, 10, len(got)) // number of provisioner.SignOptions returned
 				}
 			}
 		})
@@ -743,13 +743,13 @@ func TestAuthority_Authorize(t *testing.T) {
 			if err != nil {
 				if assert.NotNil(t, tc.err, fmt.Sprintf("unexpected error: %s", err)) {
 					assert.Nil(t, got)
-					sc, ok := err.(render.StatusCodedError)
-					assert.Fatal(t, ok, "error does not implement StatusCodedError interface")
+					var sc render.StatusCodedError
+					assert.Fatal(t, errors.As(err, &sc), "error does not implement StatusCodedError interface")
 					assert.Equals(t, sc.StatusCode(), tc.code)
 					assert.HasPrefix(t, err.Error(), tc.err.Error())
 
-					ctxErr, ok := err.(*errs.Error)
-					assert.Fatal(t, ok, "error is not of type *errs.Error")
+					var ctxErr *errs.Error
+					assert.Fatal(t, errors.As(err, &ctxErr), "error is not of type *errs.Error")
 					assert.Equals(t, ctxErr.Details["token"], tc.token)
 				}
 			} else {
@@ -876,16 +876,16 @@ func TestAuthority_authorizeRenew(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			tc := genTestCase(t)
 
-			err := tc.auth.authorizeRenew(tc.cert)
+			err := tc.auth.authorizeRenew(context.Background(), tc.cert)
 			if err != nil {
 				if assert.NotNil(t, tc.err) {
-					sc, ok := err.(render.StatusCodedError)
-					assert.Fatal(t, ok, "error does not implement StatusCoder interface")
+					var sc render.StatusCodedError
+					assert.Fatal(t, errors.As(err, &sc), "error does not implement StatusCodedError interface")
 					assert.Equals(t, sc.StatusCode(), tc.code)
 					assert.HasPrefix(t, err.Error(), tc.err.Error())
 
-					ctxErr, ok := err.(*errs.Error)
-					assert.Fatal(t, ok, "error is not of type *errs.Error")
+					var ctxErr *errs.Error
+					assert.Fatal(t, errors.As(err, &ctxErr), "error is not of type *errs.Error")
 					assert.Equals(t, ctxErr.Details["serialNumber"], tc.cert.SerialNumber.String())
 				}
 			} else {
@@ -1027,14 +1027,14 @@ func TestAuthority_authorizeSSHSign(t *testing.T) {
 			got, err := tc.auth.authorizeSSHSign(context.Background(), tc.token)
 			if err != nil {
 				if assert.NotNil(t, tc.err) {
-					sc, ok := err.(render.StatusCodedError)
-					assert.Fatal(t, ok, "error does not implement StatusCodedError interface")
+					var sc render.StatusCodedError
+					assert.Fatal(t, errors.As(err, &sc), "error does not implement StatusCodedError interface")
 					assert.Equals(t, sc.StatusCode(), tc.code)
 					assert.HasPrefix(t, err.Error(), tc.err.Error())
 				}
 			} else {
 				if assert.Nil(t, tc.err) {
-					assert.Len(t, 9, got) // number of provisioner.SignOptions returned
+					assert.Len(t, 10, got) // number of provisioner.SignOptions returned
 				}
 			}
 		})
@@ -1144,8 +1144,8 @@ func TestAuthority_authorizeSSHRenew(t *testing.T) {
 			got, err := tc.auth.authorizeSSHRenew(context.Background(), tc.token)
 			if err != nil {
 				if assert.NotNil(t, tc.err) {
-					sc, ok := err.(render.StatusCodedError)
-					assert.Fatal(t, ok, "error does not implement StatusCodedError interface")
+					var sc render.StatusCodedError
+					assert.Fatal(t, errors.As(err, &sc), "error does not implement StatusCodedError interface")
 					assert.Equals(t, sc.StatusCode(), tc.code)
 					assert.HasPrefix(t, err.Error(), tc.err.Error())
 				}
@@ -1244,8 +1244,8 @@ func TestAuthority_authorizeSSHRevoke(t *testing.T) {
 
 			if err := tc.auth.authorizeSSHRevoke(context.Background(), tc.token); err != nil {
 				if assert.NotNil(t, tc.err) {
-					sc, ok := err.(render.StatusCodedError)
-					assert.Fatal(t, ok, "error does not implement StatusCodedError interface")
+					var sc render.StatusCodedError
+					assert.Fatal(t, errors.As(err, &sc), "error does not implement StatusCodedError interface")
 					assert.Equals(t, sc.StatusCode(), tc.code)
 					assert.HasPrefix(t, err.Error(), tc.err.Error())
 				}
@@ -1337,8 +1337,8 @@ func TestAuthority_authorizeSSHRekey(t *testing.T) {
 			cert, signOpts, err := tc.auth.authorizeSSHRekey(context.Background(), tc.token)
 			if err != nil {
 				if assert.NotNil(t, tc.err) {
-					sc, ok := err.(render.StatusCodedError)
-					assert.Fatal(t, ok, "error does not implement StatusCodedError interface")
+					var sc render.StatusCodedError
+					assert.Fatal(t, errors.As(err, &sc), "error does not implement StatusCodedError interface")
 					assert.Equals(t, sc.StatusCode(), tc.code)
 					assert.HasPrefix(t, err.Error(), tc.err.Error())
 				}
@@ -1444,6 +1444,37 @@ func TestAuthority_AuthorizeRenewToken(t *testing.T) {
 		Audience:  []string{"https://example.com/1.0/renew"},
 		Subject:   "test.example.com",
 		Issuer:    "step-cli",
+		NotBefore: jose.NewNumericDate(now),
+		Expiry:    jose.NewNumericDate(now.Add(5 * time.Minute)),
+	}, provisioner.CertificateEnforcerFunc(func(cert *x509.Certificate) error {
+		cert.NotBefore = now
+		cert.NotAfter = now.Add(time.Hour)
+		b, err := asn1.Marshal(stepProvisionerASN1{int(provisioner.TypeJWK), []byte("step-cli"), nil, nil})
+		if err != nil {
+			return err
+		}
+		cert.ExtraExtensions = append(cert.ExtraExtensions, pkix.Extension{
+			Id:    asn1.ObjectIdentifier{1, 3, 6, 1, 4, 1, 37476, 9000, 64, 1},
+			Value: b,
+		})
+		return nil
+	}))
+	a4 := testAuthority(t)
+	a4.db = &db.MockAuthDB{
+		MUseToken: func(id, tok string) (bool, error) {
+			return true, nil
+		},
+		MGetCertificateData: func(serialNumber string) (*db.CertificateData, error) {
+			return &db.CertificateData{
+				Provisioner: &db.ProvisionerData{ID: "Max:IMi94WBNI6gP5cNHXlZYNUzvMjGdHyBRmFoo-lCEaqk", Name: "Max"},
+				RaInfo:      &provisioner.RAInfo{ProvisionerName: "ra"},
+			}, nil
+		},
+	}
+	t4, c4 := generateX5cToken(a1, signer, jose.Claims{
+		Audience:  []string{"https://ra.example.com/1.0/renew"},
+		Subject:   "test.example.com",
+		Issuer:    "step-ca-client/1.0",
 		NotBefore: jose.NewNumericDate(now),
 		Expiry:    jose.NewNumericDate(now.Add(5 * time.Minute)),
 	}, provisioner.CertificateEnforcerFunc(func(cert *x509.Certificate) error {
@@ -1627,6 +1658,7 @@ func TestAuthority_AuthorizeRenewToken(t *testing.T) {
 		{"ok", a1, args{ctx, t1}, c1, false},
 		{"ok expired cert", a1, args{ctx, t2}, c2, false},
 		{"ok provisioner issuer", a1, args{ctx, t3}, c3, false},
+		{"ok ra provisioner", a4, args{ctx, t4}, c4, false},
 		{"fail token", a1, args{ctx, "not.a.token"}, nil, true},
 		{"fail token reuse", a1, args{ctx, t1}, nil, true},
 		{"fail token signature", a1, args{ctx, badSigner}, nil, true},

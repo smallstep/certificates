@@ -75,6 +75,8 @@ func (ap ProblemType) String() string {
 		return "accountDoesNotExist"
 	case ErrorAlreadyRevokedType:
 		return "alreadyRevoked"
+	case ErrorBadAttestationStatementType:
+		return "badAttestationStatement"
 	case ErrorBadCSRType:
 		return "badCSR"
 	case ErrorBadNonceType:
@@ -310,10 +312,11 @@ func NewErrorISE(msg string, args ...interface{}) *Error {
 
 // WrapError attempts to wrap the internal error.
 func WrapError(typ ProblemType, err error, msg string, args ...interface{}) *Error {
-	switch e := err.(type) {
-	case nil:
+	var e *Error
+	switch {
+	case err == nil:
 		return nil
-	case *Error:
+	case errors.As(err, &e):
 		if e.Err == nil {
 			e.Err = errors.Errorf(msg+"; "+e.Detail, args...)
 		} else {

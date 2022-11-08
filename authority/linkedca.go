@@ -278,6 +278,7 @@ func (c *linkedCaClient) StoreCertificateChain(p provisioner.Interface, fullchai
 		PemCertificate:      serializeCertificateChain(fullchain[0]),
 		PemCertificateChain: serializeCertificateChain(fullchain[1:]...),
 		Provisioner:         createProvisionerIdentity(p),
+		AttestationData:     createAttestationData(p),
 		RaProvisioner:       raProvisioner,
 		EndpointId:          endpointID,
 	})
@@ -395,24 +396,32 @@ func createProvisionerIdentity(p provisioner.Interface) *linkedca.ProvisionerIde
 	}
 }
 
-type raProvisioner interface {
-	RAInfo() *provisioner.RAInfo
-}
-
 func createRegistrationAuthorityProvisioner(p provisioner.Interface) (*linkedca.RegistrationAuthorityProvisioner, string) {
 	if rap, ok := p.(raProvisioner); ok {
-		info := rap.RAInfo()
-		typ := linkedca.Provisioner_Type_value[strings.ToUpper(info.ProvisionerType)]
-		return &linkedca.RegistrationAuthorityProvisioner{
-			AuthorityId: info.AuthorityID,
-			Provisioner: &linkedca.ProvisionerIdentity{
-				Id:   info.ProvisionerID,
-				Type: linkedca.Provisioner_Type(typ),
-				Name: info.ProvisionerName,
-			},
-		}, info.EndpointID
+		if info := rap.RAInfo(); info != nil {
+			typ := linkedca.Provisioner_Type_value[strings.ToUpper(info.ProvisionerType)]
+			return &linkedca.RegistrationAuthorityProvisioner{
+				AuthorityId: info.AuthorityID,
+				Provisioner: &linkedca.ProvisionerIdentity{
+					Id:   info.ProvisionerID,
+					Type: linkedca.Provisioner_Type(typ),
+					Name: info.ProvisionerName,
+				},
+			}, info.EndpointID
+		}
 	}
 	return nil, ""
+}
+
+func createAttestationData(p provisioner.Interface) *linkedca.AttestationData {
+	if ap, ok := p.(attProvisioner); ok {
+		if data := ap.AttestationData(); data != nil {
+			return &linkedca.AttestationData{
+				PermanentIdentifier: data.PermanentIdentifier,
+			}
+		}
+	}
+	return nil
 }
 
 func serializeCertificate(crt *x509.Certificate) string {
@@ -461,7 +470,7 @@ func getRootCertificate(endpoint, fingerprint string) (*x509.Certificate, error)
 	defer cancel()
 
 	conn, err := grpc.DialContext(ctx, endpoint, grpc.WithTransportCredentials(credentials.NewTLS(&tls.Config{
-		// nolint:gosec // used in bootstrap protocol
+		//nolint:gosec // used in bootstrap protocol
 		InsecureSkipVerify: true, // lgtm[go/disabled-certificate-check]
 	})))
 	if err != nil {

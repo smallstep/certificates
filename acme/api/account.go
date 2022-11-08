@@ -2,6 +2,7 @@ package api
 
 import (
 	"encoding/json"
+	"errors"
 	"net/http"
 
 	"github.com/go-chi/chi"
@@ -97,8 +98,8 @@ func NewAccount(w http.ResponseWriter, r *http.Request) {
 	httpStatus := http.StatusCreated
 	acc, err := accountFromContext(ctx)
 	if err != nil {
-		acmeErr, ok := err.(*acme.Error)
-		if !ok || acmeErr.Status != http.StatusBadRequest {
+		var acmeErr *acme.Error
+		if !errors.As(err, &acmeErr) || acmeErr.Status != http.StatusBadRequest {
 			// Something went wrong ...
 			render.Error(w, err)
 			return

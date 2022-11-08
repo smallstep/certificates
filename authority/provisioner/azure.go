@@ -17,6 +17,7 @@ import (
 	"go.step.sm/crypto/jose"
 	"go.step.sm/crypto/sshutil"
 	"go.step.sm/crypto/x509util"
+	"go.step.sm/linkedca"
 
 	"github.com/smallstep/certificates/errs"
 )
@@ -24,8 +25,7 @@ import (
 // azureOIDCBaseURL is the base discovery url for Microsoft Azure tokens.
 const azureOIDCBaseURL = "https://login.microsoftonline.com"
 
-// azureIdentityTokenURL is the URL to get the identity token for an instance.
-// nolint:gosec // no credentials here
+//nolint:gosec // azureIdentityTokenURL is the URL to get the identity token for an instance.
 const azureIdentityTokenURL = "http://169.254.169.254/metadata/identity/oauth2/token?api-version=2018-02-01&resource=https%3A%2F%2Fmanagement.azure.com%2F"
 
 // azureDefaultAudience is the default audience used.
@@ -364,6 +364,7 @@ func (p *Azure) AuthorizeSign(ctx context.Context, token string) ([]SignOption, 
 		defaultPublicKeyValidator{},
 		newValidityValidator(p.ctl.Claimer.MinTLSCertDuration(), p.ctl.Claimer.MaxTLSCertDuration()),
 		newX509NamePolicyValidator(p.ctl.getPolicy().getX509()),
+		p.ctl.newWebhookController(data, linkedca.Webhook_X509),
 	), nil
 }
 
@@ -432,6 +433,8 @@ func (p *Azure) AuthorizeSSHSign(ctx context.Context, token string) ([]SignOptio
 		&sshCertDefaultValidator{},
 		// Ensure that all principal names are allowed
 		newSSHNamePolicyValidator(p.ctl.getPolicy().getSSHHost(), nil),
+		// Call webhooks
+		p.ctl.newWebhookController(data, linkedca.Webhook_SSH),
 	), nil
 }
 

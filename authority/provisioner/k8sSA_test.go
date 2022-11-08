@@ -118,8 +118,8 @@ func TestK8sSA_authorizeToken(t *testing.T) {
 			tc := tt(t)
 			if claims, err := tc.p.authorizeToken(tc.token, testAudiences.Sign); err != nil {
 				if assert.NotNil(t, tc.err) {
-					sc, ok := err.(render.StatusCodedError)
-					assert.Fatal(t, ok, "error does not implement StatusCodedError interface")
+					var sc render.StatusCodedError
+					assert.Fatal(t, errors.As(err, &sc), "error does not implement StatusCodedError interface")
 					assert.Equals(t, sc.StatusCode(), tc.code)
 					assert.HasPrefix(t, err.Error(), tc.err.Error())
 				}
@@ -167,8 +167,8 @@ func TestK8sSA_AuthorizeRevoke(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			tc := tt(t)
 			if err := tc.p.AuthorizeRevoke(context.Background(), tc.token); err != nil {
-				sc, ok := err.(render.StatusCodedError)
-				assert.Fatal(t, ok, "error does not implement StatusCodedError interface")
+				var sc render.StatusCodedError
+				assert.Fatal(t, errors.As(err, &sc), "error does not implement StatusCodedError interface")
 				assert.Equals(t, sc.StatusCode(), tc.code)
 				if assert.NotNil(t, tc.err) {
 					assert.HasPrefix(t, err.Error(), tc.err.Error())
@@ -223,8 +223,8 @@ func TestK8sSA_AuthorizeRenew(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			tc := tt(t)
 			if err := tc.p.AuthorizeRenew(context.Background(), tc.cert); err != nil {
-				sc, ok := err.(render.StatusCodedError)
-				assert.Fatal(t, ok, "error does not implement StatusCodedError interface")
+				var sc render.StatusCodedError
+				assert.Fatal(t, errors.As(err, &sc), "error does not implement StatusCodedError interface")
 				assert.Equals(t, sc.StatusCode(), tc.code)
 				if assert.NotNil(t, tc.err) {
 					assert.HasPrefix(t, err.Error(), tc.err.Error())
@@ -272,8 +272,8 @@ func TestK8sSA_AuthorizeSign(t *testing.T) {
 			tc := tt(t)
 			if opts, err := tc.p.AuthorizeSign(context.Background(), tc.token); err != nil {
 				if assert.NotNil(t, tc.err) {
-					sc, ok := err.(render.StatusCodedError)
-					assert.Fatal(t, ok, "error does not implement StatusCodedError interface")
+					var sc render.StatusCodedError
+					assert.Fatal(t, errors.As(err, &sc), "error does not implement StatusCodedError interface")
 					assert.Equals(t, sc.StatusCode(), tc.code)
 					assert.HasPrefix(t, err.Error(), tc.err.Error())
 				}
@@ -297,11 +297,13 @@ func TestK8sSA_AuthorizeSign(t *testing.T) {
 								assert.Equals(t, v.max, tc.p.ctl.Claimer.MaxTLSCertDuration())
 							case *x509NamePolicyValidator:
 								assert.Equals(t, nil, v.policyEngine)
+							case *WebhookController:
+								assert.Len(t, 0, v.webhooks)
 							default:
 								assert.FatalError(t, fmt.Errorf("unexpected sign option of type %T", v))
 							}
 						}
-						assert.Equals(t, 7, len(opts))
+						assert.Equals(t, 8, len(opts))
 					}
 				}
 			}
@@ -360,15 +362,15 @@ func TestK8sSA_AuthorizeSSHSign(t *testing.T) {
 			tc := tt(t)
 			if opts, err := tc.p.AuthorizeSSHSign(context.Background(), tc.token); err != nil {
 				if assert.NotNil(t, tc.err) {
-					sc, ok := err.(render.StatusCodedError)
-					assert.Fatal(t, ok, "error does not implement StatusCodedError interface")
+					var sc render.StatusCodedError
+					assert.Fatal(t, errors.As(err, &sc), "error does not implement StatusCodedError interface")
 					assert.Equals(t, sc.StatusCode(), tc.code)
 					assert.HasPrefix(t, err.Error(), tc.err.Error())
 				}
 			} else {
 				if assert.Nil(t, tc.err) {
 					if assert.NotNil(t, opts) {
-						assert.Len(t, 8, opts)
+						assert.Len(t, 9, opts)
 						for _, o := range opts {
 							switch v := o.(type) {
 							case Interface:
@@ -384,6 +386,8 @@ func TestK8sSA_AuthorizeSSHSign(t *testing.T) {
 							case *sshNamePolicyValidator:
 								assert.Equals(t, nil, v.userPolicyEngine)
 								assert.Equals(t, nil, v.hostPolicyEngine)
+							case *WebhookController:
+								assert.Len(t, 0, v.webhooks)
 							default:
 								assert.FatalError(t, fmt.Errorf("unexpected sign option of type %T", v))
 							}

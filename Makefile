@@ -28,8 +28,9 @@ ci: testcgo build
 #########################################
 
 bootstra%:
-	# Using a released version of golangci-lint to take into account custom replacements in their go.mod
-	$Q curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s -- -b $(shell go env GOPATH)/bin v1.42.0
+	$Q curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s -- -b $$(go env GOPATH)/bin latest
+	$Q go install golang.org/x/vuln/cmd/govulncheck@latest
+	$Q go install gotest.tools/gotestsum@latest
 
 .PHONY: bootstra%
 
@@ -77,8 +78,6 @@ $(info    VERSION is $(VERSION))
 $(info    DEB_VERSION is $(DEB_VERSION))
 $(info    PUSHTYPE is $(PUSHTYPE))
 endif
-
-include make/docker.mk
 
 #########################################
 # Build
@@ -132,17 +131,18 @@ generate:
 # Test
 #########################################
 test:
-	$Q $(GOFLAGS) go test -short -coverprofile=coverage.out ./...
+	$Q $(GOFLAGS) gotestsum -- -coverprofile=coverage.out -short -covermode=atomic ./...
+
 
 testcgo:
-	$Q go test -short -coverprofile=coverage.out ./...
+	$Q gotestsum -- -coverprofile=coverage.out -short -covermode=atomic ./...
 
 .PHONY: test testcgo
 
 integrate: integration
 
 integration: bin/$(BINNAME)
-	$Q $(GOFLAGS) go test -tags=integration ./integration/...
+	$Q $(GOFLAGS) gotestsum -- -tags=integration ./integration/...
 
 .PHONY: integrate integration
 
@@ -151,15 +151,14 @@ integration: bin/$(BINNAME)
 #########################################
 
 fmt:
-	$Q gofmt -l -s -w $(SRC)
+	$Q goimports -l -w $(SRC)
 
+lint: SHELL:=/bin/bash
 lint:
-	$Q golangci-lint run --timeout=30m
+	$Q LOG_LEVEL=error golangci-lint run --config <(curl -s https://raw.githubusercontent.com/smallstep/workflows/master/.golangci.yml) --timeout=30m
+	$Q govulncheck ./...
 
-lintcgo:
-	$Q LOG_LEVEL=error golangci-lint run --timeout=30m
-
-.PHONY: fmt lint lintcgo
+.PHONY: fmt lint
 
 #########################################
 # Install
@@ -231,11 +230,3 @@ debian: changelog
 distclean: clean
 
 .PHONY: changelog debian distclean
-
-#################################################
-# Targets for creating step artifacts
-#################################################
-
-docker-artifacts: docker-$(PUSHTYPE)
-
-.PHONY: docker-artifacts

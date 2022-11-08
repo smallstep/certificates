@@ -522,8 +522,8 @@ func TestAWS_authorizeToken(t *testing.T) {
 			tc := tt(t)
 			if claims, err := tc.p.authorizeToken(tc.token); err != nil {
 				if assert.NotNil(t, tc.err) {
-					sc, ok := err.(render.StatusCodedError)
-					assert.Fatal(t, ok, "error does not implement StatusCodedError interface")
+					var sc render.StatusCodedError
+					assert.Fatal(t, errors.As(err, &sc), "error does not implement StatusCodedError interface")
 					assert.Equals(t, sc.StatusCode(), tc.code)
 					assert.HasPrefix(t, err.Error(), tc.err.Error())
 				}
@@ -642,11 +642,11 @@ func TestAWS_AuthorizeSign(t *testing.T) {
 		code    int
 		wantErr bool
 	}{
-		{"ok", p1, args{t1, "foo.local"}, 8, http.StatusOK, false},
-		{"ok", p2, args{t2, "instance-id"}, 12, http.StatusOK, false},
-		{"ok", p2, args{t2Hostname, "ip-127-0-0-1.us-west-1.compute.internal"}, 12, http.StatusOK, false},
-		{"ok", p2, args{t2PrivateIP, "127.0.0.1"}, 12, http.StatusOK, false},
-		{"ok", p1, args{t4, "instance-id"}, 8, http.StatusOK, false},
+		{"ok", p1, args{t1, "foo.local"}, 9, http.StatusOK, false},
+		{"ok", p2, args{t2, "instance-id"}, 13, http.StatusOK, false},
+		{"ok", p2, args{t2Hostname, "ip-127-0-0-1.us-west-1.compute.internal"}, 13, http.StatusOK, false},
+		{"ok", p2, args{t2PrivateIP, "127.0.0.1"}, 13, http.StatusOK, false},
+		{"ok", p1, args{t4, "instance-id"}, 9, http.StatusOK, false},
 		{"fail account", p3, args{token: t3}, 0, http.StatusUnauthorized, true},
 		{"fail token", p1, args{token: "token"}, 0, http.StatusUnauthorized, true},
 		{"fail subject", p1, args{token: failSubject}, 0, http.StatusUnauthorized, true},
@@ -669,8 +669,8 @@ func TestAWS_AuthorizeSign(t *testing.T) {
 				t.Errorf("AWS.AuthorizeSign() error = %v, wantErr %v", err, tt.wantErr)
 				return
 			case err != nil:
-				sc, ok := err.(render.StatusCodedError)
-				assert.Fatal(t, ok, "error does not implement StatusCodedError interface")
+				var sc render.StatusCodedError
+				assert.Fatal(t, errors.As(err, &sc), "error does not implement StatusCodedError interface")
 				assert.Equals(t, sc.StatusCode(), tt.code)
 			default:
 				assert.Equals(t, tt.wantLen, len(got))
@@ -701,6 +701,8 @@ func TestAWS_AuthorizeSign(t *testing.T) {
 						assert.Equals(t, []string(v), []string{"ip-127-0-0-1.us-west-1.compute.internal"})
 					case *x509NamePolicyValidator:
 						assert.Equals(t, nil, v.policyEngine)
+					case *WebhookController:
+						assert.Len(t, 0, v.webhooks)
 					default:
 						assert.FatalError(t, fmt.Errorf("unexpected sign option of type %T", v))
 					}
@@ -748,7 +750,7 @@ func TestAWS_AuthorizeSSHSign(t *testing.T) {
 	pub := key.Public().Key
 	rsa2048, err := rsa.GenerateKey(rand.Reader, 2048)
 	assert.FatalError(t, err)
-	// nolint:gosec // tests minimum size of the key
+	//nolint:gosec // tests minimum size of the key
 	rsa1024, err := rsa.GenerateKey(rand.Reader, 1024)
 	assert.FatalError(t, err)
 
@@ -807,8 +809,8 @@ func TestAWS_AuthorizeSSHSign(t *testing.T) {
 				return
 			}
 			if err != nil {
-				sc, ok := err.(render.StatusCodedError)
-				assert.Fatal(t, ok, "error does not implement StatusCodedError interface")
+				var sc render.StatusCodedError
+				assert.Fatal(t, errors.As(err, &sc), "error does not implement StatusCodedError interface")
 				assert.Equals(t, sc.StatusCode(), tt.code)
 				assert.Nil(t, got)
 			} else if assert.NotNil(t, got) {
@@ -864,8 +866,8 @@ func TestAWS_AuthorizeRenew(t *testing.T) {
 			if err := tt.aws.AuthorizeRenew(context.Background(), tt.args.cert); (err != nil) != tt.wantErr {
 				t.Errorf("AWS.AuthorizeRenew() error = %v, wantErr %v", err, tt.wantErr)
 			} else if err != nil {
-				sc, ok := err.(render.StatusCodedError)
-				assert.Fatal(t, ok, "error does not implement StatusCodedError interface")
+				var sc render.StatusCodedError
+				assert.Fatal(t, errors.As(err, &sc), "error does not implement StatusCodedError interface")
 				assert.Equals(t, sc.StatusCode(), tt.code)
 			}
 		})

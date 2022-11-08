@@ -261,6 +261,7 @@ func (i *Identity) GetClientCertificateFunc() func(*tls.CertificateRequestInfo) 
 // GetCertPool returns a x509.CertPool if the identity defines a custom root.
 func (i *Identity) GetCertPool() (*x509.CertPool, error) {
 	if i.Root == "" {
+		//nolint:nilnil // legacy
 		return nil, nil
 	}
 	b, err := os.ReadFile(i.Root)

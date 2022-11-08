@@ -336,8 +336,8 @@ func TestAzure_authorizeToken(t *testing.T) {
 			tc := tt(t)
 			if claims, name, group, subscriptionID, objectID, err := tc.p.authorizeToken(tc.token); err != nil {
 				if assert.NotNil(t, tc.err) {
-					sc, ok := err.(render.StatusCodedError)
-					assert.Fatal(t, ok, "error does not implement StatusCodedError interface")
+					var sc render.StatusCodedError
+					assert.Fatal(t, errors.As(err, &sc), "error does not implement StatusCodedError interface")
 					assert.Equals(t, sc.StatusCode(), tc.code)
 					assert.HasPrefix(t, err.Error(), tc.err.Error())
 				}
@@ -474,11 +474,11 @@ func TestAzure_AuthorizeSign(t *testing.T) {
 		code    int
 		wantErr bool
 	}{
-		{"ok", p1, args{t1}, 7, http.StatusOK, false},
-		{"ok", p2, args{t2}, 12, http.StatusOK, false},
-		{"ok", p1, args{t11}, 7, http.StatusOK, false},
-		{"ok", p5, args{t5}, 7, http.StatusOK, false},
-		{"ok", p7, args{t7}, 7, http.StatusOK, false},
+		{"ok", p1, args{t1}, 8, http.StatusOK, false},
+		{"ok", p2, args{t2}, 13, http.StatusOK, false},
+		{"ok", p1, args{t11}, 8, http.StatusOK, false},
+		{"ok", p5, args{t5}, 8, http.StatusOK, false},
+		{"ok", p7, args{t7}, 8, http.StatusOK, false},
 		{"fail tenant", p3, args{t3}, 0, http.StatusUnauthorized, true},
 		{"fail resource group", p4, args{t4}, 0, http.StatusUnauthorized, true},
 		{"fail subscription", p6, args{t6}, 0, http.StatusUnauthorized, true},
@@ -498,8 +498,8 @@ func TestAzure_AuthorizeSign(t *testing.T) {
 				t.Errorf("Azure.AuthorizeSign() error = %v, wantErr %v", err, tt.wantErr)
 				return
 			case err != nil:
-				sc, ok := err.(render.StatusCodedError)
-				assert.Fatal(t, ok, "error does not implement StatusCodedError interface")
+				var sc render.StatusCodedError
+				assert.Fatal(t, errors.As(err, &sc), "error does not implement StatusCodedError interface")
 				assert.Equals(t, sc.StatusCode(), tt.code)
 			default:
 				assert.Equals(t, tt.wantLen, len(got))
@@ -530,6 +530,8 @@ func TestAzure_AuthorizeSign(t *testing.T) {
 						assert.Equals(t, []string(v), []string{"virtualMachine"})
 					case *x509NamePolicyValidator:
 						assert.Equals(t, nil, v.policyEngine)
+					case *WebhookController:
+						assert.Len(t, 0, v.webhooks)
 					default:
 						assert.FatalError(t, fmt.Errorf("unexpected sign option of type %T", v))
 					}
@@ -576,8 +578,8 @@ func TestAzure_AuthorizeRenew(t *testing.T) {
 			if err := tt.azure.AuthorizeRenew(context.Background(), tt.args.cert); (err != nil) != tt.wantErr {
 				t.Errorf("Azure.AuthorizeRenew() error = %v, wantErr %v", err, tt.wantErr)
 			} else if err != nil {
-				sc, ok := err.(render.StatusCodedError)
-				assert.Fatal(t, ok, "error does not implement StatusCodedError interface")
+				var sc render.StatusCodedError
+				assert.Fatal(t, errors.As(err, &sc), "error does not implement StatusCodedError interface")
 				assert.Equals(t, sc.StatusCode(), tt.code)
 			}
 		})
@@ -624,7 +626,7 @@ func TestAzure_AuthorizeSSHSign(t *testing.T) {
 	pub := key.Public().Key
 	rsa2048, err := rsa.GenerateKey(rand.Reader, 2048)
 	assert.FatalError(t, err)
-	// nolint:gosec // tests minimum size of the key
+	//nolint:gosec // tests minimum size of the key
 	rsa1024, err := rsa.GenerateKey(rand.Reader, 1024)
 	assert.FatalError(t, err)
 
@@ -673,8 +675,8 @@ func TestAzure_AuthorizeSSHSign(t *testing.T) {
 				return
 			}
 			if err != nil {
-				sc, ok := err.(render.StatusCodedError)
-				assert.Fatal(t, ok, "error does not implement StatusCodedError interface")
+				var sc render.StatusCodedError
+				assert.Fatal(t, errors.As(err, &sc), "error does not implement StatusCodedError interface")
 				assert.Equals(t, sc.StatusCode(), tt.code)
 				assert.Nil(t, got)
 			} else if assert.NotNil(t, got) {

@@ -17,9 +17,9 @@ type Engine struct {
 
 // New returns a new Engine using Options.
 func New(options *Options) (*Engine, error) {
-
 	// if no options provided, return early
 	if options == nil {
+		//nolint:nilnil // legacy
 		return nil, nil
 	}
 
@@ -56,7 +56,6 @@ func New(options *Options) (*Engine, error) {
 // the X.509 policy (if available) and returns an error if one of the
 // names in the certificate is not allowed.
 func (e *Engine) IsX509CertificateAllowed(cert *x509.Certificate) error {
-
 	// return early if there's no policy to evaluate
 	if e == nil || e.x509Policy == nil {
 		return nil
@@ -69,7 +68,6 @@ func (e *Engine) IsX509CertificateAllowed(cert *x509.Certificate) error {
 // AreSANsAllowed evaluates the slice of SANs against the X.509 policy
 // (if available) and returns an error if one of the SANs is not allowed.
 func (e *Engine) AreSANsAllowed(sans []string) error {
-
 	// return early if there's no policy to evaluate
 	if e == nil || e.x509Policy == nil {
 		return nil
@@ -83,7 +81,6 @@ func (e *Engine) AreSANsAllowed(sans []string) error {
 // user or host policy (if configured) and returns an error if one of the
 // principals in the certificate is not allowed.
 func (e *Engine) IsSSHCertificateAllowed(cert *ssh.Certificate) error {
-
 	// return early if there's no policy to evaluate
 	if e == nil || (e.sshHostPolicy == nil && e.sshUserPolicy == nil) {
 		return nil
