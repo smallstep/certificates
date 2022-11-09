@@ -394,6 +394,6 @@ func GetCertificate(w http.ResponseWriter, r *http.Request) {
 	}
 
 	api.LogCertificate(w, cert.Leaf)
-	w.Header().Set("Content-Type", "application/pem-certificate-chain; charset=utf-8")
+	w.Header().Set("Content-Type", "application/pem-certificate-chain")
 	w.Write(certBytes)
 }

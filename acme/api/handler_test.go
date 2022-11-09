@@ -514,7 +514,7 @@ func TestHandler_GetCertificate(t *testing.T) {
 				assert.Equals(t, res.Header["Content-Type"], []string{"application/problem+json"})
 			} else {
 				assert.Equals(t, bytes.TrimSpace(body), bytes.TrimSpace(certBytes))
-				assert.Equals(t, res.Header["Content-Type"], []string{"application/pem-certificate-chain; charset=utf-8"})
+				assert.Equals(t, res.Header["Content-Type"], []string{"application/pem-certificate-chain"})
 			}
 		})
 	}
