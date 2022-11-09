@@ -121,7 +121,13 @@ func appAction(ctx *cli.Context) error {
 
 	// Allow custom contexts.
 	if caCtx := ctx.String("context"); caCtx != "" {
-		if err := step.Contexts().SetCurrent(caCtx); err != nil {
+		if _, ok := step.Contexts().Get(caCtx); ok {
+			if err := step.Contexts().SetCurrent(caCtx); err != nil {
+				return err
+			}
+		} else if token == "" {
+			return fmt.Errorf("context %q not found", caCtx)
+		} else if err := createContext(caCtx); err != nil {
 			return err
 		}
 	}
@@ -230,6 +236,26 @@ To get a linked authority token:
 	go ca.StopReloaderHandler(srv)
 	if err = srv.Run(); err != nil && !errors.Is(err, http.ErrServerClosed) {
 		fatal(err)
+	}
+	return nil
+}
+
+// createContext creates a new context using the given name for the context,
+// authority and profile.
+func createContext(name string) error {
+	if err := step.Contexts().Add(&step.Context{
+		Name: name, Authority: name, Profile: name,
+	}); err != nil {
+		return fmt.Errorf("error adding context: %w", err)
+	}
+	if err := step.Contexts().SaveCurrent(name); err != nil {
+		return fmt.Errorf("error saving context: %w", err)
+	}
+	if err := step.Contexts().SetCurrent(name); err != nil {
+		return fmt.Errorf("error setting context: %w", err)
+	}
+	if err := os.MkdirAll(step.Path(), 0700); err != nil {
+		return fmt.Errorf("error creating directory: %w", err)
 	}
 	return nil
 }
