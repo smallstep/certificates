@@ -413,13 +413,13 @@ func (a *Authority) init() error {
 
 	// Read root certificates and store them in the certificates map.
 	if len(a.rootX509Certs) == 0 {
-		a.rootX509Certs = make([]*x509.Certificate, len(a.config.Root))
-		for i, path := range a.config.Root {
-			crt, err := pemutil.ReadCertificate(path)
+		a.rootX509Certs = make([]*x509.Certificate, 0, len(a.config.Root))
+		for _, path := range a.config.Root {
+			crts, err := pemutil.ReadCertificateBundle(path)
 			if err != nil {
 				return err
 			}
-			a.rootX509Certs[i] = crt
+			a.rootX509Certs = append(a.rootX509Certs, crts...)
 		}
 	}
 	for _, crt := range a.rootX509Certs {
@@ -434,13 +434,13 @@ func (a *Authority) init() error {
 
 	// Read federated certificates and store them in the certificates map.
 	if len(a.federatedX509Certs) == 0 {
-		a.federatedX509Certs = make([]*x509.Certificate, len(a.config.FederatedRoots))
-		for i, path := range a.config.FederatedRoots {
-			crt, err := pemutil.ReadCertificate(path)
+		a.federatedX509Certs = make([]*x509.Certificate, 0, len(a.config.FederatedRoots))
+		for _, path := range a.config.FederatedRoots {
+			crts, err := pemutil.ReadCertificateBundle(path)
 			if err != nil {
 				return err
 			}
-			a.federatedX509Certs[i] = crt
+			a.federatedX509Certs = append(a.federatedX509Certs, crts...)
 		}
 	}
 	for _, crt := range a.federatedX509Certs {
