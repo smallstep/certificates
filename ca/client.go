@@ -13,6 +13,7 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"encoding/pem"
+	"fmt"
 	"io"
 	"net/http"
 	"net/url"
@@ -76,7 +77,7 @@ func (c *uaClient) SetTransport(tr http.RoundTripper) {
 func (c *uaClient) Get(u string) (*http.Response, error) {
 	req, err := http.NewRequest("GET", u, http.NoBody)
 	if err != nil {
-		return nil, errors.Wrapf(err, "new request GET %s failed", u)
+		return nil, errors.Wrapf(err, "create GET %s request failed", u)
 	}
 	req.Header.Set("User-Agent", UserAgent)
 	return c.Client.Do(req)
@@ -85,7 +86,7 @@ func (c *uaClient) Get(u string) (*http.Response, error) {
 func (c *uaClient) Post(u, contentType string, body io.Reader) (*http.Response, error) {
 	req, err := http.NewRequest("POST", u, body)
 	if err != nil {
-		return nil, err
+		return nil, errors.Wrapf(err, "create POST %s request failed", u)
 	}
 	req.Header.Set("Content-Type", contentType)
 	req.Header.Set("User-Agent", UserAgent)
@@ -588,7 +589,7 @@ func (c *Client) Version() (*api.VersionResponse, error) {
 retry:
 	resp, err := c.client.Get(u.String())
 	if err != nil {
-		return nil, errs.Wrapf(http.StatusInternalServerError, err, "client.Version; client GET %s failed", u)
+		return nil, clientError(err)
 	}
 	if resp.StatusCode >= 400 {
 		if !retried && c.retryOnError(resp) {
@@ -612,7 +613,7 @@ func (c *Client) Health() (*api.HealthResponse, error) {
 retry:
 	resp, err := c.client.Get(u.String())
 	if err != nil {
-		return nil, errs.Wrapf(http.StatusInternalServerError, err, "client.Health; client GET %s failed", u)
+		return nil, clientError(err)
 	}
 	if resp.StatusCode >= 400 {
 		if !retried && c.retryOnError(resp) {
@@ -639,7 +640,7 @@ func (c *Client) Root(sha256Sum string) (*api.RootResponse, error) {
 retry:
 	resp, err := newInsecureClient().Get(u.String())
 	if err != nil {
-		return nil, errs.Wrapf(http.StatusInternalServerError, err, "client.Root; client GET %s failed", u)
+		return nil, clientError(err)
 	}
 	if resp.StatusCode >= 400 {
 		if !retried && c.retryOnError(resp) {
@@ -672,7 +673,7 @@ func (c *Client) Sign(req *api.SignRequest) (*api.SignResponse, error) {
 retry:
 	resp, err := c.client.Post(u.String(), "application/json", bytes.NewReader(body))
 	if err != nil {
-		return nil, errs.Wrapf(http.StatusInternalServerError, err, "client.Sign; client POST %s failed", u)
+		return nil, clientError(err)
 	}
 	if resp.StatusCode >= 400 {
 		if !retried && c.retryOnError(resp) {
@@ -700,7 +701,7 @@ func (c *Client) Renew(tr http.RoundTripper) (*api.SignResponse, error) {
 retry:
 	resp, err := client.Post(u.String(), "application/json", http.NoBody)
 	if err != nil {
-		return nil, errs.Wrapf(http.StatusInternalServerError, err, "client.Renew; client POST %s failed", u)
+		return nil, clientError(err)
 	}
 	if resp.StatusCode >= 400 {
 		if !retried && c.retryOnError(resp) {
@@ -724,13 +725,13 @@ func (c *Client) RenewWithToken(token string) (*api.SignResponse, error) {
 	u := c.endpoint.ResolveReference(&url.URL{Path: "/renew"})
 	req, err := http.NewRequest("POST", u.String(), http.NoBody)
 	if err != nil {
-		return nil, errs.Wrapf(http.StatusInternalServerError, err, "client.RenewWithToken; error creating request")
+		return nil, errors.Wrapf(err, "create POST %s request failed", u)
 	}
 	req.Header.Add("Authorization", "Bearer "+token)
 retry:
 	resp, err := c.client.Do(req)
 	if err != nil {
-		return nil, errs.Wrapf(http.StatusInternalServerError, err, "client.RenewWithToken; client POST %s failed", u)
+		return nil, clientError(err)
 	}
 	if resp.StatusCode >= 400 {
 		if !retried && c.retryOnError(resp) {
@@ -760,7 +761,7 @@ func (c *Client) Rekey(req *api.RekeyRequest, tr http.RoundTripper) (*api.SignRe
 retry:
 	resp, err := client.Post(u.String(), "application/json", bytes.NewReader(body))
 	if err != nil {
-		return nil, errs.Wrapf(http.StatusInternalServerError, err, "client.Rekey; client POST %s failed", u)
+		return nil, clientError(err)
 	}
 	if resp.StatusCode >= 400 {
 		if !retried && c.retryOnError(resp) {
@@ -795,7 +796,7 @@ retry:
 	u := c.endpoint.ResolveReference(&url.URL{Path: "/revoke"})
 	resp, err := client.Post(u.String(), "application/json", bytes.NewReader(body))
 	if err != nil {
-		return nil, errors.Wrapf(err, "client POST %s failed", u)
+		return nil, clientError(err)
 	}
 	if resp.StatusCode >= 400 {
 		if !retried && c.retryOnError(resp) {
@@ -829,7 +830,7 @@ func (c *Client) Provisioners(opts ...ProvisionerOption) (*api.ProvisionersRespo
 retry:
 	resp, err := c.client.Get(u.String())
 	if err != nil {
-		return nil, errors.Wrapf(err, "client GET %s failed", u)
+		return nil, clientError(err)
 	}
 	if resp.StatusCode >= 400 {
 		if !retried && c.retryOnError(resp) {
@@ -854,7 +855,7 @@ func (c *Client) ProvisionerKey(kid string) (*api.ProvisionerKeyResponse, error)
 retry:
 	resp, err := c.client.Get(u.String())
 	if err != nil {
-		return nil, errors.Wrapf(err, "client GET %s failed", u)
+		return nil, clientError(err)
 	}
 	if resp.StatusCode >= 400 {
 		if !retried && c.retryOnError(resp) {
@@ -878,7 +879,7 @@ func (c *Client) Roots() (*api.RootsResponse, error) {
 retry:
 	resp, err := c.client.Get(u.String())
 	if err != nil {
-		return nil, errors.Wrapf(err, "client GET %s failed", u)
+		return nil, clientError(err)
 	}
 	if resp.StatusCode >= 400 {
 		if !retried && c.retryOnError(resp) {
@@ -902,7 +903,7 @@ func (c *Client) Federation() (*api.FederationResponse, error) {
 retry:
 	resp, err := c.client.Get(u.String())
 	if err != nil {
-		return nil, errors.Wrapf(err, "client GET %s failed", u)
+		return nil, clientError(err)
 	}
 	if resp.StatusCode >= 400 {
 		if !retried && c.retryOnError(resp) {
@@ -930,7 +931,7 @@ func (c *Client) SSHSign(req *api.SSHSignRequest) (*api.SSHSignResponse, error) 
 retry:
 	resp, err := c.client.Post(u.String(), "application/json", bytes.NewReader(body))
 	if err != nil {
-		return nil, errors.Wrapf(err, "client POST %s failed", u)
+		return nil, clientError(err)
 	}
 	if resp.StatusCode >= 400 {
 		if !retried && c.retryOnError(resp) {
@@ -958,7 +959,7 @@ func (c *Client) SSHRenew(req *api.SSHRenewRequest) (*api.SSHRenewResponse, erro
 retry:
 	resp, err := c.client.Post(u.String(), "application/json", bytes.NewReader(body))
 	if err != nil {
-		return nil, errors.Wrapf(err, "client POST %s failed", u)
+		return nil, clientError(err)
 	}
 	if resp.StatusCode >= 400 {
 		if !retried && c.retryOnError(resp) {
@@ -986,7 +987,7 @@ func (c *Client) SSHRekey(req *api.SSHRekeyRequest) (*api.SSHRekeyResponse, erro
 retry:
 	resp, err := c.client.Post(u.String(), "application/json", bytes.NewReader(body))
 	if err != nil {
-		return nil, errors.Wrapf(err, "client POST %s failed", u)
+		return nil, clientError(err)
 	}
 	if resp.StatusCode >= 400 {
 		if !retried && c.retryOnError(resp) {
@@ -1014,7 +1015,7 @@ func (c *Client) SSHRevoke(req *api.SSHRevokeRequest) (*api.SSHRevokeResponse, e
 retry:
 	resp, err := c.client.Post(u.String(), "application/json", bytes.NewReader(body))
 	if err != nil {
-		return nil, errors.Wrapf(err, "client POST %s failed", u)
+		return nil, clientError(err)
 	}
 	if resp.StatusCode >= 400 {
 		if !retried && c.retryOnError(resp) {
@@ -1038,7 +1039,7 @@ func (c *Client) SSHRoots() (*api.SSHRootsResponse, error) {
 retry:
 	resp, err := c.client.Get(u.String())
 	if err != nil {
-		return nil, errors.Wrapf(err, "client GET %s failed", u)
+		return nil, clientError(err)
 	}
 	if resp.StatusCode >= 400 {
 		if !retried && c.retryOnError(resp) {
@@ -1062,7 +1063,7 @@ func (c *Client) SSHFederation() (*api.SSHRootsResponse, error) {
 retry:
 	resp, err := c.client.Get(u.String())
 	if err != nil {
-		return nil, errors.Wrapf(err, "client GET %s failed", u)
+		return nil, clientError(err)
 	}
 	if resp.StatusCode >= 400 {
 		if !retried && c.retryOnError(resp) {
@@ -1090,7 +1091,7 @@ func (c *Client) SSHConfig(req *api.SSHConfigRequest) (*api.SSHConfigResponse, e
 retry:
 	resp, err := c.client.Post(u.String(), "application/json", bytes.NewReader(body))
 	if err != nil {
-		return nil, errors.Wrapf(err, "client POST %s failed", u)
+		return nil, clientError(err)
 	}
 	if resp.StatusCode >= 400 {
 		if !retried && c.retryOnError(resp) {
@@ -1123,8 +1124,7 @@ func (c *Client) SSHCheckHost(principal, token string) (*api.SSHCheckPrincipalRe
 retry:
 	resp, err := c.client.Post(u.String(), "application/json", bytes.NewReader(body))
 	if err != nil {
-		return nil, errs.Wrapf(http.StatusInternalServerError, err, "client POST %s failed",
-			[]interface{}{u, errs.WithMessage("Failed to perform POST request to %s", u)}...)
+		return nil, clientError(err)
 	}
 	if resp.StatusCode >= 400 {
 		if !retried && c.retryOnError(resp) {
@@ -1148,7 +1148,7 @@ func (c *Client) SSHGetHosts() (*api.SSHGetHostsResponse, error) {
 retry:
 	resp, err := c.client.Get(u.String())
 	if err != nil {
-		return nil, errors.Wrapf(err, "client GET %s failed", u)
+		return nil, clientError(err)
 	}
 	if resp.StatusCode >= 400 {
 		if !retried && c.retryOnError(resp) {
@@ -1175,7 +1175,7 @@ func (c *Client) SSHBastion(req *api.SSHBastionRequest) (*api.SSHBastionResponse
 retry:
 	resp, err := c.client.Post(u.String(), "application/json", bytes.NewReader(body))
 	if err != nil {
-		return nil, errors.Wrapf(err, "client.SSHBastion; client POST %s failed", u)
+		return nil, clientError(err)
 	}
 	if resp.StatusCode >= 400 {
 		if !retried && c.retryOnError(resp) {
@@ -1198,7 +1198,7 @@ func (c *Client) RootFingerprint() (string, error) {
 	u := c.endpoint.ResolveReference(&url.URL{Path: "/health"})
 	resp, err := c.client.Get(u.String())
 	if err != nil {
-		return "", errors.Wrapf(err, "client GET %s failed", u)
+		return "", clientError(err)
 	}
 	defer resp.Body.Close()
 	if resp.TLS == nil || len(resp.TLS.VerifiedChains) == 0 {
@@ -1352,4 +1352,13 @@ func readError(r io.ReadCloser) error {
 		return err
 	}
 	return apiErr
+}
+
+func clientError(err error) error {
+	var uerr *url.Error
+	if errors.As(err, &uerr) {
+		return fmt.Errorf("client %s %s failed: %w",
+			strings.ToUpper(uerr.Op), uerr.URL, uerr.Err)
+	}
+	return fmt.Errorf("client request failed: %w", err)
 }
