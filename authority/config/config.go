@@ -90,7 +90,7 @@ type CRLConfig struct {
 	GenerateOnRevoke bool                  `json:"generateOnRevoke,omitempty"`
 	CacheDuration    *provisioner.Duration `json:"cacheDuration,omitempty"`
 	RenewPeriod      *provisioner.Duration `json:"renewPeriod,omitempty"`
-	IDPurl			 string				   `json:"idpurl"`
+	IDPurl           string                `json:"idpurl"`
 }
 
 // IsEnabled returns if the CRL is enabled.
