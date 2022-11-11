@@ -773,10 +773,17 @@ func (a *Authority) GenerateCertificateRevocationList() error {
 		NextUpdate:          now.Add(updateDuration),
 	}
 
+	// Set CRL IDP to config item, otherwise, leave as default
+	var fullName string
+	if a.config.CRL.IDPurl != "" {
+		fullName = a.config.CRL.IDPurl
+	} else {
+		fullName = a.config.Audience("/1.0/crl")[0]
+	}
+
 	// Add distribution point.
 	//
 	// Note that this is currently using the port 443 by default.
-	fullName := a.config.Audience("/1.0/crl")[0]
 	if b, err := marshalDistributionPoint(fullName, false); err == nil {
 		revocationList.ExtraExtensions = []pkix.Extension{
 			{Id: oidExtensionIssuingDistributionPoint, Value: b},
