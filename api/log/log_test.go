@@ -4,7 +4,6 @@ import (
 	"errors"
 	"net/http"
 	"net/http/httptest"
-	"reflect"
 	"testing"
 	"unsafe"
 
@@ -26,10 +25,10 @@ func TestError(t *testing.T) {
 		name       string
 		args       args
 		withFields bool
-		want       error
+		want       string
 	}{
-		{"normalLogger", args{httptest.NewRecorder(), theError}, false, theError},
-		{"responseLogger", args{logging.NewResponseLogger(httptest.NewRecorder()), theError}, true, theError},
+		{"normalLogger", args{httptest.NewRecorder(), theError}, false, "the error"},
+		{"responseLogger", args{logging.NewResponseLogger(httptest.NewRecorder()), theError}, true, "the error"},
 	}
 
 	for _, tt := range tests {
@@ -38,8 +37,8 @@ func TestError(t *testing.T) {
 			if tt.withFields {
 				if rl, ok := tt.args.rw.(logging.ResponseLogger); ok {
 					fields := rl.Fields()
-					if !reflect.DeepEqual(fields["error"], tt.want) {
-						t.Errorf("ResponseLogger[\"error\"] = %s, wants %s", fields["error"], tt.want)
+					if fields["error"].(error).Error() != tt.want {
+						t.Errorf(`ResponseLogger["error"] = %s, wants %s`, fields["error"], tt.want)
 					}
 				} else {
 					t.Error("ResponseWriter does not implement logging.ResponseLogger")
@@ -76,9 +75,9 @@ func TestError_StackTracedError(t *testing.T) {
 		name       string
 		args       args
 		withFields bool
-		want       error
+		want       string
 	}{
-		{"responseLoggerWithStackTracedError", args{logging.NewResponseLogger(httptest.NewRecorder()), &aStackTracedError}, true, &aStackTracedError},
+		{"responseLoggerWithStackTracedError", args{logging.NewResponseLogger(httptest.NewRecorder()), &aStackTracedError}, true, "a stacktraced error"},
 	}
 
 	for _, tt := range tests {
@@ -87,12 +86,12 @@ func TestError_StackTracedError(t *testing.T) {
 			if tt.withFields {
 				if rl, ok := tt.args.rw.(logging.ResponseLogger); ok {
 					fields := rl.Fields()
-					if !reflect.DeepEqual(fields["error"], tt.want) {
-						t.Errorf("ResponseLogger[\"error\"] = %s, wants %s", fields["error"], tt.want)
+					if fields["error"].(error).Error() != tt.want {
+						t.Errorf(`ResponseLogger["error"] = %s, wants %s`, fields["error"], tt.want)
 					}
 					// `stack-trace` expected to be set; not interested in actual output
 					if _, ok := fields["stack-trace"]; !ok {
-						t.Errorf("ResponseLogger[\"stack-trace\"] not set")
+						t.Errorf(`ResponseLogger["stack-trace"] not set`)
 					}
 				} else {
 					t.Error("ResponseWriter does not implement logging.ResponseLogger")
