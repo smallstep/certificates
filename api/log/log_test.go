@@ -1,102 +1,72 @@
 package log
 
 import (
-	"errors"
-	"net/http"
 	"net/http/httptest"
+	"strconv"
 	"testing"
 	"unsafe"
 
 	pkgerrors "github.com/pkg/errors"
+	"github.com/stretchr/testify/assert"
 
 	"github.com/smallstep/certificates/logging"
 )
 
 func TestError(t *testing.T) {
-
-	t.Setenv("STEPDEBUG", "1") // force to end of `Error` function instead of early return
-	theError := errors.New("the error")
-
-	type args struct {
-		rw  http.ResponseWriter
-		err error
-	}
-	tests := []struct {
-		name       string
-		args       args
-		withFields bool
-		want       string
+	cases := []struct {
+		error
+		stepDebug        bool
+		expectStackTrace bool
 	}{
-		{"normalLogger", args{httptest.NewRecorder(), theError}, false, "the error"},
-		{"responseLogger", args{logging.NewResponseLogger(httptest.NewRecorder()), theError}, true, "the error"},
+		0: {nil, false, false},
+		1: {nil, true, false},
+		2: {assert.AnError, false, false},
+		3: {assert.AnError, true, false},
+		4: {new(stackTracedError), false, false},
+		5: {new(stackTracedError), true, true},
 	}
 
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			Error(tt.args.rw, tt.args.err)
-			if tt.withFields {
-				if rl, ok := tt.args.rw.(logging.ResponseLogger); ok {
-					fields := rl.Fields()
-					if fields["error"].(error).Error() != tt.want {
-						t.Errorf(`ResponseLogger["error"] = %s, wants %s`, fields["error"], tt.want)
-					}
-				} else {
-					t.Error("ResponseWriter does not implement logging.ResponseLogger")
-				}
+	for caseIndex := range cases {
+		kase := cases[caseIndex]
+
+		t.Run(strconv.Itoa(caseIndex), func(t *testing.T) {
+			if kase.stepDebug {
+				t.Setenv("STEPDEBUG", "1")
+			} else {
+				t.Setenv("STEPDEBUG", "0")
+			}
+
+			rw := logging.NewResponseLogger(httptest.NewRecorder())
+			Error(rw, kase.error)
+
+			fields := rw.Fields()
+
+			// expect the error field to be set and to be the same error that was fed to Error
+			if kase.error == nil {
+				assert.Nil(t, fields["error"])
+			} else {
+				assert.Same(t, kase.error, fields["error"])
+			}
+
+			if _, hasStackTrace := fields["stack-trace"]; kase.expectStackTrace && !hasStackTrace {
+				t.Error("stack-trace was not set")
+			} else if !kase.expectStackTrace && hasStackTrace {
+				t.Error("stack-trace was set")
 			}
 		})
 	}
 }
 
-type mockStackTracedError struct{}
+type stackTracedError struct{}
 
-func (t *mockStackTracedError) Error() string {
+func (stackTracedError) Error() string {
 	return "a stacktraced error"
 }
 
-func (t *mockStackTracedError) StackTrace() pkgerrors.StackTrace {
+func (stackTracedError) StackTrace() pkgerrors.StackTrace {
 	f := struct{}{}
 	return pkgerrors.StackTrace{ // fake stacktrace
 		pkgerrors.Frame(unsafe.Pointer(&f)),
 		pkgerrors.Frame(unsafe.Pointer(&f)),
-	}
-}
-
-func TestError_StackTracedError(t *testing.T) {
-
-	t.Setenv("STEPDEBUG", "1")
-	aStackTracedError := mockStackTracedError{}
-
-	type args struct {
-		rw  http.ResponseWriter
-		err error
-	}
-	tests := []struct {
-		name       string
-		args       args
-		withFields bool
-		want       string
-	}{
-		{"responseLoggerWithStackTracedError", args{logging.NewResponseLogger(httptest.NewRecorder()), &aStackTracedError}, true, "a stacktraced error"},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			Error(tt.args.rw, tt.args.err)
-			if tt.withFields {
-				if rl, ok := tt.args.rw.(logging.ResponseLogger); ok {
-					fields := rl.Fields()
-					if fields["error"].(error).Error() != tt.want {
-						t.Errorf(`ResponseLogger["error"] = %s, wants %s`, fields["error"], tt.want)
-					}
-					// `stack-trace` expected to be set; not interested in actual output
-					if _, ok := fields["stack-trace"]; !ok {
-						t.Errorf(`ResponseLogger["stack-trace"] not set`)
-					}
-				} else {
-					t.Error("ResponseWriter does not implement logging.ResponseLogger")
-				}
-			}
-		})
 	}
 }
