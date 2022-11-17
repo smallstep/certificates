@@ -1,8 +1,8 @@
 package log
 
 import (
+	"net/http"
 	"net/http/httptest"
-	"strconv"
 	"testing"
 	"unsafe"
 
@@ -11,51 +11,6 @@ import (
 
 	"github.com/smallstep/certificates/logging"
 )
-
-func TestError(t *testing.T) {
-	cases := []struct {
-		error
-		stepDebug        bool
-		expectStackTrace bool
-	}{
-		0: {nil, false, false},
-		1: {nil, true, false},
-		2: {assert.AnError, false, false},
-		3: {assert.AnError, true, false},
-		4: {new(stackTracedError), false, false},
-		5: {new(stackTracedError), true, true},
-	}
-
-	for caseIndex := range cases {
-		kase := cases[caseIndex]
-
-		t.Run(strconv.Itoa(caseIndex), func(t *testing.T) {
-			if kase.stepDebug {
-				t.Setenv("STEPDEBUG", "1")
-			} else {
-				t.Setenv("STEPDEBUG", "0")
-			}
-
-			rw := logging.NewResponseLogger(httptest.NewRecorder())
-			Error(rw, kase.error)
-
-			fields := rw.Fields()
-
-			// expect the error field to be set and to be the same error that was fed to Error
-			if kase.error == nil {
-				assert.Nil(t, fields["error"])
-			} else {
-				assert.Same(t, kase.error, fields["error"])
-			}
-
-			if _, hasStackTrace := fields["stack-trace"]; kase.expectStackTrace && !hasStackTrace {
-				t.Error("stack-trace was not set")
-			} else if !kase.expectStackTrace && hasStackTrace {
-				t.Error("stack-trace was set")
-			}
-		})
-	}
-}
 
 type stackTracedError struct{}
 
@@ -68,5 +23,57 @@ func (stackTracedError) StackTrace() pkgerrors.StackTrace {
 	return pkgerrors.StackTrace{ // fake stacktrace
 		pkgerrors.Frame(unsafe.Pointer(&f)),
 		pkgerrors.Frame(unsafe.Pointer(&f)),
+	}
+}
+
+func TestError(t *testing.T) {
+	tests := []struct {
+		name string
+		error
+		rw               http.ResponseWriter
+		isFieldCarrier   bool
+		stepDebug        bool
+		expectStackTrace bool
+	}{
+		{"noLogger", nil, nil, false, false, false},
+		{"noError", nil, logging.NewResponseLogger(httptest.NewRecorder()), true, false, false},
+		{"noErrorDebug", nil, logging.NewResponseLogger(httptest.NewRecorder()), true, true, false},
+		{"anError", assert.AnError, logging.NewResponseLogger(httptest.NewRecorder()), true, false, false},
+		{"anErrorDebug", assert.AnError, logging.NewResponseLogger(httptest.NewRecorder()), true, true, false},
+		{"stackTracedError", new(stackTracedError), logging.NewResponseLogger(httptest.NewRecorder()), true, true, true},
+		{"stackTracedErrorDebug", new(stackTracedError), logging.NewResponseLogger(httptest.NewRecorder()), true, true, true},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if tt.stepDebug {
+				t.Setenv("STEPDEBUG", "1")
+			} else {
+				t.Setenv("STEPDEBUG", "0")
+			}
+
+			Error(tt.rw, tt.error)
+
+			// return early if test case doesn't use logger
+			if !tt.isFieldCarrier {
+				return
+			}
+
+			fields := tt.rw.(logging.ResponseLogger).Fields()
+
+			// expect the error field to be (not) set and to be the same error that was fed to Error
+			if tt.error == nil {
+				assert.Nil(t, fields["error"])
+			} else {
+				assert.Same(t, tt.error, fields["error"])
+			}
+
+			// check if stack-trace is set when expected
+			if _, hasStackTrace := fields["stack-trace"]; tt.expectStackTrace && !hasStackTrace {
+				t.Error(`ResponseLogger["stack-trace"] not set`)
+			} else if !tt.expectStackTrace && hasStackTrace {
+				t.Error(`ResponseLogger["stack-trace"] was set`)
+			}
+		})
 	}
 }

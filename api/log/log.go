@@ -21,6 +21,7 @@ type StackTracedError interface {
 
 type fieldCarrier interface {
 	WithFields(map[string]any)
+	Fields() map[string]any
 }
 
 // Error adds to the response writer the given error if it implements
