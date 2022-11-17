@@ -39,7 +39,7 @@ func Error(rw http.ResponseWriter, err error) {
 	}
 
 	var st StackTracedError
-	if !errors.As(err, &st) {
+	if errors.As(err, &st) {
 		rl.WithFields(map[string]interface{}{
 			"stack-trace": fmt.Sprintf("%+v", st.StackTrace()),
 		})
