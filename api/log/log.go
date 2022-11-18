@@ -7,8 +7,6 @@ import (
 	"os"
 
 	"github.com/pkg/errors"
-
-	"github.com/smallstep/certificates/logging"
 )
 
 // StackTracedError is the set of errors implementing the StackTrace function.
@@ -21,16 +19,21 @@ type StackTracedError interface {
 	StackTrace() errors.StackTrace
 }
 
+type fieldCarrier interface {
+	WithFields(map[string]any)
+	Fields() map[string]any
+}
+
 // Error adds to the response writer the given error if it implements
 // logging.ResponseLogger. If it does not implement it, then writes the error
 // using the log package.
 func Error(rw http.ResponseWriter, err error) {
-	rl, ok := rw.(logging.ResponseLogger)
+	fc, ok := rw.(fieldCarrier)
 	if !ok {
 		return
 	}
 
-	rl.WithFields(map[string]interface{}{
+	fc.WithFields(map[string]any{
 		"error": err,
 	})
 
@@ -39,8 +42,8 @@ func Error(rw http.ResponseWriter, err error) {
 	}
 
 	var st StackTracedError
-	if !errors.As(err, &st) {
-		rl.WithFields(map[string]interface{}{
+	if errors.As(err, &st) {
+		fc.WithFields(map[string]any{
 			"stack-trace": fmt.Sprintf("%+v", st.StackTrace()),
 		})
 	}
@@ -48,9 +51,9 @@ func Error(rw http.ResponseWriter, err error) {
 
 // EnabledResponse log the response object if it implements the EnableLogger
 // interface.
-func EnabledResponse(rw http.ResponseWriter, v interface{}) {
+func EnabledResponse(rw http.ResponseWriter, v any) {
 	type enableLogger interface {
-		ToLog() (interface{}, error)
+		ToLog() (any, error)
 	}
 
 	if el, ok := v.(enableLogger); ok {
@@ -61,8 +64,8 @@ func EnabledResponse(rw http.ResponseWriter, v interface{}) {
 			return
 		}
 
-		if rl, ok := rw.(logging.ResponseLogger); ok {
-			rl.WithFields(map[string]interface{}{
+		if rl, ok := rw.(fieldCarrier); ok {
+			rl.WithFields(map[string]any{
 				"response": out,
 			})
 		}
