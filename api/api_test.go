@@ -212,6 +212,7 @@ type mockAuthority struct {
 	checkSSHHost                 func(ctx context.Context, principal, token string) (bool, error)
 	getSSHBastion                func(ctx context.Context, user string, hostname string) (*authority.Bastion, error)
 	version                      func() authority.Version
+	capabilities                 func() authority.Capabilities
 }
 
 func (m *mockAuthority) GetCertificateRevocationList() ([]byte, error) {
@@ -403,6 +404,13 @@ func (m *mockAuthority) Version() authority.Version {
 		return m.version()
 	}
 	return m.ret1.(authority.Version)
+}
+
+func (m *mockAuthority) Capabilities() authority.Capabilities {
+	if m.version != nil {
+		return m.capabilities()
+	}
+	return m.ret1.(authority.Capabilities)
 }
 
 func TestNewCertificate(t *testing.T) {
@@ -870,6 +878,35 @@ func Test_Health(t *testing.T) {
 	expected := []byte("{\"status\":\"ok\"}\n")
 	if !bytes.Equal(body, expected) {
 		t.Errorf("caHandler.Health Body = %s, wants %s", body, expected)
+	}
+}
+
+func Test_Capabilities(t *testing.T) {
+	capResp := CapabilitiesResponse{
+		RequireClientAuthentication:   false,
+		RemoteConfigurationManagement: true,
+	}
+	mockMustAuthority(t, &mockAuthority{ret1: authority.Capabilities(capResp)})
+	req := httptest.NewRequest("GET", "http://example.com/capabilities", nil)
+	w := httptest.NewRecorder()
+	Capabilities(w, req)
+
+	res := w.Result()
+	if res.StatusCode != 200 {
+		t.Errorf("caHandler.Capabilities StatusCode = %d, wants 200", res.StatusCode)
+	}
+
+	body, err := io.ReadAll(res.Body)
+	res.Body.Close()
+	if err != nil {
+		t.Errorf("caHandler.Capabilities unexpected error = %v", err)
+	}
+	wantBytes, err := json.Marshal(capResp)
+	if err != nil {
+		assert.FatalError(t, err)
+	}
+	if !bytes.Equal(bytes.TrimSpace(body), wantBytes) {
+		t.Errorf("caHandler.Capabilities Body = %s, wants %s", body, wantBytes)
 	}
 }
 

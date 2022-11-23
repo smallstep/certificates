@@ -45,6 +45,9 @@ var DisableIdentity = false
 // UserAgent will set the User-Agent header in the client requests.
 var UserAgent = "step-http-client/1.0"
 
+// ErrNotFound is a standard not-found error.
+var ErrNotFound = errors.New("not found")
+
 type uaClient struct {
 	Client *http.Client
 }
@@ -603,6 +606,34 @@ retry:
 		return nil, errs.Wrapf(http.StatusInternalServerError, err, "client.Version; error reading %s", u)
 	}
 	return &version, nil
+}
+
+// Capabilities performs the capabilities request to the CA and returns the
+// api.Capabilities struct.
+func (c *Client) Capabilities() (*api.CapabilitiesResponse, error) {
+	var retried bool
+	u := c.endpoint.ResolveReference(&url.URL{Path: "/capabilities"})
+retry:
+	resp, err := c.client.Get(u.String())
+	if err != nil {
+		return nil, clientError(err)
+	}
+	switch {
+	case resp.StatusCode == http.StatusNotFound:
+		return nil, ErrNotFound
+	case resp.StatusCode >= 400:
+		if !retried && c.retryOnError(resp) {
+			retried = true
+			goto retry
+		}
+		return nil, readError(resp.Body)
+	default:
+		var capabilities api.CapabilitiesResponse
+		if err := readJSON(resp.Body, &capabilities); err != nil {
+			return nil, errs.Wrapf(http.StatusInternalServerError, err, "client.Capabilities; error reading %s", u)
+		}
+		return &capabilities, nil
+	}
 }
 
 // Health performs the health request to the CA and returns the

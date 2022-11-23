@@ -50,6 +50,7 @@ type Authority interface {
 	GetRoots() ([]*x509.Certificate, error)
 	GetFederation() ([]*x509.Certificate, error)
 	Version() authority.Version
+	Capabilities() authority.Capabilities
 	GetCertificateRevocationList() ([]byte, error)
 }
 
@@ -211,6 +212,10 @@ type VersionResponse struct {
 	RequireClientAuthentication bool   `json:"requireClientAuthentication,omitempty"`
 }
 
+// CapabilitiesResponse is the response object that returns the version of the
+// server.
+type CapabilitiesResponse authority.Capabilities
+
 // HealthResponse is the response object that returns the health of the server.
 type HealthResponse struct {
 	Status string `json:"status"`
@@ -261,8 +266,10 @@ func New(auth Authority) RouterHandler {
 	return &caHandler{}
 }
 
+// Route defines routing for the API.
 func Route(r Router) {
 	r.MethodFunc("GET", "/version", Version)
+	r.MethodFunc("GET", "/capabilities", Capabilities)
 	r.MethodFunc("GET", "/health", Health)
 	r.MethodFunc("GET", "/root/{sha}", Root)
 	r.MethodFunc("POST", "/sign", Sign)
@@ -301,6 +308,12 @@ func Version(w http.ResponseWriter, r *http.Request) {
 		Version:                     v.Version,
 		RequireClientAuthentication: v.RequireClientAuthentication,
 	})
+}
+
+// Capabilities is an HTTP handler that returns the capabilities of the authority
+// server.
+func Capabilities(w http.ResponseWriter, r *http.Request) {
+	render.JSON(w, CapabilitiesResponse(mustAuthority(r.Context()).Capabilities()))
 }
 
 // Health is an HTTP handler that returns the status of the server.

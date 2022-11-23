@@ -206,6 +206,64 @@ func TestClient_Version(t *testing.T) {
 	}
 }
 
+func TestClient_Capabilities(t *testing.T) {
+	ok := &api.CapabilitiesResponse{
+		RequireClientAuthentication:   false,
+		RemoteConfigurationManagement: true,
+	}
+
+	tests := []struct {
+		name         string
+		response     interface{}
+		responseCode int
+		wantErr      bool
+		expectedErr  error
+	}{
+		{"ok", ok, 200, false, nil},
+		{"500", errs.InternalServer("force"), 500, true, errors.New(errs.InternalServerErrorDefaultMsg)},
+		{"404", errs.NotFound("force"), 404, true, ErrNotFound},
+	}
+
+	srv := httptest.NewServer(nil)
+	defer srv.Close()
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			c, err := NewClient(srv.URL, WithTransport(http.DefaultTransport))
+			if err != nil {
+				t.Errorf("NewClient() error = %v", err)
+				return
+			}
+
+			srv.Config.Handler = http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+				render.JSONStatus(w, tt.response, tt.responseCode)
+			})
+
+			got, err := c.Capabilities()
+			if (err != nil) != tt.wantErr {
+				t.Errorf("Client.Capabilities() error = %v, wantErr %v", err, tt.wantErr)
+				return
+			}
+
+			switch {
+			case err != nil:
+				if got != nil {
+					t.Errorf("Client.Capabilities() = %v, want nil", got)
+				}
+				if tt.responseCode == http.StatusNotFound {
+					assert.True(t, errors.Is(err, ErrNotFound))
+				} else {
+					assert.HasPrefix(t, tt.expectedErr.Error(), err.Error())
+				}
+			default:
+				if !reflect.DeepEqual(got, tt.response) {
+					t.Errorf("Client.Version() = %v, want %v", got, tt.response)
+				}
+			}
+		})
+	}
+}
+
 func TestClient_Health(t *testing.T) {
 	ok := &api.HealthResponse{Status: "ok"}
 
