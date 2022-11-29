@@ -257,7 +257,7 @@ func TestClient_Capabilities(t *testing.T) {
 				}
 			default:
 				if !reflect.DeepEqual(got, tt.response) {
-					t.Errorf("Client.Version() = %v, want %v", got, tt.response)
+					t.Errorf("Client.Capabilities() = %v, want %v", got, tt.response)
 				}
 			}
 		})
