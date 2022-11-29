@@ -630,7 +630,7 @@ retry:
 	default:
 		var capabilities api.CapabilitiesResponse
 		if err := readJSON(resp.Body, &capabilities); err != nil {
-			return nil, errs.Wrapf(http.StatusInternalServerError, err, "client.Capabilities; error reading %s", u)
+			return nil, errs.Wrapf(http.StatusInternalServerError, err, "client.Capabilities; error reading %q", u)
 		}
 		return &capabilities, nil
 	}
