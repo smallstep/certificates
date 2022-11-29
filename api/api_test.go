@@ -407,7 +407,7 @@ func (m *mockAuthority) Version() authority.Version {
 }
 
 func (m *mockAuthority) Capabilities() authority.Capabilities {
-	if m.version != nil {
+	if m.capabilities != nil {
 		return m.capabilities()
 	}
 	return m.ret1.(authority.Capabilities)
