@@ -609,7 +609,7 @@ retry:
 }
 
 // Capabilities performs the capabilities request to the CA and returns the
-// api.Capabilities struct.
+// api.CapabilitiesResponse struct.
 func (c *Client) Capabilities() (*api.CapabilitiesResponse, error) {
 	var retried bool
 	u := c.endpoint.ResolveReference(&url.URL{Path: "/capabilities"})
