@@ -27,6 +27,11 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
 
 ## [Unreleased]
 
+### Added
+
+- Added configuration property `.crl.idpURL`  to be able to set a custom Issuing
+  Distribution Point in the CRL.
+
 ## [v0.23.0] - 2022-11-11
 
 ### Added
