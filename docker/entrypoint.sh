@@ -49,6 +49,12 @@ function step_ca_init () {
     if [ -n "${DOCKER_STEPCA_INIT_SSH}" ]; then
         setup_args=("${setup_args[@]}" --ssh)
     fi
+    if [ -n "${DOCKER_STEPCA_INIT_ACME}" ]; then
+        setup_args=("${setup_args[@]}" --acme)
+    fi
+    if [ -n "${DOCKER_STEPCA_INIT_REMOTE_MANAGEMENT}" ]; then
+        setup_args=("${setup_args[@]}" --remote-management)
+    fi
     step ca init "${setup_args[@]}"
     mv $STEPPATH/password $PWDPATH
 }
