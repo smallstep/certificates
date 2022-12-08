@@ -29,6 +29,8 @@ func (fn certificateOptionsFunc) Options(so SignOptions) []x509util.Option {
 type Options struct {
 	X509 *X509Options `json:"x509,omitempty"`
 	SSH  *SSHOptions  `json:"ssh,omitempty"`
+	OIDC *OIDCOptions `json:"oidc,omitempty"`
+	DPOP *DPOPOptions `json:"dpop,omitempty"`
 
 	// Webhooks is a list of webhooks that can augment template data
 	Webhooks []*Webhook `json:"webhooks,omitempty"`
@@ -48,6 +50,22 @@ func (o *Options) GetSSHOptions() *SSHOptions {
 		return nil
 	}
 	return o.SSH
+}
+
+// GetOIDCOptions returns the OIDC options.
+func (o *Options) GetOIDCOptions() *OIDCOptions {
+	if o == nil {
+		return nil
+	}
+	return o.OIDC
+}
+
+// GetDPOPOptions returns the OIDC options.
+func (o *Options) GetDPOPOptions() *DPOPOptions {
+	if o == nil {
+		return nil
+	}
+	return o.DPOP
 }
 
 // GetWebhooks returns the webhooks options.

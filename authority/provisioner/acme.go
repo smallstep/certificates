@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/pkg/errors"
+	"github.com/smallstep/certificates/wire"
 	"go.step.sm/linkedca"
 )
 
@@ -26,6 +27,10 @@ const (
 	TLS_ALPN_01 ACMEChallenge = "tls-alpn-01"
 	// DEVICE_ATTEST_01 is the device-attest-01 ACME challenge.
 	DEVICE_ATTEST_01 ACMEChallenge = "device-attest-01"
+	// WIREOIDC_01 is the Wire OIDC challenge.
+	WIREOIDC_01 ACMEChallenge = "wire-oidc-01"
+	// WIREDPOP_01 is the Wire DPoP challenge.
+	WIREDPOP_01 ACMEChallenge = "wire-dpop-01"
 )
 
 // String returns a normalized version of the challenge.
@@ -36,7 +41,7 @@ func (c ACMEChallenge) String() string {
 // Validate returns an error if the acme challenge is not a valid one.
 func (c ACMEChallenge) Validate() error {
 	switch ACMEChallenge(c.String()) {
-	case HTTP_01, DNS_01, TLS_ALPN_01, DEVICE_ATTEST_01:
+	case HTTP_01, DNS_01, TLS_ALPN_01, DEVICE_ATTEST_01, WIREOIDC_01, WIREDPOP_01:
 		return nil
 	default:
 		return fmt.Errorf("acme challenge %q is not supported", c)
@@ -59,6 +64,9 @@ const (
 
 	// TPM is the format used to enable device-attest-01 on TPMs.
 	TPM ACMEAttestationFormat = "tpm"
+
+	WIREOIDC ACMEAttestationFormat = "oidc"
+	WIREDPOP ACMEAttestationFormat = "dpop"
 )
 
 // String returns a normalized version of the attestation format.
@@ -69,7 +77,7 @@ func (f ACMEAttestationFormat) String() string {
 // Validate returns an error if the attestation format is not a valid one.
 func (f ACMEAttestationFormat) Validate() error {
 	switch ACMEAttestationFormat(f.String()) {
-	case APPLE, STEP, TPM:
+	case APPLE, STEP, TPM, WIREOIDC, WIREDPOP:
 		return nil
 	default:
 		return fmt.Errorf("acme attestation format %q is not supported", f)
@@ -218,6 +226,8 @@ const (
 	IP ACMEIdentifierType = "ip"
 	// DNS is the ACME dns identifier type
 	DNS ACMEIdentifierType = "dns"
+	// WireID is the Wire user identifier type
+	WireID ACMEIdentifierType = "wireapp-id"
 )
 
 // ACMEIdentifier encodes ACME Order Identifiers
@@ -243,6 +253,13 @@ func (p *ACME) AuthorizeOrderIdentifier(ctx context.Context, identifier ACMEIden
 		err = x509Policy.IsIPAllowed(net.ParseIP(identifier.Value))
 	case DNS:
 		err = x509Policy.IsDNSAllowed(identifier.Value)
+	case WireID:
+		wireSANs, err := wire.ParseID([]byte(identifier.Value))
+		if err != nil {
+			err = fmt.Errorf("could not parse Wire SANs: %w", err)
+			break
+		}
+		err = x509Policy.AreSANsAllowed([]string{wireSANs.ClientID, wireSANs.Handle})
 	default:
 		err = fmt.Errorf("invalid ACME identifier type '%s' provided", identifier.Type)
 	}
@@ -291,7 +308,7 @@ func (p *ACME) AuthorizeRenew(ctx context.Context, cert *x509.Certificate) error
 // Challenge provisioner property should have at least one element.
 func (p *ACME) IsChallengeEnabled(ctx context.Context, challenge ACMEChallenge) bool {
 	enabledChallenges := []ACMEChallenge{
-		HTTP_01, DNS_01, TLS_ALPN_01,
+		HTTP_01, DNS_01, TLS_ALPN_01, WIREOIDC_01, WIREDPOP_01,
 	}
 	if len(p.Challenges) > 0 {
 		enabledChallenges = p.Challenges
@@ -309,7 +326,7 @@ func (p *ACME) IsChallengeEnabled(ctx context.Context, challenge ACMEChallenge) 
 // AttestationFormat provisioner property should have at least one element.
 func (p *ACME) IsAttestationFormatEnabled(ctx context.Context, format ACMEAttestationFormat) bool {
 	enabledFormats := []ACMEAttestationFormat{
-		APPLE, STEP, TPM,
+		APPLE, STEP, TPM, WIREOIDC, WIREDPOP,
 	}
 	if len(p.AttestationFormats) > 0 {
 		enabledFormats = p.AttestationFormats

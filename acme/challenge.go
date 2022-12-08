@@ -15,11 +15,14 @@ import (
 	"encoding/base64"
 	"encoding/hex"
 	"encoding/json"
+	"encoding/pem"
 	"errors"
 	"fmt"
 	"io"
 	"net"
 	"net/url"
+	"os"
+	"os/exec"
 	"reflect"
 	"strconv"
 	"strings"
@@ -27,8 +30,10 @@ import (
 
 	"github.com/fxamacker/cbor/v2"
 	"github.com/smallstep/certificates/authority/provisioner"
+	"github.com/smallstep/certificates/wire"
 	"go.step.sm/crypto/jose"
 	"go.step.sm/crypto/pemutil"
+	"golang.org/x/oauth2"
 )
 
 type ChallengeType string
@@ -42,6 +47,10 @@ const (
 	TLSALPN01 ChallengeType = "tls-alpn-01"
 	// DEVICEATTEST01 is the device-attest-01 ACME challenge type
 	DEVICEATTEST01 ChallengeType = "device-attest-01"
+	// WIREOIDC01 is the Wire OIDC challenge type
+	WIREOIDC01 ChallengeType = "wire-oidc-01"
+	// WIREDPOP01 is the Wire DPoP challenge type
+	WIREDPOP01 ChallengeType = "wire-dpop-01"
 )
 
 var (
@@ -97,6 +106,10 @@ func (ch *Challenge) Validate(ctx context.Context, db DB, jwk *jose.JSONWebKey, 
 		return tlsalpn01Validate(ctx, ch, db, jwk)
 	case DEVICEATTEST01:
 		return deviceAttest01Validate(ctx, ch, db, jwk, payload)
+	case WIREOIDC01:
+		return wireOIDC01Validate(ctx, ch, db, jwk, payload)
+	case WIREDPOP01:
+		return wireDPOP01Validate(ctx, ch, db, jwk, payload)
 	default:
 		return NewErrorISE("unexpected challenge type '%s'", ch.Type)
 	}
@@ -332,6 +345,146 @@ func dns01Validate(ctx context.Context, ch *Challenge, db DB, jwk *jose.JSONWebK
 	if err = db.UpdateChallenge(ctx, ch); err != nil {
 		return WrapErrorISE(err, "error updating challenge")
 	}
+	return nil
+}
+
+func wireOIDC01Validate(ctx context.Context, ch *Challenge, db DB, jwk *jose.JSONWebKey, payload []byte) error {
+	prov, ok := ProvisionerFromContext(ctx)
+	if !ok {
+		return NewErrorISE("no provisioner provided")
+	}
+
+	var token oauth2.Token
+	err := json.Unmarshal(payload, &token)
+	if err != nil {
+		return storeError(ctx, db, ch, false, WrapError(ErrorRejectedIdentifierType, err,
+			"error unmarshalling OpenID token"))
+	}
+
+	idTokenRaw, ok := token.Extra("id_token").(string)
+	if !ok {
+		return storeError(ctx, db, ch, false, WrapError(ErrorRejectedIdentifierType, err,
+			"error retrieving ID token from OAUTH2 token"))
+	}
+
+	oidcOptions := prov.GetOptions().GetOIDCOptions()
+	idToken, err := oidcOptions.
+		GetProvider(ctx).
+		Verifier(
+			oidcOptions.
+				GetConfig()).
+		Verify(ctx, idTokenRaw)
+	if err != nil {
+		return storeError(ctx, db, ch, false, WrapError(ErrorRejectedIdentifierType, err,
+			"error verifying ID token signature"))
+	}
+
+	var claims struct {
+		Name    string `json:"name"`
+		Handle  string `json:"handle"`
+		KeyAuth string `json:"keyauth"`
+	}
+	err = idToken.Claims(&claims)
+	if err != nil {
+		return storeError(ctx, db, ch, false, WrapError(ErrorRejectedIdentifierType, err,
+			"error retrieving claims from ID token"))
+	}
+
+	challengeValues, err := wire.ParseID([]byte(ch.Value))
+	if err != nil {
+		return WrapErrorISE(err, "error unmarshalling challenge data")
+	}
+
+	expectedKeyAuth, err := KeyAuthorization(ch.Token, jwk)
+	if err != nil {
+		return err
+	}
+	if expectedKeyAuth != claims.KeyAuth {
+		return storeError(ctx, db, ch, true, NewError(ErrorRejectedIdentifierType,
+			"keyAuthorization does not match; expected %s, but got %s", expectedKeyAuth, claims.KeyAuth))
+	}
+
+	if challengeValues.Name != claims.Name || challengeValues.Handle != claims.Handle {
+		return storeError(ctx, db, ch, false, NewError(ErrorRejectedIdentifierType, "OIDC claims don't match"))
+	}
+
+	return nil
+}
+
+func wireDPOP01Validate(ctx context.Context, ch *Challenge, db DB, jwk *jose.JSONWebKey, payload []byte) error {
+	provisioner, ok := ProvisionerFromContext(ctx)
+	if !ok {
+		return NewErrorISE("missing provisioner")
+	}
+
+	key, ok := jwk.Key.(ed25519.PublicKey)
+	if !ok {
+		return NewErrorISE("key is not ED25519")
+	}
+
+	file, err := os.CreateTemp(os.TempDir(), "acme-validate-challenge-pubkey-")
+	if err != nil {
+		return WrapErrorISE(err, "temporary file could not be created")
+	}
+	defer file.Close()
+	defer os.Remove(file.Name())
+
+	err = pem.Encode(file, &pem.Block{
+		Type:  "PUBLIC KEY",
+		Bytes: key,
+	})
+	if err != nil {
+		return NewErrorISE("could not PEM-encode public key")
+	}
+
+	challengeValues, err := wire.ParseID([]byte(ch.Value))
+	if err != nil {
+		return WrapErrorISE(err, "error unmarshalling challenge data")
+	}
+
+	cmd := exec.CommandContext(
+		ctx,
+		provisioner.GetOptions().GetDPOPOptions().GetValidationExecPath(),
+		"verify-access",
+		"--client-id",
+		challengeValues.ClientID,
+		"--challenge",
+		ch.ID,
+		"--leeway",
+		"360",
+		"--max-expiry",
+		strconv.FormatInt(time.Now().Add(time.Hour*24*365).Unix(), 10),
+		"--hash-algorithm",
+		`"SHA-256"`,
+		"--key",
+		file.Name(),
+	)
+
+	stdin, err := cmd.StdinPipe()
+	if err != nil {
+		return WrapErrorISE(err, "error getting process stdin")
+	}
+
+	err = cmd.Start()
+	if err != nil {
+		return WrapErrorISE(err, "error starting validation process")
+	}
+
+	_, err = stdin.Write(payload)
+	if err != nil {
+		return WrapErrorISE(err, "error writing to stdin")
+	}
+
+	err = stdin.Close()
+	if err != nil {
+		return WrapErrorISE(err, "error closing stdin")
+	}
+
+	err = cmd.Wait()
+	if err != nil {
+		return storeError(ctx, db, ch, true, NewError(ErrorRejectedIdentifierType, "error finishing validation: %s", err))
+	}
+
 	return nil
 }
 

@@ -95,6 +95,16 @@ func TestNewOrderRequest_Validate(t *testing.T) {
 				err: acme.NewError(acme.ErrorMalformedType, "invalid IP address: %s", "192.168.42.1000"),
 			}
 		},
+		"fail/bad-identifier/wireapp-prefix-mismatch": func(t *testing.T) test {
+			return test{
+				nor: &NewOrderRequest{
+					Identifiers: []acme.Identifier{
+						{Type: "wireapp-id", Value: "{}"},
+					},
+				},
+				err: acme.NewError(acme.ErrorMalformedType, "missing client ID prefix"),
+			}
+		},
 		"ok": func(t *testing.T) test {
 			nbf := time.Now().UTC().Add(time.Minute)
 			naf := time.Now().UTC().Add(5 * time.Minute)
@@ -165,6 +175,21 @@ func TestNewOrderRequest_Validate(t *testing.T) {
 					Identifiers: []acme.Identifier{
 						{Type: "ip", Value: "192.168.42.42"},
 						{Type: "ip", Value: "2001:db8::1"},
+					},
+					NotAfter:  naf,
+					NotBefore: nbf,
+				},
+				nbf: nbf,
+				naf: naf,
+			}
+		},
+		"ok/wireapp-prefix": func(t *testing.T) test {
+			nbf := time.Now().UTC().Add(time.Minute)
+			naf := time.Now().UTC().Add(5 * time.Minute)
+			return test{
+				nor: &NewOrderRequest{
+					Identifiers: []acme.Identifier{
+						{Type: "wireapp-id", Value: `{"name": "Smith, Alice M (QA)", "domain": "example.com", "client-id": "wireapp-id:75d73550-16e0-4027-abfd-0137e32180cc/ed416ce8ecdd9fad@example.com", "handle": "wireapp:alice.smith.qa@example.com"}`},
 					},
 					NotAfter:  naf,
 					NotBefore: nbf,
@@ -748,6 +773,53 @@ func TestHandler_newAuthorization(t *testing.T) {
 						assert.Equals(t, _az.Identifier, az.Identifier)
 						assert.Equals(t, _az.ExpiresAt, az.ExpiresAt)
 						assert.Equals(t, _az.Challenges, []*acme.Challenge{ch1})
+						assert.Equals(t, _az.Wildcard, false)
+						return nil
+					},
+				},
+				az: az,
+			}
+		},
+		"ok/im": func(t *testing.T) test {
+			az := &acme.Authorization{
+				AccountID: "accID",
+				Identifier: acme.Identifier{
+					Type:  "wireapp",
+					Value: "wireapp-id:user/client@domain",
+				},
+				Status:    acme.StatusPending,
+				ExpiresAt: clock.Now(),
+			}
+			count := 0
+			var ch1 **acme.Challenge
+			return test{
+				prov: defaultProvisioner,
+				db: &acme.MockDB{
+					MockCreateChallenge: func(ctx context.Context, ch *acme.Challenge) error {
+						switch count {
+						case 0:
+							ch.ID = "wireapp"
+							assert.Equals(t, ch.Type, acme.WIREOIDC01)
+							ch1 = &ch
+						default:
+							assert.FatalError(t, errors.New("test logic error"))
+							return errors.New("force")
+						}
+						count++
+						assert.Equals(t, ch.AccountID, az.AccountID)
+						assert.Equals(t, ch.Token, az.Token)
+						assert.Equals(t, ch.Status, acme.StatusPending)
+						assert.Equals(t, ch.Value, az.Identifier.Value)
+						return nil
+					},
+					MockCreateAuthorization: func(ctx context.Context, _az *acme.Authorization) error {
+						assert.Equals(t, _az.AccountID, az.AccountID)
+						assert.Equals(t, _az.Token, az.Token)
+						assert.Equals(t, _az.Status, acme.StatusPending)
+						assert.Equals(t, _az.Identifier, az.Identifier)
+						assert.Equals(t, _az.ExpiresAt, az.ExpiresAt)
+						_ = ch1
+						// assert.Equals(t, _az.Challenges, []*acme.Challenge{*ch1})
 						assert.Equals(t, _az.Wildcard, false)
 						return nil
 					},
@@ -1609,6 +1681,96 @@ func TestHandler_NewOrder(t *testing.T) {
 					testBufferDur := 5 * time.Second
 					orderExpiry := now.Add(defaultOrderExpiry)
 					expNbf := now.Add(-defaultOrderBackdate)
+
+					assert.Equals(t, o.ID, "ordID")
+					assert.Equals(t, o.Status, acme.StatusPending)
+					assert.Equals(t, o.Identifiers, nor.Identifiers)
+					assert.Equals(t, o.AuthorizationURLs, []string{fmt.Sprintf("%s/acme/%s/authz/az1ID", baseURL.String(), escProvName)})
+					assert.True(t, o.NotBefore.Add(-testBufferDur).Before(expNbf))
+					assert.True(t, o.NotBefore.Add(testBufferDur).After(expNbf))
+					assert.True(t, o.NotAfter.Add(-testBufferDur).Before(expNaf))
+					assert.True(t, o.NotAfter.Add(testBufferDur).After(expNaf))
+					assert.True(t, o.ExpiresAt.Add(-testBufferDur).Before(orderExpiry))
+					assert.True(t, o.ExpiresAt.Add(testBufferDur).After(orderExpiry))
+				},
+			}
+		},
+		"ok/default-naf-nbf-wireapp": func(t *testing.T) test {
+			acc := &acme.Account{ID: "accID"}
+			nor := &NewOrderRequest{
+				Identifiers: []acme.Identifier{
+					{Type: "wireapp-id", Value: `{"client-id": "wireapp-id:user/client@domain"}`},
+				},
+			}
+			b, err := json.Marshal(nor)
+			assert.FatalError(t, err)
+			ctx := acme.NewProvisionerContext(context.Background(), prov)
+			ctx = context.WithValue(ctx, accContextKey, acc)
+			ctx = context.WithValue(ctx, payloadContextKey, &payloadInfo{value: b})
+			var (
+				ch1, ch2 **acme.Challenge
+				az1ID    *string
+				count    = 0
+			)
+			return test{
+				ctx:        ctx,
+				statusCode: 201,
+				nor:        nor,
+				ca:         &mockCA{},
+				db: &acme.MockDB{
+					MockCreateChallenge: func(ctx context.Context, ch *acme.Challenge) error {
+						switch count {
+						case 0:
+							ch.ID = "wireapp-oidc"
+							assert.Equals(t, ch.Type, acme.WIREOIDC01)
+							ch1 = &ch
+						case 1:
+							ch.ID = "wireapp-dpop"
+							assert.Equals(t, ch.Type, acme.WIREDPOP01)
+							ch2 = &ch
+						default:
+							assert.FatalError(t, errors.New("test logic error"))
+							return errors.New("force")
+						}
+						count++
+						assert.Equals(t, ch.AccountID, "accID")
+						assert.NotEquals(t, ch.Token, "")
+						assert.Equals(t, ch.Status, acme.StatusPending)
+						assert.Equals(t, ch.Value, `{"client-id": "wireapp-id:user/client@domain"}`)
+						return nil
+					},
+					MockCreateAuthorization: func(ctx context.Context, az *acme.Authorization) error {
+						az.ID = "az1ID"
+						az1ID = &az.ID
+						assert.Equals(t, az.AccountID, "accID")
+						assert.NotEquals(t, az.Token, "")
+						assert.Equals(t, az.Status, acme.StatusPending)
+						assert.Equals(t, az.Identifier, nor.Identifiers[0])
+						assert.Equals(t, az.Challenges, []*acme.Challenge{*ch1, *ch2})
+						assert.Equals(t, az.Wildcard, false)
+						return nil
+					},
+					MockCreateOrder: func(ctx context.Context, o *acme.Order) error {
+						o.ID = "ordID"
+						assert.Equals(t, o.AccountID, "accID")
+						assert.Equals(t, o.ProvisionerID, prov.GetID())
+						assert.Equals(t, o.Status, acme.StatusPending)
+						assert.Equals(t, o.Identifiers, nor.Identifiers)
+						assert.Equals(t, o.AuthorizationIDs, []string{*az1ID})
+						return nil
+					},
+					MockGetExternalAccountKeyByAccountID: func(ctx context.Context, provisionerID, accountID string) (*acme.ExternalAccountKey, error) {
+						assert.Equals(t, prov.GetID(), provisionerID)
+						assert.Equals(t, "accID", accountID)
+						return nil, nil
+					},
+				},
+				vr: func(t *testing.T, o *acme.Order) {
+					now := clock.Now()
+					testBufferDur := 5 * time.Second
+					orderExpiry := now.Add(defaultOrderExpiry)
+					expNbf := now.Add(-defaultOrderBackdate)
+					expNaf := now.Add(prov.DefaultTLSCertDuration())
 
 					assert.Equals(t, o.ID, "ordID")
 					assert.Equals(t, o.Status, acme.StatusPending)
