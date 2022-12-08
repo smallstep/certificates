@@ -9,11 +9,11 @@ require (
 	github.com/dgraph-io/badger v1.6.2
 	github.com/dgraph-io/badger/v2 v2.2007.4
 	github.com/fxamacker/cbor/v2 v2.5.0
+	github.com/go-chi/chi v1.5.5
 	github.com/go-chi/chi/v5 v5.0.11
 	github.com/go-jose/go-jose/v3 v3.0.1
 	github.com/golang/mock v1.6.0
 	github.com/google/go-cmp v0.6.0
-	github.com/google/go-tpm v0.9.0
 	github.com/google/uuid v1.5.0
 	github.com/googleapis/gax-go/v2 v2.12.0
 	github.com/hashicorp/vault/api v1.10.0
@@ -35,11 +35,15 @@ require (
 	go.step.sm/crypto v0.40.0
 	go.step.sm/linkedca v0.20.1
 	golang.org/x/crypto v0.17.0
-	golang.org/x/exp v0.0.0-20230310171629-522b1b587ee0
 	golang.org/x/net v0.19.0
 	google.golang.org/api v0.155.0
 	google.golang.org/grpc v1.60.1
 	google.golang.org/protobuf v1.32.0
+)
+
+require (
+	github.com/google/go-tpm v0.9.0 // indirect
+	gopkg.in/square/go-jose.v2 v2.6.0 // indirect
 )
 
 require (
@@ -64,6 +68,7 @@ require (
 	github.com/cespare/xxhash v1.1.0 // indirect
 	github.com/cespare/xxhash/v2 v2.2.0 // indirect
 	github.com/chzyer/readline v1.5.1 // indirect
+	github.com/coreos/go-oidc/v3 v3.4.0
 	github.com/cpuguy83/go-md2man/v2 v2.0.2 // indirect
 	github.com/davecgh/go-spew v1.1.1 // indirect
 	github.com/dgraph-io/ristretto v0.1.0 // indirect
@@ -146,5 +151,6 @@ require (
 	google.golang.org/genproto v0.0.0-20231211222908-989df2bf70f3 // indirect
 	google.golang.org/genproto/googleapis/api v0.0.0-20231211222908-989df2bf70f3 // indirect
 	google.golang.org/genproto/googleapis/rpc v0.0.0-20231212172506-995d672761c0 // indirect
-	gopkg.in/yaml.v3 v3.0.1 // indirect
+	gopkg.in/check.v1 v1.0.0-20201130134442-10cb98267c6c // indirect
+	gopkg.in/yaml.v3 v3.0.1 // indirect; indirects
 )

@@ -19,6 +19,7 @@ import (
 	"github.com/smallstep/certificates/api/render"
 	"github.com/smallstep/certificates/authority/policy"
 	"github.com/smallstep/certificates/authority/provisioner"
+	"github.com/smallstep/certificates/wire"
 )
 
 // NewOrderRequest represents the body for a NewOrder request.
@@ -48,6 +49,14 @@ func (n *NewOrderRequest) Validate() error {
 			if id.Value == "" {
 				return acme.NewError(acme.ErrorMalformedType, "permanent identifier cannot be empty")
 			}
+		case acme.WireID:
+			orderValue, err := wire.ParseID([]byte(id.Value))
+			if err != nil {
+				return acme.NewError(acme.ErrorMalformedType, "ID cannot be parsed")
+			}
+			if !strings.HasPrefix(orderValue.ClientID, "wireapp-id:") {
+				return acme.NewError(acme.ErrorMalformedType, "missing client ID prefix")
+			}
 		default:
 			return acme.NewError(acme.ErrorMalformedType, "identifier type unsupported: %s", id.Type)
 		}
@@ -55,6 +64,7 @@ func (n *NewOrderRequest) Validate() error {
 		// TODO(hs): add some validations for DNS domains?
 		// TODO(hs): combine the errors from this with allow/deny policy, like example error in https://datatracker.ietf.org/doc/html/rfc8555#section-6.7.1
 	}
+
 	return nil
 }
 
@@ -399,6 +409,8 @@ func challengeTypes(az *acme.Authorization) []acme.ChallengeType {
 		}
 	case acme.PermanentIdentifier:
 		chTypes = []acme.ChallengeType{acme.DEVICEATTEST01}
+	case acme.WireID:
+		chTypes = []acme.ChallengeType{acme.WIREOIDC01, acme.WIREDPOP01}
 	default:
 		chTypes = []acme.ChallengeType{}
 	}
