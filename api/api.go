@@ -224,8 +224,39 @@ type RootResponse struct {
 // ProvisionersResponse is the response object that returns the list of
 // provisioners.
 type ProvisionersResponse struct {
-	Provisioners provisioner.List `json:"provisioners"`
-	NextCursor   string           `json:"nextCursor"`
+	Provisioners provisioner.List
+	NextCursor   string
+}
+
+// MarshalJSON implements json.Marshaler. It marshals the ProvisionersResponse
+// into a byte slice.
+//
+// Special treatment is given to the SCEP provisioner, as it contains a
+// challenge secret that MUST NOT be leaked in (public) HTTP responses. The
+// challenge value is thus redacted in HTTP responses.
+func (p ProvisionersResponse) MarshalJSON() ([]byte, error) {
+	for _, item := range p.Provisioners {
+		scepProv, ok := item.(*provisioner.SCEP)
+		if !ok {
+			continue
+		}
+
+		old := scepProv.ChallengePassword
+		scepProv.ChallengePassword = "*** REDACTED ***"
+		defer func(p string) { //nolint:gocritic // defer in loop required to restore initial state of provisioners
+			scepProv.ChallengePassword = p
+		}(old)
+	}
+
+	var list = struct {
+		Provisioners []provisioner.Interface `json:"provisioners"`
+		NextCursor   string                  `json:"nextCursor"`
+	}{
+		Provisioners: []provisioner.Interface(p.Provisioners),
+		NextCursor:   p.NextCursor,
+	}
+
+	return json.Marshal(list)
 }
 
 // ProvisionerKeyResponse is the response object that returns the encrypted key

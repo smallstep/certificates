@@ -235,29 +235,6 @@ type provisioner struct {
 // List represents a list of provisioners.
 type List []Interface
 
-// MarshalJSON implements json.Marshaler. It marshals a List of Interfaces
-// into a byte slice.
-//
-// Special treatment is given to the SCEP provisioner, as it contains a
-// challenge secret that MUST NOT be leaked in public HTTP responses. The
-// challenge value is redacted in HTTP responses.
-func (l List) MarshalJSON() ([]byte, error) {
-	for _, item := range l {
-		scepProv, ok := item.(*SCEP)
-		if !ok {
-			continue
-		}
-
-		old := scepProv.ChallengePassword
-		scepProv.ChallengePassword = "*** REDACTED ***"
-		defer func(p string) {
-			scepProv.ChallengePassword = p
-		}(old)
-	}
-
-	return json.Marshal([]Interface(l))
-}
-
 // UnmarshalJSON implements json.Unmarshaler and allows to unmarshal a list of a
 // interfaces into the right type.
 func (l *List) UnmarshalJSON(data []byte) error {
