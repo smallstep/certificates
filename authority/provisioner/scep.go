@@ -33,7 +33,6 @@ type SCEP struct {
 	Options                       *Options `json:"options,omitempty"`
 	Claims                        *Claims  `json:"claims,omitempty"`
 	ctl                           *Controller
-	secretChallengePassword       string
 	encryptionAlgorithm           int
 }
 
@@ -91,10 +90,6 @@ func (s *SCEP) Init(config Config) (err error) {
 		return errors.New("provisioner name cannot be empty")
 	}
 
-	// Mask the actual challenge value, so it won't be marshaled
-	s.secretChallengePassword = s.ChallengePassword
-	s.ChallengePassword = "*** redacted ***"
-
 	// Default to 2048 bits minimum public key length (for CSRs) if not set
 	if s.MinimumPublicKeyLength == 0 {
 		s.MinimumPublicKeyLength = 2048
@@ -135,7 +130,7 @@ func (s *SCEP) AuthorizeSign(ctx context.Context, token string) ([]SignOption, e
 
 // GetChallengePassword returns the challenge password
 func (s *SCEP) GetChallengePassword() string {
-	return s.secretChallengePassword
+	return s.ChallengePassword
 }
 
 // GetCapabilities returns the CA capabilities

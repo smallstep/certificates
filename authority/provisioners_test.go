@@ -9,14 +9,15 @@ import (
 	"testing"
 	"time"
 
+	"go.step.sm/crypto/jose"
+	"go.step.sm/crypto/keyutil"
+	"go.step.sm/linkedca"
+
 	"github.com/smallstep/assert"
 	"github.com/smallstep/certificates/api/render"
 	"github.com/smallstep/certificates/authority/admin"
 	"github.com/smallstep/certificates/authority/provisioner"
 	"github.com/smallstep/certificates/db"
-	"go.step.sm/crypto/jose"
-	"go.step.sm/crypto/keyutil"
-	"go.step.sm/linkedca"
 )
 
 func TestGetEncryptedKey(t *testing.T) {
@@ -100,6 +101,13 @@ func TestGetProvisioners(t *testing.T) {
 			assert.FatalError(t, err)
 			return &gp{a: a}
 		},
+		"ok/rsa": func(t *testing.T) *gp {
+			c, err := LoadConfiguration("../ca/testdata/rsaca.json")
+			assert.FatalError(t, err)
+			a, err := New(c)
+			assert.FatalError(t, err)
+			return &gp{a: a}
+		},
 	}
 
 	for name, genTestCase := range tests {
@@ -111,13 +119,13 @@ func TestGetProvisioners(t *testing.T) {
 				if assert.NotNil(t, tc.err) {
 					var sc render.StatusCodedError
 					if assert.True(t, errors.As(err, &sc), "error does not implement StatusCodedError interface") {
-						assert.Equals(t, sc.StatusCode(), tc.code)
+						assert.Equals(t, tc.code, sc.StatusCode())
 					}
-					assert.HasPrefix(t, err.Error(), tc.err.Error())
+					assert.HasPrefix(t, tc.err.Error(), err.Error())
 				}
 			} else {
 				if assert.Nil(t, tc.err) {
-					assert.Equals(t, ps, tc.a.config.AuthorityConfig.Provisioners)
+					assert.Equals(t, tc.a.config.AuthorityConfig.Provisioners, ps)
 					assert.Equals(t, "", next)
 				}
 			}
