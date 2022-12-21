@@ -1,6 +1,7 @@
 package stepcas
 
 import (
+	"context"
 	"net/url"
 	"reflect"
 	"testing"
@@ -118,7 +119,7 @@ func Test_newStepIssuer(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got, err := newStepIssuer(tt.args.caURL, tt.args.client, tt.args.iss)
+			got, err := newStepIssuer(context.TODO(), tt.args.caURL, tt.args.client, tt.args.iss)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("newStepIssuer() error = %v, wantErr %v", err, tt.wantErr)
 				return

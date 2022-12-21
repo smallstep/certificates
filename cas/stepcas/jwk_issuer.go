@@ -1,6 +1,7 @@
 package stepcas
 
 import (
+	"context"
 	"crypto"
 	"encoding/json"
 	"net/url"
@@ -21,13 +22,13 @@ type jwkIssuer struct {
 	signer jose.Signer
 }
 
-func newJWKIssuer(caURL *url.URL, client *ca.Client, cfg *apiv1.CertificateIssuer) (*jwkIssuer, error) {
+func newJWKIssuer(ctx context.Context, caURL *url.URL, client *ca.Client, cfg *apiv1.CertificateIssuer) (*jwkIssuer, error) {
 	var err error
 	var signer jose.Signer
 	// Read the key from the CA if not provided.
 	// Or read it from a PEM file.
 	if cfg.Key == "" {
-		p, err := findProvisioner(client, provisioner.TypeJWK, cfg.Provisioner)
+		p, err := findProvisioner(ctx, client, provisioner.TypeJWK, cfg.Provisioner)
 		if err != nil {
 			return nil, err
 		}
@@ -144,10 +145,10 @@ func newJWKSignerFromEncryptedKey(kid, key, password string) (jose.Signer, error
 	return newJoseSigner(signer, so)
 }
 
-func findProvisioner(client *ca.Client, typ provisioner.Type, name string) (provisioner.Interface, error) {
+func findProvisioner(ctx context.Context, client *ca.Client, typ provisioner.Type, name string) (provisioner.Interface, error) {
 	cursor := ""
 	for {
-		ps, err := client.Provisioners(ca.WithProvisionerCursor(cursor))
+		ps, err := client.ProvisionersWithContext(ctx, ca.WithProvisionerCursor(cursor))
 		if err != nil {
 			return nil, err
 		}

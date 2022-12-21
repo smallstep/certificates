@@ -1,6 +1,7 @@
 package stepcas
 
 import (
+	"context"
 	"net/url"
 	"strings"
 	"time"
@@ -37,7 +38,7 @@ type stepIssuer interface {
 }
 
 // newStepIssuer returns the configured step issuer.
-func newStepIssuer(caURL *url.URL, client *ca.Client, iss *apiv1.CertificateIssuer) (stepIssuer, error) {
+func newStepIssuer(ctx context.Context, caURL *url.URL, client *ca.Client, iss *apiv1.CertificateIssuer) (stepIssuer, error) {
 	if err := validateCertificateIssuer(iss); err != nil {
 		return nil, err
 	}
@@ -46,7 +47,7 @@ func newStepIssuer(caURL *url.URL, client *ca.Client, iss *apiv1.CertificateIssu
 	case "x5c":
 		return newX5CIssuer(caURL, iss)
 	case "jwk":
-		return newJWKIssuer(caURL, client, iss)
+		return newJWKIssuer(ctx, caURL, client, iss)
 	default:
 		return nil, errors.Errorf("stepCAS `certificateIssuer.type` %s is not supported", iss.Type)
 	}

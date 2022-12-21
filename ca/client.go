@@ -607,7 +607,7 @@ retry:
 		return nil, clientError(err)
 	}
 	if resp.StatusCode >= 400 {
-		if !retried && c.retryOnError(resp) {
+		if !retried && c.retryOnError(resp) { //nolint:contextcheck // deeply nested context; retry using the same context
 			retried = true
 			goto retry
 		}
@@ -637,7 +637,7 @@ retry:
 		return nil, clientError(err)
 	}
 	if resp.StatusCode >= 400 {
-		if !retried && c.retryOnError(resp) {
+		if !retried && c.retryOnError(resp) { //nolint:contextcheck // deeply nested context; retry using the same context
 			retried = true
 			goto retry
 		}
@@ -672,7 +672,7 @@ retry:
 		return nil, clientError(err)
 	}
 	if resp.StatusCode >= 400 {
-		if !retried && c.retryOnError(resp) {
+		if !retried && c.retryOnError(resp) { //nolint:contextcheck // deeply nested context; retry using the same context
 			retried = true
 			goto retry
 		}
@@ -711,7 +711,7 @@ retry:
 		return nil, clientError(err)
 	}
 	if resp.StatusCode >= 400 {
-		if !retried && c.retryOnError(resp) {
+		if !retried && c.retryOnError(resp) { //nolint:contextcheck // deeply nested context; retry using the same context
 			retried = true
 			goto retry
 		}
@@ -750,7 +750,7 @@ retry:
 		return nil, clientError(err)
 	}
 	if resp.StatusCode >= 400 {
-		if !retried && c.retryOnError(resp) {
+		if !retried && c.retryOnError(resp) { //nolint:contextcheck // deeply nested context; retry using the same context
 			retried = true
 			goto retry
 		}
@@ -787,7 +787,7 @@ retry:
 		return nil, clientError(err)
 	}
 	if resp.StatusCode >= 400 {
-		if !retried && c.retryOnError(resp) {
+		if !retried && c.retryOnError(resp) { //nolint:contextcheck // deeply nested context; retry using the same context
 			retried = true
 			goto retry
 		}
@@ -827,7 +827,7 @@ retry:
 		return nil, clientError(err)
 	}
 	if resp.StatusCode >= 400 {
-		if !retried && c.retryOnError(resp) {
+		if !retried && c.retryOnError(resp) { //nolint:contextcheck // deeply nested context; retry using the same context
 			retried = true
 			goto retry
 		}
@@ -868,7 +868,7 @@ retry:
 		return nil, clientError(err)
 	}
 	if resp.StatusCode >= 400 {
-		if !retried && c.retryOnError(resp) {
+		if !retried && c.retryOnError(resp) { //nolint:contextcheck // deeply nested context; retry using the same context
 			retried = true
 			goto retry
 		}
@@ -911,7 +911,7 @@ retry:
 		return nil, clientError(err)
 	}
 	if resp.StatusCode >= 400 {
-		if !retried && c.retryOnError(resp) {
+		if !retried && c.retryOnError(resp) { //nolint:contextcheck // deeply nested context; retry using the same context
 			retried = true
 			goto retry
 		}
@@ -943,7 +943,7 @@ retry:
 		return nil, clientError(err)
 	}
 	if resp.StatusCode >= 400 {
-		if !retried && c.retryOnError(resp) {
+		if !retried && c.retryOnError(resp) { //nolint:contextcheck // deeply nested context; retry using the same context
 			retried = true
 			goto retry
 		}
@@ -973,7 +973,7 @@ retry:
 		return nil, clientError(err)
 	}
 	if resp.StatusCode >= 400 {
-		if !retried && c.retryOnError(resp) {
+		if !retried && c.retryOnError(resp) { //nolint:contextcheck // deeply nested context; retry using the same context
 			retried = true
 			goto retry
 		}
@@ -1003,7 +1003,7 @@ retry:
 		return nil, clientError(err)
 	}
 	if resp.StatusCode >= 400 {
-		if !retried && c.retryOnError(resp) {
+		if !retried && c.retryOnError(resp) { //nolint:contextcheck // deeply nested context; retry using the same context
 			retried = true
 			goto retry
 		}
@@ -1037,7 +1037,7 @@ retry:
 		return nil, clientError(err)
 	}
 	if resp.StatusCode >= 400 {
-		if !retried && c.retryOnError(resp) {
+		if !retried && c.retryOnError(resp) { //nolint:contextcheck // deeply nested context; retry using the same context
 			retried = true
 			goto retry
 		}
@@ -1071,7 +1071,7 @@ retry:
 		return nil, clientError(err)
 	}
 	if resp.StatusCode >= 400 {
-		if !retried && c.retryOnError(resp) {
+		if !retried && c.retryOnError(resp) { //nolint:contextcheck // deeply nested context; retry using the same context
 			retried = true
 			goto retry
 		}
@@ -1105,7 +1105,7 @@ retry:
 		return nil, clientError(err)
 	}
 	if resp.StatusCode >= 400 {
-		if !retried && c.retryOnError(resp) {
+		if !retried && c.retryOnError(resp) { //nolint:contextcheck // deeply nested context; retry using the same context
 			retried = true
 			goto retry
 		}
@@ -1139,7 +1139,7 @@ retry:
 		return nil, clientError(err)
 	}
 	if resp.StatusCode >= 400 {
-		if !retried && c.retryOnError(resp) {
+		if !retried && c.retryOnError(resp) { //nolint:contextcheck // deeply nested context; retry using the same context
 			retried = true
 			goto retry
 		}
@@ -1169,7 +1169,7 @@ retry:
 		return nil, clientError(err)
 	}
 	if resp.StatusCode >= 400 {
-		if !retried && c.retryOnError(resp) {
+		if !retried && c.retryOnError(resp) { //nolint:contextcheck // deeply nested context; retry using the same context
 			retried = true
 			goto retry
 		}
@@ -1199,7 +1199,7 @@ retry:
 		return nil, clientError(err)
 	}
 	if resp.StatusCode >= 400 {
-		if !retried && c.retryOnError(resp) {
+		if !retried && c.retryOnError(resp) { //nolint:contextcheck // deeply nested context; retry using the same context
 			retried = true
 			goto retry
 		}
@@ -1233,7 +1233,7 @@ retry:
 		return nil, clientError(err)
 	}
 	if resp.StatusCode >= 400 {
-		if !retried && c.retryOnError(resp) {
+		if !retried && c.retryOnError(resp) { //nolint:contextcheck // deeply nested context; retry using the same context
 			retried = true
 			goto retry
 		}
@@ -1272,7 +1272,7 @@ retry:
 		return nil, clientError(err)
 	}
 	if resp.StatusCode >= 400 {
-		if !retried && c.retryOnError(resp) {
+		if !retried && c.retryOnError(resp) { //nolint:contextcheck // deeply nested context; retry using the same context
 			retried = true
 			goto retry
 		}
@@ -1301,7 +1301,7 @@ retry:
 		return nil, clientError(err)
 	}
 	if resp.StatusCode >= 400 {
-		if !retried && c.retryOnError(resp) {
+		if !retried && c.retryOnError(resp) { //nolint:contextcheck // deeply nested context; retry using the same context
 			retried = true
 			goto retry
 		}
@@ -1333,7 +1333,7 @@ retry:
 		return nil, clientError(err)
 	}
 	if resp.StatusCode >= 400 {
-		if !retried && c.retryOnError(resp) {
+		if !retried && c.retryOnError(resp) { //nolint:contextcheck // deeply nested context; retry using the same context
 			retried = true
 			goto retry
 		}
