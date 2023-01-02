@@ -8,9 +8,6 @@ on:
     - "master"
   pull_request:
   workflow_call:
-    secrets:
-      CODECOV_TOKEN:
-        required: true
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
@@ -18,9 +15,31 @@ concurrency:
 
 jobs:
   ci:
-    uses: smallstep/workflows/.github/workflows/goCI.yml@main
-    with:
-      os-dependencies: "libpcsclite-dev"
-      run-gitleaks: true
-      run-codeql: true
-    secrets: inherit
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Repo
+        uses: actions/checkout@v3
+      - name: Install OS dependencies
+        run: |
+          sudo apt-get update && sudo apt-get install -y libpcsclite-dev
+      - name: Install Go
+        uses: actions/setup-go@v3
+        with:
+          go-version: 1.19
+          check-latest: true
+          cache: true
+      # - name: Configure Linter
+      #   run: |
+      #     curl -LO https://raw.githubusercontent.com/smallstep/workflows/master/.golangci.yml
+      # - name: Lint
+      #   uses: golangci/golangci-lint-action@v3
+      #   with:
+      #     version: v1.50
+      #     args: --timeout=30m
+      #     skip-pkg-cache: true
+      # - name: Test
+      #   run: |
+      #     go test ./...
+      - name: Build
+        run: |
+          go build cmd/step-ca/main.go

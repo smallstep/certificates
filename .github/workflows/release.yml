@@ -8,15 +8,14 @@ on:
 
 jobs:
   ci:
-    uses: smallstep/certificates/.github/workflows/ci.yml@master
-    secrets: inherit
+    uses: ./.github/workflows/ci.yml
 
   create_release:
     name: Create Release
     needs: ci
     runs-on: ubuntu-latest
     env:
-      DOCKER_IMAGE: smallstep/step-ca
+      DOCKER_IMAGE: quay.io/wire/smallstep-acme
     outputs:
       version: ${{ steps.extract-tag.outputs.VERSION }}
       is_prerelease: ${{ steps.is_prerelease.outputs.IS_PRERELEASE }}
@@ -40,61 +39,26 @@ jobs:
         if: steps.is_prerelease.outputs.IS_PRERELEASE == 'false'
         run: |
           echo "DOCKER_TAGS=${{ env.DOCKER_TAGS }},${{ env.DOCKER_IMAGE }}:latest" >> ${GITHUB_ENV}
-      - name: Create Release
-        id: create_release
-        uses: actions/create-release@v1
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        with:
-          tag_name: ${{ github.ref }}
-          release_name: Release ${{ github.ref }}
-          draft: false
-          prerelease: ${{ steps.is_prerelease.outputs.IS_PRERELEASE }}
-
-  goreleaser:
-    name: Upload Assets To Github w/ goreleaser
-    runs-on: ubuntu-latest
-    needs: create_release
-    permissions:
-      id-token: write
-      contents: write
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v3
-      - name: Set up Go
-        uses: actions/setup-go@v3
-        with:
-          go-version: 1.19
-          check-latest: true
-      - name: Install cosign
-        uses: sigstore/cosign-installer@v2
-        with:
-          cosign-release: 'v1.13.1'
-      - name: Get Release Date
-        id: release_date
-        run: |
-          RELEASE_DATE=$(date +"%y-%m-%d")
-          echo "RELEASE_DATE=${RELEASE_DATE}" >> ${GITHUB_ENV}
-      - name: Run GoReleaser
-        uses: goreleaser/goreleaser-action@v3
-        with:
-          version: 'latest'
-          args: release --rm-dist
-        env:
-          GITHUB_TOKEN: ${{ secrets.GORELEASER_PAT }}
-          RELEASE_DATE: ${{ env.RELEASE_DATE }}
-          COSIGN_EXPERIMENTAL: 1
 
   build_upload_docker:
     name: Build & Upload Docker Images
     needs: create_release
-    permissions:
-      id-token: write
-      contents: write
-    uses: smallstep/workflows/.github/workflows/docker-buildx-push.yml@main
-    with:
-      platforms: linux/amd64,linux/386,linux/arm,linux/arm64
-      tags: ${{ needs.create_release.outputs.docker_tags }}
-      docker_image: smallstep/step-ca
-      docker_file: docker/Dockerfile.step-ca
-    secrets: inherit
+    runs-on: ubuntu-latest
+    environment: quay.io
+    steps:
+      - name: Checkout Repo
+        uses: actions/checkout@v3
+      - name: Login to Quay.io
+        uses: docker/login-action@v2
+        with:
+          registry: quay.io
+          username: ${{ secrets.DOCKER_USER_NAME }}
+          password: ${{ secrets.DOCKER_PASSWORD }}
+      - name: Push Docker Image
+        uses: docker/build-push-action@v3
+        with:
+          push: true
+          context: .
+          file: docker/Dockerfile.step-ca
+          tags: ${{ needs.create_release.outputs.docker_tags }}
+          platforms: linux/amd64
