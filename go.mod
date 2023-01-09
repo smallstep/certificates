@@ -3,8 +3,8 @@ module github.com/smallstep/certificates
 go 1.18
 
 require (
-	cloud.google.com/go v0.105.0 // indirect
-	cloud.google.com/go/longrunning v0.3.0
+	cloud.google.com/go v0.107.0 // indirect
+	cloud.google.com/go/longrunning v0.4.0
 	cloud.google.com/go/security v1.10.0
 	github.com/Azure/azure-sdk-for-go v67.0.0+incompatible // indirect
 	github.com/Azure/go-autorest/autorest v0.11.28 // indirect
