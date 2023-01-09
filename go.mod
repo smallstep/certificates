@@ -46,8 +46,8 @@ require (
 	go.step.sm/crypto v0.23.1
 	go.step.sm/linkedca v0.19.0
 	golang.org/x/crypto v0.4.0
-	golang.org/x/net v0.4.0
-	golang.org/x/sys v0.3.0 // indirect
+	golang.org/x/net v0.5.0
+	golang.org/x/sys v0.4.0 // indirect
 	golang.org/x/time v0.0.0-20210220033141-f8bda1e9f3ba // indirect
 	google.golang.org/api v0.105.0
 	google.golang.org/genproto v0.0.0-20221206210731-b1a01be3a5f6 // indirect
@@ -144,7 +144,7 @@ require (
 	go.opencensus.io v0.24.0 // indirect
 	go.uber.org/atomic v1.9.0 // indirect
 	golang.org/x/oauth2 v0.0.0-20221014153046-6fdb5e3db783 // indirect
-	golang.org/x/text v0.5.0 // indirect
+	golang.org/x/text v0.6.0 // indirect
 	google.golang.org/appengine v1.6.7 // indirect
 	gopkg.in/check.v1 v1.0.0-20201130134442-10cb98267c6c // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
