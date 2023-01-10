@@ -34,8 +34,11 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
 - Added configuration property `.crl.idpURL`  to be able to set a custom Issuing
   Distribution Point in the CRL (smallstep/certificates#1178).
 - Added WithContext methods to the CA client (smallstep/certificates#1211).
-- Added environment variables for enabling Remote Management and ACME
+- Docker: Added environment variables for enabling Remote Management and ACME
   provisioner (smallstep/certificates#1201).
+- Docker: The entrypoint script now generates and displays an initial JWK
+  provisioner password by default when the CA is being initialized
+  (smallstep/certificates#1223).
 
 ### Changed
 
