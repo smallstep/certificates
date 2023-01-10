@@ -59,6 +59,13 @@ function step_ca_init () {
         setup_args=("${setup_args[@]}" --remote-management)
     fi
     step ca init "${setup_args[@]}"
+   	echo ""
+    if [ -n "${DOCKER_STEPCA_INIT_REMOTE_MANAGEMENT}" ]; then
+        echo "👉 Your CA administrative username is: step"
+    fi
+    echo "👉 Your CA administrative password is: $(< $STEPPATH/provisioner_password )"
+    echo "🤫 This will only be displayed once."
+    rm $STEPPATH/provisioner_password
     mv $STEPPATH/password $PWDPATH
 }
 
