@@ -32,16 +32,16 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
 ### Added
 
 - Added configuration property `.crl.idpURL`  to be able to set a custom Issuing
-  Distribution Point in the CRL (#1178).
-- Added WithContext methods to the CA client (#1211).
+  Distribution Point in the CRL (smallstep/certificates#1178).
+- Added WithContext methods to the CA client (smallstep/certificates#1211).
 - Added environment variables for enabling Remote Management and ACME
-  provisioner (#1201).
+  provisioner (smallstep/certificates#1201).
 
 ### Changed
 
 - Ignore SSH principals validation when using an OIDC provisioner. The
   provisioner will ignore the principals passed and set the defaults or the ones
-  including using WebHooks or templates (#1206).
+  including using WebHooks or templates (smallstep/certificates#1206).
 
 ## [v0.23.0] - 2022-11-11
 
