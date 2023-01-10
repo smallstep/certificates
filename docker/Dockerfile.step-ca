@@ -7,7 +7,6 @@ RUN apk add --no-cache curl git make
 RUN make V=1 download
 RUN make V=1 bin/step-ca bin/step-awskms-init bin/step-cloudkms-init
 
-
 FROM smallstep/step-cli:latest
 
 COPY --from=builder /src/bin/step-ca /usr/local/bin/step-ca
