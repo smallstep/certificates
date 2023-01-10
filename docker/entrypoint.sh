@@ -63,16 +63,16 @@ if [ -f /usr/sbin/pcscd ]; then
 	/usr/sbin/pcscd
 fi
 
-if [ ! -f "${STEPPATH}/config/ca.json" ]; then
-	init_if_possible
-fi
-
 if [ ! -f "${STEPPATH}/password" ]; then
     generate_password > "${STEPPATH}/password"
 fi
 
 if [ ! -f "${STEPPATH}/provisioner_password" ]; then
 	generate_password > "${STEPPATH}/provisioner_password"
+fi
+
+if [ ! -f "${STEPPATH}/config/ca.json" ]; then
+	init_if_possible
 fi
 
 exec "${@}"
