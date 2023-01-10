@@ -60,7 +60,6 @@ function step_ca_init () {
     fi
     step ca init "${setup_args[@]}"
     mv $STEPPATH/password $PWDPATH
-    mv $STEPPATH/provisioner_password $PROVISIONER_PWDPATH
 }
 
 if [ -f /usr/sbin/pcscd ]; then
@@ -69,13 +68,6 @@ fi
 
 if [ ! -f "${STEPPATH}/config/ca.json" ]; then
     init_if_possible
-fi
-
-if [ -f "${PWDPATH}" ] && [ ! -f "${PROVISIONER_PWDPATH}" ]; then
-    # For backward compatibility,
-    # if the --provisioner-password-file doesn't exist,
-    # use the same password as the CA.
-    cp ${PWDPATH} ${PROVISIONER_PWDPATH}
 fi
 
 exec "${@}"
