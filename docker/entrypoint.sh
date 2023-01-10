@@ -45,6 +45,9 @@ function step_ca_init () {
     if [ -n "${DOCKER_STEPCA_INIT_PASSWORD}" ]; then
         echo "${DOCKER_STEPCA_INIT_PASSWORD}" > "${STEPPATH}/password"
         echo "${DOCKER_STEPCA_INIT_PASSWORD}" > "${STEPPATH}/provisioner_password"
+	else
+		generate_password > "${STEPPATH}/password"
+		generate_password > "${STEPPATH}/provisioner_password"
     fi
     if [ -n "${DOCKER_STEPCA_INIT_SSH}" ]; then
         setup_args=("${setup_args[@]}" --ssh)
@@ -57,22 +60,22 @@ function step_ca_init () {
     fi
     step ca init "${setup_args[@]}"
     mv $STEPPATH/password $PWDPATH
+	mv $STEPPATH/provisioner_password $PROVISIONER_PWDPATH
 }
 
 if [ -f /usr/sbin/pcscd ]; then
 	/usr/sbin/pcscd
 fi
 
-if [ ! -f "${STEPPATH}/password" ]; then
-    generate_password > "${STEPPATH}/password"
-fi
-
-if [ ! -f "${STEPPATH}/provisioner_password" ]; then
-	generate_password > "${STEPPATH}/provisioner_password"
-fi
-
 if [ ! -f "${STEPPATH}/config/ca.json" ]; then
 	init_if_possible
+fi
+
+if [ ! -f "${PROVISIONER_PWDPATH}" ]; then
+	# For backward compatibility,
+	# if the --provisioner-password-file doesn't exist,
+	# use the same password as the CA.
+	cp ${PWDPATH} ${PROVISIONER_PWDPATH}
 fi
 
 exec "${@}"
