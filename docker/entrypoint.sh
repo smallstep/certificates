@@ -65,7 +65,7 @@ function step_ca_init () {
     fi
     echo "👉 Your CA administrative password is: $(< $STEPPATH/provisioner_password )"
     echo "🤫 This will only be displayed once."
-    rm $STEPPATH/provisioner_password
+    shred -u $STEPPATH/provisioner_password
     mv $STEPPATH/password $PWDPATH
 }
 
