@@ -148,8 +148,10 @@ func (c *AdminClient) IsEnabled() error {
 		return clientError(err)
 	}
 	defer resp.Body.Close()
-	// If the response is a 404 then the Admin Remote Management API is not
-	// enabled. Therefore we default to using the local ca.json.
+
+	if resp.StatusCode < http.StatusBadRequest {
+		return nil
+	}
 	switch resp.StatusCode {
 	case http.StatusNotFound, http.StatusNotImplemented:
 		return ErrAdminAPINotImplemented
