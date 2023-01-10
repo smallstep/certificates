@@ -582,6 +582,9 @@ func TestOIDC_AuthorizeSSHSign(t *testing.T) {
 		{"ok-principals", p1, args{t1, SignSSHOptions{Principals: []string{"name"}}, pub},
 			&SignSSHOptions{CertType: "user", Principals: []string{"name", "name@smallstep.com"},
 				ValidAfter: NewTimeDuration(tm), ValidBefore: NewTimeDuration(tm.Add(userDuration))}, http.StatusOK, false, false},
+		{"ok-principals-ignore-passed", p1, args{t1, SignSSHOptions{Principals: []string{"root"}}, pub},
+			&SignSSHOptions{CertType: "user", Principals: []string{"name", "name@smallstep.com"},
+				ValidAfter: NewTimeDuration(tm), ValidBefore: NewTimeDuration(tm.Add(userDuration))}, http.StatusOK, false, false},
 		{"ok-principals-getIdentity", p4, args{okGetIdentityToken, SignSSHOptions{Principals: []string{"mariano"}}, pub},
 			&SignSSHOptions{CertType: "user", Principals: []string{"max", "mariano"},
 				ValidAfter: NewTimeDuration(tm), ValidBefore: NewTimeDuration(tm.Add(userDuration))}, http.StatusOK, false, false},
@@ -600,7 +603,6 @@ func TestOIDC_AuthorizeSSHSign(t *testing.T) {
 				ValidAfter: NewTimeDuration(tm), ValidBefore: NewTimeDuration(tm.Add(userDuration))}, http.StatusOK, false, false},
 		{"fail-rsa1024", p1, args{t1, SignSSHOptions{}, rsa1024.Public()}, expectedUserOptions, http.StatusOK, false, true},
 		{"fail-user-host", p1, args{t1, SignSSHOptions{CertType: "host"}, pub}, nil, http.StatusOK, false, true},
-		{"fail-user-principals", p1, args{t1, SignSSHOptions{Principals: []string{"root"}}, pub}, nil, http.StatusOK, false, true},
 		{"fail-getIdentity", p5, args{failGetIdentityToken, SignSSHOptions{}, pub}, nil, http.StatusInternalServerError, true, false},
 		{"fail-sshCA-disabled", p6, args{"foo", SignSSHOptions{}, pub}, nil, http.StatusUnauthorized, true, false},
 		// Missing parametrs

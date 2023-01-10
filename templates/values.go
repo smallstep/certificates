@@ -108,10 +108,10 @@ var DefaultSSHTemplateData = map[string]string{
 {{- end }}
 {{- if or .User.GOOS "none" | eq "windows" }}
 	UserKnownHostsFile "{{.User.StepPath}}\ssh\known_hosts"
-	ProxyCommand C:\Windows\System32\cmd.exe /c step ssh proxycommand{{- if .User.Context }} --context {{ .User.Context }}{{- end }} %r %h %p
+	ProxyCommand C:\Windows\System32\cmd.exe /c step ssh proxycommand{{- if .User.Context }} --context {{ .User.Context }}{{- end }}{{- if .User.Provisioner }} --provisioner {{ .User.Provisioner }}{{- end }} %r %h %p
 {{- else }}
 	UserKnownHostsFile "{{.User.StepPath}}/ssh/known_hosts"
-	ProxyCommand step ssh proxycommand{{- if .User.Context }} --context {{ .User.Context }}{{- end }} %r %h %p
+	ProxyCommand step ssh proxycommand{{- if .User.Context }} --context {{ .User.Context }}{{- end }}{{- if .User.Provisioner }} --provisioner {{ .User.Provisioner }}{{- end }} %r %h %p
 {{- end }}
 `,
 
