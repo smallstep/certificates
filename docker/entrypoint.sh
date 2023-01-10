@@ -39,12 +39,12 @@ function step_ca_init () {
 		--dns "${DOCKER_STEPCA_INIT_DNS_NAMES}"
 		--provisioner "${DOCKER_STEPCA_INIT_PROVISIONER_NAME:-admin}"
 		--password-file "${STEPPATH}/password"
+		--provisioner-password-file "${STEPPATH}/provisioner_password"
         --address ":9000"
     )
     if [ -n "${DOCKER_STEPCA_INIT_PASSWORD}" ]; then
         echo "${DOCKER_STEPCA_INIT_PASSWORD}" > "${STEPPATH}/password"
-    else
-        generate_password > "${STEPPATH}/password"
+        echo "${DOCKER_STEPCA_INIT_PASSWORD}" > "${STEPPATH}/provisioner_password"
     fi
     if [ -n "${DOCKER_STEPCA_INIT_SSH}" ]; then
         setup_args=("${setup_args[@]}" --ssh)
@@ -65,6 +65,14 @@ fi
 
 if [ ! -f "${STEPPATH}/config/ca.json" ]; then
 	init_if_possible
+fi
+
+if [ ! -f "${STEPPATH}/password" ]; then
+    generate_password > "${STEPPATH}/password"
+fi
+
+if [ ! -f "${STEPPATH}/provisioner_password" ]; then
+	generate_password > "${STEPPATH}/provisioner_password"
 fi
 
 exec "${@}"
