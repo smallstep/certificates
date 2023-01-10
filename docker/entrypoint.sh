@@ -34,12 +34,16 @@ function generate_password () {
 
 # Initialize a CA if not already initialized
 function step_ca_init () {
+    DOCKER_STEPCA_INIT_PROVISIONER_NAME="${DOCKER_STEPCA_INIT_PROVISIONER_NAME:-admin}"
+    DOCKER_STEPCA_INIT_ADMIN_SUBJECT="${DOCKER_STEPCA_INIT_ADMIN_SUBJECT:-step}"
+
     local -a setup_args=(
         --name "${DOCKER_STEPCA_INIT_NAME}"
         --dns "${DOCKER_STEPCA_INIT_DNS_NAMES}"
-        --provisioner "${DOCKER_STEPCA_INIT_PROVISIONER_NAME:-admin}"
+        --provisioner "${DOCKER_STEPCA_INIT_PROVISIONER_NAME}"
         --password-file "${STEPPATH}/password"
         --provisioner-password-file "${STEPPATH}/provisioner_password"
+        --admin-subject "${DOCKER_STEPCA_INIT_ADMIN_SUBJECT}"
         --address ":9000"
     )
     if [ -n "${DOCKER_STEPCA_INIT_PASSWORD}" ]; then
@@ -61,7 +65,7 @@ function step_ca_init () {
     step ca init "${setup_args[@]}"
    	echo ""
     if [ -n "${DOCKER_STEPCA_INIT_REMOTE_MANAGEMENT}" ]; then
-        echo "👉 Your CA administrative username is: step"
+        echo "👉 Your CA administrative username is: ${DOCKER_STEPCA_INIT_ADMIN_SUBJECT}"
     fi
     echo "👉 Your CA administrative password is: $(< $STEPPATH/provisioner_password )"
     echo "🤫 This will only be displayed once."
