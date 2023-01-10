@@ -44,6 +44,9 @@ type AdminClient struct {
 	x5cSubject  string
 }
 
+var ErrAdminAPINotImplemented = errors.New("admin API not implemented")
+var ErrAdminAPINotAuthorized = errors.New("admin API not authorized")
+
 // AdminClientError is the client side representation of an
 // AdminError returned by the CA.
 type AdminClientError struct {
@@ -135,6 +138,28 @@ func (c *AdminClient) retryOnError(r *http.Response) bool {
 		}
 	}
 	return false
+}
+
+// IsEnabled checks if the admin API is enabled.
+func (c *AdminClient) IsEnabled() error {
+	u := c.endpoint.ResolveReference(&url.URL{Path: path.Join(adminURLPrefix, "admins")})
+	resp, err := c.client.Get(u.String())
+	if err != nil {
+		return clientError(err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode < http.StatusBadRequest {
+		return nil
+	}
+	switch resp.StatusCode {
+	case http.StatusNotFound, http.StatusNotImplemented:
+		return ErrAdminAPINotImplemented
+	case http.StatusUnauthorized:
+		return ErrAdminAPINotAuthorized
+	default:
+		return errors.Errorf("unexpected status code when performing is-enabled check for Admin API: %d", resp.StatusCode)
+	}
 }
 
 // GetAdmin performs the GET /admin/admin/{id} request to the CA.
