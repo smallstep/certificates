@@ -43,7 +43,6 @@ function step_ca_init () {
         --provisioner "${DOCKER_STEPCA_INIT_PROVISIONER_NAME}"
         --password-file "${STEPPATH}/password"
         --provisioner-password-file "${STEPPATH}/provisioner_password"
-        --admin-subject "${DOCKER_STEPCA_INIT_ADMIN_SUBJECT}"
         --address ":9000"
     )
     if [ -n "${DOCKER_STEPCA_INIT_PASSWORD}" ]; then
@@ -53,18 +52,20 @@ function step_ca_init () {
         generate_password > "${STEPPATH}/password"
         generate_password > "${STEPPATH}/provisioner_password"
     fi
-    if [ -n "${DOCKER_STEPCA_INIT_SSH}" ]; then
+    if [ "${DOCKER_STEPCA_INIT_SSH}" == "true" ]; then
         setup_args=("${setup_args[@]}" --ssh)
     fi
-    if [ -n "${DOCKER_STEPCA_INIT_ACME}" ]; then
+    if [ "${DOCKER_STEPCA_INIT_ACME}" == "true" ]; then
         setup_args=("${setup_args[@]}" --acme)
     fi
-    if [ -n "${DOCKER_STEPCA_INIT_REMOTE_MANAGEMENT}" ]; then
-        setup_args=("${setup_args[@]}" --remote-management)
+    if [ "${DOCKER_STEPCA_INIT_REMOTE_MANAGEMENT}" == "true" ]; then
+        setup_args=("${setup_args[@]}" --remote-management
+                       --admin-subject "${DOCKER_STEPCA_INIT_ADMIN_SUBJECT}"
+        )
     fi
     step ca init "${setup_args[@]}"
    	echo ""
-    if [ -n "${DOCKER_STEPCA_INIT_REMOTE_MANAGEMENT}" ]; then
+    if [ "${DOCKER_STEPCA_INIT_REMOTE_MANAGEMENT}" == "true" ]; then
         echo "👉 Your CA administrative username is: ${DOCKER_STEPCA_INIT_ADMIN_SUBJECT}"
     fi
     echo "👉 Your CA administrative password is: $(< $STEPPATH/provisioner_password )"
