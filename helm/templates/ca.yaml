@@ -1,0 +1,222 @@
+apiVersion: apps/v1
+kind: {{ .Values.kind }}
+metadata:
+  name: {{ include "step-certificates.fullname" . }}
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "step-certificates.labels" . | nindent 4 }}
+spec:
+  # Only one replica is supported at this moment
+  replicas: {{ .Values.replicaCount }}
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: {{ include "step-certificates.name" . }}
+      app.kubernetes.io/instance: {{ .Release.Name }}
+  {{- if eq .Values.kind "StatefulSet" }}
+  serviceName: {{ include "step-certificates.fullname" . }}
+  {{- end }}
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: {{ include "step-certificates.name" . }}
+        app.kubernetes.io/instance: {{ .Release.Name }}
+        {{- with .Values.podExtraLabels }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
+      {{- if .Values.inject.enabled }}
+      annotations:
+        checksum/config: {{ include (print $.Template.BasePath "/configmaps.yaml") . | sha256sum }}
+        checksum/secret: {{ include (print $.Template.BasePath "/secrets.yaml") . | sha256sum }}
+      {{- end }}
+    spec:
+      {{- if and .Release.IsInstall (not (or .Values.inject.enabled .Values.existingSecrets.enabled )) }}
+      initContainers:
+        - name: {{ .Chart.Name }}-init
+          image: {{ .Values.image.initContainerRepository }}
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          command: ["sleep", "20"]
+      {{- end }}
+      securityContext:
+        {{- if .Values.ca.runAsRoot }}
+        runAsUser: 0
+        {{- else }}
+        runAsUser: 1000
+        runAsNonRoot: true
+        runAsGroup: 1000
+        fsGroup: 1000
+        {{- end }}
+      containers:
+        - name: {{ .Chart.Name }}
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag | default .Chart.AppVersion }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          command: [
+            "/usr/local/bin/step-ca",
+            {{- if or (and .Values.existingSecrets.enabled .Values.existingSecrets.issuer) (and .Values.inject.enabled (and .Values.inject.secrets.certificate_issuer.enabled (not (eq .Values.inject.secrets.certificate_issuer.password "")))) }}
+            "--issuer-password-file", "/home/step/secrets/certificate-issuer/password",
+            {{- end }}
+            {{- if or .Values.existingSecrets.enabled (or (and .Values.bootstrap.enabled .Values.bootstrap.secrets) (and .Values.inject.enabled (not (eq .Values.inject.secrets.ca_password "")))) }}
+            "--password-file", "/home/step/secrets/passwords/password",
+            {{- end }}
+            {{- if or (and .Values.existingSecrets.enabled .Values.existingSecrets.sshHostCa) (and .Values.inject.enabled (and .Values.inject.secrets.ssh.enabled (not (eq .Values.inject.secrets.ssh.host_ca_password "")))) }}
+            "--ssh-host-password-file", "/home/step/secrets/ssh-host-ca/password",
+            {{- end }}
+            {{- if or (and .Values.existingSecrets.enabled .Values.existingSecrets.sshUserCa) (and .Values.inject.enabled (and .Values.inject.secrets.ssh.enabled (not (eq .Values.inject.secrets.ssh.user_ca_password "")))) }}
+            "--ssh-user-password-file", "/home/step/secrets/ssh-user-ca/password",
+            {{- end }}
+            "/home/step/config/ca.json"
+          ]
+          env:
+          - name: NAMESPACE
+            value: "{{ .Release.Namespace }}"
+          {{- if .Values.ca.env }}
+            {{- toYaml .Values.ca.env | nindent 10 }}
+          {{- end }}
+          {{- if or .Values.linkedca.token (and .Values.linkedca.secretKeyRef.name .Values.linkedca.secretKeyRef.key) }}
+          - name: STEP_CA_TOKEN
+            valueFrom:
+              secretKeyRef:
+                name: {{ include "step-certificates.linkedca.secretKeyRef.name" . }}
+                key: {{ include "step-certificates.linkedca.secretKeyRef.key" . }}
+          {{- end }}
+          ports:
+            - name: https
+              containerPort: {{ .Values.service.targetPort }}
+              protocol: TCP
+          livenessProbe:
+            initialDelaySeconds: 5
+            httpGet:
+              path: /health
+              port: {{ .Values.service.targetPort }}
+              scheme: HTTPS
+          readinessProbe:
+            initialDelaySeconds: 5
+            httpGet:
+              path: /health
+              port: {{ .Values.service.targetPort }}
+              scheme: HTTPS
+          resources:
+            {{- toYaml .Values.resources | nindent 12 }}
+          {{- if not .Values.ca.runAsRoot }}
+          securityContext:
+            allowPrivilegeEscalation: false
+          {{- end }}
+          volumeMounts:
+          - name: certs
+            mountPath: /home/step/certs
+            readOnly: true
+          - name: config
+            mountPath: /home/step/config
+            readOnly: true
+          - name: secrets
+            mountPath: /home/step/secrets
+            readOnly: true
+          {{- if or (and .Values.existingSecrets.enabled .Values.existingSecrets.ca)  (or (and .Values.bootstrap.enabled .Values.bootstrap.secrets) (and .Values.inject.enabled (not (eq .Values.inject.secrets.ca_password "")))) }}
+          - name: ca-password
+            mountPath: /home/step/secrets/passwords
+            readOnly: true
+          {{- end }}
+          {{- if .Values.ca.db.enabled }}
+          - name: database
+            mountPath: /home/step/db
+            readOnly: false
+          {{- end }}
+          {{- if or (and .Values.existingSecrets.enabled .Values.existingSecrets.issuer)  (and .Values.inject.enabled (and .Values.inject.secrets.certificate_issuer.enabled (not (eq .Values.inject.secrets.certificate_issuer.password "")))) }}
+          - name: certificate-issuer
+            mountPath: /home/step/secrets/certificate-issuer
+            readOnly: true
+          {{- end }}
+          {{- if or (and .Values.existingSecrets.enabled .Values.existingSecrets.sshHostCa)  (and .Values.inject.enabled (and .Values.inject.secrets.ssh.enabled (not (eq .Values.inject.secrets.ssh.host_ca_password "")))) }}
+          - name: ssh-host-ca-password
+            mountPath: /home/step/secrets/ssh-host-ca
+            readOnly: true
+          {{- end }}
+          {{- if or (and .Values.existingSecrets.enabled .Values.existingSecrets.sshUserCa) (and .Values.inject.enabled (and .Values.inject.secrets.ssh.enabled (not (eq .Values.inject.secrets.ssh.user_ca_password "")))) }}
+          - name: ssh-user-ca-password
+            mountPath: /home/step/secrets/ssh-user-ca
+            readOnly: true
+          {{- end }}
+      volumes:
+      - name: certs
+        configMap:
+          name: {{ include "step-certificates.fullname" . }}-certs
+      - name: config
+      {{- if and .Values.existingSecrets.enabled .Values.existingSecrets.configAsSecret }}
+        secret:
+          secretName: {{ include "step-certificates.fullname" . }}-config
+      {{- else }}
+        configMap:
+          name: {{ include "step-certificates.fullname" . }}-config
+      {{- end }}
+      - name: secrets
+      {{- if or .Values.inject.enabled .Values.existingSecrets.enabled }}
+        secret:
+          secretName: {{ include "step-certificates.fullname" . }}-secrets
+      {{- else }}
+        configMap:
+          name: {{ include "step-certificates.fullname" . }}-secrets
+      {{- end }}
+      {{- if or (and .Values.existingSecrets.enabled .Values.existingSecrets.ca) (or (and .Values.bootstrap.enabled .Values.bootstrap.secrets) (and .Values.inject.enabled (not (eq .Values.inject.secrets.ca_password "")))) }}
+      - name: ca-password
+        secret:
+          secretName: {{ include "step-certificates.fullname" . }}-ca-password
+      {{- end }}
+      {{- if or (and .Values.existingSecrets.enabled .Values.existingSecrets.issuer) (and .Values.inject.enabled (and .Values.inject.secrets.certificate_issuer.enabled (not (eq .Values.inject.secrets.certificate_issuer.password "")))) }}
+      - name: certificate-issuer
+        secret:
+          secretName: {{ include "step-certificates.fullname" . }}-certificate-issuer-password
+      {{- end }}
+      {{- if or (and .Values.existingSecrets.enabled .Values.existingSecrets.sshHostCa) (and .Values.inject.enabled (and .Values.inject.secrets.ssh.enabled (not (eq .Values.inject.secrets.ssh.host_ca_password "")))) }}
+      - name: ssh-host-ca-password
+        secret:
+          secretName: {{ include "step-certificates.fullname" . }}-ssh-host-ca-password
+      {{- end }}
+      {{- if or (and .Values.existingSecrets.enabled .Values.existingSecrets.sshUserCa) (and .Values.inject.enabled (and .Values.inject.secrets.ssh.enabled (not (eq .Values.inject.secrets.ssh.user_ca_password "")))) }}
+      - name: ssh-user-ca-password
+        secret:
+          secretName: {{ include "step-certificates.fullname" . }}-ssh-user-ca-password
+      {{- end }}
+      {{- if and .Values.ca.db.enabled (not .Values.ca.db.persistent) }}
+      - name: database
+        emptyDir: {}
+      {{- end }}
+      {{- if and .Values.ca.db.enabled (and .Values.ca.db.persistent .Values.ca.db.existingClaim) }}
+      - name: database
+        persistentVolumeClaim:
+          claimName: {{ .Values.ca.db.existingClaim }}
+      {{- end }}
+      {{- with .Values.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+  {{- if and .Values.ca.db.enabled .Values.ca.db.persistent (not .Values.ca.db.existingClaim) }}
+  volumeClaimTemplates:
+  - metadata:
+      name: database
+      labels:
+        app.kubernetes.io/name: {{ include "step-certificates.name" . }}
+        app.kubernetes.io/instance: {{ .Release.Name }}
+        app.kubernetes.io/managed-by: {{ .Release.Service }}
+    spec:
+      accessModes:
+      {{- range .Values.ca.db.accessModes }}
+        - {{ . | quote }}
+      {{- end }}
+      resources:
+        requests:
+          storage: {{ .Values.ca.db.size | quote }}
+      {{- if .Values.ca.db.storageClass }}
+      {{- if (eq "-" .Values.ca.db.storageClass) }}
+      storageClassName: ""
+      {{- else }}
+      storageClassName: {{ .Values.ca.db.storageClass | quote }}
+      {{- end }}
+      {{- end }}
+  {{- end }}
