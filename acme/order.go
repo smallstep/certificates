@@ -165,6 +165,15 @@ func (o *Order) Finalize(ctx context.Context, db DB, csr *x509.CertificateReques
 	for i := range o.Identifiers {
 		if o.Identifiers[i].Type == PermanentIdentifier {
 			permanentIdentifier = o.Identifiers[i].Value
+			// the first (and only) Permanent Identifier that gets added to the certificate
+			// should be equal to the Subject Common Name if it's set. If not equal, the CSR
+			// is rejected, because the Common Name hasn't been challenged in that case. This
+			// could result in unauthorized access if a relying system relies on the Common
+			// Name in its authorization logic.
+			if csr.Subject.CommonName != "" && csr.Subject.CommonName != permanentIdentifier {
+				return NewError(ErrorBadCSRType, "CSR Subject Common Name does not match identifiers exactly: "+
+					"CSR Subject Common Name = %s, Order Permanent Identifier = %s", csr.Subject.CommonName, permanentIdentifier)
+			}
 			break
 		}
 	}
