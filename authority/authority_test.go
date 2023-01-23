@@ -6,8 +6,10 @@ import (
 	"crypto/sha256"
 	"crypto/x509"
 	"encoding/hex"
+	"encoding/pem"
 	"net"
 	"os"
+	"path/filepath"
 	"reflect"
 	"testing"
 	"time"
@@ -18,6 +20,7 @@ import (
 	"github.com/smallstep/certificates/authority/provisioner"
 	"github.com/smallstep/certificates/db"
 	"go.step.sm/crypto/jose"
+	"go.step.sm/crypto/minica"
 	"go.step.sm/crypto/pemutil"
 )
 
@@ -167,6 +170,130 @@ func TestAuthorityNew(t *testing.T) {
 					_, ok = auth.provisioners.Load("fooo")
 					assert.False(t, ok)
 				}
+			}
+		})
+	}
+}
+
+func TestAuthorityNew_bundles(t *testing.T) {
+	ca0, err := minica.New()
+	if err != nil {
+		t.Fatal(err)
+	}
+	ca1, err := minica.New()
+	if err != nil {
+		t.Fatal(err)
+	}
+	ca2, err := minica.New()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	rootPath := t.TempDir()
+	writeCert := func(fn string, certs ...*x509.Certificate) error {
+		var b []byte
+		for _, crt := range certs {
+			b = append(b, pem.EncodeToMemory(&pem.Block{
+				Type:  "CERTIFICATE",
+				Bytes: crt.Raw,
+			})...)
+		}
+		return os.WriteFile(filepath.Join(rootPath, fn), b, 0600)
+	}
+	writeKey := func(fn string, signer crypto.Signer) error {
+		_, err := pemutil.Serialize(signer, pemutil.ToFile(filepath.Join(rootPath, fn), 0600))
+		return err
+	}
+
+	if err := writeCert("root0.crt", ca0.Root); err != nil {
+		t.Fatal(err)
+	}
+	if err := writeCert("int0.crt", ca0.Intermediate); err != nil {
+		t.Fatal(err)
+	}
+	if err := writeKey("int0.key", ca0.Signer); err != nil {
+		t.Fatal(err)
+	}
+	if err := writeCert("root1.crt", ca1.Root); err != nil {
+		t.Fatal(err)
+	}
+	if err := writeCert("int1.crt", ca1.Intermediate); err != nil {
+		t.Fatal(err)
+	}
+	if err := writeKey("int1.key", ca1.Signer); err != nil {
+		t.Fatal(err)
+	}
+	if err := writeCert("bundle0.crt", ca0.Root, ca1.Root); err != nil {
+		t.Fatal(err)
+	}
+	if err := writeCert("bundle1.crt", ca1.Root, ca2.Root); err != nil {
+		t.Fatal(err)
+	}
+
+	tests := []struct {
+		name    string
+		config  *config.Config
+		wantErr bool
+	}{
+		{"ok ca0", &config.Config{
+			Address:          "127.0.0.1:443",
+			Root:             []string{filepath.Join(rootPath, "root0.crt")},
+			IntermediateCert: filepath.Join(rootPath, "int0.crt"),
+			IntermediateKey:  filepath.Join(rootPath, "int0.key"),
+			DNSNames:         []string{"127.0.0.1"},
+			AuthorityConfig:  &AuthConfig{},
+		}, false},
+		{"ok bundle", &config.Config{
+			Address:          "127.0.0.1:443",
+			Root:             []string{filepath.Join(rootPath, "bundle0.crt")},
+			IntermediateCert: filepath.Join(rootPath, "int0.crt"),
+			IntermediateKey:  filepath.Join(rootPath, "int0.key"),
+			DNSNames:         []string{"127.0.0.1"},
+			AuthorityConfig:  &AuthConfig{},
+		}, false},
+		{"ok federated ca1", &config.Config{
+			Address:          "127.0.0.1:443",
+			Root:             []string{filepath.Join(rootPath, "root0.crt")},
+			FederatedRoots:   []string{filepath.Join(rootPath, "root1.crt")},
+			IntermediateCert: filepath.Join(rootPath, "int0.crt"),
+			IntermediateKey:  filepath.Join(rootPath, "int0.key"),
+			DNSNames:         []string{"127.0.0.1"},
+			AuthorityConfig:  &AuthConfig{},
+		}, false},
+		{"ok federated bundle", &config.Config{
+			Address:          "127.0.0.1:443",
+			Root:             []string{filepath.Join(rootPath, "root0.crt")},
+			FederatedRoots:   []string{filepath.Join(rootPath, "bundle1.crt")},
+			IntermediateCert: filepath.Join(rootPath, "int0.crt"),
+			IntermediateKey:  filepath.Join(rootPath, "int0.key"),
+			DNSNames:         []string{"127.0.0.1"},
+			AuthorityConfig:  &AuthConfig{},
+		}, false},
+		{"fail root", &config.Config{
+			Address:          "127.0.0.1:443",
+			Root:             []string{filepath.Join(rootPath, "missing.crt")},
+			IntermediateCert: filepath.Join(rootPath, "int0.crt"),
+			IntermediateKey:  filepath.Join(rootPath, "int0.key"),
+			DNSNames:         []string{"127.0.0.1"},
+			AuthorityConfig:  &AuthConfig{},
+		}, true},
+		{"fail federated", &config.Config{
+			Address:          "127.0.0.1:443",
+			Root:             []string{filepath.Join(rootPath, "root0.crt")},
+			FederatedRoots:   []string{filepath.Join(rootPath, "missing.crt")},
+			IntermediateCert: filepath.Join(rootPath, "int0.crt"),
+			IntermediateKey:  filepath.Join(rootPath, "int0.key"),
+			DNSNames:         []string{"127.0.0.1"},
+			AuthorityConfig:  &AuthConfig{},
+		}, true},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			_, err := New(tt.config)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("New() error = %v, wantErr %v", err, tt.wantErr)
+				return
 			}
 		})
 	}

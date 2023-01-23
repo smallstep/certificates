@@ -44,6 +44,9 @@ type AdminClient struct {
 	x5cSubject  string
 }
 
+var ErrAdminAPINotImplemented = errors.New("admin API not implemented")
+var ErrAdminAPINotAuthorized = errors.New("admin API not authorized")
+
 // AdminClientError is the client side representation of an
 // AdminError returned by the CA.
 type AdminClientError struct {
@@ -137,6 +140,28 @@ func (c *AdminClient) retryOnError(r *http.Response) bool {
 	return false
 }
 
+// IsEnabled checks if the admin API is enabled.
+func (c *AdminClient) IsEnabled() error {
+	u := c.endpoint.ResolveReference(&url.URL{Path: path.Join(adminURLPrefix, "admins")})
+	resp, err := c.client.Get(u.String())
+	if err != nil {
+		return clientError(err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode < http.StatusBadRequest {
+		return nil
+	}
+	switch resp.StatusCode {
+	case http.StatusNotFound, http.StatusNotImplemented:
+		return ErrAdminAPINotImplemented
+	case http.StatusUnauthorized:
+		return ErrAdminAPINotAuthorized
+	default:
+		return errors.Errorf("unexpected status code when performing is-enabled check for Admin API: %d", resp.StatusCode)
+	}
+}
+
 // GetAdmin performs the GET /admin/admin/{id} request to the CA.
 func (c *AdminClient) GetAdmin(id string) (*linkedca.Admin, error) {
 	var retried bool
@@ -144,7 +169,7 @@ func (c *AdminClient) GetAdmin(id string) (*linkedca.Admin, error) {
 retry:
 	resp, err := c.client.Get(u.String())
 	if err != nil {
-		return nil, errors.Wrapf(err, "client GET %s failed", u)
+		return nil, clientError(err)
 	}
 	if resp.StatusCode >= 400 {
 		if !retried && c.retryOnError(resp) {
@@ -227,7 +252,7 @@ func (c *AdminClient) GetAdminsPaginate(opts ...AdminOption) (*adminAPI.GetAdmin
 retry:
 	resp, err := c.client.Do(req)
 	if err != nil {
-		return nil, errors.Wrapf(err, "client GET %s failed", u)
+		return nil, clientError(err)
 	}
 	if resp.StatusCode >= 400 {
 		if !retried && c.retryOnError(resp) {
@@ -282,7 +307,7 @@ func (c *AdminClient) CreateAdmin(createAdminRequest *adminAPI.CreateAdminReques
 retry:
 	resp, err := c.client.Do(req)
 	if err != nil {
-		return nil, errors.Wrapf(err, "client POST %s failed", u)
+		return nil, clientError(err)
 	}
 	if resp.StatusCode >= 400 {
 		if !retried && c.retryOnError(resp) {
@@ -314,7 +339,7 @@ func (c *AdminClient) RemoveAdmin(id string) error {
 retry:
 	resp, err := c.client.Do(req)
 	if err != nil {
-		return errors.Wrapf(err, "client DELETE %s failed", u)
+		return clientError(err)
 	}
 	if resp.StatusCode >= 400 {
 		if !retried && c.retryOnError(resp) {
@@ -340,13 +365,13 @@ func (c *AdminClient) UpdateAdmin(id string, uar *adminAPI.UpdateAdminRequest) (
 	}
 	req, err := http.NewRequest("PATCH", u.String(), bytes.NewReader(body))
 	if err != nil {
-		return nil, errors.Wrapf(err, "create PUT %s request failed", u)
+		return nil, errors.Wrapf(err, "create PATCH %s request failed", u)
 	}
 	req.Header.Add("Authorization", tok)
 retry:
 	resp, err := c.client.Do(req)
 	if err != nil {
-		return nil, errors.Wrapf(err, "client PUT %s failed", u)
+		return nil, clientError(err)
 	}
 	if resp.StatusCode >= 400 {
 		if !retried && c.retryOnError(resp) {
@@ -387,13 +412,13 @@ func (c *AdminClient) GetProvisioner(opts ...ProvisionerOption) (*linkedca.Provi
 	}
 	req, err := http.NewRequest("GET", u.String(), http.NoBody)
 	if err != nil {
-		return nil, errors.Wrapf(err, "create PUT %s request failed", u)
+		return nil, errors.Wrapf(err, "create GET %s request failed", u)
 	}
 	req.Header.Add("Authorization", tok)
 retry:
 	resp, err := c.client.Do(req)
 	if err != nil {
-		return nil, errors.Wrapf(err, "client GET %s failed", u)
+		return nil, clientError(err)
 	}
 	if resp.StatusCode >= 400 {
 		if !retried && c.retryOnError(resp) {
@@ -426,13 +451,13 @@ func (c *AdminClient) GetProvisionersPaginate(opts ...ProvisionerOption) (*admin
 	}
 	req, err := http.NewRequest("GET", u.String(), http.NoBody)
 	if err != nil {
-		return nil, errors.Wrapf(err, "create PUT %s request failed", u)
+		return nil, errors.Wrapf(err, "create GET %s request failed", u)
 	}
 	req.Header.Add("Authorization", tok)
 retry:
 	resp, err := c.client.Do(req)
 	if err != nil {
-		return nil, errors.Wrapf(err, "client GET %s failed", u)
+		return nil, clientError(err)
 	}
 	if resp.StatusCode >= 400 {
 		if !retried && c.retryOnError(resp) {
@@ -502,7 +527,7 @@ func (c *AdminClient) RemoveProvisioner(opts ...ProvisionerOption) error {
 retry:
 	resp, err := c.client.Do(req)
 	if err != nil {
-		return errors.Wrapf(err, "client DELETE %s failed", u)
+		return clientError(err)
 	}
 	if resp.StatusCode >= 400 {
 		if !retried && c.retryOnError(resp) {
@@ -534,7 +559,7 @@ func (c *AdminClient) CreateProvisioner(prov *linkedca.Provisioner) (*linkedca.P
 retry:
 	resp, err := c.client.Do(req)
 	if err != nil {
-		return nil, errors.Wrapf(err, "client POST %s failed", u)
+		return nil, clientError(err)
 	}
 	if resp.StatusCode >= 400 {
 		if !retried && c.retryOnError(resp) {
@@ -570,7 +595,7 @@ func (c *AdminClient) UpdateProvisioner(name string, prov *linkedca.Provisioner)
 retry:
 	resp, err := c.client.Do(req)
 	if err != nil {
-		return errors.Wrapf(err, "client PUT %s failed", u)
+		return clientError(err)
 	}
 	if resp.StatusCode >= 400 {
 		if !retried && c.retryOnError(resp) {
@@ -609,7 +634,7 @@ func (c *AdminClient) GetExternalAccountKeysPaginate(provisionerName, reference 
 retry:
 	resp, err := c.client.Do(req)
 	if err != nil {
-		return nil, errors.Wrapf(err, "client GET %s failed", u)
+		return nil, clientError(err)
 	}
 	if resp.StatusCode >= 400 {
 		if !retried && c.retryOnError(resp) {
@@ -645,7 +670,7 @@ func (c *AdminClient) CreateExternalAccountKey(provisionerName string, eakReques
 retry:
 	resp, err := c.client.Do(req)
 	if err != nil {
-		return nil, errors.Wrapf(err, "client POST %s failed", u)
+		return nil, clientError(err)
 	}
 	if resp.StatusCode >= 400 {
 		if !retried && c.retryOnError(resp) {
@@ -677,7 +702,7 @@ func (c *AdminClient) RemoveExternalAccountKey(provisionerName, keyID string) er
 retry:
 	resp, err := c.client.Do(req)
 	if err != nil {
-		return errors.Wrapf(err, "client DELETE %s failed", u)
+		return clientError(err)
 	}
 	if resp.StatusCode >= 400 {
 		if !retried && c.retryOnError(resp) {
@@ -704,7 +729,7 @@ func (c *AdminClient) GetAuthorityPolicy() (*linkedca.Policy, error) {
 retry:
 	resp, err := c.client.Do(req)
 	if err != nil {
-		return nil, fmt.Errorf("client GET %s failed: %w", u, err)
+		return nil, clientError(err)
 	}
 	if resp.StatusCode >= 400 {
 		if !retried && c.retryOnError(resp) {
@@ -739,7 +764,7 @@ func (c *AdminClient) CreateAuthorityPolicy(p *linkedca.Policy) (*linkedca.Polic
 retry:
 	resp, err := c.client.Do(req)
 	if err != nil {
-		return nil, fmt.Errorf("client POST %s failed: %w", u, err)
+		return nil, clientError(err)
 	}
 	if resp.StatusCode >= 400 {
 		if !retried && c.retryOnError(resp) {
@@ -774,7 +799,7 @@ func (c *AdminClient) UpdateAuthorityPolicy(p *linkedca.Policy) (*linkedca.Polic
 retry:
 	resp, err := c.client.Do(req)
 	if err != nil {
-		return nil, fmt.Errorf("client PUT %s failed: %w", u, err)
+		return nil, clientError(err)
 	}
 	if resp.StatusCode >= 400 {
 		if !retried && c.retryOnError(resp) {
@@ -805,7 +830,7 @@ func (c *AdminClient) RemoveAuthorityPolicy() error {
 retry:
 	resp, err := c.client.Do(req)
 	if err != nil {
-		return fmt.Errorf("client DELETE %s failed: %w", u, err)
+		return clientError(err)
 	}
 	if resp.StatusCode >= 400 {
 		if !retried && c.retryOnError(resp) {
@@ -832,7 +857,7 @@ func (c *AdminClient) GetProvisionerPolicy(provisionerName string) (*linkedca.Po
 retry:
 	resp, err := c.client.Do(req)
 	if err != nil {
-		return nil, fmt.Errorf("client GET %s failed: %w", u, err)
+		return nil, clientError(err)
 	}
 	if resp.StatusCode >= 400 {
 		if !retried && c.retryOnError(resp) {
@@ -867,7 +892,7 @@ func (c *AdminClient) CreateProvisionerPolicy(provisionerName string, p *linkedc
 retry:
 	resp, err := c.client.Do(req)
 	if err != nil {
-		return nil, fmt.Errorf("client POST %s failed: %w", u, err)
+		return nil, clientError(err)
 	}
 	if resp.StatusCode >= 400 {
 		if !retried && c.retryOnError(resp) {
@@ -902,7 +927,7 @@ func (c *AdminClient) UpdateProvisionerPolicy(provisionerName string, p *linkedc
 retry:
 	resp, err := c.client.Do(req)
 	if err != nil {
-		return nil, fmt.Errorf("client PUT %s failed: %w", u, err)
+		return nil, clientError(err)
 	}
 	if resp.StatusCode >= 400 {
 		if !retried && c.retryOnError(resp) {
@@ -933,7 +958,7 @@ func (c *AdminClient) RemoveProvisionerPolicy(provisionerName string) error {
 retry:
 	resp, err := c.client.Do(req)
 	if err != nil {
-		return fmt.Errorf("client DELETE %s failed: %w", u, err)
+		return clientError(err)
 	}
 	if resp.StatusCode >= 400 {
 		if !retried && c.retryOnError(resp) {
@@ -967,7 +992,7 @@ func (c *AdminClient) GetACMEPolicy(provisionerName, reference, keyID string) (*
 retry:
 	resp, err := c.client.Do(req)
 	if err != nil {
-		return nil, fmt.Errorf("client GET %s failed: %w", u, err)
+		return nil, clientError(err)
 	}
 	if resp.StatusCode >= 400 {
 		if !retried && c.retryOnError(resp) {
@@ -1009,7 +1034,7 @@ func (c *AdminClient) CreateACMEPolicy(provisionerName, reference, keyID string,
 retry:
 	resp, err := c.client.Do(req)
 	if err != nil {
-		return nil, fmt.Errorf("client POST %s failed: %w", u, err)
+		return nil, clientError(err)
 	}
 	if resp.StatusCode >= 400 {
 		if !retried && c.retryOnError(resp) {
@@ -1051,7 +1076,7 @@ func (c *AdminClient) UpdateACMEPolicy(provisionerName, reference, keyID string,
 retry:
 	resp, err := c.client.Do(req)
 	if err != nil {
-		return nil, fmt.Errorf("client PUT %s failed: %w", u, err)
+		return nil, clientError(err)
 	}
 	if resp.StatusCode >= 400 {
 		if !retried && c.retryOnError(resp) {
@@ -1089,7 +1114,7 @@ func (c *AdminClient) RemoveACMEPolicy(provisionerName, reference, keyID string)
 retry:
 	resp, err := c.client.Do(req)
 	if err != nil {
-		return fmt.Errorf("client DELETE %s failed: %w", u, err)
+		return clientError(err)
 	}
 	if resp.StatusCode >= 400 {
 		if !retried && c.retryOnError(resp) {
@@ -1120,7 +1145,7 @@ retry:
 	req.Header.Add("Authorization", tok)
 	resp, err := c.client.Do(req)
 	if err != nil {
-		return nil, fmt.Errorf("client POST %s failed: %w", u, err)
+		return nil, clientError(err)
 	}
 	if resp.StatusCode >= 400 {
 		if !retried && c.retryOnError(resp) {
@@ -1155,7 +1180,7 @@ retry:
 	req.Header.Add("Authorization", tok)
 	resp, err := c.client.Do(req)
 	if err != nil {
-		return nil, fmt.Errorf("client PUT %s failed: %w", u, err)
+		return nil, clientError(err)
 	}
 	if resp.StatusCode >= 400 {
 		if !retried && c.retryOnError(resp) {
@@ -1186,7 +1211,7 @@ retry:
 	req.Header.Add("Authorization", tok)
 	resp, err := c.client.Do(req)
 	if err != nil {
-		return fmt.Errorf("client DELETE %s failed: %w", u, err)
+		return clientError(err)
 	}
 	if resp.StatusCode >= 400 {
 		if !retried && c.retryOnError(resp) {

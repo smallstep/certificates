@@ -385,16 +385,13 @@ func (o *OIDC) AuthorizeSSHSign(ctx context.Context, token string) ([]SignOption
 	}
 
 	var data sshutil.TemplateData
-	var principals []string
-
 	if claims.Email == "" {
-		// If email is empty, use the Subject claim instead to create minimal data for the template to use
+		// If email is empty, use the Subject claim instead to create minimal
+		// data for the template to use.
 		data = sshutil.CreateTemplateData(sshutil.UserCert, claims.Subject, nil)
 		if v, err := unsafeParseSigned(token); err == nil {
 			data.SetToken(v)
 		}
-
-		principals = nil
 	} else {
 		// Get the identity using either the default identityFunc or one injected
 		// externally. Note that the PreferredUsername might be empty.
@@ -417,8 +414,6 @@ func (o *OIDC) AuthorizeSSHSign(ctx context.Context, token string) ([]SignOption
 		for k, v := range iden.Permissions.CriticalOptions {
 			data.AddCriticalOption(k, v)
 		}
-
-		principals = iden.Usernames
 	}
 
 	// Use the default template unless no-templates are configured and email is
@@ -446,8 +441,7 @@ func (o *OIDC) AuthorizeSSHSign(ctx context.Context, token string) ([]SignOption
 		})
 	} else {
 		signOptions = append(signOptions, sshCertOptionsValidator(SignSSHOptions{
-			CertType:   SSHUserCert,
-			Principals: principals,
+			CertType: SSHUserCert,
 		}))
 	}
 

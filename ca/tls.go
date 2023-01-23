@@ -24,6 +24,10 @@ import (
 // getDefaultTransport.
 var mTLSDialContext func() func(ctx context.Context, network, address string) (net.Conn, error)
 
+// localAddr is the local address to use when dialing an address. This address
+// is defined by the environment variable STEP_CLIENT_ADDR.
+var localAddr net.Addr
+
 func init() {
 	// STEP_TLS_TUNNEL is an environment variable that can be set to do an TLS
 	// over (m)TLS tunnel to step-ca using identity-like credentials. The value
@@ -70,6 +74,29 @@ func init() {
 			}
 		}
 	}
+
+	// STEP_CLIENT_ADDR is an environment variable that can be set to define the
+	// local address to use when dialing an address. This can be useful when
+	// step is run behind a CIDR-based ACL.
+	//
+	// STEP_CLIENT_ADDR can be set to an IP ("127.0.0.1", "[::1]"), a hostname
+	// ("localhost"), or a host:port ("[::1]:0"). If the port is set to
+	// something other than ":0" and the dialer is created multiple times it
+	// will fail with an "address already in use" error.
+	//
+	// See https://github.com/smallstep/cli/issues/730
+	if v := os.Getenv("STEP_CLIENT_ADDR"); v != "" {
+		_, _, err := net.SplitHostPort(v)
+		if err != nil {
+			// assuming that the error is a missing port, if it's not it will
+			// panic below.
+			v += ":0"
+		}
+		localAddr, err = net.ResolveTCPAddr("tcp", v)
+		if err != nil {
+			panic(err)
+		}
+	}
 }
 
 // GetClientTLSConfig returns a tls.Config for client use configured with the
@@ -108,7 +135,7 @@ func (c *Client) getClientTLSConfig(ctx context.Context, sign *api.SignResponse,
 	//nolint:staticcheck // Use mutable tls.Config on renew
 	tr.DialTLS = c.buildDialTLS(tlsCtx)
 	// tr.DialTLSContext = c.buildDialTLSContext(tlsCtx)
-	renewer.RenewCertificate = getRenewFunc(tlsCtx, c, tr, pk)
+	renewer.RenewCertificate = getRenewFunc(tlsCtx, c, tr, pk) //nolint:contextcheck // deeply nested context
 
 	// Update client transport
 	c.SetTransport(tr)
@@ -156,7 +183,7 @@ func (c *Client) GetServerTLSConfig(ctx context.Context, sign *api.SignResponse,
 	//nolint:staticcheck // Use mutable tls.Config on renew
 	tr.DialTLS = c.buildDialTLS(tlsCtx)
 	// tr.DialTLSContext = c.buildDialTLSContext(tlsCtx)
-	renewer.RenewCertificate = getRenewFunc(tlsCtx, c, tr, pk)
+	renewer.RenewCertificate = getRenewFunc(tlsCtx, c, tr, pk) //nolint:contextcheck // deeply nested context
 
 	// Update client transport
 	c.SetTransport(tr)
@@ -279,7 +306,8 @@ func getDefaultTLSConfig(sign *api.SignResponse) *tls.Config {
 func getDefaultDialer() *net.Dialer {
 	// With the KeepAlive parameter set to 0, it will be use Golang's default.
 	return &net.Dialer{
-		Timeout: 30 * time.Second,
+		Timeout:   30 * time.Second,
+		LocalAddr: localAddr,
 	}
 }
 
