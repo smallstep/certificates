@@ -270,19 +270,61 @@ var (
 	}
 )
 
-// Error represents an ACME
+// Error represents an ACME Error
 type Error struct {
-	Type        string        `json:"type"`
-	Detail      string        `json:"detail"`
-	Subproblems []interface{} `json:"subproblems,omitempty"`
-	Identifier  interface{}   `json:"identifier,omitempty"`
-	Err         error         `json:"-"`
-	Status      int           `json:"-"`
+	Type        string       `json:"type"`
+	Detail      string       `json:"detail"`
+	Subproblems []Subproblem `json:"subproblems,omitempty"`
+
+	// 	The "identifier" field MUST NOT be present at the top level in ACME
+	//    problem documents.  It can only be present in subproblems.
+	//    Subproblems need not all have the same type, and they do not need to
+	//    match the top level type.
+	Identifier Identifier `json:"identifier,omitempty"` // TODO(hs): seems unused and MUST NOT be present; this can likely be removed
+	Err        error      `json:"-"`
+	Status     int        `json:"-"`
+}
+
+// Subproblem represents an ACME subproblem. It's fairly
+// similar to an ACME error, but differs in that it can't
+// include subproblems itself, the error is reflected
+// in the Detail property and doesn't have a Status.
+type Subproblem struct {
+	Type       string      `json:"type"`
+	Detail     string      `json:"detail"`
+	Identifier *Identifier `json:"identifier,omitempty"`
+}
+
+// AddSubproblems adds the Subproblems to Error. It
+// returns the Error, allowing for fluent addition.
+func (e *Error) AddSubproblems(subproblems ...Subproblem) *Error {
+	e.Subproblems = append(e.Subproblems, subproblems...)
+	return e
 }
 
 // NewError creates a new Error type.
 func NewError(pt ProblemType, msg string, args ...interface{}) *Error {
 	return newError(pt, errors.Errorf(msg, args...))
+}
+
+// NewSubproblem creates a new Subproblem. The msg and args
+// are used to create a new error, which is set as the Detail, allowing
+// for more detailed error messages to be returned to the ACME client.
+func NewSubproblem(pt ProblemType, msg string, args ...interface{}) Subproblem {
+	e := newError(pt, fmt.Errorf(msg, args...))
+	s := Subproblem{
+		Type:   e.Type,
+		Detail: e.Err.Error(),
+	}
+	return s
+}
+
+// NewSubproblemWithIdentifier creates a new Subproblem with a specific ACME
+// Identifier. It calls NewSubproblem and sets the Identifier.
+func NewSubproblemWithIdentifier(pt ProblemType, identifier Identifier, msg string, args ...interface{}) Subproblem {
+	s := NewSubproblem(pt, msg, args...)
+	s.Identifier = &identifier
+	return s
 }
 
 func newError(pt ProblemType, err error) *Error {

@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/go-chi/chi"
+	"github.com/ryboe/q"
 
 	"github.com/smallstep/certificates/acme"
 	"github.com/smallstep/certificates/api"
@@ -354,6 +355,8 @@ func GetChallenge(w http.ResponseWriter, r *http.Request) {
 		render.Error(w, acme.WrapErrorISE(err, "error validating challenge"))
 		return
 	}
+
+	q.Q(ch)
 
 	linker.LinkChallenge(ctx, ch, azID)
 

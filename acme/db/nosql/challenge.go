@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/pkg/errors"
+	"github.com/ryboe/q"
 	"github.com/smallstep/certificates/acme"
 	"github.com/smallstep/nosql"
 )
@@ -19,7 +20,7 @@ type dbChallenge struct {
 	Value       string             `json:"value"`
 	ValidatedAt string             `json:"validatedAt"`
 	CreatedAt   time.Time          `json:"createdAt"`
-	Error       *acme.Error        `json:"error"`
+	Error       *acme.Error        `json:"error"` // TODO(hs): a bit dangerous; should become db-specific type
 }
 
 func (dbc *dbChallenge) clone() *dbChallenge {
@@ -29,6 +30,7 @@ func (dbc *dbChallenge) clone() *dbChallenge {
 
 func (db *DB) getDBChallenge(ctx context.Context, id string) (*dbChallenge, error) {
 	data, err := db.db.Get(challengeTable, []byte(id))
+	q.Q(data)
 	if nosql.IsErrNotFound(err) {
 		return nil, acme.NewError(acme.ErrorMalformedType, "challenge %s not found", id)
 	} else if err != nil {
@@ -39,6 +41,7 @@ func (db *DB) getDBChallenge(ctx context.Context, id string) (*dbChallenge, erro
 	if err := json.Unmarshal(data, dbch); err != nil {
 		return nil, errors.Wrap(err, "error unmarshaling dbChallenge")
 	}
+	q.Q(dbch)
 	return dbch, nil
 }
 
