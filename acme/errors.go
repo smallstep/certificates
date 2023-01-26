@@ -275,14 +275,8 @@ type Error struct {
 	Type        string       `json:"type"`
 	Detail      string       `json:"detail"`
 	Subproblems []Subproblem `json:"subproblems,omitempty"`
-
-	// 	The "identifier" field MUST NOT be present at the top level in ACME
-	//    problem documents.  It can only be present in subproblems.
-	//    Subproblems need not all have the same type, and they do not need to
-	//    match the top level type.
-	Identifier Identifier `json:"identifier,omitempty"` // TODO(hs): seems unused and MUST NOT be present; this can likely be removed
-	Err        error      `json:"-"`
-	Status     int        `json:"-"`
+	Err         error        `json:"-"`
+	Status      int          `json:"-"`
 }
 
 // Subproblem represents an ACME subproblem. It's fairly
@@ -290,8 +284,12 @@ type Error struct {
 // include subproblems itself, the error is reflected
 // in the Detail property and doesn't have a Status.
 type Subproblem struct {
-	Type       string      `json:"type"`
-	Detail     string      `json:"detail"`
+	Type   string `json:"type"`
+	Detail string `json:"detail"`
+	// The "identifier" field MUST NOT be present at the top level in ACME
+	// problem documents.  It can only be present in subproblems.
+	// Subproblems need not all have the same type, and they do not need to
+	// match the top level type.
 	Identifier *Identifier `json:"identifier,omitempty"`
 }
 

@@ -135,7 +135,6 @@ func TestExternalAccountKey_BindTo(t *testing.T) {
 				if assert.True(t, errors.As(err, &ae)) {
 					assert.Equals(t, ae.Type, tt.err.Type)
 					assert.Equals(t, ae.Detail, tt.err.Detail)
-					assert.Equals(t, ae.Identifier, tt.err.Identifier)
 					assert.Equals(t, ae.Subproblems, tt.err.Subproblems)
 				}
 			} else {
