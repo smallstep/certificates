@@ -30,7 +30,6 @@ import (
 	"go.step.sm/crypto/pemutil"
 
 	"github.com/smallstep/certificates/authority/provisioner"
-	"github.com/smallstep/certificates/utils/debug/q"
 )
 
 type ChallengeType string
@@ -406,8 +405,6 @@ func deviceAttest01Validate(ctx context.Context, ch *Challenge, db DB, jwk *jose
 		}
 	case "step":
 		data, err := doStepAttestationFormat(ctx, prov, ch, jwk, &att)
-		q.Q(data)
-		q.Q(err)
 		if err != nil {
 			var acmeError *Error
 			if errors.As(err, &acmeError) {
@@ -423,16 +420,13 @@ func deviceAttest01Validate(ctx context.Context, ch *Challenge, db DB, jwk *jose
 		// certificate with the challenged Order value.
 		//
 		// Note: We might want to use an external service for this.
-		q.Q(data.SerialNumber, ch.Value)
 		if data.SerialNumber != ch.Value {
-			q.Q("not the same")
 			subproblem := NewSubproblemWithIdentifier(
 				ErrorMalformedType,
 				Identifier{Type: "permanent-identifier", Value: ch.Value},
 				"challenge identifier %q doesn't match the attested hardware identifier %q", ch.Value, data.SerialNumber,
 			)
-			s2 := NewSubproblem(ErrorMalformedType, "test")
-			return storeError(ctx, db, ch, true, NewError(ErrorBadAttestationStatementType, "permanent identifier does not match").AddSubproblems(subproblem, s2))
+			return storeError(ctx, db, ch, true, NewError(ErrorBadAttestationStatementType, "permanent identifier does not match").AddSubproblems(subproblem))
 		}
 	default:
 		return storeError(ctx, db, ch, true, NewError(ErrorBadAttestationStatementType, "unexpected attestation object format"))
@@ -764,7 +758,6 @@ func KeyAuthorization(token string, jwk *jose.JSONWebKey) (string, error) {
 // storeError the given error to an ACME error and saves using the DB interface.
 func storeError(ctx context.Context, db DB, ch *Challenge, markInvalid bool, err *Error) error {
 	ch.Error = err
-	q.Q(err)
 	if markInvalid {
 		ch.Status = StatusInvalid
 	}
