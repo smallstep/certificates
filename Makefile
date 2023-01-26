@@ -1,13 +1,5 @@
 PKG?=github.com/smallstep/certificates/cmd/step-ca
 BINNAME?=step-ca
-CLOUDKMS_BINNAME?=step-cloudkms-init
-CLOUDKMS_PKG?=github.com/smallstep/certificates/cmd/step-cloudkms-init
-AWSKMS_BINNAME?=step-awskms-init
-AWSKMS_PKG?=github.com/smallstep/certificates/cmd/step-awskms-init
-YUBIKEY_BINNAME?=step-yubikey-init
-YUBIKEY_PKG?=github.com/smallstep/certificates/cmd/step-yubikey-init
-PKCS11_BINNAME?=step-pkcs11-init
-PKCS11_PKG?=github.com/smallstep/certificates/cmd/step-pkcs11-init
 
 # Set V to 1 for verbose output from the Makefile
 Q=$(if $V,,@)
@@ -90,28 +82,12 @@ GOFLAGS := CGO_ENABLED=0
 download:
 	$Q go mod download
 
-build: $(PREFIX)bin/$(BINNAME) $(PREFIX)bin/$(CLOUDKMS_BINNAME) $(PREFIX)bin/$(AWSKMS_BINNAME) $(PREFIX)bin/$(YUBIKEY_BINNAME) $(PREFIX)bin/$(PKCS11_BINNAME)
+build: $(PREFIX)bin/$(BINNAME)
 	@echo "Build Complete!"
 
 $(PREFIX)bin/$(BINNAME): download $(call rwildcard,*.go)
 	$Q mkdir -p $(@D)
 	$Q $(GOOS_OVERRIDE) $(GOFLAGS) go build -v -o $(PREFIX)bin/$(BINNAME) $(LDFLAGS) $(PKG)
-
-$(PREFIX)bin/$(CLOUDKMS_BINNAME): download $(call rwildcard,*.go)
-	$Q mkdir -p $(@D)
-	$Q $(GOOS_OVERRIDE) $(GOFLAGS) go build -v -o $(PREFIX)bin/$(CLOUDKMS_BINNAME) $(LDFLAGS) $(CLOUDKMS_PKG)
-
-$(PREFIX)bin/$(AWSKMS_BINNAME): download $(call rwildcard,*.go)
-	$Q mkdir -p $(@D)
-	$Q $(GOOS_OVERRIDE) $(GOFLAGS) go build -v -o $(PREFIX)bin/$(AWSKMS_BINNAME) $(LDFLAGS) $(AWSKMS_PKG)
-
-$(PREFIX)bin/$(YUBIKEY_BINNAME): download $(call rwildcard,*.go)
-	$Q mkdir -p $(@D)
-	$Q $(GOOS_OVERRIDE) $(GOFLAGS) go build -v -o $(PREFIX)bin/$(YUBIKEY_BINNAME) $(LDFLAGS) $(YUBIKEY_PKG)
-
-$(PREFIX)bin/$(PKCS11_BINNAME): download $(call rwildcard,*.go)
-	$Q mkdir -p $(@D)
-	$Q $(GOOS_OVERRIDE) $(GOFLAGS) go build -v -o $(PREFIX)bin/$(PKCS11_BINNAME) $(LDFLAGS) $(PKCS11_PKG)
 
 # Target to force a build of step-ca without running tests
 simple: build
@@ -132,7 +108,6 @@ generate:
 #########################################
 test:
 	$Q $(GOFLAGS) gotestsum -- -coverprofile=coverage.out -short -covermode=atomic ./...
-
 
 testcgo:
 	$Q gotestsum -- -coverprofile=coverage.out -short -covermode=atomic ./...
@@ -166,15 +141,11 @@ lint:
 
 INSTALL_PREFIX?=/usr/
 
-install: $(PREFIX)bin/$(BINNAME) $(PREFIX)bin/$(CLOUDKMS_BINNAME) $(PREFIX)bin/$(AWSKMS_BINNAME)
+install: $(PREFIX)bin/$(BINNAME)
 	$Q install -D $(PREFIX)bin/$(BINNAME) $(DESTDIR)$(INSTALL_PREFIX)bin/$(BINNAME)
-	$Q install -D $(PREFIX)bin/$(CLOUDKMS_BINNAME) $(DESTDIR)$(INSTALL_PREFIX)bin/$(CLOUDKMS_BINNAME)
-	$Q install -D $(PREFIX)bin/$(AWSKMS_BINNAME) $(DESTDIR)$(INSTALL_PREFIX)bin/$(AWSKMS_BINNAME)
 
 uninstall:
 	$Q rm -f $(DESTDIR)$(INSTALL_PREFIX)/bin/$(BINNAME)
-	$Q rm -f $(DESTDIR)$(INSTALL_PREFIX)/bin/$(CLOUDKMS_BINNAME)
-	$Q rm -f $(DESTDIR)$(INSTALL_PREFIX)/bin/$(AWSKMS_BINNAME)
 
 .PHONY: install uninstall
 
@@ -185,18 +156,6 @@ uninstall:
 clean:
 ifneq ($(BINNAME),"")
 	$Q rm -f bin/$(BINNAME)
-endif
-ifneq ($(CLOUDKMS_BINNAME),"")
-	$Q rm -f bin/$(CLOUDKMS_BINNAME)
-endif
-ifneq ($(AWSKMS_BINNAME),"")
-	$Q rm -f bin/$(AWSKMS_BINNAME)
-endif
-ifneq ($(YUBIKEY_BINNAME),"")
-	$Q rm -f bin/$(YUBIKEY_BINNAME)
-endif
-ifneq ($(PKCS11_BINNAME),"")
-	$Q rm -f bin/$(PKCS11_BINNAME)
 endif
 
 .PHONY: clean

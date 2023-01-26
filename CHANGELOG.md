@@ -27,6 +27,14 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
 
 ## [Unreleased]
 
+### Removed
+
+- The deprecated CLI utils `step-awskms-init`, `step-cloudkms-init`,
+  `step-pkcs11-init`, `step-yubikey-init` have been removed.
+  [`step`](https://github.com/smallstep/cli) and
+  [`step-kms-plugin`](https://github.com/smallstep/step-kms-plugin) should be
+  used instead.
+
 ## [v0.23.1] - 2022-01-10
 
 ### Added
