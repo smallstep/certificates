@@ -6,9 +6,11 @@ import (
 	"time"
 
 	"github.com/pkg/errors"
-	"github.com/ryboe/q"
-	"github.com/smallstep/certificates/acme"
+
 	"github.com/smallstep/nosql"
+
+	"github.com/smallstep/certificates/acme"
+	"github.com/smallstep/certificates/utils/debug/q"
 )
 
 type dbChallenge struct {

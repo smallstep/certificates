@@ -10,13 +10,13 @@ import (
 	"time"
 
 	"github.com/go-chi/chi"
-	"github.com/ryboe/q"
 
 	"github.com/smallstep/certificates/acme"
 	"github.com/smallstep/certificates/api"
 	"github.com/smallstep/certificates/api/render"
 	"github.com/smallstep/certificates/authority"
 	"github.com/smallstep/certificates/authority/provisioner"
+	"github.com/smallstep/certificates/utils/debug/q"
 )
 
 func link(url, typ string) string {

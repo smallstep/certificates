@@ -26,11 +26,11 @@ import (
 	"time"
 
 	"github.com/fxamacker/cbor/v2"
-	"github.com/smallstep/certificates/authority/provisioner"
 	"go.step.sm/crypto/jose"
 	"go.step.sm/crypto/pemutil"
 
-	"github.com/ryboe/q"
+	"github.com/smallstep/certificates/authority/provisioner"
+	"github.com/smallstep/certificates/utils/debug/q"
 )
 
 type ChallengeType string
