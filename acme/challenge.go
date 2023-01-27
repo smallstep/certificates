@@ -80,10 +80,9 @@ func (ch *Challenge) ToLog() (interface{}, error) {
 	return string(b), nil
 }
 
-// Validate attempts to validate the challenge. Stores changes to the Challenge
-// type using the DB interface.
-// satisfactorily validated, the 'status' and 'validated' attributes are
-// updated.
+// Validate attempts to validate the Challenge. Stores changes to the Challenge
+// type using the DB interface. If the Challenge is validated, the 'status' and
+// 'validated' attributes are updated.
 func (ch *Challenge) Validate(ctx context.Context, db DB, jwk *jose.JSONWebKey, payload []byte) error {
 	// If already valid or invalid then return without performing validation.
 	if ch.Status != StatusPending {
@@ -336,21 +335,21 @@ func dns01Validate(ctx context.Context, ch *Challenge, db DB, jwk *jose.JSONWebK
 	return nil
 }
 
-type Payload struct {
+type payloadType struct {
 	AttObj string `json:"attObj"`
 	Error  string `json:"error"`
 }
 
-type AttestationObject struct {
+type attestationObject struct {
 	Format       string                 `json:"fmt"`
 	AttStatement map[string]interface{} `json:"attStmt,omitempty"`
 }
 
 // TODO(bweeks): move attestation verification to a shared package.
-// TODO(bweeks): define new error type for failed attestation validation.
 func deviceAttest01Validate(ctx context.Context, ch *Challenge, db DB, jwk *jose.JSONWebKey, payload []byte) error {
-	var p Payload
+	var p payloadType
 	if err := json.Unmarshal(payload, &p); err != nil {
+
 		return WrapErrorISE(err, "error unmarshalling JSON")
 	}
 	if p.Error != "" {
@@ -363,7 +362,7 @@ func deviceAttest01Validate(ctx context.Context, ch *Challenge, db DB, jwk *jose
 		return WrapErrorISE(err, "error base64 decoding attObj")
 	}
 
-	att := AttestationObject{}
+	att := attestationObject{}
 	if err := cbor.Unmarshal(attObj, &att); err != nil {
 		return WrapErrorISE(err, "error unmarshalling CBOR")
 	}
@@ -475,7 +474,7 @@ type appleAttestationData struct {
 	Certificate  *x509.Certificate
 }
 
-func doAppleAttestationFormat(ctx context.Context, prov Provisioner, ch *Challenge, att *AttestationObject) (*appleAttestationData, error) {
+func doAppleAttestationFormat(ctx context.Context, prov Provisioner, ch *Challenge, att *attestationObject) (*appleAttestationData, error) {
 	// Use configured or default attestation roots if none is configured.
 	roots, ok := prov.GetAttestationRoots()
 	if !ok {
@@ -576,7 +575,7 @@ type stepAttestationData struct {
 	SerialNumber string
 }
 
-func doStepAttestationFormat(ctx context.Context, prov Provisioner, ch *Challenge, jwk *jose.JSONWebKey, att *AttestationObject) (*stepAttestationData, error) {
+func doStepAttestationFormat(ctx context.Context, prov Provisioner, ch *Challenge, jwk *jose.JSONWebKey, att *attestationObject) (*stepAttestationData, error) {
 	// Use configured or default attestation roots if none is configured.
 	roots, ok := prov.GetAttestationRoots()
 	if !ok {
