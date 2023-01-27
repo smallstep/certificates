@@ -349,7 +349,6 @@ type attestationObject struct {
 func deviceAttest01Validate(ctx context.Context, ch *Challenge, db DB, jwk *jose.JSONWebKey, payload []byte) error {
 	var p payloadType
 	if err := json.Unmarshal(payload, &p); err != nil {
-
 		return WrapErrorISE(err, "error unmarshalling JSON")
 	}
 	if p.Error != "" {

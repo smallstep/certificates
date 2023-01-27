@@ -677,7 +677,7 @@ func TestChallenge_Validate(t *testing.T) {
 
 						err := NewError(ErrorRejectedIdentifierType, "payload contained error: an error")
 
-						sassert.EqualError(t, err.Err, updch.Error.Err.Error())
+						sassert.EqualError(t, updch.Error.Err, err.Err.Error())
 						sassert.Equal(t, err.Type, updch.Error.Type)
 						sassert.Equal(t, err.Detail, updch.Error.Detail)
 						sassert.Equal(t, err.Status, updch.Error.Status)
@@ -3195,7 +3195,7 @@ func Test_deviceAttest01Validate(t *testing.T) {
 
 							err := NewError(ErrorRejectedIdentifierType, "payload contained error: an error")
 
-							sassert.EqualError(t, err.Err, updch.Error.Err.Error())
+							sassert.EqualError(t, updch.Error.Err, err.Err.Error())
 							sassert.Equal(t, err.Type, updch.Error.Type)
 							sassert.Equal(t, err.Detail, updch.Error.Detail)
 							sassert.Equal(t, err.Status, updch.Error.Status)
@@ -3229,7 +3229,7 @@ func Test_deviceAttest01Validate(t *testing.T) {
 
 							err := NewError(ErrorRejectedIdentifierType, "payload contained error: an error")
 
-							sassert.EqualError(t, err.Err, updch.Error.Err.Error())
+							sassert.EqualError(t, updch.Error.Err, err.Err.Error())
 							sassert.Equal(t, err.Type, updch.Error.Type)
 							sassert.Equal(t, err.Detail, updch.Error.Detail)
 							sassert.Equal(t, err.Status, updch.Error.Status)
@@ -3343,7 +3343,7 @@ func Test_deviceAttest01Validate(t *testing.T) {
 
 							err := NewError(ErrorBadAttestationStatementType, "attestation format %q is not enabled", "step")
 
-							sassert.EqualError(t, err.Err, updch.Error.Err.Error())
+							sassert.EqualError(t, updch.Error.Err, err.Err.Error())
 							sassert.Equal(t, err.Type, updch.Error.Type)
 							sassert.Equal(t, err.Detail, updch.Error.Detail)
 							sassert.Equal(t, err.Status, updch.Error.Status)
@@ -3393,7 +3393,7 @@ func Test_deviceAttest01Validate(t *testing.T) {
 
 							err := NewError(ErrorBadAttestationStatementType, "x5c not present")
 
-							sassert.EqualError(t, err.Err, updch.Error.Err.Error())
+							sassert.EqualError(t, updch.Error.Err, err.Err.Error())
 							sassert.Equal(t, err.Type, updch.Error.Type)
 							sassert.Equal(t, err.Detail, updch.Error.Detail)
 							sassert.Equal(t, err.Status, updch.Error.Status)
@@ -3689,7 +3689,7 @@ func Test_deviceAttest01Validate(t *testing.T) {
 									"challenge identifier \"12345678\" doesn't match the attested hardware identifier \"87654321\"",
 								))
 
-							sassert.EqualError(t, err.Err, updch.Error.Err.Error())
+							sassert.EqualError(t, updch.Error.Err, err.Err.Error())
 							sassert.Equal(t, err.Type, updch.Error.Type)
 							sassert.Equal(t, err.Detail, updch.Error.Detail)
 							sassert.Equal(t, err.Status, updch.Error.Status)
@@ -3776,7 +3776,7 @@ func Test_deviceAttest01Validate(t *testing.T) {
 
 							err := NewError(ErrorBadAttestationStatementType, "unexpected attestation object format")
 
-							sassert.EqualError(t, err.Err, updch.Error.Err.Error())
+							sassert.EqualError(t, updch.Error.Err, err.Err.Error())
 							sassert.Equal(t, err.Type, updch.Error.Type)
 							sassert.Equal(t, err.Detail, updch.Error.Detail)
 							sassert.Equal(t, err.Status, updch.Error.Status)
