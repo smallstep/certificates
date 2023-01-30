@@ -140,7 +140,7 @@ release:
 
     #### Windows
 
-    - 📦 [step-ca_windows_{{ .Version }}_arm64.zip](https://dl.step.sm/gh-release/certificates/gh-release-header/{{ .Tag }}/step-ca_windows_{{ .Version }}_amd64.zip)
+    - 📦 [step-ca_windows_{{ .Version }}_amd64.zip](https://dl.step.sm/gh-release/certificates/gh-release-header/{{ .Tag }}/step-ca_windows_{{ .Version }}_amd64.zip)
 
     For more builds across platforms and architectures, see the `Assets` section below.
     And for packaged versions (Docker, k8s, Homebrew), see our [installation docs](https://smallstep.com/docs/step-ca/installation).
