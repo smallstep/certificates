@@ -6,13 +6,13 @@ require (
 	cloud.google.com/go v0.107.0 // indirect
 	cloud.google.com/go/longrunning v0.4.0
 	cloud.google.com/go/security v1.11.0
-	github.com/Azure/azure-sdk-for-go v67.0.0+incompatible // indirect
+	github.com/Azure/azure-sdk-for-go v68.0.0+incompatible // indirect
 	github.com/Azure/go-autorest/autorest v0.11.28 // indirect
-	github.com/Azure/go-autorest/autorest/azure/auth v0.5.11 // indirect
+	github.com/Azure/go-autorest/autorest/azure/auth v0.5.12 // indirect
 	github.com/Azure/go-autorest/autorest/date v0.3.0 // indirect
 	github.com/Masterminds/sprig/v3 v3.2.3
 	github.com/ThalesIgnite/crypto11 v1.2.5 // indirect
-	github.com/aws/aws-sdk-go v1.44.132 // indirect
+	github.com/aws/aws-sdk-go v1.44.185 // indirect
 	github.com/dgraph-io/ristretto v0.1.0 // indirect
 	github.com/fatih/color v1.9.0 // indirect
 	github.com/fxamacker/cbor/v2 v2.4.0
@@ -43,7 +43,7 @@ require (
 	github.com/urfave/cli v1.22.12
 	go.mozilla.org/pkcs7 v0.0.0-20210826202110-33d05740a352
 	go.step.sm/cli-utils v0.7.5
-	go.step.sm/crypto v0.23.1
+	go.step.sm/crypto v0.23.2
 	go.step.sm/linkedca v0.19.0
 	golang.org/x/crypto v0.5.0
 	golang.org/x/net v0.5.0
@@ -60,7 +60,7 @@ require (
 	cloud.google.com/go/compute v1.14.0 // indirect
 	cloud.google.com/go/compute/metadata v0.2.3 // indirect
 	cloud.google.com/go/iam v0.8.0 // indirect
-	cloud.google.com/go/kms v1.6.0 // indirect
+	cloud.google.com/go/kms v1.8.0 // indirect
 	filippo.io/edwards25519 v1.0.0 // indirect
 	github.com/AndreasBriese/bbloom v0.0.0-20190825152654-46b345b51c96 // indirect
 	github.com/Azure/go-autorest v14.2.0+incompatible // indirect
