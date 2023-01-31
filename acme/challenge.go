@@ -408,6 +408,14 @@ func wireOIDC01Validate(ctx context.Context, ch *Challenge, db DB, jwk *jose.JSO
 		return storeError(ctx, db, ch, false, NewError(ErrorRejectedIdentifierType, "OIDC claims don't match"))
 	}
 
+	// Update and store the challenge.
+	ch.Status = StatusValid
+	ch.Error = nil
+	ch.ValidatedAt = clock.Now().Format(time.RFC3339)
+
+	if err = db.UpdateChallenge(ctx, ch); err != nil {
+		return WrapErrorISE(err, "error updating challenge")
+	}
 	return nil
 }
 
@@ -485,6 +493,14 @@ func wireDPOP01Validate(ctx context.Context, ch *Challenge, db DB, jwk *jose.JSO
 		return storeError(ctx, db, ch, true, NewError(ErrorRejectedIdentifierType, "error finishing validation: %s", err))
 	}
 
+	// Update and store the challenge.
+	ch.Status = StatusValid
+	ch.Error = nil
+	ch.ValidatedAt = clock.Now().Format(time.RFC3339)
+
+	if err = db.UpdateChallenge(ctx, ch); err != nil {
+		return WrapErrorISE(err, "error updating challenge")
+	}
 	return nil
 }
 
