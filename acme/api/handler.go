@@ -16,7 +16,6 @@ import (
 	"github.com/smallstep/certificates/api/render"
 	"github.com/smallstep/certificates/authority"
 	"github.com/smallstep/certificates/authority/provisioner"
-	"github.com/smallstep/certificates/utils/debug/q"
 )
 
 func link(url, typ string) string {
@@ -355,8 +354,6 @@ func GetChallenge(w http.ResponseWriter, r *http.Request) {
 		render.Error(w, acme.WrapErrorISE(err, "error validating challenge"))
 		return
 	}
-
-	q.Q(ch)
 
 	linker.LinkChallenge(ctx, ch, azID)
 

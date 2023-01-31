@@ -10,7 +10,6 @@ import (
 	"github.com/smallstep/nosql"
 
 	"github.com/smallstep/certificates/acme"
-	"github.com/smallstep/certificates/utils/debug/q"
 )
 
 type dbChallenge struct {
@@ -32,7 +31,6 @@ func (dbc *dbChallenge) clone() *dbChallenge {
 
 func (db *DB) getDBChallenge(ctx context.Context, id string) (*dbChallenge, error) {
 	data, err := db.db.Get(challengeTable, []byte(id))
-	q.Q(data)
 	if nosql.IsErrNotFound(err) {
 		return nil, acme.NewError(acme.ErrorMalformedType, "challenge %s not found", id)
 	} else if err != nil {
@@ -43,7 +41,6 @@ func (db *DB) getDBChallenge(ctx context.Context, id string) (*dbChallenge, erro
 	if err := json.Unmarshal(data, dbch); err != nil {
 		return nil, errors.Wrap(err, "error unmarshaling dbChallenge")
 	}
-	q.Q(dbch)
 	return dbch, nil
 }
 
