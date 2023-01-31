@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"unicode"
 
@@ -29,7 +30,7 @@ var AppCommand = cli.Command{
 	Action: appAction,
 	UsageText: `**step-ca** <config> [**--password-file**=<file>]
 [**--ssh-host-password-file**=<file>] [**--ssh-user-password-file**=<file>]
-[**--issuer-password-file**=<file>] [**--resolver**=<addr>]`,
+[**--issuer-password-file**=<file>] [**--pidfile**=<file>] [**--resolver**=<addr>]`,
 	Flags: []cli.Flag{
 		cli.StringFlag{
 			Name: "password-file",
@@ -82,12 +83,18 @@ Requires **--insecure** flag.`,
 			Usage: `the <port> used on tls-alpn-01 challenges. It can be changed for testing purposes.
 Requires **--insecure** flag.`,
 		},
+		cli.StringFlag{
+			Name:  "pidfile",
+			Usage: "that path to the <file> to write the process ID.",
+		},
 		cli.BoolFlag{
 			Name:  "insecure",
 			Usage: "enable insecure flags.",
 		},
 	},
 }
+
+var pidfile string
 
 // AppAction is the action used when the top command runs.
 func appAction(ctx *cli.Context) error {
@@ -213,6 +220,15 @@ To get a linked authority token:
 		issuerPassword = bytes.TrimRightFunc(issuerPassword, unicode.IsSpace)
 	}
 
+	if filename := ctx.String("pidfile"); filename != "" {
+		pid := []byte(strconv.Itoa(os.Getpid()) + "\n")
+		//nolint:gosec // 0644 (-rw-r--r--) are common permissions for a pid file
+		if err := os.WriteFile(filename, pid, 0644); err != nil {
+			fatal(errors.Wrap(err, "error writing pidfile"))
+		}
+		pidfile = filename
+	}
+
 	// replace resolver if requested
 	if resolver != "" {
 		net.DefaultResolver.PreferGo = true
@@ -237,6 +253,11 @@ To get a linked authority token:
 	if err = srv.Run(); err != nil && !errors.Is(err, http.ErrServerClosed) {
 		fatal(err)
 	}
+
+	if pidfile != "" {
+		os.Remove(pidfile)
+	}
+
 	return nil
 }
 
@@ -268,6 +289,9 @@ func fatal(err error) {
 		fmt.Fprintf(os.Stderr, "%+v\n", err)
 	} else {
 		fmt.Fprintln(os.Stderr, err)
+	}
+	if pidfile != "" {
+		os.Remove(pidfile)
 	}
 	os.Exit(2)
 }
