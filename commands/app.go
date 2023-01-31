@@ -141,6 +141,9 @@ func appAction(ctx *cli.Context) error {
 
 	cfg, err := config.LoadConfiguration(configFile)
 	if err != nil && token == "" {
+		fmt.Println("step-ca can't find or open the configuration file for your CA.")
+		fmt.Println("You may need to create a CA first by running `step ca init`.")
+		fmt.Println("Documentation: https://u.step.sm/docs/ca\n")
 		fatal(err)
 	}
 
