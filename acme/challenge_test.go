@@ -31,13 +31,15 @@ import (
 	"time"
 
 	"github.com/fxamacker/cbor/v2"
-	"github.com/smallstep/assert"
-	"github.com/smallstep/certificates/authority/config"
-	"github.com/smallstep/certificates/authority/provisioner"
-	sassert "github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+
 	"go.step.sm/crypto/jose"
 	"go.step.sm/crypto/keyutil"
 	"go.step.sm/crypto/minica"
+
+	"github.com/smallstep/certificates/authority/config"
+	"github.com/smallstep/certificates/authority/provisioner"
 )
 
 type mockClient struct {
@@ -106,16 +108,17 @@ func Test_storeError(t *testing.T) {
 				ch: ch,
 				db: &MockDB{
 					MockUpdateChallenge: func(ctx context.Context, updch *Challenge) error {
-						assert.Equals(t, updch.ID, ch.ID)
-						assert.Equals(t, updch.Token, ch.Token)
-						assert.Equals(t, updch.Value, ch.Value)
-						assert.Equals(t, updch.Status, StatusValid)
+						assert.Equal(t, "chID", updch.ID)
+						assert.Equal(t, "token", updch.Token)
+						assert.Equal(t, "zap.internal", updch.Value)
+						assert.Equal(t, StatusValid, updch.Status)
 
-						assert.HasPrefix(t, updch.Error.Err.Error(), err.Err.Error())
-						assert.Equals(t, updch.Error.Type, err.Type)
-						assert.Equals(t, updch.Error.Detail, err.Detail)
-						assert.Equals(t, updch.Error.Status, err.Status)
-						assert.Equals(t, updch.Error.Detail, err.Detail)
+						assert.EqualError(t, updch.Error.Err, err.Err.Error())
+						assert.Equal(t, err.Type, updch.Error.Type)
+						assert.Equal(t, err.Detail, updch.Error.Detail)
+						assert.Equal(t, err.Status, updch.Error.Status)
+						assert.Equal(t, err.Subproblems, updch.Error.Subproblems)
+
 						return errors.New("force")
 					},
 				},
@@ -133,16 +136,17 @@ func Test_storeError(t *testing.T) {
 				ch: ch,
 				db: &MockDB{
 					MockUpdateChallenge: func(ctx context.Context, updch *Challenge) error {
-						assert.Equals(t, updch.ID, ch.ID)
-						assert.Equals(t, updch.Token, ch.Token)
-						assert.Equals(t, updch.Value, ch.Value)
-						assert.Equals(t, updch.Status, StatusValid)
+						assert.Equal(t, "chID", updch.ID)
+						assert.Equal(t, "token", updch.Token)
+						assert.Equal(t, "zap.internal", updch.Value)
+						assert.Equal(t, StatusValid, updch.Status)
 
-						assert.HasPrefix(t, updch.Error.Err.Error(), err.Err.Error())
-						assert.Equals(t, updch.Error.Type, err.Type)
-						assert.Equals(t, updch.Error.Detail, err.Detail)
-						assert.Equals(t, updch.Error.Status, err.Status)
-						assert.Equals(t, updch.Error.Detail, err.Detail)
+						assert.EqualError(t, updch.Error.Err, err.Err.Error())
+						assert.Equal(t, err.Type, updch.Error.Type)
+						assert.Equal(t, err.Detail, updch.Error.Detail)
+						assert.Equal(t, err.Status, updch.Error.Status)
+						assert.Equal(t, err.Subproblems, updch.Error.Subproblems)
+
 						return NewError(ErrorMalformedType, "bar")
 					},
 				},
@@ -160,16 +164,17 @@ func Test_storeError(t *testing.T) {
 				ch: ch,
 				db: &MockDB{
 					MockUpdateChallenge: func(ctx context.Context, updch *Challenge) error {
-						assert.Equals(t, updch.ID, ch.ID)
-						assert.Equals(t, updch.Token, ch.Token)
-						assert.Equals(t, updch.Value, ch.Value)
-						assert.Equals(t, updch.Status, StatusValid)
+						assert.Equal(t, "chID", updch.ID)
+						assert.Equal(t, "token", updch.Token)
+						assert.Equal(t, "zap.internal", updch.Value)
+						assert.Equal(t, StatusValid, updch.Status)
 
-						assert.HasPrefix(t, updch.Error.Err.Error(), err.Err.Error())
-						assert.Equals(t, updch.Error.Type, err.Type)
-						assert.Equals(t, updch.Error.Detail, err.Detail)
-						assert.Equals(t, updch.Error.Status, err.Status)
-						assert.Equals(t, updch.Error.Detail, err.Detail)
+						assert.EqualError(t, updch.Error.Err, err.Err.Error())
+						assert.Equal(t, err.Type, updch.Error.Type)
+						assert.Equal(t, err.Detail, updch.Error.Detail)
+						assert.Equal(t, err.Status, updch.Error.Status)
+						assert.Equal(t, err.Subproblems, updch.Error.Subproblems)
+
 						return nil
 					},
 				},
@@ -186,16 +191,17 @@ func Test_storeError(t *testing.T) {
 				ch: ch,
 				db: &MockDB{
 					MockUpdateChallenge: func(ctx context.Context, updch *Challenge) error {
-						assert.Equals(t, updch.ID, ch.ID)
-						assert.Equals(t, updch.Token, ch.Token)
-						assert.Equals(t, updch.Value, ch.Value)
-						assert.Equals(t, updch.Status, StatusInvalid)
+						assert.Equal(t, "chID", updch.ID)
+						assert.Equal(t, "token", updch.Token)
+						assert.Equal(t, "zap.internal", updch.Value)
+						assert.Equal(t, StatusInvalid, updch.Status)
 
-						assert.HasPrefix(t, updch.Error.Err.Error(), err.Err.Error())
-						assert.Equals(t, updch.Error.Type, err.Type)
-						assert.Equals(t, updch.Error.Detail, err.Detail)
-						assert.Equals(t, updch.Error.Status, err.Status)
-						assert.Equals(t, updch.Error.Detail, err.Detail)
+						assert.EqualError(t, updch.Error.Err, err.Err.Error())
+						assert.Equal(t, err.Type, updch.Error.Type)
+						assert.Equal(t, err.Detail, updch.Error.Detail)
+						assert.Equal(t, err.Status, updch.Error.Status)
+						assert.Equal(t, err.Subproblems, updch.Error.Subproblems)
+
 						return nil
 					},
 				},
@@ -207,16 +213,15 @@ func Test_storeError(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			tc := run(t)
 			if err := storeError(context.Background(), tc.db, tc.ch, tc.markInvalid, err); err != nil {
-				if assert.NotNil(t, tc.err) {
+				if assert.Error(t, tc.err) {
 					var k *Error
 					if errors.As(err, &k) {
-						assert.Equals(t, k.Type, tc.err.Type)
-						assert.Equals(t, k.Detail, tc.err.Detail)
-						assert.Equals(t, k.Status, tc.err.Status)
-						assert.Equals(t, k.Err.Error(), tc.err.Err.Error())
-						assert.Equals(t, k.Detail, tc.err.Detail)
+						assert.Equal(t, tc.err.Type, k.Type)
+						assert.Equal(t, tc.err.Detail, k.Detail)
+						assert.Equal(t, tc.err.Status, k.Status)
+						assert.Equal(t, tc.err.Err.Error(), k.Err.Error())
 					} else {
-						assert.FatalError(t, errors.New("unexpected error type"))
+						assert.Fail(t, "unexpected error type")
 					}
 				}
 			} else {
@@ -236,7 +241,7 @@ func TestKeyAuthorization(t *testing.T) {
 	tests := map[string]func(t *testing.T) test{
 		"fail/jwk-thumbprint-error": func(t *testing.T) test {
 			jwk, err := jose.GenerateJWK("EC", "P-256", "ES256", "sig", "", 0)
-			assert.FatalError(t, err)
+			require.NoError(t, err)
 			jwk.Key = "foo"
 			return test{
 				token: "1234",
@@ -247,9 +252,9 @@ func TestKeyAuthorization(t *testing.T) {
 		"ok": func(t *testing.T) test {
 			token := "1234"
 			jwk, err := jose.GenerateJWK("EC", "P-256", "ES256", "sig", "", 0)
-			assert.FatalError(t, err)
+			require.NoError(t, err)
 			thumbprint, err := jwk.Thumbprint(crypto.SHA256)
-			assert.FatalError(t, err)
+			require.NoError(t, err)
 			encPrint := base64.RawURLEncoding.EncodeToString(thumbprint)
 			return test{
 				token: token,
@@ -262,21 +267,20 @@ func TestKeyAuthorization(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			tc := run(t)
 			if ka, err := KeyAuthorization(tc.token, tc.jwk); err != nil {
-				if assert.NotNil(t, tc.err) {
+				if assert.Error(t, tc.err) {
 					var k *Error
 					if errors.As(err, &k) {
-						assert.Equals(t, k.Type, tc.err.Type)
-						assert.Equals(t, k.Detail, tc.err.Detail)
-						assert.Equals(t, k.Status, tc.err.Status)
-						assert.Equals(t, k.Err.Error(), tc.err.Err.Error())
-						assert.Equals(t, k.Detail, tc.err.Detail)
+						assert.Equal(t, tc.err.Type, k.Type)
+						assert.Equal(t, tc.err.Detail, k.Detail)
+						assert.Equal(t, tc.err.Status, k.Status)
+						assert.Equal(t, tc.err.Err.Error(), k.Err.Error())
 					} else {
-						assert.FatalError(t, errors.New("unexpected error type"))
+						assert.Fail(t, "unexpected error type")
 					}
 				}
 			} else {
 				if assert.Nil(t, tc.err) {
-					assert.Equals(t, tc.exp, ka)
+					assert.Equal(t, tc.exp, ka)
 				}
 			}
 		})
@@ -339,18 +343,19 @@ func TestChallenge_Validate(t *testing.T) {
 				},
 				db: &MockDB{
 					MockUpdateChallenge: func(ctx context.Context, updch *Challenge) error {
-						assert.Equals(t, updch.ID, ch.ID)
-						assert.Equals(t, updch.Token, ch.Token)
-						assert.Equals(t, updch.Type, ch.Type)
-						assert.Equals(t, updch.Status, ch.Status)
-						assert.Equals(t, updch.Value, ch.Value)
+						assert.Equal(t, "chID", updch.ID)
+						assert.Equal(t, "token", updch.Token)
+						assert.Equal(t, ChallengeType("http-01"), updch.Type)
+						assert.Equal(t, "zap.internal", updch.Value)
+						assert.Equal(t, StatusPending, updch.Status)
 
 						err := NewError(ErrorConnectionType, "error doing http GET for url http://zap.internal/.well-known/acme-challenge/%s: force", ch.Token)
-						assert.HasPrefix(t, updch.Error.Err.Error(), err.Err.Error())
-						assert.Equals(t, updch.Error.Type, err.Type)
-						assert.Equals(t, updch.Error.Detail, err.Detail)
-						assert.Equals(t, updch.Error.Status, err.Status)
-						assert.Equals(t, updch.Error.Detail, err.Detail)
+						assert.EqualError(t, updch.Error.Err, err.Err.Error())
+						assert.Equal(t, err.Type, updch.Error.Type)
+						assert.Equal(t, err.Detail, updch.Error.Detail)
+						assert.Equal(t, err.Status, updch.Error.Status)
+						assert.Equal(t, err.Subproblems, updch.Error.Subproblems)
+
 						return errors.New("force")
 					},
 				},
@@ -375,18 +380,19 @@ func TestChallenge_Validate(t *testing.T) {
 				},
 				db: &MockDB{
 					MockUpdateChallenge: func(ctx context.Context, updch *Challenge) error {
-						assert.Equals(t, updch.ID, ch.ID)
-						assert.Equals(t, updch.Token, ch.Token)
-						assert.Equals(t, updch.Type, ch.Type)
-						assert.Equals(t, updch.Status, ch.Status)
-						assert.Equals(t, updch.Value, ch.Value)
+						assert.Equal(t, "chID", updch.ID)
+						assert.Equal(t, "token", updch.Token)
+						assert.Equal(t, ChallengeType("http-01"), updch.Type)
+						assert.Equal(t, "zap.internal", updch.Value)
+						assert.Equal(t, StatusPending, updch.Status)
 
 						err := NewError(ErrorConnectionType, "error doing http GET for url http://zap.internal/.well-known/acme-challenge/%s: force", ch.Token)
-						assert.HasPrefix(t, updch.Error.Err.Error(), err.Err.Error())
-						assert.Equals(t, updch.Error.Type, err.Type)
-						assert.Equals(t, updch.Error.Detail, err.Detail)
-						assert.Equals(t, updch.Error.Status, err.Status)
-						assert.Equals(t, updch.Error.Detail, err.Detail)
+						assert.EqualError(t, updch.Error.Err, err.Err.Error())
+						assert.Equal(t, err.Type, updch.Error.Type)
+						assert.Equal(t, err.Detail, updch.Error.Detail)
+						assert.Equal(t, err.Status, updch.Error.Status)
+						assert.Equal(t, err.Subproblems, updch.Error.Subproblems)
+
 						return nil
 					},
 				},
@@ -416,18 +422,19 @@ func TestChallenge_Validate(t *testing.T) {
 				},
 				db: &MockDB{
 					MockUpdateChallenge: func(ctx context.Context, updch *Challenge) error {
-						assert.Equals(t, updch.ID, ch.ID)
-						assert.Equals(t, updch.Token, ch.Token)
-						assert.Equals(t, updch.Type, ch.Type)
-						assert.Equals(t, updch.Status, ch.Status)
-						assert.Equals(t, updch.Value, ch.Value)
+						assert.Equal(t, "chID", updch.ID)
+						assert.Equal(t, "token", updch.Token)
+						assert.Equal(t, ChallengeType("http-01"), updch.Type)
+						assert.Equal(t, "zap.internal", updch.Value)
+						assert.Equal(t, StatusPending, updch.Status)
 
 						err := NewError(ErrorConnectionType, "error doing http GET for url http://zap.internal:8080/.well-known/acme-challenge/%s: force", ch.Token)
-						assert.HasPrefix(t, updch.Error.Err.Error(), err.Err.Error())
-						assert.Equals(t, updch.Error.Type, err.Type)
-						assert.Equals(t, updch.Error.Detail, err.Detail)
-						assert.Equals(t, updch.Error.Status, err.Status)
-						assert.Equals(t, updch.Error.Detail, err.Detail)
+						assert.EqualError(t, updch.Error.Err, err.Err.Error())
+						assert.Equal(t, err.Type, updch.Error.Type)
+						assert.Equal(t, err.Detail, updch.Error.Detail)
+						assert.Equal(t, err.Status, updch.Error.Status)
+						assert.Equal(t, err.Subproblems, updch.Error.Subproblems)
+
 						return nil
 					},
 				},
@@ -451,19 +458,20 @@ func TestChallenge_Validate(t *testing.T) {
 				},
 				db: &MockDB{
 					MockUpdateChallenge: func(ctx context.Context, updch *Challenge) error {
-						assert.Equals(t, updch.ID, ch.ID)
-						assert.Equals(t, updch.Token, ch.Token)
-						assert.Equals(t, updch.Type, ch.Type)
-						assert.Equals(t, updch.Status, ch.Status)
-						assert.Equals(t, updch.Value, ch.Value)
+						assert.Equal(t, "chID", updch.ID)
+						assert.Equal(t, "token", updch.Token)
+						assert.Equal(t, ChallengeType("dns-01"), updch.Type)
+						assert.Equal(t, "zap.internal", updch.Value)
+						assert.Equal(t, StatusPending, updch.Status)
 
 						err := NewError(ErrorDNSType, "error looking up TXT records for domain %s: force", ch.Value)
 
-						assert.HasPrefix(t, updch.Error.Err.Error(), err.Err.Error())
-						assert.Equals(t, updch.Error.Type, err.Type)
-						assert.Equals(t, updch.Error.Detail, err.Detail)
-						assert.Equals(t, updch.Error.Status, err.Status)
-						assert.Equals(t, updch.Error.Detail, err.Detail)
+						assert.EqualError(t, updch.Error.Err, err.Err.Error())
+						assert.Equal(t, err.Type, updch.Error.Type)
+						assert.Equal(t, err.Detail, updch.Error.Detail)
+						assert.Equal(t, err.Status, updch.Error.Status)
+						assert.Equal(t, err.Subproblems, updch.Error.Subproblems)
+
 						return errors.New("force")
 					},
 				},
@@ -488,19 +496,20 @@ func TestChallenge_Validate(t *testing.T) {
 				},
 				db: &MockDB{
 					MockUpdateChallenge: func(ctx context.Context, updch *Challenge) error {
-						assert.Equals(t, updch.ID, ch.ID)
-						assert.Equals(t, updch.Token, ch.Token)
-						assert.Equals(t, updch.Type, ch.Type)
-						assert.Equals(t, updch.Status, ch.Status)
-						assert.Equals(t, updch.Value, ch.Value)
+						assert.Equal(t, "chID", updch.ID)
+						assert.Equal(t, "token", updch.Token)
+						assert.Equal(t, ChallengeType("dns-01"), updch.Type)
+						assert.Equal(t, "zap.internal", updch.Value)
+						assert.Equal(t, StatusPending, updch.Status)
 
 						err := NewError(ErrorDNSType, "error looking up TXT records for domain %s: force", ch.Value)
 
-						assert.HasPrefix(t, updch.Error.Err.Error(), err.Err.Error())
-						assert.Equals(t, updch.Error.Type, err.Type)
-						assert.Equals(t, updch.Error.Detail, err.Detail)
-						assert.Equals(t, updch.Error.Status, err.Status)
-						assert.Equals(t, updch.Error.Detail, err.Detail)
+						assert.EqualError(t, updch.Error.Err, err.Err.Error())
+						assert.Equal(t, err.Type, updch.Error.Type)
+						assert.Equal(t, err.Detail, updch.Error.Detail)
+						assert.Equal(t, err.Status, updch.Error.Status)
+						assert.Equal(t, err.Subproblems, updch.Error.Subproblems)
+
 						return nil
 					},
 				},
@@ -523,19 +532,20 @@ func TestChallenge_Validate(t *testing.T) {
 				},
 				db: &MockDB{
 					MockUpdateChallenge: func(ctx context.Context, updch *Challenge) error {
-						assert.Equals(t, updch.ID, ch.ID)
-						assert.Equals(t, updch.Token, ch.Token)
-						assert.Equals(t, updch.Status, ch.Status)
-						assert.Equals(t, updch.Type, ch.Type)
-						assert.Equals(t, updch.Value, ch.Value)
+						assert.Equal(t, "chID", updch.ID)
+						assert.Equal(t, "token", updch.Token)
+						assert.Equal(t, ChallengeType("tls-alpn-01"), updch.Type)
+						assert.Equal(t, "zap.internal", updch.Value)
+						assert.Equal(t, StatusPending, updch.Status)
 
 						err := NewError(ErrorConnectionType, "error doing TLS dial for %v:443: force", ch.Value)
 
-						assert.HasPrefix(t, updch.Error.Err.Error(), err.Err.Error())
-						assert.Equals(t, updch.Error.Type, err.Type)
-						assert.Equals(t, updch.Error.Detail, err.Detail)
-						assert.Equals(t, updch.Error.Status, err.Status)
-						assert.Equals(t, updch.Error.Detail, err.Detail)
+						assert.EqualError(t, updch.Error.Err, err.Err.Error())
+						assert.Equal(t, err.Type, updch.Error.Type)
+						assert.Equal(t, err.Detail, updch.Error.Detail)
+						assert.Equal(t, err.Status, updch.Error.Status)
+						assert.Equal(t, err.Subproblems, updch.Error.Subproblems)
+
 						return errors.New("force")
 					},
 				},
@@ -552,14 +562,14 @@ func TestChallenge_Validate(t *testing.T) {
 			}
 
 			jwk, err := jose.GenerateJWK("EC", "P-256", "ES256", "sig", "", 0)
-			assert.FatalError(t, err)
+			require.NoError(t, err)
 
 			expKeyAuth, err := KeyAuthorization(ch.Token, jwk)
-			assert.FatalError(t, err)
+			require.NoError(t, err)
 			expKeyAuthHash := sha256.Sum256([]byte(expKeyAuth))
 
 			cert, err := newTLSALPNValidationCert(expKeyAuthHash[:], false, true, ch.Value)
-			assert.FatalError(t, err)
+			require.NoError(t, err)
 
 			srv, tlsDial := newTestTLSALPNServer(cert)
 			srv.Start()
@@ -571,12 +581,12 @@ func TestChallenge_Validate(t *testing.T) {
 				},
 				db: &MockDB{
 					MockUpdateChallenge: func(ctx context.Context, updch *Challenge) error {
-						assert.Equals(t, updch.ID, ch.ID)
-						assert.Equals(t, updch.Token, ch.Token)
-						assert.Equals(t, updch.Status, ch.Status)
-						assert.Equals(t, updch.Type, ch.Type)
-						assert.Equals(t, updch.Value, ch.Value)
-						assert.Equals(t, updch.Error, nil)
+						assert.Equal(t, "chID", updch.ID)
+						assert.Equal(t, "token", updch.Token)
+						assert.Equal(t, ChallengeType("tls-alpn-01"), updch.Type)
+						assert.Equal(t, "zap.internal", updch.Value)
+						assert.Equal(t, StatusValid, updch.Status)
+						assert.Nil(t, updch.Error)
 						return nil
 					},
 				},
@@ -598,14 +608,14 @@ func TestChallenge_Validate(t *testing.T) {
 			}
 
 			jwk, err := jose.GenerateJWK("EC", "P-256", "ES256", "sig", "", 0)
-			assert.FatalError(t, err)
+			require.NoError(t, err)
 
 			expKeyAuth, err := KeyAuthorization(ch.Token, jwk)
-			assert.FatalError(t, err)
+			require.NoError(t, err)
 			expKeyAuthHash := sha256.Sum256([]byte(expKeyAuth))
 
 			cert, err := newTLSALPNValidationCert(expKeyAuthHash[:], false, true, ch.Value)
-			assert.FatalError(t, err)
+			require.NoError(t, err)
 
 			l, err := net.Listen("tcp", "127.0.0.1:0")
 			if err != nil {
@@ -637,12 +647,12 @@ func TestChallenge_Validate(t *testing.T) {
 				},
 				db: &MockDB{
 					MockUpdateChallenge: func(ctx context.Context, updch *Challenge) error {
-						assert.Equals(t, updch.ID, ch.ID)
-						assert.Equals(t, updch.Token, ch.Token)
-						assert.Equals(t, updch.Status, ch.Status)
-						assert.Equals(t, updch.Type, ch.Type)
-						assert.Equals(t, updch.Value, ch.Value)
-						assert.Equals(t, updch.Error, nil)
+						assert.Equal(t, "chID", updch.ID)
+						assert.Equal(t, "token", updch.Token)
+						assert.Equal(t, ChallengeType("tls-alpn-01"), updch.Type)
+						assert.Equal(t, "zap.internal", updch.Value)
+						assert.Equal(t, StatusValid, updch.Status)
+						assert.Nil(t, updch.Error)
 						return nil
 					},
 				},
@@ -663,25 +673,24 @@ func TestChallenge_Validate(t *testing.T) {
 			}{
 				Error: "an error",
 			})
-			sassert.NoError(t, err)
+			assert.NoError(t, err)
 			return test{
 				ch:      ch,
 				payload: payload,
 				db: &MockDB{
 					MockUpdateChallenge: func(ctx context.Context, updch *Challenge) error {
-						sassert.Equal(t, "chID", updch.ID)
-						sassert.Equal(t, "token", updch.Token)
-						sassert.Equal(t, StatusInvalid, updch.Status)
-						sassert.Equal(t, ChallengeType("device-attest-01"), updch.Type)
-						sassert.Equal(t, "12345678", updch.Value)
+						assert.Equal(t, "chID", updch.ID)
+						assert.Equal(t, "token", updch.Token)
+						assert.Equal(t, StatusInvalid, updch.Status)
+						assert.Equal(t, ChallengeType("device-attest-01"), updch.Type)
+						assert.Equal(t, "12345678", updch.Value)
 
 						err := NewError(ErrorRejectedIdentifierType, "payload contained error: an error")
 
-						sassert.EqualError(t, updch.Error.Err, err.Err.Error())
-						sassert.Equal(t, err.Type, updch.Error.Type)
-						sassert.Equal(t, err.Detail, updch.Error.Detail)
-						sassert.Equal(t, err.Status, updch.Error.Status)
-						sassert.Equal(t, err.Detail, updch.Error.Detail)
+						assert.EqualError(t, updch.Error.Err, err.Err.Error())
+						assert.Equal(t, err.Type, updch.Error.Type)
+						assert.Equal(t, err.Detail, updch.Error.Detail)
+						assert.Equal(t, err.Status, updch.Error.Status)
 
 						return errors.New("force")
 					},
@@ -692,7 +701,7 @@ func TestChallenge_Validate(t *testing.T) {
 		"ok/device-attest-01": func(t *testing.T) test {
 			ctx := context.Background()
 			ca, err := minica.New()
-			sassert.NoError(t, err)
+			assert.NoError(t, err)
 			caRoot := pem.EncodeToMemory(&pem.Block{Type: "CERTIFICATE", Bytes: ca.Root.Raw})
 			ctx = NewProvisionerContext(ctx, mustAttestationProvisioner(t, caRoot))
 			makeLeaf := func(signer crypto.Signer, serialNumber []byte) *x509.Certificate {
@@ -710,21 +719,21 @@ func TestChallenge_Validate(t *testing.T) {
 			}
 
 			signer, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
-			sassert.NoError(t, err)
+			assert.NoError(t, err)
 			serialNumber, err := asn1.Marshal(1234)
-			sassert.NoError(t, err)
+			assert.NoError(t, err)
 			leaf := makeLeaf(signer, serialNumber)
 
 			jwk, err := jose.GenerateJWK("EC", "P-256", "ES256", "sig", "", 0)
-			sassert.NoError(t, err)
+			assert.NoError(t, err)
 			token := "token"
 			keyAuth, err := KeyAuthorization(token, jwk)
-			sassert.NoError(t, err)
+			assert.NoError(t, err)
 			keyAuthSum := sha256.Sum256([]byte(keyAuth))
 			sig, err := signer.Sign(rand.Reader, keyAuthSum[:], crypto.SHA256)
-			sassert.NoError(t, err)
+			assert.NoError(t, err)
 			cborSig, err := cbor.Marshal(sig)
-			sassert.NoError(t, err)
+			assert.NoError(t, err)
 
 			ch := &Challenge{
 				ID:     "chID",
@@ -744,13 +753,13 @@ func TestChallenge_Validate(t *testing.T) {
 					"sig": cborSig,
 				},
 			})
-			sassert.NoError(t, err)
+			assert.NoError(t, err)
 			payload, err := json.Marshal(struct {
 				AttObj string `json:"attObj"`
 			}{
 				AttObj: base64.RawURLEncoding.EncodeToString(attObj),
 			})
-			sassert.NoError(t, err)
+			assert.NoError(t, err)
 			return test{
 				ch:      ch,
 				payload: payload,
@@ -758,11 +767,11 @@ func TestChallenge_Validate(t *testing.T) {
 				jwk:     jwk,
 				db: &MockDB{
 					MockUpdateChallenge: func(ctx context.Context, updch *Challenge) error {
-						sassert.Equal(t, "chID", updch.ID)
-						sassert.Equal(t, token, updch.Token)
-						sassert.Equal(t, StatusValid, updch.Status)
-						sassert.Equal(t, ChallengeType("device-attest-01"), updch.Type)
-						sassert.Equal(t, "1234", updch.Value)
+						assert.Equal(t, "chID", updch.ID)
+						assert.Equal(t, token, updch.Token)
+						assert.Equal(t, StatusValid, updch.Status)
+						assert.Equal(t, ChallengeType("device-attest-01"), updch.Type)
+						assert.Equal(t, "1234", updch.Value)
 
 						return nil
 					},
@@ -784,16 +793,15 @@ func TestChallenge_Validate(t *testing.T) {
 			}
 			ctx = NewClientContext(ctx, tc.vc)
 			if err := tc.ch.Validate(ctx, tc.db, tc.jwk, tc.payload); err != nil {
-				if assert.NotNil(t, tc.err) {
+				if assert.Error(t, tc.err) {
 					var k *Error
 					if errors.As(err, &k) {
-						assert.Equals(t, k.Type, tc.err.Type)
-						assert.Equals(t, k.Detail, tc.err.Detail)
-						assert.Equals(t, k.Status, tc.err.Status)
-						assert.Equals(t, k.Err.Error(), tc.err.Err.Error())
-						assert.Equals(t, k.Detail, tc.err.Detail)
+						assert.Equal(t, tc.err.Type, k.Type)
+						assert.Equal(t, tc.err.Detail, k.Detail)
+						assert.Equal(t, tc.err.Status, k.Status)
+						assert.Equal(t, tc.err.Err.Error(), k.Err.Error())
 					} else {
-						assert.FatalError(t, errors.New("unexpected error type"))
+						assert.Fail(t, "unexpected error type")
 					}
 				}
 			} else {
@@ -838,17 +846,18 @@ func TestHTTP01Validate(t *testing.T) {
 				},
 				db: &MockDB{
 					MockUpdateChallenge: func(ctx context.Context, updch *Challenge) error {
-						assert.Equals(t, updch.ID, ch.ID)
-						assert.Equals(t, updch.Token, ch.Token)
-						assert.Equals(t, updch.Value, ch.Value)
-						assert.Equals(t, updch.Status, StatusPending)
+						assert.Equal(t, "chID", updch.ID)
+						assert.Equal(t, "token", updch.Token)
+						assert.Equal(t, "zap.internal", updch.Value)
+						assert.Equal(t, StatusPending, updch.Status)
 
 						err := NewError(ErrorConnectionType, "error doing http GET for url http://zap.internal/.well-known/acme-challenge/%s: force", ch.Token)
-						assert.HasPrefix(t, updch.Error.Err.Error(), err.Err.Error())
-						assert.Equals(t, updch.Error.Type, err.Type)
-						assert.Equals(t, updch.Error.Detail, err.Detail)
-						assert.Equals(t, updch.Error.Status, err.Status)
-						assert.Equals(t, updch.Error.Detail, err.Detail)
+						assert.EqualError(t, updch.Error.Err, err.Err.Error())
+						assert.Equal(t, err.Type, updch.Error.Type)
+						assert.Equal(t, err.Detail, updch.Error.Detail)
+						assert.Equal(t, err.Status, updch.Error.Status)
+						assert.Equal(t, err.Subproblems, updch.Error.Subproblems)
+
 						return errors.New("force")
 					},
 				},
@@ -872,17 +881,18 @@ func TestHTTP01Validate(t *testing.T) {
 				},
 				db: &MockDB{
 					MockUpdateChallenge: func(ctx context.Context, updch *Challenge) error {
-						assert.Equals(t, updch.ID, ch.ID)
-						assert.Equals(t, updch.Token, ch.Token)
-						assert.Equals(t, updch.Value, ch.Value)
-						assert.Equals(t, updch.Status, StatusPending)
+						assert.Equal(t, "chID", updch.ID)
+						assert.Equal(t, "token", updch.Token)
+						assert.Equal(t, "zap.internal", updch.Value)
+						assert.Equal(t, StatusPending, updch.Status)
 
 						err := NewError(ErrorConnectionType, "error doing http GET for url http://zap.internal/.well-known/acme-challenge/%s: force", ch.Token)
-						assert.HasPrefix(t, updch.Error.Err.Error(), err.Err.Error())
-						assert.Equals(t, updch.Error.Type, err.Type)
-						assert.Equals(t, updch.Error.Detail, err.Detail)
-						assert.Equals(t, updch.Error.Status, err.Status)
-						assert.Equals(t, updch.Error.Detail, err.Detail)
+						assert.EqualError(t, updch.Error.Err, err.Err.Error())
+						assert.Equal(t, err.Type, updch.Error.Type)
+						assert.Equal(t, err.Detail, updch.Error.Detail)
+						assert.Equal(t, err.Status, updch.Error.Status)
+						assert.Equal(t, err.Subproblems, updch.Error.Subproblems)
+
 						return nil
 					},
 				},
@@ -908,17 +918,18 @@ func TestHTTP01Validate(t *testing.T) {
 				},
 				db: &MockDB{
 					MockUpdateChallenge: func(ctx context.Context, updch *Challenge) error {
-						assert.Equals(t, updch.ID, ch.ID)
-						assert.Equals(t, updch.Token, ch.Token)
-						assert.Equals(t, updch.Value, ch.Value)
-						assert.Equals(t, updch.Status, StatusPending)
+						assert.Equal(t, "chID", updch.ID)
+						assert.Equal(t, "token", updch.Token)
+						assert.Equal(t, "zap.internal", updch.Value)
+						assert.Equal(t, StatusPending, updch.Status)
 
 						err := NewError(ErrorConnectionType, "error doing http GET for url http://zap.internal/.well-known/acme-challenge/%s with status code 400", ch.Token)
-						assert.HasPrefix(t, updch.Error.Err.Error(), err.Err.Error())
-						assert.Equals(t, updch.Error.Type, err.Type)
-						assert.Equals(t, updch.Error.Detail, err.Detail)
-						assert.Equals(t, updch.Error.Status, err.Status)
-						assert.Equals(t, updch.Error.Detail, err.Detail)
+						assert.EqualError(t, updch.Error.Err, err.Err.Error())
+						assert.Equal(t, err.Type, updch.Error.Type)
+						assert.Equal(t, err.Detail, updch.Error.Detail)
+						assert.Equal(t, err.Status, updch.Error.Status)
+						assert.Equal(t, err.Subproblems, updch.Error.Subproblems)
+
 						return errors.New("force")
 					},
 				},
@@ -945,17 +956,18 @@ func TestHTTP01Validate(t *testing.T) {
 				},
 				db: &MockDB{
 					MockUpdateChallenge: func(ctx context.Context, updch *Challenge) error {
-						assert.Equals(t, updch.ID, ch.ID)
-						assert.Equals(t, updch.Token, ch.Token)
-						assert.Equals(t, updch.Value, ch.Value)
-						assert.Equals(t, updch.Status, StatusPending)
+						assert.Equal(t, "chID", updch.ID)
+						assert.Equal(t, "token", updch.Token)
+						assert.Equal(t, "zap.internal", updch.Value)
+						assert.Equal(t, StatusPending, updch.Status)
 
 						err := NewError(ErrorConnectionType, "error doing http GET for url http://zap.internal/.well-known/acme-challenge/%s with status code 400", ch.Token)
-						assert.HasPrefix(t, updch.Error.Err.Error(), err.Err.Error())
-						assert.Equals(t, updch.Error.Type, err.Type)
-						assert.Equals(t, updch.Error.Detail, err.Detail)
-						assert.Equals(t, updch.Error.Status, err.Status)
-						assert.Equals(t, updch.Error.Detail, err.Detail)
+						assert.EqualError(t, updch.Error.Err, err.Err.Error())
+						assert.Equal(t, err.Type, updch.Error.Type)
+						assert.Equal(t, err.Detail, updch.Error.Detail)
+						assert.Equal(t, err.Status, updch.Error.Status)
+						assert.Equal(t, err.Subproblems, updch.Error.Subproblems)
+
 						return nil
 					},
 				},
@@ -990,7 +1002,7 @@ func TestHTTP01Validate(t *testing.T) {
 			}
 
 			jwk, err := jose.GenerateJWK("EC", "P-256", "ES256", "sig", "", 0)
-			assert.FatalError(t, err)
+			require.NoError(t, err)
 			jwk.Key = "foo"
 			return test{
 				ch: ch,
@@ -1014,10 +1026,10 @@ func TestHTTP01Validate(t *testing.T) {
 			}
 
 			jwk, err := jose.GenerateJWK("EC", "P-256", "ES256", "sig", "", 0)
-			assert.FatalError(t, err)
+			require.NoError(t, err)
 
 			expKeyAuth, err := KeyAuthorization(ch.Token, jwk)
-			assert.FatalError(t, err)
+			require.NoError(t, err)
 			return test{
 				ch: ch,
 				vc: &mockClient{
@@ -1030,18 +1042,19 @@ func TestHTTP01Validate(t *testing.T) {
 				jwk: jwk,
 				db: &MockDB{
 					MockUpdateChallenge: func(ctx context.Context, updch *Challenge) error {
-						assert.Equals(t, updch.ID, ch.ID)
-						assert.Equals(t, updch.Token, ch.Token)
-						assert.Equals(t, updch.Value, ch.Value)
-						assert.Equals(t, updch.Status, StatusInvalid)
+						assert.Equal(t, "chID", updch.ID)
+						assert.Equal(t, "token", updch.Token)
+						assert.Equal(t, "zap.internal", updch.Value)
+						assert.Equal(t, StatusInvalid, updch.Status)
 
 						err := NewError(ErrorRejectedIdentifierType,
 							"keyAuthorization does not match; expected %s, but got foo", expKeyAuth)
-						assert.HasPrefix(t, updch.Error.Err.Error(), err.Err.Error())
-						assert.Equals(t, updch.Error.Type, err.Type)
-						assert.Equals(t, updch.Error.Detail, err.Detail)
-						assert.Equals(t, updch.Error.Status, err.Status)
-						assert.Equals(t, updch.Error.Detail, err.Detail)
+						assert.EqualError(t, updch.Error.Err, err.Err.Error())
+						assert.Equal(t, err.Type, updch.Error.Type)
+						assert.Equal(t, err.Detail, updch.Error.Detail)
+						assert.Equal(t, err.Status, updch.Error.Status)
+						assert.Equal(t, err.Subproblems, updch.Error.Subproblems)
+
 						return nil
 					},
 				},
@@ -1056,10 +1069,10 @@ func TestHTTP01Validate(t *testing.T) {
 			}
 
 			jwk, err := jose.GenerateJWK("EC", "P-256", "ES256", "sig", "", 0)
-			assert.FatalError(t, err)
+			require.NoError(t, err)
 
 			expKeyAuth, err := KeyAuthorization(ch.Token, jwk)
-			assert.FatalError(t, err)
+			require.NoError(t, err)
 			return test{
 				ch: ch,
 				vc: &mockClient{
@@ -1072,18 +1085,19 @@ func TestHTTP01Validate(t *testing.T) {
 				jwk: jwk,
 				db: &MockDB{
 					MockUpdateChallenge: func(ctx context.Context, updch *Challenge) error {
-						assert.Equals(t, updch.ID, ch.ID)
-						assert.Equals(t, updch.Token, ch.Token)
-						assert.Equals(t, updch.Value, ch.Value)
-						assert.Equals(t, updch.Status, StatusInvalid)
+						assert.Equal(t, "chID", updch.ID)
+						assert.Equal(t, "token", updch.Token)
+						assert.Equal(t, "zap.internal", updch.Value)
+						assert.Equal(t, StatusInvalid, updch.Status)
 
 						err := NewError(ErrorRejectedIdentifierType,
 							"keyAuthorization does not match; expected %s, but got foo", expKeyAuth)
-						assert.HasPrefix(t, updch.Error.Err.Error(), err.Err.Error())
-						assert.Equals(t, updch.Error.Type, err.Type)
-						assert.Equals(t, updch.Error.Detail, err.Detail)
-						assert.Equals(t, updch.Error.Status, err.Status)
-						assert.Equals(t, updch.Error.Detail, err.Detail)
+						assert.EqualError(t, updch.Error.Err, err.Err.Error())
+						assert.Equal(t, err.Type, updch.Error.Type)
+						assert.Equal(t, err.Detail, updch.Error.Detail)
+						assert.Equal(t, err.Status, updch.Error.Status)
+						assert.Equal(t, err.Subproblems, updch.Error.Subproblems)
+
 						return errors.New("force")
 					},
 				},
@@ -1099,10 +1113,10 @@ func TestHTTP01Validate(t *testing.T) {
 			}
 
 			jwk, err := jose.GenerateJWK("EC", "P-256", "ES256", "sig", "", 0)
-			assert.FatalError(t, err)
+			require.NoError(t, err)
 
 			expKeyAuth, err := KeyAuthorization(ch.Token, jwk)
-			assert.FatalError(t, err)
+			require.NoError(t, err)
 			return test{
 				ch: ch,
 				vc: &mockClient{
@@ -1115,13 +1129,14 @@ func TestHTTP01Validate(t *testing.T) {
 				jwk: jwk,
 				db: &MockDB{
 					MockUpdateChallenge: func(ctx context.Context, updch *Challenge) error {
-						assert.Equals(t, updch.ID, ch.ID)
-						assert.Equals(t, updch.Token, ch.Token)
-						assert.Equals(t, updch.Value, ch.Value)
-						assert.Equals(t, updch.Status, StatusValid)
-						assert.Equals(t, updch.Error, nil)
+						assert.Equal(t, "chID", updch.ID)
+						assert.Equal(t, "token", updch.Token)
+						assert.Equal(t, "zap.internal", updch.Value)
+						assert.Equal(t, StatusValid, updch.Status)
+						assert.Nil(t, updch.Error)
+
 						va, err := time.Parse(time.RFC3339, updch.ValidatedAt)
-						assert.FatalError(t, err)
+						require.NoError(t, err)
 						now := clock.Now()
 						assert.True(t, va.Add(-time.Minute).Before(now))
 						assert.True(t, va.Add(time.Minute).After(now))
@@ -1141,10 +1156,10 @@ func TestHTTP01Validate(t *testing.T) {
 			}
 
 			jwk, err := jose.GenerateJWK("EC", "P-256", "ES256", "sig", "", 0)
-			assert.FatalError(t, err)
+			require.NoError(t, err)
 
 			expKeyAuth, err := KeyAuthorization(ch.Token, jwk)
-			assert.FatalError(t, err)
+			require.NoError(t, err)
 			return test{
 				ch: ch,
 				vc: &mockClient{
@@ -1157,14 +1172,14 @@ func TestHTTP01Validate(t *testing.T) {
 				jwk: jwk,
 				db: &MockDB{
 					MockUpdateChallenge: func(ctx context.Context, updch *Challenge) error {
-						assert.Equals(t, updch.ID, ch.ID)
-						assert.Equals(t, updch.Token, ch.Token)
-						assert.Equals(t, updch.Value, ch.Value)
+						assert.Equal(t, "chID", updch.ID)
+						assert.Equal(t, "token", updch.Token)
+						assert.Equal(t, "zap.internal", updch.Value)
+						assert.Equal(t, StatusValid, updch.Status)
+						assert.Nil(t, updch.Error)
 
-						assert.Equals(t, updch.Status, StatusValid)
-						assert.Equals(t, updch.Error, nil)
 						va, err := time.Parse(time.RFC3339, updch.ValidatedAt)
-						assert.FatalError(t, err)
+						require.NoError(t, err)
 						now := clock.Now()
 						assert.True(t, va.Add(-time.Minute).Before(now))
 						assert.True(t, va.Add(time.Minute).After(now))
@@ -1179,16 +1194,15 @@ func TestHTTP01Validate(t *testing.T) {
 			tc := run(t)
 			ctx := NewClientContext(context.Background(), tc.vc)
 			if err := http01Validate(ctx, tc.ch, tc.db, tc.jwk); err != nil {
-				if assert.NotNil(t, tc.err) {
+				if assert.Error(t, tc.err) {
 					var k *Error
 					if errors.As(err, &k) {
-						assert.Equals(t, k.Type, tc.err.Type)
-						assert.Equals(t, k.Detail, tc.err.Detail)
-						assert.Equals(t, k.Status, tc.err.Status)
-						assert.Equals(t, k.Err.Error(), tc.err.Err.Error())
-						assert.Equals(t, k.Detail, tc.err.Detail)
+						assert.Equal(t, tc.err.Type, k.Type)
+						assert.Equal(t, tc.err.Detail, k.Detail)
+						assert.Equal(t, tc.err.Status, k.Status)
+						assert.Equal(t, tc.err.Err.Error(), k.Err.Error())
 					} else {
-						assert.FatalError(t, errors.New("unexpected error type"))
+						assert.Fail(t, "unexpected error type")
 					}
 				}
 			} else {
@@ -1226,18 +1240,19 @@ func TestDNS01Validate(t *testing.T) {
 				},
 				db: &MockDB{
 					MockUpdateChallenge: func(ctx context.Context, updch *Challenge) error {
-						assert.Equals(t, updch.ID, ch.ID)
-						assert.Equals(t, updch.Token, ch.Token)
-						assert.Equals(t, updch.Value, ch.Value)
-						assert.Equals(t, updch.Status, StatusPending)
+						assert.Equal(t, "chID", updch.ID)
+						assert.Equal(t, "token", updch.Token)
+						assert.Equal(t, fulldomain, updch.Value)
+						assert.Equal(t, StatusPending, updch.Status)
 
 						err := NewError(ErrorDNSType, "error looking up TXT records for domain %s: force", domain)
 
-						assert.HasPrefix(t, updch.Error.Err.Error(), err.Err.Error())
-						assert.Equals(t, updch.Error.Type, err.Type)
-						assert.Equals(t, updch.Error.Detail, err.Detail)
-						assert.Equals(t, updch.Error.Status, err.Status)
-						assert.Equals(t, updch.Error.Detail, err.Detail)
+						assert.EqualError(t, updch.Error.Err, err.Err.Error())
+						assert.Equal(t, err.Type, updch.Error.Type)
+						assert.Equal(t, err.Detail, updch.Error.Detail)
+						assert.Equal(t, err.Status, updch.Error.Status)
+						assert.Equal(t, err.Subproblems, updch.Error.Subproblems)
+
 						return errors.New("force")
 					},
 				},
@@ -1261,18 +1276,19 @@ func TestDNS01Validate(t *testing.T) {
 				},
 				db: &MockDB{
 					MockUpdateChallenge: func(ctx context.Context, updch *Challenge) error {
-						assert.Equals(t, updch.ID, ch.ID)
-						assert.Equals(t, updch.Token, ch.Token)
-						assert.Equals(t, updch.Value, ch.Value)
-						assert.Equals(t, updch.Status, StatusPending)
+						assert.Equal(t, "chID", updch.ID)
+						assert.Equal(t, "token", updch.Token)
+						assert.Equal(t, fulldomain, updch.Value)
+						assert.Equal(t, StatusPending, updch.Status)
 
 						err := NewError(ErrorDNSType, "error looking up TXT records for domain %s: force", domain)
 
-						assert.HasPrefix(t, updch.Error.Err.Error(), err.Err.Error())
-						assert.Equals(t, updch.Error.Type, err.Type)
-						assert.Equals(t, updch.Error.Detail, err.Detail)
-						assert.Equals(t, updch.Error.Status, err.Status)
-						assert.Equals(t, updch.Error.Detail, err.Detail)
+						assert.EqualError(t, updch.Error.Err, err.Err.Error())
+						assert.Equal(t, err.Type, updch.Error.Type)
+						assert.Equal(t, err.Detail, updch.Error.Detail)
+						assert.Equal(t, err.Status, updch.Error.Status)
+						assert.Equal(t, err.Subproblems, updch.Error.Subproblems)
+
 						return nil
 					},
 				},
@@ -1287,7 +1303,7 @@ func TestDNS01Validate(t *testing.T) {
 			}
 
 			jwk, err := jose.GenerateJWK("EC", "P-256", "ES256", "sig", "", 0)
-			assert.FatalError(t, err)
+			require.NoError(t, err)
 			jwk.Key = "foo"
 
 			return test{
@@ -1310,10 +1326,10 @@ func TestDNS01Validate(t *testing.T) {
 			}
 
 			jwk, err := jose.GenerateJWK("EC", "P-256", "ES256", "sig", "", 0)
-			assert.FatalError(t, err)
+			require.NoError(t, err)
 
 			expKeyAuth, err := KeyAuthorization(ch.Token, jwk)
-			assert.FatalError(t, err)
+			require.NoError(t, err)
 
 			return test{
 				ch: ch,
@@ -1324,18 +1340,19 @@ func TestDNS01Validate(t *testing.T) {
 				},
 				db: &MockDB{
 					MockUpdateChallenge: func(ctx context.Context, updch *Challenge) error {
-						assert.Equals(t, updch.ID, ch.ID)
-						assert.Equals(t, updch.Token, ch.Token)
-						assert.Equals(t, updch.Value, ch.Value)
-						assert.Equals(t, updch.Status, StatusPending)
+						assert.Equal(t, "chID", updch.ID)
+						assert.Equal(t, "token", updch.Token)
+						assert.Equal(t, fulldomain, updch.Value)
+						assert.Equal(t, StatusPending, updch.Status)
 
 						err := NewError(ErrorRejectedIdentifierType, "keyAuthorization does not match; expected %s, but got %s", expKeyAuth, []string{"foo", "bar"})
 
-						assert.HasPrefix(t, updch.Error.Err.Error(), err.Err.Error())
-						assert.Equals(t, updch.Error.Type, err.Type)
-						assert.Equals(t, updch.Error.Detail, err.Detail)
-						assert.Equals(t, updch.Error.Status, err.Status)
-						assert.Equals(t, updch.Error.Detail, err.Detail)
+						assert.EqualError(t, updch.Error.Err, err.Err.Error())
+						assert.Equal(t, err.Type, updch.Error.Type)
+						assert.Equal(t, err.Detail, updch.Error.Detail)
+						assert.Equal(t, err.Status, updch.Error.Status)
+						assert.Equal(t, err.Subproblems, updch.Error.Subproblems)
+
 						return errors.New("force")
 					},
 				},
@@ -1352,10 +1369,10 @@ func TestDNS01Validate(t *testing.T) {
 			}
 
 			jwk, err := jose.GenerateJWK("EC", "P-256", "ES256", "sig", "", 0)
-			assert.FatalError(t, err)
+			require.NoError(t, err)
 
 			expKeyAuth, err := KeyAuthorization(ch.Token, jwk)
-			assert.FatalError(t, err)
+			require.NoError(t, err)
 
 			return test{
 				ch: ch,
@@ -1366,18 +1383,19 @@ func TestDNS01Validate(t *testing.T) {
 				},
 				db: &MockDB{
 					MockUpdateChallenge: func(ctx context.Context, updch *Challenge) error {
-						assert.Equals(t, updch.ID, ch.ID)
-						assert.Equals(t, updch.Token, ch.Token)
-						assert.Equals(t, updch.Value, ch.Value)
-						assert.Equals(t, updch.Status, StatusPending)
+						assert.Equal(t, "chID", updch.ID)
+						assert.Equal(t, "token", updch.Token)
+						assert.Equal(t, fulldomain, updch.Value)
+						assert.Equal(t, StatusPending, updch.Status)
 
 						err := NewError(ErrorRejectedIdentifierType, "keyAuthorization does not match; expected %s, but got %s", expKeyAuth, []string{"foo", "bar"})
 
-						assert.HasPrefix(t, updch.Error.Err.Error(), err.Err.Error())
-						assert.Equals(t, updch.Error.Type, err.Type)
-						assert.Equals(t, updch.Error.Detail, err.Detail)
-						assert.Equals(t, updch.Error.Status, err.Status)
-						assert.Equals(t, updch.Error.Detail, err.Detail)
+						assert.EqualError(t, updch.Error.Err, err.Err.Error())
+						assert.Equal(t, err.Type, updch.Error.Type)
+						assert.Equal(t, err.Detail, updch.Error.Detail)
+						assert.Equal(t, err.Status, updch.Error.Status)
+						assert.Equal(t, err.Subproblems, updch.Error.Subproblems)
+
 						return nil
 					},
 				},
@@ -1393,10 +1411,10 @@ func TestDNS01Validate(t *testing.T) {
 			}
 
 			jwk, err := jose.GenerateJWK("EC", "P-256", "ES256", "sig", "", 0)
-			assert.FatalError(t, err)
+			require.NoError(t, err)
 
 			expKeyAuth, err := KeyAuthorization(ch.Token, jwk)
-			assert.FatalError(t, err)
+			require.NoError(t, err)
 			h := sha256.Sum256([]byte(expKeyAuth))
 			expected := base64.RawURLEncoding.EncodeToString(h[:])
 
@@ -1409,15 +1427,14 @@ func TestDNS01Validate(t *testing.T) {
 				},
 				db: &MockDB{
 					MockUpdateChallenge: func(ctx context.Context, updch *Challenge) error {
-						assert.Equals(t, updch.ID, ch.ID)
-						assert.Equals(t, updch.Token, ch.Token)
-						assert.Equals(t, updch.Value, ch.Value)
-						assert.Equals(t, updch.Status, StatusValid)
+						assert.Equal(t, "chID", updch.ID)
+						assert.Equal(t, "token", updch.Token)
+						assert.Equal(t, fulldomain, ch.Value)
+						assert.Equal(t, StatusValid, updch.Status)
+						assert.Nil(t, updch.Error)
 
-						assert.Equals(t, updch.Status, StatusValid)
-						assert.Equals(t, updch.Error, nil)
 						va, err := time.Parse(time.RFC3339, updch.ValidatedAt)
-						assert.FatalError(t, err)
+						require.NoError(t, err)
 						now := clock.Now()
 						assert.True(t, va.Add(-time.Minute).Before(now))
 						assert.True(t, va.Add(time.Minute).After(now))
@@ -1438,10 +1455,10 @@ func TestDNS01Validate(t *testing.T) {
 			}
 
 			jwk, err := jose.GenerateJWK("EC", "P-256", "ES256", "sig", "", 0)
-			assert.FatalError(t, err)
+			require.NoError(t, err)
 
 			expKeyAuth, err := KeyAuthorization(ch.Token, jwk)
-			assert.FatalError(t, err)
+			require.NoError(t, err)
 			h := sha256.Sum256([]byte(expKeyAuth))
 			expected := base64.RawURLEncoding.EncodeToString(h[:])
 
@@ -1454,15 +1471,14 @@ func TestDNS01Validate(t *testing.T) {
 				},
 				db: &MockDB{
 					MockUpdateChallenge: func(ctx context.Context, updch *Challenge) error {
-						assert.Equals(t, updch.ID, ch.ID)
-						assert.Equals(t, updch.Token, ch.Token)
-						assert.Equals(t, updch.Value, ch.Value)
-						assert.Equals(t, updch.Status, StatusValid)
+						assert.Equal(t, "chID", updch.ID)
+						assert.Equal(t, "token", updch.Token)
+						assert.Equal(t, fulldomain, updch.Value)
+						assert.Equal(t, StatusValid, updch.Status)
+						assert.Nil(t, updch.Error)
 
-						assert.Equals(t, updch.Status, StatusValid)
-						assert.Equals(t, updch.Error, nil)
 						va, err := time.Parse(time.RFC3339, updch.ValidatedAt)
-						assert.FatalError(t, err)
+						require.NoError(t, err)
 						now := clock.Now()
 						assert.True(t, va.Add(-time.Minute).Before(now))
 						assert.True(t, va.Add(time.Minute).After(now))
@@ -1479,16 +1495,15 @@ func TestDNS01Validate(t *testing.T) {
 			tc := run(t)
 			ctx := NewClientContext(context.Background(), tc.vc)
 			if err := dns01Validate(ctx, tc.ch, tc.db, tc.jwk); err != nil {
-				if assert.NotNil(t, tc.err) {
+				if assert.Error(t, tc.err) {
 					var k *Error
 					if errors.As(err, &k) {
-						assert.Equals(t, k.Type, tc.err.Type)
-						assert.Equals(t, k.Detail, tc.err.Detail)
-						assert.Equals(t, k.Status, tc.err.Status)
-						assert.Equals(t, k.Err.Error(), tc.err.Err.Error())
-						assert.Equals(t, k.Detail, tc.err.Detail)
+						assert.Equal(t, tc.err.Type, k.Type)
+						assert.Equal(t, tc.err.Detail, k.Detail)
+						assert.Equal(t, tc.err.Status, k.Status)
+						assert.Equal(t, tc.err.Err.Error(), k.Err.Error())
 					} else {
-						assert.FatalError(t, errors.New("unexpected error type"))
+						assert.Fail(t, "unexpected error type")
 					}
 				}
 			} else {
@@ -1627,19 +1642,20 @@ func TestTLSALPN01Validate(t *testing.T) {
 				},
 				db: &MockDB{
 					MockUpdateChallenge: func(ctx context.Context, updch *Challenge) error {
-						assert.Equals(t, updch.ID, ch.ID)
-						assert.Equals(t, updch.Token, ch.Token)
-						assert.Equals(t, updch.Status, ch.Status)
-						assert.Equals(t, updch.Type, ch.Type)
-						assert.Equals(t, updch.Value, ch.Value)
+						assert.Equal(t, "chID", updch.ID)
+						assert.Equal(t, "token", updch.Token)
+						assert.Equal(t, StatusPending, updch.Status)
+						assert.Equal(t, ChallengeType("tls-alpn-01"), updch.Type)
+						assert.Equal(t, "zap.internal", updch.Value)
 
 						err := NewError(ErrorConnectionType, "error doing TLS dial for %v:443: force", ch.Value)
 
-						assert.HasPrefix(t, updch.Error.Err.Error(), err.Err.Error())
-						assert.Equals(t, updch.Error.Type, err.Type)
-						assert.Equals(t, updch.Error.Detail, err.Detail)
-						assert.Equals(t, updch.Error.Status, err.Status)
-						assert.Equals(t, updch.Error.Detail, err.Detail)
+						assert.EqualError(t, updch.Error.Err, err.Err.Error())
+						assert.Equal(t, err.Type, updch.Error.Type)
+						assert.Equal(t, err.Detail, updch.Error.Detail)
+						assert.Equal(t, err.Status, updch.Error.Status)
+						assert.Equal(t, err.Subproblems, updch.Error.Subproblems)
+
 						return errors.New("force")
 					},
 				},
@@ -1657,19 +1673,20 @@ func TestTLSALPN01Validate(t *testing.T) {
 				},
 				db: &MockDB{
 					MockUpdateChallenge: func(ctx context.Context, updch *Challenge) error {
-						assert.Equals(t, updch.ID, ch.ID)
-						assert.Equals(t, updch.Token, ch.Token)
-						assert.Equals(t, updch.Status, ch.Status)
-						assert.Equals(t, updch.Type, ch.Type)
-						assert.Equals(t, updch.Value, ch.Value)
+						assert.Equal(t, "chID", updch.ID)
+						assert.Equal(t, "token", updch.Token)
+						assert.Equal(t, StatusPending, updch.Status)
+						assert.Equal(t, ChallengeType("tls-alpn-01"), updch.Type)
+						assert.Equal(t, "zap.internal", updch.Value)
 
 						err := NewError(ErrorConnectionType, "error doing TLS dial for %v:443: force", ch.Value)
 
-						assert.HasPrefix(t, updch.Error.Err.Error(), err.Err.Error())
-						assert.Equals(t, updch.Error.Type, err.Type)
-						assert.Equals(t, updch.Error.Detail, err.Detail)
-						assert.Equals(t, updch.Error.Status, err.Status)
-						assert.Equals(t, updch.Error.Detail, err.Detail)
+						assert.EqualError(t, updch.Error.Err, err.Err.Error())
+						assert.Equal(t, err.Type, updch.Error.Type)
+						assert.Equal(t, err.Detail, updch.Error.Detail)
+						assert.Equal(t, err.Status, updch.Error.Status)
+						assert.Equal(t, err.Subproblems, updch.Error.Subproblems)
+
 						return nil
 					},
 				},
@@ -1688,19 +1705,20 @@ func TestTLSALPN01Validate(t *testing.T) {
 				},
 				db: &MockDB{
 					MockUpdateChallenge: func(ctx context.Context, updch *Challenge) error {
-						assert.Equals(t, updch.ID, ch.ID)
-						assert.Equals(t, updch.Token, ch.Token)
-						assert.Equals(t, updch.Status, ch.Status)
-						assert.Equals(t, updch.Type, ch.Type)
-						assert.Equals(t, updch.Value, ch.Value)
+						assert.Equal(t, "chID", updch.ID)
+						assert.Equal(t, "token", updch.Token)
+						assert.Equal(t, StatusPending, updch.Status)
+						assert.Equal(t, ChallengeType("tls-alpn-01"), updch.Type)
+						assert.Equal(t, "zap.internal", updch.Value)
 
-						err := NewError(ErrorConnectionType, "error doing TLS dial for %v:443:", ch.Value)
+						err := NewError(ErrorConnectionType, "error doing TLS dial for %v:443: context deadline exceeded", ch.Value)
 
-						assert.HasPrefix(t, updch.Error.Err.Error(), err.Err.Error())
-						assert.Equals(t, updch.Error.Type, err.Type)
-						assert.Equals(t, updch.Error.Detail, err.Detail)
-						assert.Equals(t, updch.Error.Status, err.Status)
-						assert.Equals(t, updch.Error.Detail, err.Detail)
+						assert.EqualError(t, updch.Error.Err, err.Err.Error())
+						assert.Equal(t, err.Type, updch.Error.Type)
+						assert.Equal(t, err.Detail, updch.Error.Detail)
+						assert.Equal(t, err.Status, updch.Error.Status)
+						assert.Equal(t, err.Subproblems, updch.Error.Subproblems)
+
 						return nil
 					},
 				},
@@ -1719,19 +1737,20 @@ func TestTLSALPN01Validate(t *testing.T) {
 				},
 				db: &MockDB{
 					MockUpdateChallenge: func(ctx context.Context, updch *Challenge) error {
-						assert.Equals(t, updch.ID, ch.ID)
-						assert.Equals(t, updch.Token, ch.Token)
-						assert.Equals(t, updch.Status, StatusInvalid)
-						assert.Equals(t, updch.Type, ch.Type)
-						assert.Equals(t, updch.Value, ch.Value)
+						assert.Equal(t, "chID", updch.ID)
+						assert.Equal(t, "token", updch.Token)
+						assert.Equal(t, StatusInvalid, updch.Status)
+						assert.Equal(t, ChallengeType("tls-alpn-01"), updch.Type)
+						assert.Equal(t, "zap.internal", updch.Value)
 
 						err := NewError(ErrorRejectedIdentifierType, "tls-alpn-01 challenge for %v resulted in no certificates", ch.Value)
 
-						assert.HasPrefix(t, updch.Error.Err.Error(), err.Err.Error())
-						assert.Equals(t, updch.Error.Type, err.Type)
-						assert.Equals(t, updch.Error.Detail, err.Detail)
-						assert.Equals(t, updch.Error.Status, err.Status)
-						assert.Equals(t, updch.Error.Detail, err.Detail)
+						assert.EqualError(t, updch.Error.Err, err.Err.Error())
+						assert.Equal(t, err.Type, updch.Error.Type)
+						assert.Equal(t, err.Detail, updch.Error.Detail)
+						assert.Equal(t, err.Status, updch.Error.Status)
+						assert.Equal(t, err.Subproblems, updch.Error.Subproblems)
+
 						return nil
 					},
 				},
@@ -1749,19 +1768,20 @@ func TestTLSALPN01Validate(t *testing.T) {
 				},
 				db: &MockDB{
 					MockUpdateChallenge: func(ctx context.Context, updch *Challenge) error {
-						assert.Equals(t, updch.ID, ch.ID)
-						assert.Equals(t, updch.Token, ch.Token)
-						assert.Equals(t, updch.Status, StatusInvalid)
-						assert.Equals(t, updch.Type, ch.Type)
-						assert.Equals(t, updch.Value, ch.Value)
+						assert.Equal(t, "chID", updch.ID)
+						assert.Equal(t, "token", updch.Token)
+						assert.Equal(t, StatusInvalid, updch.Status)
+						assert.Equal(t, ChallengeType("tls-alpn-01"), updch.Type)
+						assert.Equal(t, "zap.internal", updch.Value)
 
 						err := NewError(ErrorRejectedIdentifierType, "tls-alpn-01 challenge for %v resulted in no certificates", ch.Value)
 
-						assert.HasPrefix(t, updch.Error.Err.Error(), err.Err.Error())
-						assert.Equals(t, updch.Error.Type, err.Type)
-						assert.Equals(t, updch.Error.Detail, err.Detail)
-						assert.Equals(t, updch.Error.Status, err.Status)
-						assert.Equals(t, updch.Error.Detail, err.Detail)
+						assert.EqualError(t, updch.Error.Err, err.Err.Error())
+						assert.Equal(t, err.Type, updch.Error.Type)
+						assert.Equal(t, err.Detail, updch.Error.Detail)
+						assert.Equal(t, err.Status, updch.Error.Status)
+						assert.Equal(t, err.Subproblems, updch.Error.Subproblems)
+
 						return errors.New("force")
 					},
 				},
@@ -1772,7 +1792,7 @@ func TestTLSALPN01Validate(t *testing.T) {
 			ch := makeTLSCh()
 
 			jwk, err := jose.GenerateJWK("EC", "P-256", "ES256", "sig", "", 0)
-			assert.FatalError(t, err)
+			require.NoError(t, err)
 
 			srv := httptest.NewTLSServer(nil)
 
@@ -1785,19 +1805,20 @@ func TestTLSALPN01Validate(t *testing.T) {
 				},
 				db: &MockDB{
 					MockUpdateChallenge: func(ctx context.Context, updch *Challenge) error {
-						assert.Equals(t, updch.ID, ch.ID)
-						assert.Equals(t, updch.Token, ch.Token)
-						assert.Equals(t, updch.Status, StatusInvalid)
-						assert.Equals(t, updch.Type, ch.Type)
-						assert.Equals(t, updch.Value, ch.Value)
+						assert.Equal(t, "chID", updch.ID)
+						assert.Equal(t, "token", updch.Token)
+						assert.Equal(t, StatusInvalid, updch.Status)
+						assert.Equal(t, ChallengeType("tls-alpn-01"), updch.Type)
+						assert.Equal(t, "zap.internal", updch.Value)
 
 						err := NewError(ErrorRejectedIdentifierType, "cannot negotiate ALPN acme-tls/1 protocol for tls-alpn-01 challenge")
 
-						assert.HasPrefix(t, updch.Error.Err.Error(), err.Err.Error())
-						assert.Equals(t, updch.Error.Type, err.Type)
-						assert.Equals(t, updch.Error.Detail, err.Detail)
-						assert.Equals(t, updch.Error.Status, err.Status)
-						assert.Equals(t, updch.Error.Detail, err.Detail)
+						assert.EqualError(t, updch.Error.Err, err.Err.Error())
+						assert.Equal(t, err.Type, updch.Error.Type)
+						assert.Equal(t, err.Detail, updch.Error.Detail)
+						assert.Equal(t, err.Status, updch.Error.Status)
+						assert.Equal(t, err.Subproblems, updch.Error.Subproblems)
+
 						return nil
 					},
 				},
@@ -1809,7 +1830,7 @@ func TestTLSALPN01Validate(t *testing.T) {
 			ch := makeTLSCh()
 
 			jwk, err := jose.GenerateJWK("EC", "P-256", "ES256", "sig", "", 0)
-			assert.FatalError(t, err)
+			require.NoError(t, err)
 
 			srv := httptest.NewTLSServer(nil)
 
@@ -1822,19 +1843,20 @@ func TestTLSALPN01Validate(t *testing.T) {
 				},
 				db: &MockDB{
 					MockUpdateChallenge: func(ctx context.Context, updch *Challenge) error {
-						assert.Equals(t, updch.ID, ch.ID)
-						assert.Equals(t, updch.Token, ch.Token)
-						assert.Equals(t, updch.Status, StatusInvalid)
-						assert.Equals(t, updch.Type, ch.Type)
-						assert.Equals(t, updch.Value, ch.Value)
+						assert.Equal(t, "chID", updch.ID)
+						assert.Equal(t, "token", updch.Token)
+						assert.Equal(t, StatusInvalid, updch.Status)
+						assert.Equal(t, ChallengeType("tls-alpn-01"), updch.Type)
+						assert.Equal(t, "zap.internal", updch.Value)
 
 						err := NewError(ErrorRejectedIdentifierType, "cannot negotiate ALPN acme-tls/1 protocol for tls-alpn-01 challenge")
 
-						assert.HasPrefix(t, updch.Error.Err.Error(), err.Err.Error())
-						assert.Equals(t, updch.Error.Type, err.Type)
-						assert.Equals(t, updch.Error.Detail, err.Detail)
-						assert.Equals(t, updch.Error.Status, err.Status)
-						assert.Equals(t, updch.Error.Detail, err.Detail)
+						assert.EqualError(t, updch.Error.Err, err.Err.Error())
+						assert.Equal(t, err.Type, updch.Error.Type)
+						assert.Equal(t, err.Detail, updch.Error.Detail)
+						assert.Equal(t, err.Status, updch.Error.Status)
+						assert.Equal(t, err.Subproblems, updch.Error.Subproblems)
+
 						return errors.New("force")
 					},
 				},
@@ -1847,14 +1869,14 @@ func TestTLSALPN01Validate(t *testing.T) {
 			ch := makeTLSCh()
 
 			jwk, err := jose.GenerateJWK("EC", "P-256", "ES256", "sig", "", 0)
-			assert.FatalError(t, err)
+			require.NoError(t, err)
 
 			expKeyAuth, err := KeyAuthorization(ch.Token, jwk)
-			assert.FatalError(t, err)
+			require.NoError(t, err)
 			expKeyAuthHash := sha256.Sum256([]byte(expKeyAuth))
 
 			cert, err := newTLSALPNValidationCert(expKeyAuthHash[:], false, true)
-			assert.FatalError(t, err)
+			require.NoError(t, err)
 
 			srv, tlsDial := newTestTLSALPNServer(cert)
 			srv.Start()
@@ -1866,19 +1888,20 @@ func TestTLSALPN01Validate(t *testing.T) {
 				},
 				db: &MockDB{
 					MockUpdateChallenge: func(ctx context.Context, updch *Challenge) error {
-						assert.Equals(t, updch.ID, ch.ID)
-						assert.Equals(t, updch.Token, ch.Token)
-						assert.Equals(t, updch.Status, StatusInvalid)
-						assert.Equals(t, updch.Type, ch.Type)
-						assert.Equals(t, updch.Value, ch.Value)
+						assert.Equal(t, "chID", updch.ID)
+						assert.Equal(t, "token", updch.Token)
+						assert.Equal(t, StatusInvalid, updch.Status)
+						assert.Equal(t, ChallengeType("tls-alpn-01"), updch.Type)
+						assert.Equal(t, "zap.internal", updch.Value)
 
 						err := NewError(ErrorRejectedIdentifierType, "incorrect certificate for tls-alpn-01 challenge: leaf certificate must contain a single IP address or DNS name, %v", ch.Value)
 
-						assert.HasPrefix(t, updch.Error.Err.Error(), err.Err.Error())
-						assert.Equals(t, updch.Error.Type, err.Type)
-						assert.Equals(t, updch.Error.Detail, err.Detail)
-						assert.Equals(t, updch.Error.Status, err.Status)
-						assert.Equals(t, updch.Error.Detail, err.Detail)
+						assert.EqualError(t, updch.Error.Err, err.Err.Error())
+						assert.Equal(t, err.Type, updch.Error.Type)
+						assert.Equal(t, err.Detail, updch.Error.Detail)
+						assert.Equal(t, err.Status, updch.Error.Status)
+						assert.Equal(t, err.Subproblems, updch.Error.Subproblems)
+
 						return nil
 					},
 				},
@@ -1890,14 +1913,14 @@ func TestTLSALPN01Validate(t *testing.T) {
 			ch := makeTLSCh()
 
 			jwk, err := jose.GenerateJWK("EC", "P-256", "ES256", "sig", "", 0)
-			assert.FatalError(t, err)
+			require.NoError(t, err)
 
 			expKeyAuth, err := KeyAuthorization(ch.Token, jwk)
-			assert.FatalError(t, err)
+			require.NoError(t, err)
 			expKeyAuthHash := sha256.Sum256([]byte(expKeyAuth))
 
 			cert, err := newTLSALPNValidationCert(expKeyAuthHash[:], false, true)
-			assert.FatalError(t, err)
+			require.NoError(t, err)
 
 			srv, tlsDial := newTestTLSALPNServer(cert)
 			srv.Start()
@@ -1909,19 +1932,20 @@ func TestTLSALPN01Validate(t *testing.T) {
 				},
 				db: &MockDB{
 					MockUpdateChallenge: func(ctx context.Context, updch *Challenge) error {
-						assert.Equals(t, updch.ID, ch.ID)
-						assert.Equals(t, updch.Token, ch.Token)
-						assert.Equals(t, updch.Status, StatusInvalid)
-						assert.Equals(t, updch.Type, ch.Type)
-						assert.Equals(t, updch.Value, ch.Value)
+						assert.Equal(t, "chID", updch.ID)
+						assert.Equal(t, "token", updch.Token)
+						assert.Equal(t, StatusInvalid, updch.Status)
+						assert.Equal(t, ChallengeType("tls-alpn-01"), updch.Type)
+						assert.Equal(t, "zap.internal", updch.Value)
 
 						err := NewError(ErrorRejectedIdentifierType, "incorrect certificate for tls-alpn-01 challenge: leaf certificate must contain a single IP address or DNS name, %v", ch.Value)
 
-						assert.HasPrefix(t, updch.Error.Err.Error(), err.Err.Error())
-						assert.Equals(t, updch.Error.Type, err.Type)
-						assert.Equals(t, updch.Error.Detail, err.Detail)
-						assert.Equals(t, updch.Error.Status, err.Status)
-						assert.Equals(t, updch.Error.Detail, err.Detail)
+						assert.EqualError(t, updch.Error.Err, err.Err.Error())
+						assert.Equal(t, err.Type, updch.Error.Type)
+						assert.Equal(t, err.Detail, updch.Error.Detail)
+						assert.Equal(t, err.Status, updch.Error.Status)
+						assert.Equal(t, err.Subproblems, updch.Error.Subproblems)
+
 						return errors.New("force")
 					},
 				},
@@ -1934,14 +1958,14 @@ func TestTLSALPN01Validate(t *testing.T) {
 			ch := makeTLSCh()
 
 			jwk, err := jose.GenerateJWK("EC", "P-256", "ES256", "sig", "", 0)
-			assert.FatalError(t, err)
+			require.NoError(t, err)
 
 			expKeyAuth, err := KeyAuthorization(ch.Token, jwk)
-			assert.FatalError(t, err)
+			require.NoError(t, err)
 			expKeyAuthHash := sha256.Sum256([]byte(expKeyAuth))
 
 			cert, err := newTLSALPNValidationCert(expKeyAuthHash[:], false, true, ch.Value, "other.internal")
-			assert.FatalError(t, err)
+			require.NoError(t, err)
 
 			srv, tlsDial := newTestTLSALPNServer(cert)
 			srv.Start()
@@ -1953,19 +1977,20 @@ func TestTLSALPN01Validate(t *testing.T) {
 				},
 				db: &MockDB{
 					MockUpdateChallenge: func(ctx context.Context, updch *Challenge) error {
-						assert.Equals(t, updch.ID, ch.ID)
-						assert.Equals(t, updch.Token, ch.Token)
-						assert.Equals(t, updch.Status, StatusInvalid)
-						assert.Equals(t, updch.Type, ch.Type)
-						assert.Equals(t, updch.Value, ch.Value)
+						assert.Equal(t, "chID", updch.ID)
+						assert.Equal(t, "token", updch.Token)
+						assert.Equal(t, StatusInvalid, updch.Status)
+						assert.Equal(t, ChallengeType("tls-alpn-01"), updch.Type)
+						assert.Equal(t, "zap.internal", updch.Value)
 
 						err := NewError(ErrorRejectedIdentifierType, "incorrect certificate for tls-alpn-01 challenge: leaf certificate must contain a single IP address or DNS name, %v", ch.Value)
 
-						assert.HasPrefix(t, updch.Error.Err.Error(), err.Err.Error())
-						assert.Equals(t, updch.Error.Type, err.Type)
-						assert.Equals(t, updch.Error.Detail, err.Detail)
-						assert.Equals(t, updch.Error.Status, err.Status)
-						assert.Equals(t, updch.Error.Detail, err.Detail)
+						assert.EqualError(t, updch.Error.Err, err.Err.Error())
+						assert.Equal(t, err.Type, updch.Error.Type)
+						assert.Equal(t, err.Detail, updch.Error.Detail)
+						assert.Equal(t, err.Status, updch.Error.Status)
+						assert.Equal(t, err.Subproblems, updch.Error.Subproblems)
+
 						return nil
 					},
 				},
@@ -1977,14 +2002,14 @@ func TestTLSALPN01Validate(t *testing.T) {
 			ch := makeTLSCh()
 
 			jwk, err := jose.GenerateJWK("EC", "P-256", "ES256", "sig", "", 0)
-			assert.FatalError(t, err)
+			require.NoError(t, err)
 
 			expKeyAuth, err := KeyAuthorization(ch.Token, jwk)
-			assert.FatalError(t, err)
+			require.NoError(t, err)
 			expKeyAuthHash := sha256.Sum256([]byte(expKeyAuth))
 
 			cert, err := newTLSALPNValidationCert(expKeyAuthHash[:], false, true, "other.internal")
-			assert.FatalError(t, err)
+			require.NoError(t, err)
 
 			srv, tlsDial := newTestTLSALPNServer(cert)
 			srv.Start()
@@ -1996,19 +2021,20 @@ func TestTLSALPN01Validate(t *testing.T) {
 				},
 				db: &MockDB{
 					MockUpdateChallenge: func(ctx context.Context, updch *Challenge) error {
-						assert.Equals(t, updch.ID, ch.ID)
-						assert.Equals(t, updch.Token, ch.Token)
-						assert.Equals(t, updch.Status, StatusInvalid)
-						assert.Equals(t, updch.Type, ch.Type)
-						assert.Equals(t, updch.Value, ch.Value)
+						assert.Equal(t, "chID", updch.ID)
+						assert.Equal(t, "token", updch.Token)
+						assert.Equal(t, StatusInvalid, updch.Status)
+						assert.Equal(t, ChallengeType("tls-alpn-01"), updch.Type)
+						assert.Equal(t, "zap.internal", updch.Value)
 
 						err := NewError(ErrorRejectedIdentifierType, "incorrect certificate for tls-alpn-01 challenge: leaf certificate must contain a single IP address or DNS name, %v", ch.Value)
 
-						assert.HasPrefix(t, updch.Error.Err.Error(), err.Err.Error())
-						assert.Equals(t, updch.Error.Type, err.Type)
-						assert.Equals(t, updch.Error.Detail, err.Detail)
-						assert.Equals(t, updch.Error.Status, err.Status)
-						assert.Equals(t, updch.Error.Detail, err.Detail)
+						assert.EqualError(t, updch.Error.Err, err.Err.Error())
+						assert.Equal(t, err.Type, updch.Error.Type)
+						assert.Equal(t, err.Detail, updch.Error.Detail)
+						assert.Equal(t, err.Status, updch.Error.Status)
+						assert.Equal(t, err.Subproblems, updch.Error.Subproblems)
+
 						return nil
 					},
 				},
@@ -2020,15 +2046,15 @@ func TestTLSALPN01Validate(t *testing.T) {
 			ch := makeTLSCh()
 
 			jwk, err := jose.GenerateJWK("EC", "P-256", "ES256", "sig", "", 0)
-			assert.FatalError(t, err)
+			require.NoError(t, err)
 
 			expKeyAuth, err := KeyAuthorization(ch.Token, jwk)
-			assert.FatalError(t, err)
+			require.NoError(t, err)
 			expKeyAuthHash := sha256.Sum256([]byte(expKeyAuth))
 			jwk.Key = "foo"
 
 			cert, err := newTLSALPNValidationCert(expKeyAuthHash[:], false, true, ch.Value)
-			assert.FatalError(t, err)
+			require.NoError(t, err)
 
 			srv, tlsDial := newTestTLSALPNServer(cert)
 			srv.Start()
@@ -2047,10 +2073,10 @@ func TestTLSALPN01Validate(t *testing.T) {
 			ch := makeTLSCh()
 
 			jwk, err := jose.GenerateJWK("EC", "P-256", "ES256", "sig", "", 0)
-			assert.FatalError(t, err)
+			require.NoError(t, err)
 
 			cert, err := newTLSALPNValidationCert(nil, false, true, ch.Value)
-			assert.FatalError(t, err)
+			require.NoError(t, err)
 
 			srv, tlsDial := newTestTLSALPNServer(cert)
 			srv.Start()
@@ -2062,19 +2088,20 @@ func TestTLSALPN01Validate(t *testing.T) {
 				},
 				db: &MockDB{
 					MockUpdateChallenge: func(ctx context.Context, updch *Challenge) error {
-						assert.Equals(t, updch.ID, ch.ID)
-						assert.Equals(t, updch.Token, ch.Token)
-						assert.Equals(t, updch.Status, StatusInvalid)
-						assert.Equals(t, updch.Type, ch.Type)
-						assert.Equals(t, updch.Value, ch.Value)
+						assert.Equal(t, "chID", updch.ID)
+						assert.Equal(t, "token", updch.Token)
+						assert.Equal(t, StatusInvalid, updch.Status)
+						assert.Equal(t, ChallengeType("tls-alpn-01"), updch.Type)
+						assert.Equal(t, "zap.internal", updch.Value)
 
 						err := NewError(ErrorRejectedIdentifierType, "incorrect certificate for tls-alpn-01 challenge: missing acmeValidationV1 extension")
 
-						assert.HasPrefix(t, updch.Error.Err.Error(), err.Err.Error())
-						assert.Equals(t, updch.Error.Type, err.Type)
-						assert.Equals(t, updch.Error.Detail, err.Detail)
-						assert.Equals(t, updch.Error.Status, err.Status)
-						assert.Equals(t, updch.Error.Detail, err.Detail)
+						assert.EqualError(t, updch.Error.Err, err.Err.Error())
+						assert.Equal(t, err.Type, updch.Error.Type)
+						assert.Equal(t, err.Detail, updch.Error.Detail)
+						assert.Equal(t, err.Status, updch.Error.Status)
+						assert.Equal(t, err.Subproblems, updch.Error.Subproblems)
+
 						return nil
 					},
 				},
@@ -2086,10 +2113,10 @@ func TestTLSALPN01Validate(t *testing.T) {
 			ch := makeTLSCh()
 
 			jwk, err := jose.GenerateJWK("EC", "P-256", "ES256", "sig", "", 0)
-			assert.FatalError(t, err)
+			require.NoError(t, err)
 
 			cert, err := newTLSALPNValidationCert(nil, false, true, ch.Value)
-			assert.FatalError(t, err)
+			require.NoError(t, err)
 
 			srv, tlsDial := newTestTLSALPNServer(cert)
 			srv.Start()
@@ -2101,19 +2128,20 @@ func TestTLSALPN01Validate(t *testing.T) {
 				},
 				db: &MockDB{
 					MockUpdateChallenge: func(ctx context.Context, updch *Challenge) error {
-						assert.Equals(t, updch.ID, ch.ID)
-						assert.Equals(t, updch.Token, ch.Token)
-						assert.Equals(t, updch.Status, StatusInvalid)
-						assert.Equals(t, updch.Type, ch.Type)
-						assert.Equals(t, updch.Value, ch.Value)
+						assert.Equal(t, "chID", updch.ID)
+						assert.Equal(t, "token", updch.Token)
+						assert.Equal(t, StatusInvalid, updch.Status)
+						assert.Equal(t, ChallengeType("tls-alpn-01"), updch.Type)
+						assert.Equal(t, "zap.internal", updch.Value)
 
 						err := NewError(ErrorRejectedIdentifierType, "incorrect certificate for tls-alpn-01 challenge: missing acmeValidationV1 extension")
 
-						assert.HasPrefix(t, updch.Error.Err.Error(), err.Err.Error())
-						assert.Equals(t, updch.Error.Type, err.Type)
-						assert.Equals(t, updch.Error.Detail, err.Detail)
-						assert.Equals(t, updch.Error.Status, err.Status)
-						assert.Equals(t, updch.Error.Detail, err.Detail)
+						assert.EqualError(t, updch.Error.Err, err.Err.Error())
+						assert.Equal(t, err.Type, updch.Error.Type)
+						assert.Equal(t, err.Detail, updch.Error.Detail)
+						assert.Equal(t, err.Status, updch.Error.Status)
+						assert.Equal(t, err.Subproblems, updch.Error.Subproblems)
+
 						return errors.New("force")
 					},
 				},
@@ -2126,14 +2154,14 @@ func TestTLSALPN01Validate(t *testing.T) {
 			ch := makeTLSCh()
 
 			jwk, err := jose.GenerateJWK("EC", "P-256", "ES256", "sig", "", 0)
-			assert.FatalError(t, err)
+			require.NoError(t, err)
 
 			expKeyAuth, err := KeyAuthorization(ch.Token, jwk)
-			assert.FatalError(t, err)
+			require.NoError(t, err)
 			expKeyAuthHash := sha256.Sum256([]byte(expKeyAuth))
 
 			cert, err := newTLSALPNValidationCert(expKeyAuthHash[:], false, false, ch.Value)
-			assert.FatalError(t, err)
+			require.NoError(t, err)
 
 			srv, tlsDial := newTestTLSALPNServer(cert)
 			srv.Start()
@@ -2145,19 +2173,20 @@ func TestTLSALPN01Validate(t *testing.T) {
 				},
 				db: &MockDB{
 					MockUpdateChallenge: func(ctx context.Context, updch *Challenge) error {
-						assert.Equals(t, updch.ID, ch.ID)
-						assert.Equals(t, updch.Token, ch.Token)
-						assert.Equals(t, updch.Status, StatusInvalid)
-						assert.Equals(t, updch.Type, ch.Type)
-						assert.Equals(t, updch.Value, ch.Value)
+						assert.Equal(t, "chID", updch.ID)
+						assert.Equal(t, "token", updch.Token)
+						assert.Equal(t, StatusInvalid, updch.Status)
+						assert.Equal(t, ChallengeType("tls-alpn-01"), updch.Type)
+						assert.Equal(t, "zap.internal", updch.Value)
 
 						err := NewError(ErrorRejectedIdentifierType, "incorrect certificate for tls-alpn-01 challenge: acmeValidationV1 extension not critical")
 
-						assert.HasPrefix(t, updch.Error.Err.Error(), err.Err.Error())
-						assert.Equals(t, updch.Error.Type, err.Type)
-						assert.Equals(t, updch.Error.Detail, err.Detail)
-						assert.Equals(t, updch.Error.Status, err.Status)
-						assert.Equals(t, updch.Error.Detail, err.Detail)
+						assert.EqualError(t, updch.Error.Err, err.Err.Error())
+						assert.Equal(t, err.Type, updch.Error.Type)
+						assert.Equal(t, err.Detail, updch.Error.Detail)
+						assert.Equal(t, err.Status, updch.Error.Status)
+						assert.Equal(t, err.Subproblems, updch.Error.Subproblems)
+
 						return nil
 					},
 				},
@@ -2169,14 +2198,14 @@ func TestTLSALPN01Validate(t *testing.T) {
 			ch := makeTLSCh()
 
 			jwk, err := jose.GenerateJWK("EC", "P-256", "ES256", "sig", "", 0)
-			assert.FatalError(t, err)
+			require.NoError(t, err)
 
 			expKeyAuth, err := KeyAuthorization(ch.Token, jwk)
-			assert.FatalError(t, err)
+			require.NoError(t, err)
 			expKeyAuthHash := sha256.Sum256([]byte(expKeyAuth))
 
 			cert, err := newTLSALPNValidationCert(expKeyAuthHash[:], false, false, ch.Value)
-			assert.FatalError(t, err)
+			require.NoError(t, err)
 
 			srv, tlsDial := newTestTLSALPNServer(cert)
 			srv.Start()
@@ -2188,19 +2217,20 @@ func TestTLSALPN01Validate(t *testing.T) {
 				},
 				db: &MockDB{
 					MockUpdateChallenge: func(ctx context.Context, updch *Challenge) error {
-						assert.Equals(t, updch.ID, ch.ID)
-						assert.Equals(t, updch.Token, ch.Token)
-						assert.Equals(t, updch.Status, StatusInvalid)
-						assert.Equals(t, updch.Type, ch.Type)
-						assert.Equals(t, updch.Value, ch.Value)
+						assert.Equal(t, "chID", updch.ID)
+						assert.Equal(t, "token", updch.Token)
+						assert.Equal(t, StatusInvalid, updch.Status)
+						assert.Equal(t, ChallengeType("tls-alpn-01"), updch.Type)
+						assert.Equal(t, "zap.internal", updch.Value)
 
 						err := NewError(ErrorRejectedIdentifierType, "incorrect certificate for tls-alpn-01 challenge: acmeValidationV1 extension not critical")
 
-						assert.HasPrefix(t, updch.Error.Err.Error(), err.Err.Error())
-						assert.Equals(t, updch.Error.Type, err.Type)
-						assert.Equals(t, updch.Error.Detail, err.Detail)
-						assert.Equals(t, updch.Error.Status, err.Status)
-						assert.Equals(t, updch.Error.Detail, err.Detail)
+						assert.EqualError(t, updch.Error.Err, err.Err.Error())
+						assert.Equal(t, err.Type, updch.Error.Type)
+						assert.Equal(t, err.Detail, updch.Error.Detail)
+						assert.Equal(t, err.Status, updch.Error.Status)
+						assert.Equal(t, err.Subproblems, updch.Error.Subproblems)
+
 						return errors.New("force")
 					},
 				},
@@ -2213,10 +2243,10 @@ func TestTLSALPN01Validate(t *testing.T) {
 			ch := makeTLSCh()
 
 			jwk, err := jose.GenerateJWK("EC", "P-256", "ES256", "sig", "", 0)
-			assert.FatalError(t, err)
+			require.NoError(t, err)
 
 			cert, err := newTLSALPNValidationCert([]byte{1, 2, 3}, false, true, ch.Value)
-			assert.FatalError(t, err)
+			require.NoError(t, err)
 
 			srv, tlsDial := newTestTLSALPNServer(cert)
 			srv.Start()
@@ -2228,19 +2258,20 @@ func TestTLSALPN01Validate(t *testing.T) {
 				},
 				db: &MockDB{
 					MockUpdateChallenge: func(ctx context.Context, updch *Challenge) error {
-						assert.Equals(t, updch.ID, ch.ID)
-						assert.Equals(t, updch.Token, ch.Token)
-						assert.Equals(t, updch.Status, StatusInvalid)
-						assert.Equals(t, updch.Type, ch.Type)
-						assert.Equals(t, updch.Value, ch.Value)
+						assert.Equal(t, "chID", updch.ID)
+						assert.Equal(t, "token", updch.Token)
+						assert.Equal(t, StatusInvalid, updch.Status)
+						assert.Equal(t, ChallengeType("tls-alpn-01"), updch.Type)
+						assert.Equal(t, "zap.internal", updch.Value)
 
 						err := NewError(ErrorRejectedIdentifierType, "incorrect certificate for tls-alpn-01 challenge: malformed acmeValidationV1 extension value")
 
-						assert.HasPrefix(t, updch.Error.Err.Error(), err.Err.Error())
-						assert.Equals(t, updch.Error.Type, err.Type)
-						assert.Equals(t, updch.Error.Detail, err.Detail)
-						assert.Equals(t, updch.Error.Status, err.Status)
-						assert.Equals(t, updch.Error.Detail, err.Detail)
+						assert.EqualError(t, updch.Error.Err, err.Err.Error())
+						assert.Equal(t, err.Type, updch.Error.Type)
+						assert.Equal(t, err.Detail, updch.Error.Detail)
+						assert.Equal(t, err.Status, updch.Error.Status)
+						assert.Equal(t, err.Subproblems, updch.Error.Subproblems)
+
 						return nil
 					},
 				},
@@ -2252,10 +2283,10 @@ func TestTLSALPN01Validate(t *testing.T) {
 			ch := makeTLSCh()
 
 			jwk, err := jose.GenerateJWK("EC", "P-256", "ES256", "sig", "", 0)
-			assert.FatalError(t, err)
+			require.NoError(t, err)
 
 			cert, err := newTLSALPNValidationCert([]byte{1, 2, 3}, false, true, ch.Value)
-			assert.FatalError(t, err)
+			require.NoError(t, err)
 
 			srv, tlsDial := newTestTLSALPNServer(cert)
 			srv.Start()
@@ -2267,19 +2298,20 @@ func TestTLSALPN01Validate(t *testing.T) {
 				},
 				db: &MockDB{
 					MockUpdateChallenge: func(ctx context.Context, updch *Challenge) error {
-						assert.Equals(t, updch.ID, ch.ID)
-						assert.Equals(t, updch.Token, ch.Token)
-						assert.Equals(t, updch.Status, StatusInvalid)
-						assert.Equals(t, updch.Type, ch.Type)
-						assert.Equals(t, updch.Value, ch.Value)
+						assert.Equal(t, "chID", updch.ID)
+						assert.Equal(t, "token", updch.Token)
+						assert.Equal(t, StatusInvalid, updch.Status)
+						assert.Equal(t, ChallengeType("tls-alpn-01"), updch.Type)
+						assert.Equal(t, "zap.internal", updch.Value)
 
 						err := NewError(ErrorRejectedIdentifierType, "incorrect certificate for tls-alpn-01 challenge: malformed acmeValidationV1 extension value")
 
-						assert.HasPrefix(t, updch.Error.Err.Error(), err.Err.Error())
-						assert.Equals(t, updch.Error.Type, err.Type)
-						assert.Equals(t, updch.Error.Detail, err.Detail)
-						assert.Equals(t, updch.Error.Status, err.Status)
-						assert.Equals(t, updch.Error.Detail, err.Detail)
+						assert.EqualError(t, updch.Error.Err, err.Err.Error())
+						assert.Equal(t, err.Type, updch.Error.Type)
+						assert.Equal(t, err.Detail, updch.Error.Detail)
+						assert.Equal(t, err.Status, updch.Error.Status)
+						assert.Equal(t, err.Subproblems, updch.Error.Subproblems)
+
 						return errors.New("force")
 					},
 				},
@@ -2292,15 +2324,15 @@ func TestTLSALPN01Validate(t *testing.T) {
 			ch := makeTLSCh()
 
 			jwk, err := jose.GenerateJWK("EC", "P-256", "ES256", "sig", "", 0)
-			assert.FatalError(t, err)
+			require.NoError(t, err)
 
 			expKeyAuth, err := KeyAuthorization(ch.Token, jwk)
-			assert.FatalError(t, err)
+			require.NoError(t, err)
 			expKeyAuthHash := sha256.Sum256([]byte(expKeyAuth))
 			incorrectTokenHash := sha256.Sum256([]byte("mismatched"))
 
 			cert, err := newTLSALPNValidationCert(incorrectTokenHash[:], false, true, ch.Value)
-			assert.FatalError(t, err)
+			require.NoError(t, err)
 
 			srv, tlsDial := newTestTLSALPNServer(cert)
 			srv.Start()
@@ -2312,21 +2344,22 @@ func TestTLSALPN01Validate(t *testing.T) {
 				},
 				db: &MockDB{
 					MockUpdateChallenge: func(ctx context.Context, updch *Challenge) error {
-						assert.Equals(t, updch.ID, ch.ID)
-						assert.Equals(t, updch.Token, ch.Token)
-						assert.Equals(t, updch.Status, StatusInvalid)
-						assert.Equals(t, updch.Type, ch.Type)
-						assert.Equals(t, updch.Value, ch.Value)
+						assert.Equal(t, "chID", updch.ID)
+						assert.Equal(t, "token", updch.Token)
+						assert.Equal(t, StatusInvalid, updch.Status)
+						assert.Equal(t, ChallengeType("tls-alpn-01"), updch.Type)
+						assert.Equal(t, "zap.internal", updch.Value)
 
 						err := NewError(ErrorRejectedIdentifierType, "incorrect certificate for tls-alpn-01 challenge: "+
 							"expected acmeValidationV1 extension value %s for this challenge but got %s",
 							hex.EncodeToString(expKeyAuthHash[:]), hex.EncodeToString(incorrectTokenHash[:]))
 
-						assert.HasPrefix(t, updch.Error.Err.Error(), err.Err.Error())
-						assert.Equals(t, updch.Error.Type, err.Type)
-						assert.Equals(t, updch.Error.Detail, err.Detail)
-						assert.Equals(t, updch.Error.Status, err.Status)
-						assert.Equals(t, updch.Error.Detail, err.Detail)
+						assert.EqualError(t, updch.Error.Err, err.Err.Error())
+						assert.Equal(t, err.Type, updch.Error.Type)
+						assert.Equal(t, err.Detail, updch.Error.Detail)
+						assert.Equal(t, err.Status, updch.Error.Status)
+						assert.Equal(t, err.Subproblems, updch.Error.Subproblems)
+
 						return nil
 					},
 				},
@@ -2338,15 +2371,15 @@ func TestTLSALPN01Validate(t *testing.T) {
 			ch := makeTLSCh()
 
 			jwk, err := jose.GenerateJWK("EC", "P-256", "ES256", "sig", "", 0)
-			assert.FatalError(t, err)
+			require.NoError(t, err)
 
 			expKeyAuth, err := KeyAuthorization(ch.Token, jwk)
-			assert.FatalError(t, err)
+			require.NoError(t, err)
 			expKeyAuthHash := sha256.Sum256([]byte(expKeyAuth))
 			incorrectTokenHash := sha256.Sum256([]byte("mismatched"))
 
 			cert, err := newTLSALPNValidationCert(incorrectTokenHash[:], false, true, ch.Value)
-			assert.FatalError(t, err)
+			require.NoError(t, err)
 
 			srv, tlsDial := newTestTLSALPNServer(cert)
 			srv.Start()
@@ -2358,21 +2391,22 @@ func TestTLSALPN01Validate(t *testing.T) {
 				},
 				db: &MockDB{
 					MockUpdateChallenge: func(ctx context.Context, updch *Challenge) error {
-						assert.Equals(t, updch.ID, ch.ID)
-						assert.Equals(t, updch.Token, ch.Token)
-						assert.Equals(t, updch.Status, StatusInvalid)
-						assert.Equals(t, updch.Type, ch.Type)
-						assert.Equals(t, updch.Value, ch.Value)
+						assert.Equal(t, "chID", updch.ID)
+						assert.Equal(t, "token", updch.Token)
+						assert.Equal(t, StatusInvalid, updch.Status)
+						assert.Equal(t, ChallengeType("tls-alpn-01"), updch.Type)
+						assert.Equal(t, "zap.internal", updch.Value)
 
 						err := NewError(ErrorRejectedIdentifierType, "incorrect certificate for tls-alpn-01 challenge: "+
 							"expected acmeValidationV1 extension value %s for this challenge but got %s",
 							hex.EncodeToString(expKeyAuthHash[:]), hex.EncodeToString(incorrectTokenHash[:]))
 
-						assert.HasPrefix(t, updch.Error.Err.Error(), err.Err.Error())
-						assert.Equals(t, updch.Error.Type, err.Type)
-						assert.Equals(t, updch.Error.Detail, err.Detail)
-						assert.Equals(t, updch.Error.Status, err.Status)
-						assert.Equals(t, updch.Error.Detail, err.Detail)
+						assert.EqualError(t, updch.Error.Err, err.Err.Error())
+						assert.Equal(t, err.Type, updch.Error.Type)
+						assert.Equal(t, err.Detail, updch.Error.Detail)
+						assert.Equal(t, err.Status, updch.Error.Status)
+						assert.Equal(t, err.Subproblems, updch.Error.Subproblems)
+
 						return errors.New("force")
 					},
 				},
@@ -2385,14 +2419,14 @@ func TestTLSALPN01Validate(t *testing.T) {
 			ch := makeTLSCh()
 
 			jwk, err := jose.GenerateJWK("EC", "P-256", "ES256", "sig", "", 0)
-			assert.FatalError(t, err)
+			require.NoError(t, err)
 
 			expKeyAuth, err := KeyAuthorization(ch.Token, jwk)
-			assert.FatalError(t, err)
+			require.NoError(t, err)
 			expKeyAuthHash := sha256.Sum256([]byte(expKeyAuth))
 
 			cert, err := newTLSALPNValidationCert(expKeyAuthHash[:], true, true, ch.Value)
-			assert.FatalError(t, err)
+			require.NoError(t, err)
 
 			srv, tlsDial := newTestTLSALPNServer(cert)
 			srv.Start()
@@ -2404,20 +2438,21 @@ func TestTLSALPN01Validate(t *testing.T) {
 				},
 				db: &MockDB{
 					MockUpdateChallenge: func(ctx context.Context, updch *Challenge) error {
-						assert.Equals(t, updch.ID, ch.ID)
-						assert.Equals(t, updch.Token, ch.Token)
-						assert.Equals(t, updch.Status, StatusInvalid)
-						assert.Equals(t, updch.Type, ch.Type)
-						assert.Equals(t, updch.Value, ch.Value)
+						assert.Equal(t, "chID", updch.ID)
+						assert.Equal(t, "token", updch.Token)
+						assert.Equal(t, StatusInvalid, updch.Status)
+						assert.Equal(t, ChallengeType("tls-alpn-01"), updch.Type)
+						assert.Equal(t, "zap.internal", updch.Value)
 
 						err := NewError(ErrorRejectedIdentifierType, "incorrect certificate for tls-alpn-01 challenge: "+
 							"obsolete id-pe-acmeIdentifier in acmeValidationV1 extension")
 
-						assert.HasPrefix(t, updch.Error.Err.Error(), err.Err.Error())
-						assert.Equals(t, updch.Error.Type, err.Type)
-						assert.Equals(t, updch.Error.Detail, err.Detail)
-						assert.Equals(t, updch.Error.Status, err.Status)
-						assert.Equals(t, updch.Error.Detail, err.Detail)
+						assert.EqualError(t, updch.Error.Err, err.Err.Error())
+						assert.Equal(t, err.Type, updch.Error.Type)
+						assert.Equal(t, err.Detail, updch.Error.Detail)
+						assert.Equal(t, err.Status, updch.Error.Status)
+						assert.Equal(t, err.Subproblems, updch.Error.Subproblems)
+
 						return nil
 					},
 				},
@@ -2429,14 +2464,14 @@ func TestTLSALPN01Validate(t *testing.T) {
 			ch := makeTLSCh()
 
 			jwk, err := jose.GenerateJWK("EC", "P-256", "ES256", "sig", "", 0)
-			assert.FatalError(t, err)
+			require.NoError(t, err)
 
 			expKeyAuth, err := KeyAuthorization(ch.Token, jwk)
-			assert.FatalError(t, err)
+			require.NoError(t, err)
 			expKeyAuthHash := sha256.Sum256([]byte(expKeyAuth))
 
 			cert, err := newTLSALPNValidationCert(expKeyAuthHash[:], true, true, ch.Value)
-			assert.FatalError(t, err)
+			require.NoError(t, err)
 
 			srv, tlsDial := newTestTLSALPNServer(cert)
 			srv.Start()
@@ -2448,20 +2483,21 @@ func TestTLSALPN01Validate(t *testing.T) {
 				},
 				db: &MockDB{
 					MockUpdateChallenge: func(ctx context.Context, updch *Challenge) error {
-						assert.Equals(t, updch.ID, ch.ID)
-						assert.Equals(t, updch.Token, ch.Token)
-						assert.Equals(t, updch.Status, StatusInvalid)
-						assert.Equals(t, updch.Type, ch.Type)
-						assert.Equals(t, updch.Value, ch.Value)
+						assert.Equal(t, "chID", updch.ID)
+						assert.Equal(t, "token", updch.Token)
+						assert.Equal(t, StatusInvalid, updch.Status)
+						assert.Equal(t, ChallengeType("tls-alpn-01"), updch.Type)
+						assert.Equal(t, "zap.internal", updch.Value)
 
 						err := NewError(ErrorRejectedIdentifierType, "incorrect certificate for tls-alpn-01 challenge: "+
 							"obsolete id-pe-acmeIdentifier in acmeValidationV1 extension")
 
-						assert.HasPrefix(t, updch.Error.Err.Error(), err.Err.Error())
-						assert.Equals(t, updch.Error.Type, err.Type)
-						assert.Equals(t, updch.Error.Detail, err.Detail)
-						assert.Equals(t, updch.Error.Status, err.Status)
-						assert.Equals(t, updch.Error.Detail, err.Detail)
+						assert.EqualError(t, updch.Error.Err, err.Err.Error())
+						assert.Equal(t, err.Type, updch.Error.Type)
+						assert.Equal(t, err.Detail, updch.Error.Detail)
+						assert.Equal(t, err.Status, updch.Error.Status)
+						assert.Equal(t, err.Subproblems, updch.Error.Subproblems)
+
 						return errors.New("force")
 					},
 				},
@@ -2474,14 +2510,14 @@ func TestTLSALPN01Validate(t *testing.T) {
 			ch := makeTLSCh()
 
 			jwk, err := jose.GenerateJWK("EC", "P-256", "ES256", "sig", "", 0)
-			assert.FatalError(t, err)
+			require.NoError(t, err)
 
 			expKeyAuth, err := KeyAuthorization(ch.Token, jwk)
-			assert.FatalError(t, err)
+			require.NoError(t, err)
 			expKeyAuthHash := sha256.Sum256([]byte(expKeyAuth))
 
 			cert, err := newTLSALPNValidationCert(expKeyAuthHash[:], false, true, ch.Value)
-			assert.FatalError(t, err)
+			require.NoError(t, err)
 
 			srv, tlsDial := newTestTLSALPNServer(cert)
 			srv.Start()
@@ -2493,12 +2529,13 @@ func TestTLSALPN01Validate(t *testing.T) {
 				},
 				db: &MockDB{
 					MockUpdateChallenge: func(ctx context.Context, updch *Challenge) error {
-						assert.Equals(t, updch.ID, ch.ID)
-						assert.Equals(t, updch.Token, ch.Token)
-						assert.Equals(t, updch.Status, StatusValid)
-						assert.Equals(t, updch.Type, ch.Type)
-						assert.Equals(t, updch.Value, ch.Value)
-						assert.Equals(t, updch.Error, nil)
+						assert.Equal(t, "chID", updch.ID)
+						assert.Equal(t, "token", updch.Token)
+						assert.Equal(t, StatusValid, updch.Status)
+						assert.Equal(t, ChallengeType("tls-alpn-01"), updch.Type)
+						assert.Equal(t, "zap.internal", updch.Value)
+						assert.Nil(t, updch.Error)
+
 						return nil
 					},
 				},
@@ -2511,14 +2548,14 @@ func TestTLSALPN01Validate(t *testing.T) {
 			ch.Value = "127.0.0.1"
 
 			jwk, err := jose.GenerateJWK("EC", "P-256", "ES256", "sig", "", 0)
-			assert.FatalError(t, err)
+			require.NoError(t, err)
 
 			expKeyAuth, err := KeyAuthorization(ch.Token, jwk)
-			assert.FatalError(t, err)
+			require.NoError(t, err)
 			expKeyAuthHash := sha256.Sum256([]byte(expKeyAuth))
 
 			cert, err := newTLSALPNValidationCert(expKeyAuthHash[:], false, true, ch.Value)
-			assert.FatalError(t, err)
+			require.NoError(t, err)
 
 			srv, tlsDial := newTestTLSALPNServer(cert)
 			srv.Start()
@@ -2530,12 +2567,13 @@ func TestTLSALPN01Validate(t *testing.T) {
 				},
 				db: &MockDB{
 					MockUpdateChallenge: func(ctx context.Context, updch *Challenge) error {
-						assert.Equals(t, updch.ID, ch.ID)
-						assert.Equals(t, updch.Token, ch.Token)
-						assert.Equals(t, updch.Status, StatusValid)
-						assert.Equals(t, updch.Type, ch.Type)
-						assert.Equals(t, updch.Value, ch.Value)
-						assert.Equals(t, updch.Error, nil)
+						assert.Equal(t, "chID", updch.ID)
+						assert.Equal(t, "token", updch.Token)
+						assert.Equal(t, StatusValid, updch.Status)
+						assert.Equal(t, ChallengeType("tls-alpn-01"), updch.Type)
+						assert.Equal(t, "127.0.0.1", updch.Value)
+						assert.Nil(t, updch.Error)
+
 						return nil
 					},
 				},
@@ -2554,16 +2592,16 @@ func TestTLSALPN01Validate(t *testing.T) {
 
 			ctx := NewClientContext(context.Background(), tc.vc)
 			if err := tlsalpn01Validate(ctx, tc.ch, tc.db, tc.jwk); err != nil {
-				if assert.NotNil(t, tc.err) {
+				if assert.Error(t, tc.err) {
 					var k *Error
 					if errors.As(err, &k) {
-						assert.Equals(t, k.Type, tc.err.Type)
-						assert.Equals(t, k.Detail, tc.err.Detail)
-						assert.Equals(t, k.Status, tc.err.Status)
-						assert.Equals(t, k.Err.Error(), tc.err.Err.Error())
-						assert.Equals(t, k.Detail, tc.err.Detail)
+						assert.Equal(t, tc.err.Type, k.Type)
+						assert.Equal(t, tc.err.Detail, k.Detail)
+						assert.Equal(t, tc.err.Status, k.Status)
+						assert.Equal(t, tc.err.Err.Error(), k.Err.Error())
+						assert.Equal(t, tc.err.Subproblems, k.Subproblems)
 					} else {
-						assert.FatalError(t, errors.New("unexpected error type"))
+						assert.Fail(t, "unexpected error type")
 					}
 				}
 			} else {
@@ -3133,19 +3171,19 @@ func Test_deviceAttest01Validate(t *testing.T) {
 	}{
 		Error: "an error",
 	})
-	sassert.NoError(t, err)
+	require.NoError(t, err)
 	errorBase64Payload, err := json.Marshal(struct {
 		AttObj string `json:"attObj"`
 	}{
 		AttObj: "?!",
 	})
-	sassert.NoError(t, err)
+	require.NoError(t, err)
 	errorCBORPayload, err := json.Marshal(struct {
 		AttObj string `json:"attObj"`
 	}{
 		AttObj: "AAAA",
 	})
-	sassert.NoError(t, err)
+	require.NoError(t, err)
 	type args struct {
 		ctx     context.Context
 		ch      *Challenge
@@ -3187,19 +3225,19 @@ func Test_deviceAttest01Validate(t *testing.T) {
 					payload: errorPayload,
 					db: &MockDB{
 						MockUpdateChallenge: func(ctx context.Context, updch *Challenge) error {
-							sassert.Equal(t, "chID", updch.ID)
-							sassert.Equal(t, "token", updch.Token)
-							sassert.Equal(t, StatusInvalid, updch.Status)
-							sassert.Equal(t, ChallengeType("device-attest-01"), updch.Type)
-							sassert.Equal(t, "12345678", updch.Value)
+							assert.Equal(t, "chID", updch.ID)
+							assert.Equal(t, "token", updch.Token)
+							assert.Equal(t, StatusInvalid, updch.Status)
+							assert.Equal(t, ChallengeType("device-attest-01"), updch.Type)
+							assert.Equal(t, "12345678", updch.Value)
 
 							err := NewError(ErrorRejectedIdentifierType, "payload contained error: an error")
 
-							sassert.EqualError(t, updch.Error.Err, err.Err.Error())
-							sassert.Equal(t, err.Type, updch.Error.Type)
-							sassert.Equal(t, err.Detail, updch.Error.Detail)
-							sassert.Equal(t, err.Status, updch.Error.Status)
-							sassert.Equal(t, err.Detail, updch.Error.Detail)
+							assert.EqualError(t, updch.Error.Err, err.Err.Error())
+							assert.Equal(t, err.Type, updch.Error.Type)
+							assert.Equal(t, err.Detail, updch.Error.Detail)
+							assert.Equal(t, err.Status, updch.Error.Status)
+							assert.Equal(t, err.Subproblems, updch.Error.Subproblems)
 
 							return errors.New("force")
 						},
@@ -3221,19 +3259,19 @@ func Test_deviceAttest01Validate(t *testing.T) {
 					payload: errorPayload,
 					db: &MockDB{
 						MockUpdateChallenge: func(ctx context.Context, updch *Challenge) error {
-							sassert.Equal(t, "chID", updch.ID)
-							sassert.Equal(t, "token", updch.Token)
-							sassert.Equal(t, StatusInvalid, updch.Status)
-							sassert.Equal(t, ChallengeType("device-attest-01"), updch.Type)
-							sassert.Equal(t, "12345678", updch.Value)
+							assert.Equal(t, "chID", updch.ID)
+							assert.Equal(t, "token", updch.Token)
+							assert.Equal(t, StatusInvalid, updch.Status)
+							assert.Equal(t, ChallengeType("device-attest-01"), updch.Type)
+							assert.Equal(t, "12345678", updch.Value)
 
 							err := NewError(ErrorRejectedIdentifierType, "payload contained error: an error")
 
-							sassert.EqualError(t, updch.Error.Err, err.Err.Error())
-							sassert.Equal(t, err.Type, updch.Error.Type)
-							sassert.Equal(t, err.Detail, updch.Error.Detail)
-							sassert.Equal(t, err.Status, updch.Error.Status)
-							sassert.Equal(t, err.Detail, updch.Error.Detail)
+							assert.EqualError(t, updch.Error.Err, err.Err.Error())
+							assert.Equal(t, err.Type, updch.Error.Type)
+							assert.Equal(t, err.Detail, updch.Error.Detail)
+							assert.Equal(t, err.Status, updch.Error.Status)
+							assert.Equal(t, err.Subproblems, updch.Error.Subproblems)
 
 							return nil
 						},
@@ -3274,7 +3312,7 @@ func Test_deviceAttest01Validate(t *testing.T) {
 		},
 		"ok/prov.IsAttestationFormatEnabled": func(t *testing.T) test {
 			ca, err := minica.New()
-			sassert.NoError(t, err)
+			require.NoError(t, err)
 			makeLeaf := func(signer crypto.Signer, serialNumber []byte) *x509.Certificate {
 				leaf, err := ca.Sign(&x509.Certificate{
 					Subject:   pkix.Name{CommonName: "attestation cert"},
@@ -3289,20 +3327,20 @@ func Test_deviceAttest01Validate(t *testing.T) {
 				return leaf
 			}
 			signer, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
-			sassert.NoError(t, err)
+			require.NoError(t, err)
 			serialNumber, err := asn1.Marshal(1234)
-			sassert.NoError(t, err)
+			require.NoError(t, err)
 			leaf := makeLeaf(signer, serialNumber)
 			jwk, err := jose.GenerateJWK("EC", "P-256", "ES256", "sig", "", 0)
-			sassert.NoError(t, err)
+			require.NoError(t, err)
 			token := "token"
 			keyAuth, err := KeyAuthorization(token, jwk)
-			sassert.NoError(t, err)
+			require.NoError(t, err)
 			keyAuthSum := sha256.Sum256([]byte(keyAuth))
 			sig, err := signer.Sign(rand.Reader, keyAuthSum[:], crypto.SHA256)
-			sassert.NoError(t, err)
+			require.NoError(t, err)
 			cborSig, err := cbor.Marshal(sig)
-			sassert.NoError(t, err)
+			require.NoError(t, err)
 			ctx := NewProvisionerContext(context.Background(), mustNonAttestationProvisioner(t))
 			attObj, err := cbor.Marshal(struct {
 				Format       string                 `json:"fmt"`
@@ -3315,13 +3353,13 @@ func Test_deviceAttest01Validate(t *testing.T) {
 					"sig": cborSig,
 				},
 			})
-			sassert.NoError(t, err)
+			require.NoError(t, err)
 			payload, err := json.Marshal(struct {
 				AttObj string `json:"attObj"`
 			}{
 				AttObj: base64.RawURLEncoding.EncodeToString(attObj),
 			})
-			sassert.NoError(t, err)
+			require.NoError(t, err)
 			return test{
 				args: args{
 					ctx: ctx,
@@ -3335,19 +3373,19 @@ func Test_deviceAttest01Validate(t *testing.T) {
 					payload: payload,
 					db: &MockDB{
 						MockUpdateChallenge: func(ctx context.Context, updch *Challenge) error {
-							sassert.Equal(t, "chID", updch.ID)
-							sassert.Equal(t, "token", updch.Token)
-							sassert.Equal(t, StatusInvalid, updch.Status)
-							sassert.Equal(t, ChallengeType("device-attest-01"), updch.Type)
-							sassert.Equal(t, "12345678", updch.Value)
+							assert.Equal(t, "chID", updch.ID)
+							assert.Equal(t, "token", updch.Token)
+							assert.Equal(t, StatusInvalid, updch.Status)
+							assert.Equal(t, ChallengeType("device-attest-01"), updch.Type)
+							assert.Equal(t, "12345678", updch.Value)
 
 							err := NewError(ErrorBadAttestationStatementType, "attestation format %q is not enabled", "step")
 
-							sassert.EqualError(t, updch.Error.Err, err.Err.Error())
-							sassert.Equal(t, err.Type, updch.Error.Type)
-							sassert.Equal(t, err.Detail, updch.Error.Detail)
-							sassert.Equal(t, err.Status, updch.Error.Status)
-							sassert.Equal(t, err.Detail, updch.Error.Detail)
+							assert.EqualError(t, updch.Error.Err, err.Err.Error())
+							assert.Equal(t, err.Type, updch.Error.Type)
+							assert.Equal(t, err.Detail, updch.Error.Detail)
+							assert.Equal(t, err.Status, updch.Error.Status)
+							assert.Equal(t, err.Subproblems, updch.Error.Subproblems)
 
 							return nil
 						},
@@ -3365,13 +3403,13 @@ func Test_deviceAttest01Validate(t *testing.T) {
 				Format:       "apple",
 				AttStatement: map[string]interface{}{},
 			})
-			sassert.NoError(t, err)
+			require.NoError(t, err)
 			payload, err := json.Marshal(struct {
 				AttObj string `json:"attObj"`
 			}{
 				AttObj: base64.RawURLEncoding.EncodeToString(attObj),
 			})
-			sassert.NoError(t, err)
+			require.NoError(t, err)
 			return test{
 				args: args{
 					ctx: ctx,
@@ -3385,19 +3423,19 @@ func Test_deviceAttest01Validate(t *testing.T) {
 					payload: payload,
 					db: &MockDB{
 						MockUpdateChallenge: func(ctx context.Context, updch *Challenge) error {
-							sassert.Equal(t, "chID", updch.ID)
-							sassert.Equal(t, "token", updch.Token)
-							sassert.Equal(t, StatusInvalid, updch.Status)
-							sassert.Equal(t, ChallengeType("device-attest-01"), updch.Type)
-							sassert.Equal(t, "12345678", updch.Value)
+							assert.Equal(t, "chID", updch.ID)
+							assert.Equal(t, "token", updch.Token)
+							assert.Equal(t, StatusInvalid, updch.Status)
+							assert.Equal(t, ChallengeType("device-attest-01"), updch.Type)
+							assert.Equal(t, "12345678", updch.Value)
 
 							err := NewError(ErrorBadAttestationStatementType, "x5c not present")
 
-							sassert.EqualError(t, updch.Error.Err, err.Err.Error())
-							sassert.Equal(t, err.Type, updch.Error.Type)
-							sassert.Equal(t, err.Detail, updch.Error.Detail)
-							sassert.Equal(t, err.Status, updch.Error.Status)
-							sassert.Equal(t, err.Detail, updch.Error.Detail)
+							assert.EqualError(t, updch.Error.Err, err.Err.Error())
+							assert.Equal(t, err.Type, updch.Error.Type)
+							assert.Equal(t, err.Detail, updch.Error.Detail)
+							assert.Equal(t, err.Status, updch.Error.Status)
+							assert.Equal(t, err.Subproblems, updch.Error.Subproblems)
 
 							return nil
 						},
@@ -3408,9 +3446,9 @@ func Test_deviceAttest01Validate(t *testing.T) {
 		},
 		"ok/doAppleAttestationFormat-non-matching-nonce": func(t *testing.T) test {
 			ca, err := minica.New()
-			sassert.NoError(t, err)
+			require.NoError(t, err)
 			signer, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
-			sassert.NoError(t, err)
+			require.NoError(t, err)
 			caRoot := pem.EncodeToMemory(&pem.Block{Type: "CERTIFICATE", Bytes: ca.Root.Raw})
 			leaf, err := ca.Sign(&x509.Certificate{
 				Subject:   pkix.Name{CommonName: "attestation cert"},
@@ -3422,7 +3460,7 @@ func Test_deviceAttest01Validate(t *testing.T) {
 					{Id: oidAppleNonce, Value: []byte("nonce")},
 				},
 			})
-			sassert.NoError(t, err)
+			require.NoError(t, err)
 			ctx := NewProvisionerContext(context.Background(), mustAttestationProvisioner(t, caRoot))
 			attObj, err := cbor.Marshal(struct {
 				Format       string                 `json:"fmt"`
@@ -3433,13 +3471,13 @@ func Test_deviceAttest01Validate(t *testing.T) {
 					"x5c": []interface{}{leaf.Raw, ca.Intermediate.Raw},
 				},
 			})
-			sassert.NoError(t, err)
+			require.NoError(t, err)
 			payload, err := json.Marshal(struct {
 				AttObj string `json:"attObj"`
 			}{
 				AttObj: base64.RawURLEncoding.EncodeToString(attObj),
 			})
-			sassert.NoError(t, err)
+			require.NoError(t, err)
 			return test{
 				args: args{
 					ctx: ctx,
@@ -3453,19 +3491,19 @@ func Test_deviceAttest01Validate(t *testing.T) {
 					payload: payload,
 					db: &MockDB{
 						MockUpdateChallenge: func(ctx context.Context, updch *Challenge) error {
-							sassert.Equal(t, "chID", updch.ID)
-							sassert.Equal(t, "token", updch.Token)
-							sassert.Equal(t, StatusInvalid, updch.Status)
-							sassert.Equal(t, ChallengeType("device-attest-01"), updch.Type)
-							sassert.Equal(t, "12345678", updch.Value)
+							assert.Equal(t, "chID", updch.ID)
+							assert.Equal(t, "token", updch.Token)
+							assert.Equal(t, StatusInvalid, updch.Status)
+							assert.Equal(t, ChallengeType("device-attest-01"), updch.Type)
+							assert.Equal(t, "12345678", updch.Value)
 
 							err := NewError(ErrorBadAttestationStatementType, "challenge token does not match")
 
-							sassert.EqualError(t, updch.Error.Err, err.Err.Error())
-							sassert.Equal(t, err.Type, updch.Error.Type)
-							sassert.Equal(t, err.Detail, updch.Error.Detail)
-							sassert.Equal(t, err.Status, updch.Error.Status)
-							sassert.Equal(t, err.Detail, updch.Error.Detail)
+							assert.EqualError(t, updch.Error.Err, err.Err.Error())
+							assert.Equal(t, err.Type, updch.Error.Type)
+							assert.Equal(t, err.Detail, updch.Error.Detail)
+							assert.Equal(t, err.Status, updch.Error.Status)
+							assert.Equal(t, err.Subproblems, updch.Error.Subproblems)
 
 							return nil
 						},
@@ -3476,9 +3514,9 @@ func Test_deviceAttest01Validate(t *testing.T) {
 		},
 		"ok/doAppleAttestationFormat-non-matching-challenge-value": func(t *testing.T) test {
 			ca, err := minica.New()
-			sassert.NoError(t, err)
+			require.NoError(t, err)
 			signer, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
-			sassert.NoError(t, err)
+			require.NoError(t, err)
 			caRoot := pem.EncodeToMemory(&pem.Block{Type: "CERTIFICATE", Bytes: ca.Root.Raw})
 			nonce := sha256.Sum256([]byte("nonce"))
 			leaf, err := ca.Sign(&x509.Certificate{
@@ -3491,7 +3529,7 @@ func Test_deviceAttest01Validate(t *testing.T) {
 					{Id: oidAppleNonce, Value: nonce[:]},
 				},
 			})
-			sassert.NoError(t, err)
+			require.NoError(t, err)
 			ctx := NewProvisionerContext(context.Background(), mustAttestationProvisioner(t, caRoot))
 			attObj, err := cbor.Marshal(struct {
 				Format       string                 `json:"fmt"`
@@ -3502,13 +3540,13 @@ func Test_deviceAttest01Validate(t *testing.T) {
 					"x5c": []interface{}{leaf.Raw, ca.Intermediate.Raw},
 				},
 			})
-			sassert.NoError(t, err)
+			require.NoError(t, err)
 			payload, err := json.Marshal(struct {
 				AttObj string `json:"attObj"`
 			}{
 				AttObj: base64.RawURLEncoding.EncodeToString(attObj),
 			})
-			sassert.NoError(t, err)
+			require.NoError(t, err)
 			return test{
 				args: args{
 					ctx: ctx,
@@ -3522,19 +3560,19 @@ func Test_deviceAttest01Validate(t *testing.T) {
 					payload: payload,
 					db: &MockDB{
 						MockUpdateChallenge: func(ctx context.Context, updch *Challenge) error {
-							sassert.Equal(t, "chID", updch.ID)
-							sassert.Equal(t, "nonce", updch.Token)
-							sassert.Equal(t, StatusInvalid, updch.Status)
-							sassert.Equal(t, ChallengeType("device-attest-01"), updch.Type)
-							sassert.Equal(t, "non-matching-value", updch.Value)
+							assert.Equal(t, "chID", updch.ID)
+							assert.Equal(t, "nonce", updch.Token)
+							assert.Equal(t, StatusInvalid, updch.Status)
+							assert.Equal(t, ChallengeType("device-attest-01"), updch.Type)
+							assert.Equal(t, "non-matching-value", updch.Value)
 
 							err := NewError(ErrorBadAttestationStatementType, "permanent identifier does not match")
 
-							sassert.EqualError(t, updch.Error.Err, err.Err.Error())
-							sassert.Equal(t, err.Type, updch.Error.Type)
-							sassert.Equal(t, err.Detail, updch.Error.Detail)
-							sassert.Equal(t, err.Status, updch.Error.Status)
-							sassert.Equal(t, err.Detail, updch.Error.Detail)
+							assert.EqualError(t, updch.Error.Err, err.Err.Error())
+							assert.Equal(t, err.Type, updch.Error.Type)
+							assert.Equal(t, err.Detail, updch.Error.Detail)
+							assert.Equal(t, err.Status, updch.Error.Status)
+							assert.Equal(t, err.Subproblems, updch.Error.Subproblems)
 
 							return nil
 						},
@@ -3545,20 +3583,20 @@ func Test_deviceAttest01Validate(t *testing.T) {
 		},
 		"ok/doStepAttestationFormat-storeError": func(t *testing.T) test {
 			ca, err := minica.New()
-			sassert.NoError(t, err)
+			require.NoError(t, err)
 			caRoot := pem.EncodeToMemory(&pem.Block{Type: "CERTIFICATE", Bytes: ca.Root.Raw})
 			signer, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
-			sassert.NoError(t, err)
+			require.NoError(t, err)
 			jwk, err := jose.GenerateJWK("EC", "P-256", "ES256", "sig", "", 0)
-			sassert.NoError(t, err)
+			require.NoError(t, err)
 			token := "token"
 			keyAuth, err := KeyAuthorization(token, jwk)
-			sassert.NoError(t, err)
+			require.NoError(t, err)
 			keyAuthSum := sha256.Sum256([]byte(keyAuth))
 			sig, err := signer.Sign(rand.Reader, keyAuthSum[:], crypto.SHA256)
-			sassert.NoError(t, err)
+			require.NoError(t, err)
 			cborSig, err := cbor.Marshal(sig)
-			sassert.NoError(t, err)
+			require.NoError(t, err)
 			ctx := NewProvisionerContext(context.Background(), mustAttestationProvisioner(t, caRoot))
 			attObj, err := cbor.Marshal(struct {
 				Format       string                 `json:"fmt"`
@@ -3570,13 +3608,13 @@ func Test_deviceAttest01Validate(t *testing.T) {
 					"sig": cborSig,
 				},
 			})
-			sassert.NoError(t, err)
+			require.NoError(t, err)
 			payload, err := json.Marshal(struct {
 				AttObj string `json:"attObj"`
 			}{
 				AttObj: base64.RawURLEncoding.EncodeToString(attObj),
 			})
-			sassert.NoError(t, err)
+			require.NoError(t, err)
 			return test{
 				args: args{
 					ctx: ctx,
@@ -3590,19 +3628,19 @@ func Test_deviceAttest01Validate(t *testing.T) {
 					payload: payload,
 					db: &MockDB{
 						MockUpdateChallenge: func(ctx context.Context, updch *Challenge) error {
-							sassert.Equal(t, "chID", updch.ID)
-							sassert.Equal(t, "token", updch.Token)
-							sassert.Equal(t, StatusInvalid, updch.Status)
-							sassert.Equal(t, ChallengeType("device-attest-01"), updch.Type)
-							sassert.Equal(t, "12345678", updch.Value)
+							assert.Equal(t, "chID", updch.ID)
+							assert.Equal(t, "token", updch.Token)
+							assert.Equal(t, StatusInvalid, updch.Status)
+							assert.Equal(t, ChallengeType("device-attest-01"), updch.Type)
+							assert.Equal(t, "12345678", updch.Value)
 
 							err := NewError(ErrorBadAttestationStatementType, "x5c not present")
 
-							sassert.EqualError(t, updch.Error.Err, err.Err.Error())
-							sassert.Equal(t, err.Type, updch.Error.Type)
-							sassert.Equal(t, err.Detail, updch.Error.Detail)
-							sassert.Equal(t, err.Status, updch.Error.Status)
-							sassert.Equal(t, err.Detail, updch.Error.Detail)
+							assert.EqualError(t, updch.Error.Err, err.Err.Error())
+							assert.Equal(t, err.Type, updch.Error.Type)
+							assert.Equal(t, err.Detail, updch.Error.Detail)
+							assert.Equal(t, err.Status, updch.Error.Status)
+							assert.Equal(t, err.Subproblems, updch.Error.Subproblems)
 
 							return nil
 						},
@@ -3613,20 +3651,20 @@ func Test_deviceAttest01Validate(t *testing.T) {
 		},
 		"ok/doStepAttestationFormat-non-matching-identifier": func(t *testing.T) test {
 			ca, err := minica.New()
-			sassert.NoError(t, err)
+			require.NoError(t, err)
 			caRoot := pem.EncodeToMemory(&pem.Block{Type: "CERTIFICATE", Bytes: ca.Root.Raw})
 			signer, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
-			sassert.NoError(t, err)
+			require.NoError(t, err)
 			jwk, err := jose.GenerateJWK("EC", "P-256", "ES256", "sig", "", 0)
-			sassert.NoError(t, err)
+			require.NoError(t, err)
 			token := "token"
 			keyAuth, err := KeyAuthorization(token, jwk)
-			sassert.NoError(t, err)
+			require.NoError(t, err)
 			keyAuthSum := sha256.Sum256([]byte(keyAuth))
 			sig, err := signer.Sign(rand.Reader, keyAuthSum[:], crypto.SHA256)
-			sassert.NoError(t, err)
+			require.NoError(t, err)
 			cborSig, err := cbor.Marshal(sig)
-			sassert.NoError(t, err)
+			require.NoError(t, err)
 			ctx := NewProvisionerContext(context.Background(), mustAttestationProvisioner(t, caRoot))
 			makeLeaf := func(signer crypto.Signer, serialNumber []byte) *x509.Certificate {
 				leaf, err := ca.Sign(&x509.Certificate{
@@ -3641,9 +3679,9 @@ func Test_deviceAttest01Validate(t *testing.T) {
 				}
 				return leaf
 			}
-			sassert.NoError(t, err)
+			require.NoError(t, err)
 			serialNumber, err := asn1.Marshal(87654321)
-			sassert.NoError(t, err)
+			require.NoError(t, err)
 			leaf := makeLeaf(signer, serialNumber)
 			attObj, err := cbor.Marshal(struct {
 				Format       string                 `json:"fmt"`
@@ -3656,13 +3694,13 @@ func Test_deviceAttest01Validate(t *testing.T) {
 					"sig": cborSig,
 				},
 			})
-			sassert.NoError(t, err)
+			require.NoError(t, err)
 			payload, err := json.Marshal(struct {
 				AttObj string `json:"attObj"`
 			}{
 				AttObj: base64.RawURLEncoding.EncodeToString(attObj),
 			})
-			sassert.NoError(t, err)
+			require.NoError(t, err)
 			return test{
 				args: args{
 					ctx: ctx,
@@ -3676,11 +3714,11 @@ func Test_deviceAttest01Validate(t *testing.T) {
 					payload: payload,
 					db: &MockDB{
 						MockUpdateChallenge: func(ctx context.Context, updch *Challenge) error {
-							sassert.Equal(t, "chID", updch.ID)
-							sassert.Equal(t, "token", updch.Token)
-							sassert.Equal(t, StatusInvalid, updch.Status)
-							sassert.Equal(t, ChallengeType("device-attest-01"), updch.Type)
-							sassert.Equal(t, "12345678", updch.Value)
+							assert.Equal(t, "chID", updch.ID)
+							assert.Equal(t, "token", updch.Token)
+							assert.Equal(t, StatusInvalid, updch.Status)
+							assert.Equal(t, ChallengeType("device-attest-01"), updch.Type)
+							assert.Equal(t, "12345678", updch.Value)
 
 							err := NewError(ErrorBadAttestationStatementType, "permanent identifier does not match").
 								AddSubproblems(NewSubproblemWithIdentifier(
@@ -3689,12 +3727,11 @@ func Test_deviceAttest01Validate(t *testing.T) {
 									"challenge identifier \"12345678\" doesn't match the attested hardware identifier \"87654321\"",
 								))
 
-							sassert.EqualError(t, updch.Error.Err, err.Err.Error())
-							sassert.Equal(t, err.Type, updch.Error.Type)
-							sassert.Equal(t, err.Detail, updch.Error.Detail)
-							sassert.Equal(t, err.Status, updch.Error.Status)
-							sassert.Equal(t, err.Detail, updch.Error.Detail)
-							sassert.Equal(t, err.Subproblems, updch.Error.Subproblems)
+							assert.EqualError(t, updch.Error.Err, err.Err.Error())
+							assert.Equal(t, err.Type, updch.Error.Type)
+							assert.Equal(t, err.Detail, updch.Error.Detail)
+							assert.Equal(t, err.Status, updch.Error.Status)
+							assert.Equal(t, err.Subproblems, updch.Error.Subproblems)
 
 							return nil
 						},
@@ -3706,19 +3743,19 @@ func Test_deviceAttest01Validate(t *testing.T) {
 		},
 		"ok/unknown-attestation-format": func(t *testing.T) test {
 			ca, err := minica.New()
-			sassert.NoError(t, err)
+			require.NoError(t, err)
 			signer, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
-			sassert.NoError(t, err)
+			require.NoError(t, err)
 			jwk, err := jose.GenerateJWK("EC", "P-256", "ES256", "sig", "", 0)
-			sassert.NoError(t, err)
+			require.NoError(t, err)
 			token := "token"
 			keyAuth, err := KeyAuthorization(token, jwk)
-			sassert.NoError(t, err)
+			require.NoError(t, err)
 			keyAuthSum := sha256.Sum256([]byte(keyAuth))
 			sig, err := signer.Sign(rand.Reader, keyAuthSum[:], crypto.SHA256)
-			sassert.NoError(t, err)
+			require.NoError(t, err)
 			cborSig, err := cbor.Marshal(sig)
-			sassert.NoError(t, err)
+			require.NoError(t, err)
 			ctx := NewProvisionerContext(context.Background(), mustNonAttestationProvisioner(t))
 			makeLeaf := func(signer crypto.Signer, serialNumber []byte) *x509.Certificate {
 				leaf, err := ca.Sign(&x509.Certificate{
@@ -3733,9 +3770,9 @@ func Test_deviceAttest01Validate(t *testing.T) {
 				}
 				return leaf
 			}
-			sassert.NoError(t, err)
+			require.NoError(t, err)
 			serialNumber, err := asn1.Marshal(87654321)
-			sassert.NoError(t, err)
+			require.NoError(t, err)
 			leaf := makeLeaf(signer, serialNumber)
 			attObj, err := cbor.Marshal(struct {
 				Format       string                 `json:"fmt"`
@@ -3748,13 +3785,13 @@ func Test_deviceAttest01Validate(t *testing.T) {
 					"sig": cborSig,
 				},
 			})
-			sassert.NoError(t, err)
+			require.NoError(t, err)
 			payload, err := json.Marshal(struct {
 				AttObj string `json:"attObj"`
 			}{
 				AttObj: base64.RawURLEncoding.EncodeToString(attObj),
 			})
-			sassert.NoError(t, err)
+			require.NoError(t, err)
 			return test{
 				args: args{
 					ctx: ctx,
@@ -3768,20 +3805,19 @@ func Test_deviceAttest01Validate(t *testing.T) {
 					payload: payload,
 					db: &MockDB{
 						MockUpdateChallenge: func(ctx context.Context, updch *Challenge) error {
-							sassert.Equal(t, "chID", updch.ID)
-							sassert.Equal(t, "token", updch.Token)
-							sassert.Equal(t, StatusInvalid, updch.Status)
-							sassert.Equal(t, ChallengeType("device-attest-01"), updch.Type)
-							sassert.Equal(t, "12345678", updch.Value)
+							assert.Equal(t, "chID", updch.ID)
+							assert.Equal(t, "token", updch.Token)
+							assert.Equal(t, StatusInvalid, updch.Status)
+							assert.Equal(t, ChallengeType("device-attest-01"), updch.Type)
+							assert.Equal(t, "12345678", updch.Value)
 
 							err := NewError(ErrorBadAttestationStatementType, "unexpected attestation object format")
 
-							sassert.EqualError(t, updch.Error.Err, err.Err.Error())
-							sassert.Equal(t, err.Type, updch.Error.Type)
-							sassert.Equal(t, err.Detail, updch.Error.Detail)
-							sassert.Equal(t, err.Status, updch.Error.Status)
-							sassert.Equal(t, err.Detail, updch.Error.Detail)
-							sassert.Equal(t, err.Subproblems, updch.Error.Subproblems)
+							assert.EqualError(t, updch.Error.Err, err.Err.Error())
+							assert.Equal(t, err.Type, updch.Error.Type)
+							assert.Equal(t, err.Detail, updch.Error.Detail)
+							assert.Equal(t, err.Status, updch.Error.Status)
+							assert.Equal(t, err.Subproblems, updch.Error.Subproblems)
 
 							return nil
 						},
@@ -3793,20 +3829,20 @@ func Test_deviceAttest01Validate(t *testing.T) {
 		},
 		"fail/db.UpdateChallenge": func(t *testing.T) test {
 			ca, err := minica.New()
-			sassert.NoError(t, err)
+			require.NoError(t, err)
 			caRoot := pem.EncodeToMemory(&pem.Block{Type: "CERTIFICATE", Bytes: ca.Root.Raw})
 			signer, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
-			sassert.NoError(t, err)
+			require.NoError(t, err)
 			jwk, err := jose.GenerateJWK("EC", "P-256", "ES256", "sig", "", 0)
-			sassert.NoError(t, err)
+			require.NoError(t, err)
 			token := "token"
 			keyAuth, err := KeyAuthorization(token, jwk)
-			sassert.NoError(t, err)
+			require.NoError(t, err)
 			keyAuthSum := sha256.Sum256([]byte(keyAuth))
 			sig, err := signer.Sign(rand.Reader, keyAuthSum[:], crypto.SHA256)
-			sassert.NoError(t, err)
+			require.NoError(t, err)
 			cborSig, err := cbor.Marshal(sig)
-			sassert.NoError(t, err)
+			require.NoError(t, err)
 			ctx := NewProvisionerContext(context.Background(), mustAttestationProvisioner(t, caRoot))
 			makeLeaf := func(signer crypto.Signer, serialNumber []byte) *x509.Certificate {
 				leaf, err := ca.Sign(&x509.Certificate{
@@ -3821,9 +3857,9 @@ func Test_deviceAttest01Validate(t *testing.T) {
 				}
 				return leaf
 			}
-			sassert.NoError(t, err)
+			require.NoError(t, err)
 			serialNumber, err := asn1.Marshal(12345678)
-			sassert.NoError(t, err)
+			require.NoError(t, err)
 			leaf := makeLeaf(signer, serialNumber)
 			attObj, err := cbor.Marshal(struct {
 				Format       string                 `json:"fmt"`
@@ -3836,13 +3872,13 @@ func Test_deviceAttest01Validate(t *testing.T) {
 					"sig": cborSig,
 				},
 			})
-			sassert.NoError(t, err)
+			require.NoError(t, err)
 			payload, err := json.Marshal(struct {
 				AttObj string `json:"attObj"`
 			}{
 				AttObj: base64.RawURLEncoding.EncodeToString(attObj),
 			})
-			sassert.NoError(t, err)
+			require.NoError(t, err)
 			return test{
 				args: args{
 					ctx: ctx,
@@ -3856,11 +3892,11 @@ func Test_deviceAttest01Validate(t *testing.T) {
 					payload: payload,
 					db: &MockDB{
 						MockUpdateChallenge: func(ctx context.Context, updch *Challenge) error {
-							sassert.Equal(t, "chID", updch.ID)
-							sassert.Equal(t, "token", updch.Token)
-							sassert.Equal(t, StatusValid, updch.Status)
-							sassert.Equal(t, ChallengeType("device-attest-01"), updch.Type)
-							sassert.Equal(t, "12345678", updch.Value)
+							assert.Equal(t, "chID", updch.ID)
+							assert.Equal(t, "token", updch.Token)
+							assert.Equal(t, StatusValid, updch.Status)
+							assert.Equal(t, ChallengeType("device-attest-01"), updch.Type)
+							assert.Equal(t, "12345678", updch.Value)
 
 							return errors.New("force")
 						},
@@ -3870,20 +3906,97 @@ func Test_deviceAttest01Validate(t *testing.T) {
 				wantErr: NewError(ErrorServerInternalType, "error updating challenge: force"),
 			}
 		},
+		"ok": func(t *testing.T) test {
+			ca, err := minica.New()
+			require.NoError(t, err)
+			caRoot := pem.EncodeToMemory(&pem.Block{Type: "CERTIFICATE", Bytes: ca.Root.Raw})
+			signer, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
+			require.NoError(t, err)
+			jwk, err := jose.GenerateJWK("EC", "P-256", "ES256", "sig", "", 0)
+			require.NoError(t, err)
+			token := "token"
+			keyAuth, err := KeyAuthorization(token, jwk)
+			require.NoError(t, err)
+			keyAuthSum := sha256.Sum256([]byte(keyAuth))
+			sig, err := signer.Sign(rand.Reader, keyAuthSum[:], crypto.SHA256)
+			require.NoError(t, err)
+			cborSig, err := cbor.Marshal(sig)
+			require.NoError(t, err)
+			ctx := NewProvisionerContext(context.Background(), mustAttestationProvisioner(t, caRoot))
+			makeLeaf := func(signer crypto.Signer, serialNumber []byte) *x509.Certificate {
+				leaf, err := ca.Sign(&x509.Certificate{
+					Subject:   pkix.Name{CommonName: "attestation cert"},
+					PublicKey: signer.Public(),
+					ExtraExtensions: []pkix.Extension{
+						{Id: oidYubicoSerialNumber, Value: serialNumber},
+					},
+				})
+				if err != nil {
+					t.Fatal(err)
+				}
+				return leaf
+			}
+			require.NoError(t, err)
+			serialNumber, err := asn1.Marshal(12345678)
+			require.NoError(t, err)
+			leaf := makeLeaf(signer, serialNumber)
+			attObj, err := cbor.Marshal(struct {
+				Format       string                 `json:"fmt"`
+				AttStatement map[string]interface{} `json:"attStmt,omitempty"`
+			}{
+				Format: "step",
+				AttStatement: map[string]interface{}{
+					"x5c": []interface{}{leaf.Raw, ca.Intermediate.Raw},
+					"alg": -7,
+					"sig": cborSig,
+				},
+			})
+			require.NoError(t, err)
+			payload, err := json.Marshal(struct {
+				AttObj string `json:"attObj"`
+			}{
+				AttObj: base64.RawURLEncoding.EncodeToString(attObj),
+			})
+			require.NoError(t, err)
+			return test{
+				args: args{
+					ctx: ctx,
+					ch: &Challenge{
+						ID:     "chID",
+						Token:  "token",
+						Type:   "device-attest-01",
+						Status: StatusPending,
+						Value:  "12345678",
+					},
+					payload: payload,
+					db: &MockDB{
+						MockUpdateChallenge: func(ctx context.Context, updch *Challenge) error {
+							assert.Equal(t, "chID", updch.ID)
+							assert.Equal(t, "token", updch.Token)
+							assert.Equal(t, StatusValid, updch.Status)
+							assert.Equal(t, ChallengeType("device-attest-01"), updch.Type)
+							assert.Equal(t, "12345678", updch.Value)
+
+							return nil
+						},
+					},
+					jwk: jwk,
+				},
+				wantErr: nil,
+			}
+		},
 	}
 	for name, run := range tests {
 		t.Run(name, func(t *testing.T) {
 			tc := run(t)
 
 			if err := deviceAttest01Validate(tc.args.ctx, tc.args.ch, tc.args.db, tc.args.jwk, tc.args.payload); err != nil {
-				sassert.NotNil(t, tc.wantErr)
-				sassert.EqualError(t, tc.wantErr, err.Error())
+				assert.Error(t, tc.wantErr)
+				assert.EqualError(t, err, tc.wantErr.Error())
 				return
 			}
 
-			sassert.Nil(t, tc.wantErr)
-
-			// TODO: more validations?
+			assert.Nil(t, tc.wantErr)
 		})
 	}
 }
