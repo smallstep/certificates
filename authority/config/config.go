@@ -213,6 +213,9 @@ func (c *AuthConfig) Validate(audiences provisioner.Audiences) error {
 func LoadConfiguration(filename string) (*Config, error) {
 	f, err := os.Open(filename)
 	if err != nil {
+		fmt.Println("step-ca can't find or open the configuration file for your CA.")
+		fmt.Println("You may need to create a CA first by running `step ca init`.")
+		fmt.Println("Documentation: https://u.step.sm/docs/ca\n")
 		return nil, errors.Wrapf(err, "error opening %s", filename)
 	}
 	defer f.Close()
