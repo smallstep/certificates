@@ -19,6 +19,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"log"
 	"net"
 	"net/url"
 	"os"
@@ -349,6 +350,7 @@ func dns01Validate(ctx context.Context, ch *Challenge, db DB, jwk *jose.JSONWebK
 }
 
 func wireOIDC01Validate(ctx context.Context, ch *Challenge, db DB, jwk *jose.JSONWebKey, payload []byte) error {
+	log.Print("wireOIDC01Validate")
 	prov, ok := ProvisionerFromContext(ctx)
 	if !ok {
 		return NewErrorISE("no provisioner provided")
@@ -408,18 +410,23 @@ func wireOIDC01Validate(ctx context.Context, ch *Challenge, db DB, jwk *jose.JSO
 		return storeError(ctx, db, ch, false, NewError(ErrorRejectedIdentifierType, "OIDC claims don't match"))
 	}
 
+	log.Print("updating valid challenge")
+
 	// Update and store the challenge.
 	ch.Status = StatusValid
 	ch.Error = nil
 	ch.ValidatedAt = clock.Now().Format(time.RFC3339)
 
 	if err = db.UpdateChallenge(ctx, ch); err != nil {
+		log.Printf("error updating challenge: %s", err)
 		return WrapErrorISE(err, "error updating challenge")
 	}
+	log.Print("finishing")
 	return nil
 }
 
 func wireDPOP01Validate(ctx context.Context, ch *Challenge, db DB, jwk *jose.JSONWebKey, payload []byte) error {
+	log.Print("wireDPOP01Validate")
 	provisioner, ok := ProvisionerFromContext(ctx)
 	if !ok {
 		return NewErrorISE("missing provisioner")
@@ -490,6 +497,22 @@ func wireDPOP01Validate(ctx context.Context, ch *Challenge, db DB, jwk *jose.JSO
 
 	err = cmd.Wait()
 	if err != nil {
+		log.Printf("clientID: %s, cli: %s %s %s %s %s %s %s %s %s %s %s %s %s %s", challengeValues.ClientID,
+			provisioner.GetOptions().GetDPOPOptions().GetValidationExecPath(),
+			"verify-access",
+			"--client-id",
+			challengeValues.ClientID,
+			"--challenge",
+			ch.ID,
+			"--leeway",
+			"360",
+			"--max-expiry",
+			strconv.FormatInt(time.Now().Add(time.Hour*24*365).Unix(), 10),
+			"--hash-algorithm",
+			`"SHA-256"`,
+			"--key",
+			file.Name(),
+		)
 		return storeError(ctx, db, ch, true, NewError(ErrorRejectedIdentifierType, "error finishing validation: %s", err))
 	}
 
