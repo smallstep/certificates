@@ -34,7 +34,6 @@ import (
 	"github.com/smallstep/certificates/wire"
 	"go.step.sm/crypto/jose"
 	"go.step.sm/crypto/pemutil"
-	"golang.org/x/oauth2"
 )
 
 type ChallengeType string
@@ -356,26 +355,13 @@ func wireOIDC01Validate(ctx context.Context, ch *Challenge, db DB, jwk *jose.JSO
 		return NewErrorISE("no provisioner provided")
 	}
 
-	var token oauth2.Token
-	err := json.Unmarshal(payload, &token)
-	if err != nil {
-		return storeError(ctx, db, ch, false, WrapError(ErrorRejectedIdentifierType, err,
-			"error unmarshalling OpenID token"))
-	}
-
-	idTokenRaw, ok := token.Extra("id_token").(string)
-	if !ok {
-		return storeError(ctx, db, ch, false, WrapError(ErrorRejectedIdentifierType, err,
-			"error retrieving ID token from OAUTH2 token"))
-	}
-
 	oidcOptions := prov.GetOptions().GetOIDCOptions()
 	idToken, err := oidcOptions.
 		GetProvider(ctx).
 		Verifier(
 			oidcOptions.
 				GetConfig()).
-		Verify(ctx, idTokenRaw)
+		Verify(ctx, string(payload))
 	if err != nil {
 		return storeError(ctx, db, ch, false, WrapError(ErrorRejectedIdentifierType, err,
 			"error verifying ID token signature"))
