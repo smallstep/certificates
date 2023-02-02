@@ -40,7 +40,7 @@ func (o *OIDCOptions) GetProvider(ctx context.Context) *oidc.Provider {
 
 func (o *OIDCOptions) GetConfig() *oidc.Config {
 	if o == nil {
-		return nil
+		return &oidc.Config{}
 	}
 	config := oidc.Config(o.Config)
 	return &config
