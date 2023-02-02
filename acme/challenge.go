@@ -372,12 +372,8 @@ func wireOIDC01Validate(ctx context.Context, ch *Challenge, db DB, jwk *jose.JSO
 	log.Printf("id_token: %s", wireChallengePayload.IdToken)
 
 	oidcOptions := prov.GetOptions().GetOIDCOptions()
-	idToken, err := oidcOptions.
-		GetProvider(ctx).
-		Verifier(
-			oidcOptions.
-				GetConfig()).
-		Verify(ctx, wireChallengePayload.IdToken)
+	log.Printf("oidc_options: %#v", oidcOptions)
+	idToken, err := oidcOptions.GetProvider(ctx).Verifier(oidcOptions.GetConfig()).Verify(ctx, wireChallengePayload.IdToken)
 	if err != nil {
 		return storeError(ctx, db, ch, false, WrapError(ErrorRejectedIdentifierType, err,
 			"error verifying ID token signature"))
