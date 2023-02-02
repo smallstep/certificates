@@ -95,9 +95,10 @@ inject:
                     id_token_signing_alg_values_supported: ""
                   config:
                     client-id: ""
-                    support-signing-algs: ""
+                    support-signing-algs: []
                 dpop:
                   validation-exec-path: "/usr/local/bin/rusty-jwt-cli"
+                  key: ""
               forceCN: true
               claims: {}
         tls:
