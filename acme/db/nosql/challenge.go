@@ -6,8 +6,10 @@ import (
 	"time"
 
 	"github.com/pkg/errors"
-	"github.com/smallstep/certificates/acme"
+
 	"github.com/smallstep/nosql"
+
+	"github.com/smallstep/certificates/acme"
 )
 
 type dbChallenge struct {
@@ -19,7 +21,7 @@ type dbChallenge struct {
 	Value       string             `json:"value"`
 	ValidatedAt string             `json:"validatedAt"`
 	CreatedAt   time.Time          `json:"createdAt"`
-	Error       *acme.Error        `json:"error"`
+	Error       *acme.Error        `json:"error"` // TODO(hs): a bit dangerous; should become db-specific type
 }
 
 func (dbc *dbChallenge) clone() *dbChallenge {

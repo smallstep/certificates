@@ -1090,7 +1090,6 @@ func TestHandler_RevokeCert(t *testing.T) {
 
 				assert.Equals(t, ae.Type, tc.err.Type)
 				assert.Equals(t, ae.Detail, tc.err.Detail)
-				assert.Equals(t, ae.Identifier, tc.err.Identifier)
 				assert.Equals(t, ae.Subproblems, tc.err.Subproblems)
 				assert.Equals(t, res.Header["Content-Type"], []string{"application/problem+json"})
 			} else {
@@ -1230,7 +1229,6 @@ func TestHandler_isAccountAuthorized(t *testing.T) {
 			assert.Equals(t, acmeErr.Type, tc.err.Type)
 			assert.Equals(t, acmeErr.Status, tc.err.Status)
 			assert.Equals(t, acmeErr.Detail, tc.err.Detail)
-			assert.Equals(t, acmeErr.Identifier, tc.err.Identifier)
 			assert.Equals(t, acmeErr.Subproblems, tc.err.Subproblems)
 
 		})
@@ -1323,7 +1321,6 @@ func Test_wrapUnauthorizedError(t *testing.T) {
 			assert.Equals(t, acmeErr.Type, tc.want.Type)
 			assert.Equals(t, acmeErr.Status, tc.want.Status)
 			assert.Equals(t, acmeErr.Detail, tc.want.Detail)
-			assert.Equals(t, acmeErr.Identifier, tc.want.Identifier)
 			assert.Equals(t, acmeErr.Subproblems, tc.want.Subproblems)
 		})
 	}
