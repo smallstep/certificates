@@ -432,10 +432,7 @@ func wireDPOP01Validate(ctx context.Context, ch *Challenge, db DB, jwk *jose.JSO
 		return NewErrorISE("missing provisioner")
 	}
 
-	key, ok := jwk.Key.(ed25519.PublicKey)
-	if !ok {
-		return NewErrorISE("key is not ED25519")
-	}
+	key := ed25519.PublicKey([]byte(provisioner.GetOptions().GetDPOPOptions().GetSigningKey()))
 
 	var wireChallengePayload WireChallengePayload
 	err := json.Unmarshal(payload, &wireChallengePayload)
