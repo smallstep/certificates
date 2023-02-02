@@ -27,15 +27,35 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
 
 ## [Unreleased]
 
+## [v0.23.2] - 2023-02-02
+
+### Added
+
+- Added [`step-kms-plugin`](https://github.com/smallstep/step-kms-plugin) to
+  docker images, and a new image, `smallstep/step-ca-hsm`, compiled with cgo
+  (smallstep/certificates#1243).
+- Added [`scoop`](https://scoop.sh) packages back to the release
+  (smallstep/certificates#1250).
+- Added optional flag `--pidfile` which allows passing a filename where step-ca
+  will write its process id (smallstep/certificates#1251).
+- Added helpful message on CA startup when config can't be opened
+  (smallstep/certificates#1252).
+- Improved validation and error messages on `device-attest-01` orders
+  (smallstep/certificates#1235).
+
 ### Removed
 
 - The deprecated CLI utils `step-awskms-init`, `step-cloudkms-init`,
   `step-pkcs11-init`, `step-yubikey-init` have been removed.
   [`step`](https://github.com/smallstep/cli) and
   [`step-kms-plugin`](https://github.com/smallstep/step-kms-plugin) should be
-  used instead.
+  used instead (smallstep/certificates#1240).
 
-## [v0.23.1] - 2022-01-10
+### Fixed
+
+- Fixed remote management flags in docker images (smallstep/certificates#1228).
+
+## [v0.23.1] - 2023-01-10
 
 ### Added
 
