@@ -38,6 +38,10 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
   (smallstep/certificates#1250).
 - Added optional flag `--pidfile` which allows passing a filename where step-ca
   will write its process id (smallstep/certificates#1251).
+- Added helpful message on CA startup when config can't be opened
+  (smallstep/certificates#1252).
+- Improved validation and error messages on `device-attest-01` orders
+  (smallstep/certificates#1235).
 
 ### Removed
 
