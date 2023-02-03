@@ -467,7 +467,7 @@ func wireDPOP01Validate(ctx context.Context, ch *Challenge, db DB, jwk *jose.JSO
 		"--client-id",
 		challengeValues.ClientID,
 		"--challenge",
-		ch.ID,
+		ch.Token,
 		"--leeway",
 		"360",
 		"--max-expiry",
@@ -500,15 +500,14 @@ func wireDPOP01Validate(ctx context.Context, ch *Challenge, db DB, jwk *jose.JSO
 
 	err = cmd.Wait()
 	if err != nil {
-		log.Printf("access_token: %s, clientID: %s, cli: %s %s %s %s %s %s %s %s %s %s %s %s %s %s",
+		log.Printf("access_token: %s, cli: %s %s %s %s %s %s %s %s %s %s %s %s %s %s",
 			wireChallengePayload.AccessToken,
-			challengeValues.ClientID,
 			provisioner.GetOptions().GetDPOPOptions().GetValidationExecPath(),
 			"verify-access",
 			"--client-id",
 			challengeValues.ClientID,
 			"--challenge",
-			ch.ID,
+			ch.Token,
 			"--leeway",
 			"360",
 			"--max-expiry",
