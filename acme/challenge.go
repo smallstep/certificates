@@ -461,13 +461,14 @@ func wireDPOP01Validate(ctx context.Context, ch *Challenge, db DB, jwk *jose.JSO
 
 	buf := new(bytes.Buffer)
 	buf.ReadFrom(file)
-	fmt.Print(buf.String())
+	log.Printf("key: %s", buf.String())
 
 	challengeValues, err := wire.ParseID([]byte(ch.Value))
 	if err != nil {
 		return WrapErrorISE(err, "error unmarshalling challenge data")
 	}
 
+	expiry := strconv.FormatInt(time.Now().Add(time.Hour*24*365).Unix(), 10)
 	cmd := exec.CommandContext(
 		ctx,
 		provisioner.GetOptions().GetDPOPOptions().GetValidationExecPath(),
@@ -479,12 +480,14 @@ func wireDPOP01Validate(ctx context.Context, ch *Challenge, db DB, jwk *jose.JSO
 		"--leeway",
 		"360",
 		"--max-expiry",
-		strconv.FormatInt(time.Now().Add(time.Hour*24*365).Unix(), 10),
+		expiry,
 		"--hash-algorithm",
 		`"SHA-256"`,
 		"--key",
 		file.Name(),
 	)
+
+	cmd.Env = append(os.Environ(), "RUST_BACKTRACE=1")
 
 	stdin, err := cmd.StdinPipe()
 	if err != nil {
@@ -506,12 +509,12 @@ func wireDPOP01Validate(ctx context.Context, ch *Challenge, db DB, jwk *jose.JSO
 		return WrapErrorISE(err, "error closing stdin")
 	}
 
+	out, err := cmd.Output()
+	fmt.Printf("cli output: %s\n", out)
+
 	err = cmd.Wait()
 	if err != nil {
-		log.Printf("access_token: %s, cli: %s %s %s %s %s %s %s %s %s %s %s %s %s %s",
-			wireChallengePayload.AccessToken,
-			provisioner.GetOptions().GetDPOPOptions().GetValidationExecPath(),
-			"verify-access",
+		log.Printf("cli: %s %s %s %s %s %s %s %s",
 			"--client-id",
 			challengeValues.ClientID,
 			"--challenge",
@@ -519,12 +522,9 @@ func wireDPOP01Validate(ctx context.Context, ch *Challenge, db DB, jwk *jose.JSO
 			"--leeway",
 			"360",
 			"--max-expiry",
-			strconv.FormatInt(time.Now().Add(time.Hour*24*365).Unix(), 10),
-			"--hash-algorithm",
-			`"SHA-256"`,
-			"--key",
-			file.Name(),
+			expiry,
 		)
+
 		return storeError(ctx, db, ch, true, NewError(ErrorRejectedIdentifierType, "error finishing validation: %s", err))
 	}
 
