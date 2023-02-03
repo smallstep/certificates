@@ -1,6 +1,7 @@
 package acme
 
 import (
+	"bytes"
 	"context"
 	"crypto"
 	"crypto/ecdsa"
@@ -448,6 +449,8 @@ func wireDPOP01Validate(ctx context.Context, ch *Challenge, db DB, jwk *jose.JSO
 	defer file.Close()
 	defer os.Remove(file.Name())
 
+	log.Printf("key: %s", key)
+
 	err = pem.Encode(file, &pem.Block{
 		Type:  "PUBLIC KEY",
 		Bytes: key,
@@ -455,6 +458,10 @@ func wireDPOP01Validate(ctx context.Context, ch *Challenge, db DB, jwk *jose.JSO
 	if err != nil {
 		return NewErrorISE("could not PEM-encode public key")
 	}
+
+	buf := new(bytes.Buffer)
+	buf.ReadFrom(file)
+	fmt.Print(buf.String())
 
 	challengeValues, err := wire.ParseID([]byte(ch.Value))
 	if err != nil {
