@@ -489,7 +489,7 @@ func wireDPOP01Validate(ctx context.Context, ch *Challenge, db DB, jwk *jose.JSO
 		"--max-expiry",
 		expiry,
 		"--hash-algorithm",
-		`"SHA-256"`,
+		`SHA-256`,
 		"--key",
 		file.Name(),
 	)
