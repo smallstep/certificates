@@ -17,7 +17,6 @@ import (
 	"encoding/base64"
 	"encoding/hex"
 	"encoding/json"
-	"encoding/pem"
 	"errors"
 	"fmt"
 	"io"
@@ -432,7 +431,8 @@ func wireDPOP01Validate(ctx context.Context, ch *Challenge, db DB, jwk *jose.JSO
 		return NewErrorISE("missing provisioner")
 	}
 
-	key := ed25519.PublicKey([]byte(provisioner.GetOptions().GetDPOPOptions().GetSigningKey()))
+	//key := ed25519.PublicKey([]byte(provisioner.GetOptions().GetDPOPOptions().GetSigningKey()))
+	key := provisioner.GetOptions().GetDPOPOptions().GetSigningKey()
 
 	var wireChallengePayload WireChallengePayload
 	err := json.Unmarshal(payload, &wireChallengePayload)
@@ -453,14 +453,16 @@ func wireDPOP01Validate(ctx context.Context, ch *Challenge, db DB, jwk *jose.JSO
 	log.Printf("key: %s", key)
 
 	buf := bytes.NewBuffer(nil)
-	err = pem.Encode(buf, &pem.Block{
+	/*err = pem.Encode(buf, &pem.Block{
 		Type:  "PUBLIC KEY",
 		Bytes: key,
 	})
 	if err != nil {
 		return NewErrorISE("could not PEM-encode public key")
 	}
-	log.Print("key PEM encoded: ", buf.String())
+	log.Print("key PEM encoded: ", buf.String())*/
+
+	buf.WriteString(key)
 
 	n, err := file.Write(buf.Bytes())
 	if err != nil {
