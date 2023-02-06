@@ -370,11 +370,14 @@ func wireOIDC01Validate(ctx context.Context, ch *Challenge, db DB, jwk *jose.JSO
 			"error unmarshalling Wire challenge payload"))
 	}
 
-	log.Printf("id_token: %s", wireChallengePayload.IdToken)
+	log.Printf("before verify id_token: %s", wireChallengePayload.IdToken)
 
 	oidcOptions := prov.GetOptions().GetOIDCOptions()
 	log.Printf("oidc_options: %#v", oidcOptions)
 	idToken, err := oidcOptions.GetProvider(ctx).Verifier(oidcOptions.GetConfig()).Verify(ctx, wireChallengePayload.IdToken)
+
+	log.Printf("after verify id_token: %s", idToken)
+
 	if err != nil {
 		return storeError(ctx, db, ch, false, WrapError(ErrorRejectedIdentifierType, err,
 			"error verifying ID token signature"))
@@ -385,7 +388,11 @@ func wireOIDC01Validate(ctx context.Context, ch *Challenge, db DB, jwk *jose.JSO
 		Handle  string `json:"handle"`
 		KeyAuth string `json:"keyauth"`
 	}
+
 	err = idToken.Claims(&claims)
+
+	log.Printf("claims: %+v", claims)
+
 	if err != nil {
 		return storeError(ctx, db, ch, false, WrapError(ErrorRejectedIdentifierType, err,
 			"error retrieving claims from ID token"))
