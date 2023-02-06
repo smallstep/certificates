@@ -1,6 +1,7 @@
 package acme
 
 import (
+	"bufio"
 	"bytes"
 	"context"
 	"crypto"
@@ -451,17 +452,23 @@ func wireDPOP01Validate(ctx context.Context, ch *Challenge, db DB, jwk *jose.JSO
 
 	log.Printf("key: %s", key)
 
-	err = pem.Encode(file, &pem.Block{
+	buf := bytes.NewBuffer(nil)
+	err = pem.Encode(buf, &pem.Block{
 		Type:  "PUBLIC KEY",
 		Bytes: key,
 	})
 	if err != nil {
 		return NewErrorISE("could not PEM-encode public key")
 	}
+	log.Print("key PEM encoded: ", buf.String())
 
-	buf := new(bytes.Buffer)
-	buf.ReadFrom(file)
-	log.Printf("key: %s", buf.String())
+	n, err := file.Write(buf.Bytes())
+	if err != nil {
+		log.Print("writing to key file:", err)
+	}
+	if n != buf.Len() {
+		log.Printf("expected to write %d characters to the key file, got %d", buf.Len(), n)
+	}
 
 	challengeValues, err := wire.ParseID([]byte(ch.Value))
 	if err != nil {
@@ -489,6 +496,36 @@ func wireDPOP01Validate(ctx context.Context, ch *Challenge, db DB, jwk *jose.JSO
 
 	cmd.Env = append(os.Environ(), "RUST_BACKTRACE=1")
 
+	go func() {
+		stdout, err := cmd.StdoutPipe()
+		if err != nil {
+			log.Print("start merging stdout:", err)
+			return
+		}
+		scanner := bufio.NewScanner(stdout)
+		for scanner.Scan() {
+			log.Println(scanner.Text())
+		}
+		if err := scanner.Err(); err != nil {
+			log.Print("finishing up stdout:", err)
+		}
+	}()
+
+	go func() {
+		stderr, err := cmd.StderrPipe()
+		if err != nil {
+			log.Print("start merging stderr:", err)
+			return
+		}
+		scanner := bufio.NewScanner(stderr)
+		for scanner.Scan() {
+			log.Println(scanner.Text())
+		}
+		if err := scanner.Err(); err != nil {
+			log.Print("finishing up stderr:", err)
+		}
+	}()
+
 	stdin, err := cmd.StdinPipe()
 	if err != nil {
 		return WrapErrorISE(err, "error getting process stdin")
@@ -508,9 +545,6 @@ func wireDPOP01Validate(ctx context.Context, ch *Challenge, db DB, jwk *jose.JSO
 	if err != nil {
 		return WrapErrorISE(err, "error closing stdin")
 	}
-
-	out, err := cmd.Output()
-	fmt.Printf("cli output: %s\n", out)
 
 	err = cmd.Wait()
 	if err != nil {
