@@ -408,6 +408,8 @@ func wireOIDC01Validate(ctx context.Context, ch *Challenge, db DB, jwk *jose.JSO
 		return err
 	}
 	if expectedKeyAuth != claims.KeyAuth {
+		log.Printf("expected keyauth: %s", expectedKeyAuth)
+		log.Printf("actual keyauth: %s", claims.KeyAuth)
 		return storeError(ctx, db, ch, true, NewError(ErrorRejectedIdentifierType,
 			"keyAuthorization does not match; expected %s, but got %s", expectedKeyAuth, claims.KeyAuth))
 	}
