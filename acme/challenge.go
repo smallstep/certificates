@@ -1,6 +1,7 @@
 package acme
 
 import (
+	"bytes"
 	"context"
 	"crypto"
 	"crypto/ecdsa"
@@ -15,7 +16,6 @@ import (
 	"encoding/base64"
 	"encoding/hex"
 	"encoding/json"
-	"encoding/pem"
 	"errors"
 	"fmt"
 	"io"
@@ -429,7 +429,8 @@ func wireDPOP01Validate(ctx context.Context, ch *Challenge, db DB, jwk *jose.JSO
 		return NewErrorISE("missing provisioner")
 	}
 
-	key := ed25519.PublicKey([]byte(provisioner.GetOptions().GetDPOPOptions().GetSigningKey()))
+	//key := ed25519.PublicKey([]byte(provisioner.GetOptions().GetDPOPOptions().GetSigningKey()))
+	key := provisioner.GetOptions().GetDPOPOptions().GetSigningKey()
 
 	var wireChallengePayload WireChallengePayload
 	err := json.Unmarshal(payload, &wireChallengePayload)
@@ -447,12 +448,17 @@ func wireDPOP01Validate(ctx context.Context, ch *Challenge, db DB, jwk *jose.JSO
 	defer file.Close()
 	defer os.Remove(file.Name())
 
-	err = pem.Encode(file, &pem.Block{
-		Type:  "PUBLIC KEY",
-		Bytes: key,
-	})
+	log.Printf("key: %s", key)
+
+	buf := bytes.NewBuffer(nil)
+	buf.WriteString(key)
+
+	n, err := file.Write(buf.Bytes())
 	if err != nil {
-		return NewErrorISE("could not PEM-encode public key")
+		log.Print("writing to key file:", err)
+	}
+	if n != buf.Len() {
+		log.Printf("expected to write %d characters to the key file, got %d", buf.Len(), n)
 	}
 
 	challengeValues, err := wire.ParseID([]byte(ch.Value))
