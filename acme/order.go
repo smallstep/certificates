@@ -5,7 +5,6 @@ import (
 	"context"
 	"crypto/x509"
 	"encoding/json"
-	"log"
 	"net"
 	"net/url"
 	"sort"
@@ -261,10 +260,6 @@ func (o *Order) subject(csr *x509.CertificateRequest) (subject x509util.Subject,
 				return subject, NewErrorISE("expected CN %v, found %v", wireID.Name, csr.Subject.CommonName)
 			}
 			if len(csr.Subject.Organization) == 0 || !strings.EqualFold(csr.Subject.Organization[0], wireID.Domain) {
-				log.Printf("csr org: %s", csr.Subject.Organization[0])
-				log.Printf("wireID.Domain: %s", wireID.Domain)
-				log.Printf("csr org == wireID.Domain: %s", strings.EqualFold(csr.Subject.Organization[0], wireID.Domain))
-				log.Printf("len(csr.Subject.Organization) == 0: %s", len(csr.Subject.Organization) == 0)
 				return subject, NewErrorISE("expected Organiztion [%s], found %v", wireID.Domain, csr.Subject.Organization)
 			}
 			subject.CommonName = wireID.Name
@@ -307,7 +302,7 @@ func (o *Order) sans(csr *x509.CertificateRequest) ([]x509util.SubjectAlternativ
 			if err != nil {
 				return sans, NewErrorISE("unsupported identifier value in order: %s", n.Value)
 			}
-			orderNames[indexDNS] = wireID.Name
+			orderNames[indexDNS] = wireID.Domain
 			indexDNS++
 			orderURIs[indexURI] = wireID.ClientID
 			indexURI++
