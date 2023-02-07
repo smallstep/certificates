@@ -1,7 +1,6 @@
 package acme
 
 import (
-	"bufio"
 	"bytes"
 	"context"
 	"crypto"
@@ -370,13 +369,8 @@ func wireOIDC01Validate(ctx context.Context, ch *Challenge, db DB, jwk *jose.JSO
 			"error unmarshalling Wire challenge payload"))
 	}
 
-	log.Printf("before verify id_token: %s", wireChallengePayload.IdToken)
-
 	oidcOptions := prov.GetOptions().GetOIDCOptions()
-	log.Printf("oidc_options: %#v", oidcOptions)
 	idToken, err := oidcOptions.GetProvider(ctx).Verifier(oidcOptions.GetConfig()).Verify(ctx, wireChallengePayload.IdToken)
-
-	log.Printf("after verify id_token: %s", idToken)
 
 	if err != nil {
 		return storeError(ctx, db, ch, false, WrapError(ErrorRejectedIdentifierType, err,
@@ -390,9 +384,6 @@ func wireOIDC01Validate(ctx context.Context, ch *Challenge, db DB, jwk *jose.JSO
 	}
 
 	err = idToken.Claims(&claims)
-
-	log.Printf("claims: %+v", claims)
-
 	if err != nil {
 		return storeError(ctx, db, ch, false, WrapError(ErrorRejectedIdentifierType, err,
 			"error retrieving claims from ID token"))
@@ -408,23 +399,13 @@ func wireOIDC01Validate(ctx context.Context, ch *Challenge, db DB, jwk *jose.JSO
 		return err
 	}
 	if expectedKeyAuth != claims.KeyAuth {
-		log.Printf("expected keyauth: %s", expectedKeyAuth)
-		log.Printf("actual keyauth: %s", claims.KeyAuth)
 		return storeError(ctx, db, ch, true, NewError(ErrorRejectedIdentifierType,
 			"keyAuthorization does not match; expected %s, but got %s", expectedKeyAuth, claims.KeyAuth))
 	}
 
-	log.Printf("expected name: %s", challengeValues.Name)
-	log.Printf("actual name: %s", claims.Name)
-
-	log.Printf("expected handle: %s", challengeValues.Handle)
-	log.Printf("actual handle: %s", claims.Handle)
-
 	if challengeValues.Name != claims.Name || challengeValues.Handle != claims.Handle {
 		return storeError(ctx, db, ch, false, NewError(ErrorRejectedIdentifierType, "OIDC claims don't match"))
 	}
-
-	log.Print("updating valid challenge")
 
 	// Update and store the challenge.
 	ch.Status = StatusValid
@@ -435,7 +416,6 @@ func wireOIDC01Validate(ctx context.Context, ch *Challenge, db DB, jwk *jose.JSO
 		log.Printf("error updating challenge: %s", err)
 		return WrapErrorISE(err, "error updating challenge")
 	}
-	log.Print("finishing")
 	return nil
 }
 
@@ -446,7 +426,6 @@ func wireDPOP01Validate(ctx context.Context, ch *Challenge, db DB, jwk *jose.JSO
 		return NewErrorISE("missing provisioner")
 	}
 
-	//key := ed25519.PublicKey([]byte(provisioner.GetOptions().GetDPOPOptions().GetSigningKey()))
 	key := provisioner.GetOptions().GetDPOPOptions().GetSigningKey()
 
 	var wireChallengePayload WireChallengePayload
@@ -456,8 +435,6 @@ func wireDPOP01Validate(ctx context.Context, ch *Challenge, db DB, jwk *jose.JSO
 			"error unmarshalling Wire challenge payload"))
 	}
 
-	log.Printf("access_token: %s", wireChallengePayload.AccessToken)
-
 	file, err := os.CreateTemp(os.TempDir(), "acme-validate-challenge-pubkey-")
 	if err != nil {
 		return WrapErrorISE(err, "temporary file could not be created")
@@ -465,18 +442,7 @@ func wireDPOP01Validate(ctx context.Context, ch *Challenge, db DB, jwk *jose.JSO
 	defer file.Close()
 	defer os.Remove(file.Name())
 
-	log.Printf("key: %s", key)
-
 	buf := bytes.NewBuffer(nil)
-	/*err = pem.Encode(buf, &pem.Block{
-		Type:  "PUBLIC KEY",
-		Bytes: key,
-	})
-	if err != nil {
-		return NewErrorISE("could not PEM-encode public key")
-	}
-	log.Print("key PEM encoded: ", buf.String())*/
-
 	buf.WriteString(key)
 
 	n, err := file.Write(buf.Bytes())
@@ -510,38 +476,6 @@ func wireDPOP01Validate(ctx context.Context, ch *Challenge, db DB, jwk *jose.JSO
 		"--key",
 		file.Name(),
 	)
-
-	cmd.Env = append(os.Environ(), "RUST_BACKTRACE=1")
-
-	go func() {
-		stdout, err := cmd.StdoutPipe()
-		if err != nil {
-			log.Print("start merging stdout:", err)
-			return
-		}
-		scanner := bufio.NewScanner(stdout)
-		for scanner.Scan() {
-			log.Println(scanner.Text())
-		}
-		if err := scanner.Err(); err != nil {
-			log.Print("finishing up stdout:", err)
-		}
-	}()
-
-	go func() {
-		stderr, err := cmd.StderrPipe()
-		if err != nil {
-			log.Print("start merging stderr:", err)
-			return
-		}
-		scanner := bufio.NewScanner(stderr)
-		for scanner.Scan() {
-			log.Println(scanner.Text())
-		}
-		if err := scanner.Err(); err != nil {
-			log.Print("finishing up stderr:", err)
-		}
-	}()
 
 	stdin, err := cmd.StdinPipe()
 	if err != nil {
