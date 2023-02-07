@@ -354,7 +354,7 @@ func (o *Order) sans(csr *x509.CertificateRequest) ([]x509util.SubjectAlternativ
 			if err != nil {
 				return sans, NewErrorISE("unsupported identifier value in order: %s", n.Value)
 			}
-			orderNames[indexDNS] = wireID.Name
+			orderNames[indexDNS] = wireID.Domain
 			indexDNS++
 			orderURIs[indexURI] = wireID.ClientID
 			indexURI++
