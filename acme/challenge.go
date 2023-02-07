@@ -930,14 +930,11 @@ const hexit = "0123456789abcdef"
 // KeyAuthorization creates the ACME key authorization value from a token
 // and a jwk.
 func KeyAuthorization(token string, jwk *jose.JSONWebKey) (string, error) {
-	log.Printf("jwk: %+v", jwk)
 	thumbprint, err := jwk.Thumbprint(crypto.SHA256)
-	log.Printf("jwk thumbprint: %s", string(thumbprint))
 	if err != nil {
 		return "", WrapErrorISE(err, "error generating JWK thumbprint")
 	}
 	encPrint := base64.RawURLEncoding.EncodeToString(thumbprint)
-	log.Printf("b64 jwk thumbprint: %s", encPrint)
 	return fmt.Sprintf("%s.%s", token, encPrint), nil
 }
 
