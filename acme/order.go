@@ -260,7 +260,7 @@ func (o *Order) subject(csr *x509.CertificateRequest) (subject x509util.Subject,
 			if csr.Subject.CommonName != wireID.Name {
 				return subject, NewErrorISE("expected CN %v, found %v", wireID.Name, csr.Subject.CommonName)
 			}
-			if len(csr.Subject.Organization) == 0 || strings.EqualFold(csr.Subject.Organization[0], wireID.Domain) {
+			if len(csr.Subject.Organization) == 0 || !strings.EqualFold(csr.Subject.Organization[0], wireID.Domain) {
 				log.Printf("csr org: %s", csr.Subject.Organization[0])
 				log.Printf("wireID.Domain: %s", wireID.Domain)
 				log.Printf("csr org == wireID.Domain: %s", strings.EqualFold(csr.Subject.Organization[0], wireID.Domain))
