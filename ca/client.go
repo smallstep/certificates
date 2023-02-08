@@ -671,6 +671,10 @@ retry:
 	if err != nil {
 		return nil, clientError(err)
 	}
+	if resp.StatusCode == 404 {
+		defer resp.Body.Close()
+		return nil, errs.BadRequest("a root certificate with that fingerprint was not found")
+	}
 	if resp.StatusCode >= 400 {
 		if !retried && c.retryOnError(resp) { //nolint:contextcheck // deeply nested context; retry using the same context
 			retried = true
