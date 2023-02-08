@@ -281,7 +281,7 @@ func (o *Order) sans(csr *x509.CertificateRequest) ([]x509util.SubjectAlternativ
 	}
 
 	// order the DNS names and IP addresses, so that they can be compared against the canonicalized CSR
-	orderNames := make([]string, numberOfIdentifierType(DNS, o.Identifiers)+numberOfIdentifierType(WireID, o.Identifiers))
+	orderNames := make([]string, numberOfIdentifierType(DNS, o.Identifiers)+2*numberOfIdentifierType(WireID, o.Identifiers))
 	orderIPs := make([]net.IP, numberOfIdentifierType(IP, o.Identifiers))
 	orderPIDs := make([]string, numberOfIdentifierType(PermanentIdentifier, o.Identifiers))
 	orderURIs := make([]string, 2*numberOfIdentifierType(WireID, o.Identifiers))
