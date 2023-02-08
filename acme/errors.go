@@ -3,7 +3,6 @@ package acme
 import (
 	"encoding/json"
 	"fmt"
-	"log"
 	"net/http"
 
 	"github.com/pkg/errors"
@@ -283,7 +282,6 @@ type Error struct {
 
 // NewError creates a new Error type.
 func NewError(pt ProblemType, msg string, args ...interface{}) *Error {
-	log.Printf(msg, args)
 	return newError(pt, errors.Errorf(msg, args...))
 }
 
@@ -314,8 +312,6 @@ func NewErrorISE(msg string, args ...interface{}) *Error {
 
 // WrapError attempts to wrap the internal error.
 func WrapError(typ ProblemType, err error, msg string, args ...interface{}) *Error {
-	log.Printf(msg, args)
-	fmt.Println(err)
 	var e *Error
 	switch {
 	case err == nil:

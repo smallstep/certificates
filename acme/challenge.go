@@ -19,7 +19,6 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"log"
 	"net"
 	"net/url"
 	"os"
@@ -356,7 +355,6 @@ type WireChallengePayload struct {
 }
 
 func wireOIDC01Validate(ctx context.Context, ch *Challenge, db DB, jwk *jose.JSONWebKey, payload []byte) error {
-	log.Print("wireOIDC01Validate")
 	prov, ok := ProvisionerFromContext(ctx)
 	if !ok {
 		return NewErrorISE("no provisioner provided")
@@ -413,14 +411,12 @@ func wireOIDC01Validate(ctx context.Context, ch *Challenge, db DB, jwk *jose.JSO
 	ch.ValidatedAt = clock.Now().Format(time.RFC3339)
 
 	if err = db.UpdateChallenge(ctx, ch); err != nil {
-		log.Printf("error updating challenge: %s", err)
 		return WrapErrorISE(err, "error updating challenge")
 	}
 	return nil
 }
 
 func wireDPOP01Validate(ctx context.Context, ch *Challenge, db DB, jwk *jose.JSONWebKey, payload []byte) error {
-	log.Print("wireDPOP01Validate")
 	provisioner, ok := ProvisionerFromContext(ctx)
 	if !ok {
 		return NewErrorISE("missing provisioner")
@@ -447,10 +443,10 @@ func wireDPOP01Validate(ctx context.Context, ch *Challenge, db DB, jwk *jose.JSO
 
 	n, err := file.Write(buf.Bytes())
 	if err != nil {
-		log.Print("writing to key file:", err)
+		return WrapErrorISE(err, "Failed writing signature key to temp file")
 	}
 	if n != buf.Len() {
-		log.Printf("expected to write %d characters to the key file, got %d", buf.Len(), n)
+		return WrapErrorISE(err, "expected to write %d characters to the key file, got %d", buf.Len(), n)
 	}
 
 	challengeValues, err := wire.ParseID([]byte(ch.Value))
@@ -499,17 +495,6 @@ func wireDPOP01Validate(ctx context.Context, ch *Challenge, db DB, jwk *jose.JSO
 
 	err = cmd.Wait()
 	if err != nil {
-		log.Printf("cli: %s %s %s %s %s %s %s %s",
-			"--client-id",
-			challengeValues.ClientID,
-			"--challenge",
-			ch.Token,
-			"--leeway",
-			"360",
-			"--max-expiry",
-			expiry,
-		)
-
 		return storeError(ctx, db, ch, true, NewError(ErrorRejectedIdentifierType, "error finishing validation: %s", err))
 	}
 
