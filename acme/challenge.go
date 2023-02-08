@@ -19,7 +19,6 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"log"
 	"net"
 	"net/url"
 	"os"
@@ -373,10 +372,7 @@ func wireOIDC01Validate(ctx context.Context, ch *Challenge, db DB, jwk *jose.JSO
 			"error unmarshalling Wire challenge payload"))
 	}
 
-	log.Printf("id_token: %s", wireChallengePayload.IdToken)
-
 	oidcOptions := prov.GetOptions().GetOIDCOptions()
-	log.Printf("oidc_options: %#v", oidcOptions)
 	idToken, err := oidcOptions.GetProvider(ctx).Verifier(oidcOptions.GetConfig()).Verify(ctx, wireChallengePayload.IdToken)
 	if err != nil {
 		return storeError(ctx, db, ch, false, WrapError(ErrorRejectedIdentifierType, err,
@@ -439,8 +435,6 @@ func wireDPOP01Validate(ctx context.Context, ch *Challenge, db DB, jwk *jose.JSO
 			"error unmarshalling Wire challenge payload"))
 	}
 
-	log.Printf("access_token: %s", wireChallengePayload.AccessToken)
-
 	file, err := os.CreateTemp(os.TempDir(), "acme-validate-challenge-pubkey-")
 	if err != nil {
 		return WrapErrorISE(err, "temporary file could not be created")
@@ -448,17 +442,15 @@ func wireDPOP01Validate(ctx context.Context, ch *Challenge, db DB, jwk *jose.JSO
 	defer file.Close()
 	defer os.Remove(file.Name())
 
-	log.Printf("key: %s", key)
-
 	buf := bytes.NewBuffer(nil)
 	buf.WriteString(key)
 
 	n, err := file.Write(buf.Bytes())
 	if err != nil {
-		log.Print("writing to key file:", err)
+		return WrapErrorISE(err, "Failed writing signature key to temp file")
 	}
 	if n != buf.Len() {
-		log.Printf("expected to write %d characters to the key file, got %d", buf.Len(), n)
+		return WrapErrorISE(err, "expected to write %d characters to the key file, got %d", buf.Len(), n)
 	}
 
 	challengeValues, err := wire.ParseID([]byte(ch.Value))
@@ -506,23 +498,6 @@ func wireDPOP01Validate(ctx context.Context, ch *Challenge, db DB, jwk *jose.JSO
 
 	err = cmd.Wait()
 	if err != nil {
-		log.Printf("access_token: %s, cli: %s %s %s %s %s %s %s %s %s %s %s %s %s %s",
-			wireChallengePayload.AccessToken,
-			provisioner.GetOptions().GetDPOPOptions().GetValidationExecPath(),
-			"verify-access",
-			"--client-id",
-			challengeValues.ClientID,
-			"--challenge",
-			ch.Token,
-			"--leeway",
-			"360",
-			"--max-expiry",
-			strconv.FormatInt(time.Now().Add(time.Hour*24*365).Unix(), 10),
-			"--hash-algorithm",
-			`"SHA-256"`,
-			"--key",
-			file.Name(),
-		)
 		return storeError(ctx, db, ch, true, NewError(ErrorRejectedIdentifierType, "error finishing validation: %s", err))
 	}
 
