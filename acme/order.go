@@ -356,8 +356,6 @@ func (o *Order) sans(csr *x509.CertificateRequest) ([]x509util.SubjectAlternativ
 			}
 			orderNames[indexDNS] = wireID.Name
 			indexDNS++
-			orderNames[indexDNS] = wireID.Domain
-			indexDNS++
 			orderURIs[indexURI] = wireID.ClientID
 			indexURI++
 			orderURIs[indexURI] = wireID.Handle
