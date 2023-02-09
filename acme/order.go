@@ -500,7 +500,9 @@ func uniqueSortedLowerNames(names []string) (unique []string) {
 	}
 	unique = make([]string, 0, len(nameMap))
 	for name := range nameMap {
-		unique = append(unique, name)
+		if len(name) > 0 {
+			unique = append(unique, name)
+		}
 	}
 	sort.Strings(unique)
 	return
