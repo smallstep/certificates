@@ -189,7 +189,7 @@ func TestNewOrderRequest_Validate(t *testing.T) {
 			return test{
 				nor: &NewOrderRequest{
 					Identifiers: []acme.Identifier{
-						{Type: "wireapp-id", Value: `{"name": "Smith, Alice M (QA)", "domain": "example.com", "client-id": "wireapp-id:75d73550-16e0-4027-abfd-0137e32180cc/ed416ce8ecdd9fad@example.com", "handle": "wireapp:alice.smith.qa@example.com"}`},
+						{Type: "wireapp-id", Value: `{"name": "Smith, Alice M (QA)", "domain": "example.com", "client-id": "impp:wireapp=75d73550-16e0-4027-abfd-0137e32180cc/ed416ce8ecdd9fad@example.com", "handle": "impp:wireapp=alice.smith.qa@example.com"}`},
 					},
 					NotAfter:  naf,
 					NotBefore: nbf,
@@ -785,7 +785,7 @@ func TestHandler_newAuthorization(t *testing.T) {
 				AccountID: "accID",
 				Identifier: acme.Identifier{
 					Type:  "wireapp",
-					Value: "wireapp-id:user/client@domain",
+					Value: "impp:wireapp=user/client@domain",
 				},
 				Status:    acme.StatusPending,
 				ExpiresAt: clock.Now(),
@@ -1699,7 +1699,7 @@ func TestHandler_NewOrder(t *testing.T) {
 			acc := &acme.Account{ID: "accID"}
 			nor := &NewOrderRequest{
 				Identifiers: []acme.Identifier{
-					{Type: "wireapp-id", Value: `{"client-id": "wireapp-id:user/client@domain"}`},
+					{Type: "wireapp-id", Value: `{"client-id": "impp:wireapp=user/client@domain"}`},
 				},
 			}
 			b, err := json.Marshal(nor)
@@ -1736,7 +1736,7 @@ func TestHandler_NewOrder(t *testing.T) {
 						assert.Equals(t, ch.AccountID, "accID")
 						assert.NotEquals(t, ch.Token, "")
 						assert.Equals(t, ch.Status, acme.StatusPending)
-						assert.Equals(t, ch.Value, `{"client-id": "wireapp-id:user/client@domain"}`)
+						assert.Equals(t, ch.Value, `{"client-id": "impp:wireapp=user/client@domain"}`)
 						return nil
 					},
 					MockCreateAuthorization: func(ctx context.Context, az *acme.Authorization) error {
