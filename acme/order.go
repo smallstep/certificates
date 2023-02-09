@@ -319,6 +319,7 @@ func (o *Order) sans(csr *x509.CertificateRequest) ([]x509util.SubjectAlternativ
 	orderURIs = uniqueSortedLowerNames(orderURIs)
 
 	log.Printf("orderNames after sorted+lowercase: '%v'", orderNames)
+	log.Printf("first orderNames after sorted+lowercase: '%s'", orderNames[0])
 
 	totalNumberOfSANs := len(csr.DNSNames) + len(csr.IPAddresses) + len(csr.URIs)
 	sans = make([]x509util.SubjectAlternativeName, totalNumberOfSANs)
