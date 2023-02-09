@@ -5,7 +5,6 @@ import (
 	"context"
 	"crypto/x509"
 	"encoding/json"
-	"log"
 	"net"
 	"net/url"
 	"sort"
@@ -303,7 +302,6 @@ func (o *Order) sans(csr *x509.CertificateRequest) ([]x509util.SubjectAlternativ
 			if err != nil {
 				return sans, NewErrorISE("unsupported identifier value in order: %s", n.Value)
 			}
-			log.Printf("display name: '%s'", wireID.Name)
 			orderNames[indexDNS] = wireID.Name
 			indexDNS++
 			orderURIs[indexURI] = wireID.ClientID
@@ -317,10 +315,6 @@ func (o *Order) sans(csr *x509.CertificateRequest) ([]x509util.SubjectAlternativ
 	orderNames = uniqueSortedLowerNames(orderNames)
 	orderIPs = uniqueSortedIPs(orderIPs)
 	orderURIs = uniqueSortedLowerNames(orderURIs)
-
-	log.Printf("orderNames after sorted+lowercase: '%#v'", orderNames)
-	log.Printf("orderNames after sorted+lowercase len: '%d'", len(orderNames))
-	log.Printf("first orderNames after sorted+lowercase: '%s'", orderNames[0])
 
 	totalNumberOfSANs := len(csr.DNSNames) + len(csr.IPAddresses) + len(csr.URIs)
 	sans = make([]x509util.SubjectAlternativeName, totalNumberOfSANs)
