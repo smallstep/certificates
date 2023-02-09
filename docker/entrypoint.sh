@@ -36,6 +36,7 @@ function generate_password () {
 function step_ca_init () {
     DOCKER_STEPCA_INIT_PROVISIONER_NAME="${DOCKER_STEPCA_INIT_PROVISIONER_NAME:-admin}"
     DOCKER_STEPCA_INIT_ADMIN_SUBJECT="${DOCKER_STEPCA_INIT_ADMIN_SUBJECT:-step}"
+    DOCKER_STEPCA_INIT_ADDRESS="${DOCKER_STEPCA_INIT_ADDRESS:-:9000}"
 
     local -a setup_args=(
         --name "${DOCKER_STEPCA_INIT_NAME}"
@@ -43,7 +44,7 @@ function step_ca_init () {
         --provisioner "${DOCKER_STEPCA_INIT_PROVISIONER_NAME}"
         --password-file "${STEPPATH}/password"
         --provisioner-password-file "${STEPPATH}/provisioner_password"
-        --address ":9000"
+        --address "${DOCKER_STEPCA_INIT_ADDRESS}"
     )
     if [ -n "${DOCKER_STEPCA_INIT_PASSWORD}" ]; then
         echo "${DOCKER_STEPCA_INIT_PASSWORD}" > "${STEPPATH}/password"
