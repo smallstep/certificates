@@ -11,12 +11,12 @@ type Authorization struct {
 	ID          string       `json:"-"`
 	AccountID   string       `json:"-"`
 	Token       string       `json:"-"`
+	Fingerprint string       `json:"-"`
 	Identifier  Identifier   `json:"identifier"`
 	Status      Status       `json:"status"`
 	Challenges  []*Challenge `json:"challenges"`
 	Wildcard    bool         `json:"wildcard"`
 	ExpiresAt   time.Time    `json:"expires"`
-	Fingerprint string       `json:"fingerprint,omitempty"`
 	Error       *Error       `json:"error,omitempty"`
 }
 
