@@ -3,6 +3,7 @@ package acme
 import (
 	"bytes"
 	"context"
+	"crypto/subtle"
 	"crypto/x509"
 	"encoding/json"
 	"net"
@@ -11,6 +12,7 @@ import (
 	"time"
 
 	"github.com/smallstep/certificates/authority/provisioner"
+	"go.step.sm/crypto/keyutil"
 	"go.step.sm/crypto/x509util"
 )
 
@@ -125,6 +127,27 @@ func (o *Order) UpdateStatus(ctx context.Context, db DB) error {
 	return nil
 }
 
+// getKeyFingerprint returns a fingerprint from the list of authorizations. This
+// fingerprint is used on the device-attest-01 flow to verify the attestation
+// certificate public key with the CSR public key.
+//
+// There's no point on reading all the authorizations as there will be only one
+// for a permanent identifier.
+func (o *Order) getAuthorizationFingerprint(ctx context.Context, db DB) (string, error) {
+	for _, azID := range o.AuthorizationIDs {
+		az, err := db.GetAuthorization(ctx, azID)
+		if err != nil {
+			return "", WrapErrorISE(err, "error getting authorization %q", azID)
+		}
+		// There's no point on reading all the authorizations as there will
+		// be only one for a permanent identifier.
+		if az.Fingerprint != "" {
+			return az.Fingerprint, nil
+		}
+	}
+	return "", nil
+}
+
 // Finalize signs a certificate if the necessary conditions for Order completion
 // have been met.
 //
@@ -148,6 +171,24 @@ func (o *Order) Finalize(ctx context.Context, db DB, csr *x509.CertificateReques
 		break
 	default:
 		return NewErrorISE("unexpected status %s for order %s", o.Status, o.ID)
+	}
+
+	// Get key fingerprint if any. And then compare it with the CSR fingerprint.
+	//
+	// In device-attest-01 challenges we should check that the keys in the CSR
+	// and the attestation certificate are the same.
+	fingerprint, err := o.getAuthorizationFingerprint(ctx, db)
+	if err != nil {
+		return err
+	}
+	if fingerprint != "" {
+		fp, err := keyutil.Fingerprint(csr.PublicKey)
+		if err != nil {
+			return WrapErrorISE(err, "error calculating key fingerprint")
+		}
+		if subtle.ConstantTimeCompare([]byte(fingerprint), []byte(fp)) == 0 {
+			return NewError(ErrorUnauthorizedType, "order %s csr does not match the attested key", o.ID)
+		}
 	}
 
 	// canonicalize the CSR to allow for comparison
