@@ -24,10 +24,9 @@ require (
 	github.com/google/go-cmp v0.5.9
 	github.com/google/uuid v1.3.0
 	github.com/googleapis/gax-go/v2 v2.7.0
-	github.com/hashicorp/vault/api v1.8.3
+	github.com/hashicorp/vault/api v1.9.0
 	github.com/hashicorp/vault/api/auth/approle v0.3.0
 	github.com/hashicorp/vault/api/auth/kubernetes v0.3.0
-	github.com/jhump/protoreflect v1.9.0 // indirect
 	github.com/kr/pretty v0.3.1 // indirect
 	github.com/mattn/go-colorable v0.1.8 // indirect
 	github.com/mattn/go-isatty v0.0.13 // indirect
@@ -72,8 +71,6 @@ require (
 	github.com/Azure/go-autorest/tracing v0.6.0 // indirect
 	github.com/Masterminds/goutils v1.1.1 // indirect
 	github.com/Masterminds/semver/v3 v3.2.0 // indirect
-	github.com/armon/go-metrics v0.3.9 // indirect
-	github.com/armon/go-radix v1.0.0 // indirect
 	github.com/cenkalti/backoff/v3 v3.0.0 // indirect
 	github.com/cespare/xxhash v1.1.0 // indirect
 	github.com/cespare/xxhash/v2 v2.1.2 // indirect
@@ -94,22 +91,13 @@ require (
 	github.com/googleapis/enterprise-certificate-proxy v0.2.1 // indirect
 	github.com/hashicorp/errwrap v1.1.0 // indirect
 	github.com/hashicorp/go-cleanhttp v0.5.2 // indirect
-	github.com/hashicorp/go-hclog v0.16.2 // indirect
-	github.com/hashicorp/go-immutable-radix v1.3.1 // indirect
 	github.com/hashicorp/go-multierror v1.1.1 // indirect
-	github.com/hashicorp/go-plugin v1.4.5 // indirect
 	github.com/hashicorp/go-retryablehttp v0.6.6 // indirect
 	github.com/hashicorp/go-rootcerts v1.0.2 // indirect
-	github.com/hashicorp/go-secure-stdlib/mlock v0.1.1 // indirect
 	github.com/hashicorp/go-secure-stdlib/parseutil v0.1.6 // indirect
 	github.com/hashicorp/go-secure-stdlib/strutil v0.1.2 // indirect
 	github.com/hashicorp/go-sockaddr v1.0.2 // indirect
-	github.com/hashicorp/go-uuid v1.0.2 // indirect
-	github.com/hashicorp/go-version v1.2.0 // indirect
-	github.com/hashicorp/golang-lru v0.5.4 // indirect
 	github.com/hashicorp/hcl v1.0.0 // indirect
-	github.com/hashicorp/vault/sdk v0.7.0 // indirect
-	github.com/hashicorp/yamux v0.0.0-20180604194846-3520598351bb // indirect
 	github.com/huandu/xstrings v1.3.3 // indirect
 	github.com/imdario/mergo v0.3.12 // indirect
 	github.com/jackc/chunkreader/v2 v2.0.1 // indirect
@@ -127,11 +115,8 @@ require (
 	github.com/miekg/pkcs11 v1.1.1 // indirect
 	github.com/mitchellh/copystructure v1.2.0 // indirect
 	github.com/mitchellh/go-homedir v1.1.0 // indirect
-	github.com/mitchellh/go-testing-interface v1.0.0 // indirect
 	github.com/mitchellh/mapstructure v1.5.0 // indirect
 	github.com/mitchellh/reflectwalk v1.0.2 // indirect
-	github.com/oklog/run v1.0.0 // indirect
-	github.com/pierrec/lz4 v2.5.2+incompatible // indirect
 	github.com/pmezard/go-difflib v1.0.0 // indirect
 	github.com/russross/blackfriday/v2 v2.1.0 // indirect
 	github.com/ryanuber/go-glob v1.0.0 // indirect
@@ -142,7 +127,6 @@ require (
 	github.com/x448/float16 v0.8.4 // indirect
 	go.etcd.io/bbolt v1.3.6 // indirect
 	go.opencensus.io v0.24.0 // indirect
-	go.uber.org/atomic v1.9.0 // indirect
 	golang.org/x/oauth2 v0.0.0-20221014153046-6fdb5e3db783 // indirect
 	golang.org/x/text v0.6.0 // indirect
 	google.golang.org/appengine v1.6.7 // indirect
