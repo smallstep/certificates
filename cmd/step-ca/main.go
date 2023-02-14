@@ -52,6 +52,7 @@ var (
 func init() {
 	step.Set("Smallstep CA", Version, BuildTime)
 	authority.GlobalVersion.Version = Version
+	//nolint:staticcheck // deprecated in Go 1.20
 	rand.Seed(time.Now().UnixNano())
 	// Add support for asking passwords
 	pemutil.PromptPassword = func(msg string) ([]byte, error) {

@@ -54,6 +54,13 @@ func (m *mockClient) TLSDial(network, addr string, tlsConfig *tls.Config) (*tls.
 	return m.tlsDial(network, addr, tlsConfig)
 }
 
+func fatalError(t *testing.T, err error) {
+	t.Helper()
+	if err != nil {
+		t.Fatal(err)
+	}
+}
+
 func mustNonAttestationProvisioner(t *testing.T) Provisioner {
 	t.Helper()
 
@@ -86,6 +93,108 @@ func mustAttestationProvisioner(t *testing.T, roots []byte) Provisioner {
 		t.Fatal(err)
 	}
 	return prov
+}
+
+func mustAccountAndKeyAuthorization(t *testing.T, token string) (*jose.JSONWebKey, string) {
+	t.Helper()
+
+	jwk, err := jose.GenerateJWK("EC", "P-256", "ES256", "sig", "", 0)
+	fatalError(t, err)
+
+	keyAuth, err := KeyAuthorization(token, jwk)
+	fatalError(t, err)
+	return jwk, keyAuth
+}
+
+func mustAttestApple(t *testing.T, nonce string) ([]byte, *x509.Certificate, *x509.Certificate) {
+	t.Helper()
+
+	ca, err := minica.New()
+	fatalError(t, err)
+
+	signer, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
+	fatalError(t, err)
+
+	nonceSum := sha256.Sum256([]byte(nonce))
+	leaf, err := ca.Sign(&x509.Certificate{
+		Subject:   pkix.Name{CommonName: "attestation cert"},
+		PublicKey: signer.Public(),
+		ExtraExtensions: []pkix.Extension{
+			{Id: oidAppleSerialNumber, Value: []byte("serial-number")},
+			{Id: oidAppleUniqueDeviceIdentifier, Value: []byte("udid")},
+			{Id: oidAppleSecureEnclaveProcessorOSVersion, Value: []byte("16.0")},
+			{Id: oidAppleNonce, Value: nonceSum[:]},
+		},
+	})
+	fatalError(t, err)
+
+	attObj, err := cbor.Marshal(struct {
+		Format       string                 `json:"fmt"`
+		AttStatement map[string]interface{} `json:"attStmt,omitempty"`
+	}{
+		Format: "apple",
+		AttStatement: map[string]interface{}{
+			"x5c": []interface{}{leaf.Raw, ca.Intermediate.Raw},
+		},
+	})
+	fatalError(t, err)
+
+	payload, err := json.Marshal(struct {
+		AttObj string `json:"attObj"`
+	}{
+		AttObj: base64.RawURLEncoding.EncodeToString(attObj),
+	})
+	fatalError(t, err)
+
+	return payload, leaf, ca.Root
+}
+
+func mustAttestYubikey(t *testing.T, nonce, keyAuthorization string, serial int) ([]byte, *x509.Certificate, *x509.Certificate) {
+	ca, err := minica.New()
+	fatalError(t, err)
+
+	keyAuthSum := sha256.Sum256([]byte(keyAuthorization))
+
+	signer, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
+	fatalError(t, err)
+	sig, err := signer.Sign(rand.Reader, keyAuthSum[:], crypto.SHA256)
+	fatalError(t, err)
+	cborSig, err := cbor.Marshal(sig)
+	fatalError(t, err)
+
+	serialNumber, err := asn1.Marshal(serial)
+	fatalError(t, err)
+
+	leaf, err := ca.Sign(&x509.Certificate{
+		Subject:   pkix.Name{CommonName: "attestation cert"},
+		PublicKey: signer.Public(),
+		ExtraExtensions: []pkix.Extension{
+			{Id: oidYubicoSerialNumber, Value: serialNumber},
+		},
+	})
+	fatalError(t, err)
+
+	attObj, err := cbor.Marshal(struct {
+		Format       string                 `json:"fmt"`
+		AttStatement map[string]interface{} `json:"attStmt,omitempty"`
+	}{
+		Format: "step",
+		AttStatement: map[string]interface{}{
+			"x5c": []interface{}{leaf.Raw, ca.Intermediate.Raw},
+			"alg": -7,
+			"sig": cborSig,
+		},
+	})
+	fatalError(t, err)
+
+	payload, err := json.Marshal(struct {
+		AttObj string `json:"attObj"`
+	}{
+		AttObj: base64.RawURLEncoding.EncodeToString(attObj),
+	})
+	fatalError(t, err)
+
+	return payload, leaf, ca.Root
 }
 
 func Test_storeError(t *testing.T) {
@@ -661,13 +770,6 @@ func TestChallenge_Validate(t *testing.T) {
 			}
 		},
 		"fail/device-attest-01": func(t *testing.T) test {
-			ch := &Challenge{
-				ID:     "chID",
-				Token:  "token",
-				Type:   "device-attest-01",
-				Status: StatusPending,
-				Value:  "12345678",
-			}
 			payload, err := json.Marshal(struct {
 				Error string `json:"error"`
 			}{
@@ -675,9 +777,20 @@ func TestChallenge_Validate(t *testing.T) {
 			})
 			assert.NoError(t, err)
 			return test{
-				ch:      ch,
+				ch: &Challenge{
+					ID:              "chID",
+					AuthorizationID: "azID",
+					Token:           "token",
+					Type:            "device-attest-01",
+					Status:          StatusPending,
+					Value:           "12345678",
+				},
 				payload: payload,
 				db: &MockDB{
+					MockGetAuthorization: func(ctx context.Context, id string) (*Authorization, error) {
+						assert.Equal(t, "azID", id)
+						return &Authorization{ID: "azID"}, nil
+					},
 					MockUpdateChallenge: func(ctx context.Context, updch *Challenge) error {
 						assert.Equal(t, "chID", updch.ID)
 						assert.Equal(t, "token", updch.Token)
@@ -699,76 +812,39 @@ func TestChallenge_Validate(t *testing.T) {
 			}
 		},
 		"ok/device-attest-01": func(t *testing.T) test {
-			ctx := context.Background()
-			ca, err := minica.New()
-			assert.NoError(t, err)
-			caRoot := pem.EncodeToMemory(&pem.Block{Type: "CERTIFICATE", Bytes: ca.Root.Raw})
-			ctx = NewProvisionerContext(ctx, mustAttestationProvisioner(t, caRoot))
-			makeLeaf := func(signer crypto.Signer, serialNumber []byte) *x509.Certificate {
-				leaf, err := ca.Sign(&x509.Certificate{
-					Subject:   pkix.Name{CommonName: "attestation cert"},
-					PublicKey: signer.Public(),
-					ExtraExtensions: []pkix.Extension{
-						{Id: oidYubicoSerialNumber, Value: serialNumber},
-					},
-				})
-				if err != nil {
-					t.Fatal(err)
-				}
-				return leaf
-			}
+			jwk, keyAuth := mustAccountAndKeyAuthorization(t, "token")
+			payload, leaf, root := mustAttestYubikey(t, "nonce", keyAuth, 1234)
 
-			signer, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
-			assert.NoError(t, err)
-			serialNumber, err := asn1.Marshal(1234)
-			assert.NoError(t, err)
-			leaf := makeLeaf(signer, serialNumber)
+			caRoot := pem.EncodeToMemory(&pem.Block{Type: "CERTIFICATE", Bytes: root.Raw})
+			ctx := NewProvisionerContext(context.Background(), mustAttestationProvisioner(t, caRoot))
 
-			jwk, err := jose.GenerateJWK("EC", "P-256", "ES256", "sig", "", 0)
-			assert.NoError(t, err)
-			token := "token"
-			keyAuth, err := KeyAuthorization(token, jwk)
-			assert.NoError(t, err)
-			keyAuthSum := sha256.Sum256([]byte(keyAuth))
-			sig, err := signer.Sign(rand.Reader, keyAuthSum[:], crypto.SHA256)
-			assert.NoError(t, err)
-			cborSig, err := cbor.Marshal(sig)
-			assert.NoError(t, err)
-
-			ch := &Challenge{
-				ID:     "chID",
-				Token:  token,
-				Type:   "device-attest-01",
-				Status: StatusPending,
-				Value:  "1234",
-			}
-			attObj, err := cbor.Marshal(struct {
-				Format       string                 `json:"fmt"`
-				AttStatement map[string]interface{} `json:"attStmt,omitempty"`
-			}{
-				Format: "step",
-				AttStatement: map[string]interface{}{
-					"x5c": []interface{}{leaf.Raw, ca.Intermediate.Raw},
-					"alg": -7,
-					"sig": cborSig,
-				},
-			})
-			assert.NoError(t, err)
-			payload, err := json.Marshal(struct {
-				AttObj string `json:"attObj"`
-			}{
-				AttObj: base64.RawURLEncoding.EncodeToString(attObj),
-			})
-			assert.NoError(t, err)
 			return test{
-				ch:      ch,
+				ch: &Challenge{
+					ID:              "chID",
+					AuthorizationID: "azID",
+					Token:           "token",
+					Type:            "device-attest-01",
+					Status:          StatusPending,
+					Value:           "1234",
+				},
 				payload: payload,
 				ctx:     ctx,
 				jwk:     jwk,
 				db: &MockDB{
+					MockGetAuthorization: func(ctx context.Context, id string) (*Authorization, error) {
+						assert.Equal(t, "azID", id)
+						return &Authorization{ID: "azID"}, nil
+					},
+					MockUpdateAuthorization: func(ctx context.Context, az *Authorization) error {
+						fingerprint, err := keyutil.Fingerprint(leaf.PublicKey)
+						assert.NoError(t, err)
+						assert.Equal(t, "azID", az.ID)
+						assert.Equal(t, fingerprint, az.Fingerprint)
+						return nil
+					},
 					MockUpdateChallenge: func(ctx context.Context, updch *Challenge) error {
 						assert.Equal(t, "chID", updch.ID)
-						assert.Equal(t, token, updch.Token)
+						assert.Equal(t, "token", updch.Token)
 						assert.Equal(t, StatusValid, updch.Status)
 						assert.Equal(t, ChallengeType("device-attest-01"), updch.Type)
 						assert.Equal(t, "1234", updch.Value)
@@ -2745,6 +2821,10 @@ func Test_doAppleAttestationFormat(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	fingerprint, err := keyutil.Fingerprint(signer.Public())
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	type args struct {
 		ctx  context.Context
@@ -2769,6 +2849,7 @@ func Test_doAppleAttestationFormat(t *testing.T) {
 			UDID:         "udid",
 			SEPVersion:   "16.0",
 			Certificate:  leaf,
+			Fingerprint:  fingerprint,
 		}, false},
 		{"fail apple issuer", args{ctx, mustAttestationProvisioner(t, nil), &Challenge{}, &attestationObject{
 			Format: "apple",
@@ -2871,6 +2952,10 @@ func Test_doStepAttestationFormat(t *testing.T) {
 		t.Fatal(err)
 	}
 	leaf := makeLeaf(signer, serialNumber)
+	fingerprint, err := keyutil.Fingerprint(signer.Public())
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	jwk, err := jose.GenerateJWK("EC", "P-256", "ES256", "sig", "", 0)
 	if err != nil {
@@ -2926,6 +3011,7 @@ func Test_doStepAttestationFormat(t *testing.T) {
 		}}, &stepAttestationData{
 			SerialNumber: "1234",
 			Certificate:  leaf,
+			Fingerprint:  fingerprint,
 		}, false},
 		{"fail yubico issuer", args{ctx, mustAttestationProvisioner(t, nil), &Challenge{Token: "token"}, jwk, &attestationObject{
 			Format: "step",
@@ -3196,15 +3282,43 @@ func Test_deviceAttest01Validate(t *testing.T) {
 		wantErr *Error
 	}
 	tests := map[string]func(t *testing.T) test{
+		"fail/getAuthorization": func(t *testing.T) test {
+			return test{
+				args: args{
+					ch: &Challenge{
+						ID:              "chID",
+						AuthorizationID: "azID",
+						Token:           "token",
+						Type:            "device-attest-01",
+						Status:          StatusPending,
+						Value:           "12345678",
+					},
+					db: &MockDB{
+						MockGetAuthorization: func(ctx context.Context, id string) (*Authorization, error) {
+							return nil, errors.New("not found")
+						},
+					},
+					payload: []byte(invalidPayload),
+				},
+				wantErr: NewErrorISE("error loading authorization: not found"),
+			}
+		},
 		"fail/json.Unmarshal": func(t *testing.T) test {
 			return test{
 				args: args{
 					ch: &Challenge{
-						ID:     "chID",
-						Token:  "token",
-						Type:   "device-attest-01",
-						Status: StatusPending,
-						Value:  "12345678",
+						ID:              "chID",
+						AuthorizationID: "azID",
+						Token:           "token",
+						Type:            "device-attest-01",
+						Status:          StatusPending,
+						Value:           "12345678",
+					},
+					db: &MockDB{
+						MockGetAuthorization: func(ctx context.Context, id string) (*Authorization, error) {
+							assert.Equal(t, "azID", id)
+							return &Authorization{ID: "azID"}, nil
+						},
 					},
 					payload: []byte(invalidPayload),
 				},
@@ -3216,14 +3330,19 @@ func Test_deviceAttest01Validate(t *testing.T) {
 			return test{
 				args: args{
 					ch: &Challenge{
-						ID:     "chID",
-						Token:  "token",
-						Type:   "device-attest-01",
-						Status: StatusPending,
-						Value:  "12345678",
+						ID:              "chID",
+						AuthorizationID: "azID",
+						Token:           "token",
+						Type:            "device-attest-01",
+						Status:          StatusPending,
+						Value:           "12345678",
 					},
 					payload: errorPayload,
 					db: &MockDB{
+						MockGetAuthorization: func(ctx context.Context, id string) (*Authorization, error) {
+							assert.Equal(t, "azID", id)
+							return &Authorization{ID: "azID"}, nil
+						},
 						MockUpdateChallenge: func(ctx context.Context, updch *Challenge) error {
 							assert.Equal(t, "chID", updch.ID)
 							assert.Equal(t, "token", updch.Token)
@@ -3250,14 +3369,19 @@ func Test_deviceAttest01Validate(t *testing.T) {
 			return test{
 				args: args{
 					ch: &Challenge{
-						ID:     "chID",
-						Token:  "token",
-						Type:   "device-attest-01",
-						Status: StatusPending,
-						Value:  "12345678",
+						ID:              "chID",
+						AuthorizationID: "azID",
+						Token:           "token",
+						Type:            "device-attest-01",
+						Status:          StatusPending,
+						Value:           "12345678",
 					},
 					payload: errorPayload,
 					db: &MockDB{
+						MockGetAuthorization: func(ctx context.Context, id string) (*Authorization, error) {
+							assert.Equal(t, "azID", id)
+							return &Authorization{ID: "azID"}, nil
+						},
 						MockUpdateChallenge: func(ctx context.Context, updch *Challenge) error {
 							assert.Equal(t, "chID", updch.ID)
 							assert.Equal(t, "token", updch.Token)
@@ -3284,11 +3408,18 @@ func Test_deviceAttest01Validate(t *testing.T) {
 			return test{
 				args: args{
 					ch: &Challenge{
-						ID:     "chID",
-						Token:  "token",
-						Type:   "device-attest-01",
-						Status: StatusPending,
-						Value:  "12345678",
+						ID:              "chID",
+						AuthorizationID: "azID",
+						Token:           "token",
+						Type:            "device-attest-01",
+						Status:          StatusPending,
+						Value:           "12345678",
+					},
+					db: &MockDB{
+						MockGetAuthorization: func(ctx context.Context, id string) (*Authorization, error) {
+							assert.Equal(t, "azID", id)
+							return &Authorization{ID: "azID"}, nil
+						},
 					},
 					payload: errorBase64Payload,
 				},
@@ -3299,11 +3430,18 @@ func Test_deviceAttest01Validate(t *testing.T) {
 			return test{
 				args: args{
 					ch: &Challenge{
-						ID:     "chID",
-						Token:  "token",
-						Type:   "device-attest-01",
-						Status: StatusPending,
-						Value:  "12345678",
+						ID:              "chID",
+						AuthorizationID: "azID",
+						Token:           "token",
+						Type:            "device-attest-01",
+						Status:          StatusPending,
+						Value:           "12345678",
+					},
+					db: &MockDB{
+						MockGetAuthorization: func(ctx context.Context, id string) (*Authorization, error) {
+							assert.Equal(t, "azID", id)
+							return &Authorization{ID: "azID"}, nil
+						},
 					},
 					payload: errorCBORPayload,
 				},
@@ -3311,67 +3449,28 @@ func Test_deviceAttest01Validate(t *testing.T) {
 			}
 		},
 		"ok/prov.IsAttestationFormatEnabled": func(t *testing.T) test {
-			ca, err := minica.New()
-			require.NoError(t, err)
-			makeLeaf := func(signer crypto.Signer, serialNumber []byte) *x509.Certificate {
-				leaf, err := ca.Sign(&x509.Certificate{
-					Subject:   pkix.Name{CommonName: "attestation cert"},
-					PublicKey: signer.Public(),
-					ExtraExtensions: []pkix.Extension{
-						{Id: oidYubicoSerialNumber, Value: serialNumber},
-					},
-				})
-				if err != nil {
-					t.Fatal(err)
-				}
-				return leaf
-			}
-			signer, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
-			require.NoError(t, err)
-			serialNumber, err := asn1.Marshal(1234)
-			require.NoError(t, err)
-			leaf := makeLeaf(signer, serialNumber)
-			jwk, err := jose.GenerateJWK("EC", "P-256", "ES256", "sig", "", 0)
-			require.NoError(t, err)
-			token := "token"
-			keyAuth, err := KeyAuthorization(token, jwk)
-			require.NoError(t, err)
-			keyAuthSum := sha256.Sum256([]byte(keyAuth))
-			sig, err := signer.Sign(rand.Reader, keyAuthSum[:], crypto.SHA256)
-			require.NoError(t, err)
-			cborSig, err := cbor.Marshal(sig)
-			require.NoError(t, err)
+			jwk, keyAuth := mustAccountAndKeyAuthorization(t, "token")
+			payload, _, _ := mustAttestYubikey(t, "nonce", keyAuth, 12345678)
 			ctx := NewProvisionerContext(context.Background(), mustNonAttestationProvisioner(t))
-			attObj, err := cbor.Marshal(struct {
-				Format       string                 `json:"fmt"`
-				AttStatement map[string]interface{} `json:"attStmt,omitempty"`
-			}{
-				Format: "step",
-				AttStatement: map[string]interface{}{
-					"x5c": []interface{}{leaf.Raw, ca.Intermediate.Raw},
-					"alg": -7,
-					"sig": cborSig,
-				},
-			})
-			require.NoError(t, err)
-			payload, err := json.Marshal(struct {
-				AttObj string `json:"attObj"`
-			}{
-				AttObj: base64.RawURLEncoding.EncodeToString(attObj),
-			})
-			require.NoError(t, err)
+
 			return test{
 				args: args{
 					ctx: ctx,
+					jwk: jwk,
 					ch: &Challenge{
-						ID:     "chID",
-						Token:  "token",
-						Type:   "device-attest-01",
-						Status: StatusPending,
-						Value:  "12345678",
+						ID:              "chID",
+						AuthorizationID: "azID",
+						Token:           "token",
+						Type:            "device-attest-01",
+						Status:          StatusPending,
+						Value:           "12345678",
 					},
 					payload: payload,
 					db: &MockDB{
+						MockGetAuthorization: func(ctx context.Context, id string) (*Authorization, error) {
+							assert.Equal(t, "azID", id)
+							return &Authorization{ID: "azID"}, nil
+						},
 						MockUpdateChallenge: func(ctx context.Context, updch *Challenge) error {
 							assert.Equal(t, "chID", updch.ID)
 							assert.Equal(t, "token", updch.Token)
@@ -3414,14 +3513,19 @@ func Test_deviceAttest01Validate(t *testing.T) {
 				args: args{
 					ctx: ctx,
 					ch: &Challenge{
-						ID:     "chID",
-						Token:  "token",
-						Type:   "device-attest-01",
-						Status: StatusPending,
-						Value:  "12345678",
+						ID:              "chID",
+						AuthorizationID: "azID",
+						Token:           "token",
+						Type:            "device-attest-01",
+						Status:          StatusPending,
+						Value:           "12345678",
 					},
 					payload: payload,
 					db: &MockDB{
+						MockGetAuthorization: func(ctx context.Context, id string) (*Authorization, error) {
+							assert.Equal(t, "azID", id)
+							return &Authorization{ID: "azID"}, nil
+						},
 						MockUpdateChallenge: func(ctx context.Context, updch *Challenge) error {
 							assert.Equal(t, "chID", updch.ID)
 							assert.Equal(t, "token", updch.Token)
@@ -3445,57 +3549,36 @@ func Test_deviceAttest01Validate(t *testing.T) {
 			}
 		},
 		"ok/doAppleAttestationFormat-non-matching-nonce": func(t *testing.T) test {
-			ca, err := minica.New()
-			require.NoError(t, err)
-			signer, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
-			require.NoError(t, err)
-			caRoot := pem.EncodeToMemory(&pem.Block{Type: "CERTIFICATE", Bytes: ca.Root.Raw})
-			leaf, err := ca.Sign(&x509.Certificate{
-				Subject:   pkix.Name{CommonName: "attestation cert"},
-				PublicKey: signer.Public(),
-				ExtraExtensions: []pkix.Extension{
-					{Id: oidAppleSerialNumber, Value: []byte("serial-number")},
-					{Id: oidAppleUniqueDeviceIdentifier, Value: []byte("udid")},
-					{Id: oidAppleSecureEnclaveProcessorOSVersion, Value: []byte("16.0")},
-					{Id: oidAppleNonce, Value: []byte("nonce")},
-				},
-			})
-			require.NoError(t, err)
+			jwk, _ := mustAccountAndKeyAuthorization(t, "token")
+			payload, _, root := mustAttestApple(t, "bad-nonce")
+
+			caRoot := pem.EncodeToMemory(&pem.Block{Type: "CERTIFICATE", Bytes: root.Raw})
 			ctx := NewProvisionerContext(context.Background(), mustAttestationProvisioner(t, caRoot))
-			attObj, err := cbor.Marshal(struct {
-				Format       string                 `json:"fmt"`
-				AttStatement map[string]interface{} `json:"attStmt,omitempty"`
-			}{
-				Format: "apple",
-				AttStatement: map[string]interface{}{
-					"x5c": []interface{}{leaf.Raw, ca.Intermediate.Raw},
-				},
-			})
-			require.NoError(t, err)
-			payload, err := json.Marshal(struct {
-				AttObj string `json:"attObj"`
-			}{
-				AttObj: base64.RawURLEncoding.EncodeToString(attObj),
-			})
-			require.NoError(t, err)
+
 			return test{
 				args: args{
 					ctx: ctx,
+					jwk: jwk,
 					ch: &Challenge{
-						ID:     "chID",
-						Token:  "token",
-						Type:   "device-attest-01",
-						Status: StatusPending,
-						Value:  "12345678",
+						ID:              "chID",
+						AuthorizationID: "azID",
+						Token:           "token",
+						Type:            "device-attest-01",
+						Status:          StatusPending,
+						Value:           "serial-number",
 					},
 					payload: payload,
 					db: &MockDB{
+						MockGetAuthorization: func(ctx context.Context, id string) (*Authorization, error) {
+							assert.Equal(t, "azID", id)
+							return &Authorization{ID: "azID"}, nil
+						},
 						MockUpdateChallenge: func(ctx context.Context, updch *Challenge) error {
 							assert.Equal(t, "chID", updch.ID)
 							assert.Equal(t, "token", updch.Token)
 							assert.Equal(t, StatusInvalid, updch.Status)
 							assert.Equal(t, ChallengeType("device-attest-01"), updch.Type)
-							assert.Equal(t, "12345678", updch.Value)
+							assert.Equal(t, "serial-number", updch.Value)
 
 							err := NewError(ErrorBadAttestationStatementType, "challenge token does not match")
 
@@ -3513,52 +3596,29 @@ func Test_deviceAttest01Validate(t *testing.T) {
 			}
 		},
 		"ok/doAppleAttestationFormat-non-matching-challenge-value": func(t *testing.T) test {
-			ca, err := minica.New()
-			require.NoError(t, err)
-			signer, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
-			require.NoError(t, err)
-			caRoot := pem.EncodeToMemory(&pem.Block{Type: "CERTIFICATE", Bytes: ca.Root.Raw})
-			nonce := sha256.Sum256([]byte("nonce"))
-			leaf, err := ca.Sign(&x509.Certificate{
-				Subject:   pkix.Name{CommonName: "attestation cert"},
-				PublicKey: signer.Public(),
-				ExtraExtensions: []pkix.Extension{
-					{Id: oidAppleSerialNumber, Value: []byte("serial-number")},
-					{Id: oidAppleUniqueDeviceIdentifier, Value: []byte("udid")},
-					{Id: oidAppleSecureEnclaveProcessorOSVersion, Value: []byte("16.0")},
-					{Id: oidAppleNonce, Value: nonce[:]},
-				},
-			})
-			require.NoError(t, err)
+			jwk, _ := mustAccountAndKeyAuthorization(t, "token")
+			payload, _, root := mustAttestApple(t, "nonce")
+
+			caRoot := pem.EncodeToMemory(&pem.Block{Type: "CERTIFICATE", Bytes: root.Raw})
 			ctx := NewProvisionerContext(context.Background(), mustAttestationProvisioner(t, caRoot))
-			attObj, err := cbor.Marshal(struct {
-				Format       string                 `json:"fmt"`
-				AttStatement map[string]interface{} `json:"attStmt,omitempty"`
-			}{
-				Format: "apple",
-				AttStatement: map[string]interface{}{
-					"x5c": []interface{}{leaf.Raw, ca.Intermediate.Raw},
-				},
-			})
-			require.NoError(t, err)
-			payload, err := json.Marshal(struct {
-				AttObj string `json:"attObj"`
-			}{
-				AttObj: base64.RawURLEncoding.EncodeToString(attObj),
-			})
-			require.NoError(t, err)
 			return test{
 				args: args{
 					ctx: ctx,
+					jwk: jwk,
 					ch: &Challenge{
-						ID:     "chID",
-						Token:  "nonce",
-						Type:   "device-attest-01",
-						Status: StatusPending,
-						Value:  "non-matching-value",
+						ID:              "chID",
+						AuthorizationID: "azID",
+						Token:           "nonce",
+						Type:            "device-attest-01",
+						Status:          StatusPending,
+						Value:           "non-matching-value",
 					},
 					payload: payload,
 					db: &MockDB{
+						MockGetAuthorization: func(ctx context.Context, id string) (*Authorization, error) {
+							assert.Equal(t, "azID", id)
+							return &Authorization{ID: "azID"}, nil
+						},
 						MockUpdateChallenge: func(ctx context.Context, updch *Challenge) error {
 							assert.Equal(t, "chID", updch.ID)
 							assert.Equal(t, "nonce", updch.Token)
@@ -3619,14 +3679,19 @@ func Test_deviceAttest01Validate(t *testing.T) {
 				args: args{
 					ctx: ctx,
 					ch: &Challenge{
-						ID:     "chID",
-						Token:  "token",
-						Type:   "device-attest-01",
-						Status: StatusPending,
-						Value:  "12345678",
+						ID:              "chID",
+						AuthorizationID: "azID",
+						Token:           "token",
+						Type:            "device-attest-01",
+						Status:          StatusPending,
+						Value:           "12345678",
 					},
 					payload: payload,
 					db: &MockDB{
+						MockGetAuthorization: func(ctx context.Context, id string) (*Authorization, error) {
+							assert.Equal(t, "azID", id)
+							return &Authorization{ID: "azID"}, nil
+						},
 						MockUpdateChallenge: func(ctx context.Context, updch *Challenge) error {
 							assert.Equal(t, "chID", updch.ID)
 							assert.Equal(t, "token", updch.Token)
@@ -3650,69 +3715,37 @@ func Test_deviceAttest01Validate(t *testing.T) {
 			}
 		},
 		"ok/doStepAttestationFormat-non-matching-identifier": func(t *testing.T) test {
-			ca, err := minica.New()
-			require.NoError(t, err)
-			caRoot := pem.EncodeToMemory(&pem.Block{Type: "CERTIFICATE", Bytes: ca.Root.Raw})
-			signer, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
-			require.NoError(t, err)
-			jwk, err := jose.GenerateJWK("EC", "P-256", "ES256", "sig", "", 0)
-			require.NoError(t, err)
-			token := "token"
-			keyAuth, err := KeyAuthorization(token, jwk)
-			require.NoError(t, err)
-			keyAuthSum := sha256.Sum256([]byte(keyAuth))
-			sig, err := signer.Sign(rand.Reader, keyAuthSum[:], crypto.SHA256)
-			require.NoError(t, err)
-			cborSig, err := cbor.Marshal(sig)
-			require.NoError(t, err)
+			jwk, keyAuth := mustAccountAndKeyAuthorization(t, "token")
+			payload, leaf, root := mustAttestYubikey(t, "nonce", keyAuth, 87654321)
+
+			caRoot := pem.EncodeToMemory(&pem.Block{Type: "CERTIFICATE", Bytes: root.Raw})
 			ctx := NewProvisionerContext(context.Background(), mustAttestationProvisioner(t, caRoot))
-			makeLeaf := func(signer crypto.Signer, serialNumber []byte) *x509.Certificate {
-				leaf, err := ca.Sign(&x509.Certificate{
-					Subject:   pkix.Name{CommonName: "attestation cert"},
-					PublicKey: signer.Public(),
-					ExtraExtensions: []pkix.Extension{
-						{Id: oidYubicoSerialNumber, Value: serialNumber},
-					},
-				})
-				if err != nil {
-					t.Fatal(err)
-				}
-				return leaf
-			}
-			require.NoError(t, err)
-			serialNumber, err := asn1.Marshal(87654321)
-			require.NoError(t, err)
-			leaf := makeLeaf(signer, serialNumber)
-			attObj, err := cbor.Marshal(struct {
-				Format       string                 `json:"fmt"`
-				AttStatement map[string]interface{} `json:"attStmt,omitempty"`
-			}{
-				Format: "step",
-				AttStatement: map[string]interface{}{
-					"x5c": []interface{}{leaf.Raw, ca.Intermediate.Raw},
-					"alg": -7,
-					"sig": cborSig,
-				},
-			})
-			require.NoError(t, err)
-			payload, err := json.Marshal(struct {
-				AttObj string `json:"attObj"`
-			}{
-				AttObj: base64.RawURLEncoding.EncodeToString(attObj),
-			})
-			require.NoError(t, err)
+
 			return test{
 				args: args{
 					ctx: ctx,
+					jwk: jwk,
 					ch: &Challenge{
-						ID:     "chID",
-						Token:  "token",
-						Type:   "device-attest-01",
-						Status: StatusPending,
-						Value:  "12345678",
+						ID:              "chID",
+						AuthorizationID: "azID",
+						Token:           "token",
+						Type:            "device-attest-01",
+						Status:          StatusPending,
+						Value:           "12345678",
 					},
 					payload: payload,
 					db: &MockDB{
+						MockGetAuthorization: func(ctx context.Context, id string) (*Authorization, error) {
+							assert.Equal(t, "azID", id)
+							return &Authorization{ID: "azID"}, nil
+						},
+						MockUpdateAuthorization: func(ctx context.Context, az *Authorization) error {
+							fingerprint, err := keyutil.Fingerprint(leaf.PublicKey)
+							assert.NoError(t, err)
+							assert.Equal(t, "azID", az.ID)
+							assert.Equal(t, fingerprint, az.Fingerprint)
+							return nil
+						},
 						MockUpdateChallenge: func(ctx context.Context, updch *Challenge) error {
 							assert.Equal(t, "chID", updch.ID)
 							assert.Equal(t, "token", updch.Token)
@@ -3736,7 +3769,6 @@ func Test_deviceAttest01Validate(t *testing.T) {
 							return nil
 						},
 					},
-					jwk: jwk,
 				},
 				wantErr: nil,
 			}
@@ -3796,14 +3828,19 @@ func Test_deviceAttest01Validate(t *testing.T) {
 				args: args{
 					ctx: ctx,
 					ch: &Challenge{
-						ID:     "chID",
-						Token:  "token",
-						Type:   "device-attest-01",
-						Status: StatusPending,
-						Value:  "12345678",
+						ID:              "chID",
+						AuthorizationID: "azID",
+						Token:           "token",
+						Type:            "device-attest-01",
+						Status:          StatusPending,
+						Value:           "12345678",
 					},
 					payload: payload,
 					db: &MockDB{
+						MockGetAuthorization: func(ctx context.Context, id string) (*Authorization, error) {
+							assert.Equal(t, "azID", id)
+							return &Authorization{ID: "azID"}, nil
+						},
 						MockUpdateChallenge: func(ctx context.Context, updch *Challenge) error {
 							assert.Equal(t, "chID", updch.ID)
 							assert.Equal(t, "token", updch.Token)
@@ -3827,70 +3864,75 @@ func Test_deviceAttest01Validate(t *testing.T) {
 				wantErr: nil,
 			}
 		},
-		"fail/db.UpdateChallenge": func(t *testing.T) test {
-			ca, err := minica.New()
-			require.NoError(t, err)
-			caRoot := pem.EncodeToMemory(&pem.Block{Type: "CERTIFICATE", Bytes: ca.Root.Raw})
-			signer, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
-			require.NoError(t, err)
-			jwk, err := jose.GenerateJWK("EC", "P-256", "ES256", "sig", "", 0)
-			require.NoError(t, err)
-			token := "token"
-			keyAuth, err := KeyAuthorization(token, jwk)
-			require.NoError(t, err)
-			keyAuthSum := sha256.Sum256([]byte(keyAuth))
-			sig, err := signer.Sign(rand.Reader, keyAuthSum[:], crypto.SHA256)
-			require.NoError(t, err)
-			cborSig, err := cbor.Marshal(sig)
-			require.NoError(t, err)
+		"fail/db.UpdateAuthorization": func(t *testing.T) test {
+			jwk, keyAuth := mustAccountAndKeyAuthorization(t, "token")
+			payload, leaf, root := mustAttestYubikey(t, "nonce", keyAuth, 12345678)
+
+			caRoot := pem.EncodeToMemory(&pem.Block{Type: "CERTIFICATE", Bytes: root.Raw})
 			ctx := NewProvisionerContext(context.Background(), mustAttestationProvisioner(t, caRoot))
-			makeLeaf := func(signer crypto.Signer, serialNumber []byte) *x509.Certificate {
-				leaf, err := ca.Sign(&x509.Certificate{
-					Subject:   pkix.Name{CommonName: "attestation cert"},
-					PublicKey: signer.Public(),
-					ExtraExtensions: []pkix.Extension{
-						{Id: oidYubicoSerialNumber, Value: serialNumber},
-					},
-				})
-				if err != nil {
-					t.Fatal(err)
-				}
-				return leaf
-			}
-			require.NoError(t, err)
-			serialNumber, err := asn1.Marshal(12345678)
-			require.NoError(t, err)
-			leaf := makeLeaf(signer, serialNumber)
-			attObj, err := cbor.Marshal(struct {
-				Format       string                 `json:"fmt"`
-				AttStatement map[string]interface{} `json:"attStmt,omitempty"`
-			}{
-				Format: "step",
-				AttStatement: map[string]interface{}{
-					"x5c": []interface{}{leaf.Raw, ca.Intermediate.Raw},
-					"alg": -7,
-					"sig": cborSig,
-				},
-			})
-			require.NoError(t, err)
-			payload, err := json.Marshal(struct {
-				AttObj string `json:"attObj"`
-			}{
-				AttObj: base64.RawURLEncoding.EncodeToString(attObj),
-			})
-			require.NoError(t, err)
+
 			return test{
 				args: args{
 					ctx: ctx,
+					jwk: jwk,
 					ch: &Challenge{
-						ID:     "chID",
-						Token:  "token",
-						Type:   "device-attest-01",
-						Status: StatusPending,
-						Value:  "12345678",
+						ID:              "chID",
+						AuthorizationID: "azID",
+						Token:           "token",
+						Type:            "device-attest-01",
+						Status:          StatusPending,
+						Value:           "12345678",
 					},
 					payload: payload,
 					db: &MockDB{
+						MockGetAuthorization: func(ctx context.Context, id string) (*Authorization, error) {
+							assert.Equal(t, "azID", id)
+							return &Authorization{ID: "azID"}, nil
+						},
+						MockUpdateAuthorization: func(ctx context.Context, az *Authorization) error {
+							fingerprint, err := keyutil.Fingerprint(leaf.PublicKey)
+							assert.NoError(t, err)
+							assert.Equal(t, "azID", az.ID)
+							assert.Equal(t, fingerprint, az.Fingerprint)
+							return errors.New("force")
+						},
+					},
+				},
+				wantErr: NewError(ErrorServerInternalType, "error updating authorization: force"),
+			}
+		},
+		"fail/db.UpdateChallenge": func(t *testing.T) test {
+			jwk, keyAuth := mustAccountAndKeyAuthorization(t, "token")
+			payload, leaf, root := mustAttestYubikey(t, "nonce", keyAuth, 12345678)
+
+			caRoot := pem.EncodeToMemory(&pem.Block{Type: "CERTIFICATE", Bytes: root.Raw})
+			ctx := NewProvisionerContext(context.Background(), mustAttestationProvisioner(t, caRoot))
+
+			return test{
+				args: args{
+					ctx: ctx,
+					jwk: jwk,
+					ch: &Challenge{
+						ID:              "chID",
+						AuthorizationID: "azID",
+						Token:           "token",
+						Type:            "device-attest-01",
+						Status:          StatusPending,
+						Value:           "12345678",
+					},
+					payload: payload,
+					db: &MockDB{
+						MockGetAuthorization: func(ctx context.Context, id string) (*Authorization, error) {
+							assert.Equal(t, "azID", id)
+							return &Authorization{ID: "azID"}, nil
+						},
+						MockUpdateAuthorization: func(ctx context.Context, az *Authorization) error {
+							fingerprint, err := keyutil.Fingerprint(leaf.PublicKey)
+							assert.NoError(t, err)
+							assert.Equal(t, "azID", az.ID)
+							assert.Equal(t, fingerprint, az.Fingerprint)
+							return nil
+						},
 						MockUpdateChallenge: func(ctx context.Context, updch *Challenge) error {
 							assert.Equal(t, "chID", updch.ID)
 							assert.Equal(t, "token", updch.Token)
@@ -3901,75 +3943,42 @@ func Test_deviceAttest01Validate(t *testing.T) {
 							return errors.New("force")
 						},
 					},
-					jwk: jwk,
 				},
 				wantErr: NewError(ErrorServerInternalType, "error updating challenge: force"),
 			}
 		},
 		"ok": func(t *testing.T) test {
-			ca, err := minica.New()
-			require.NoError(t, err)
-			caRoot := pem.EncodeToMemory(&pem.Block{Type: "CERTIFICATE", Bytes: ca.Root.Raw})
-			signer, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
-			require.NoError(t, err)
-			jwk, err := jose.GenerateJWK("EC", "P-256", "ES256", "sig", "", 0)
-			require.NoError(t, err)
-			token := "token"
-			keyAuth, err := KeyAuthorization(token, jwk)
-			require.NoError(t, err)
-			keyAuthSum := sha256.Sum256([]byte(keyAuth))
-			sig, err := signer.Sign(rand.Reader, keyAuthSum[:], crypto.SHA256)
-			require.NoError(t, err)
-			cborSig, err := cbor.Marshal(sig)
-			require.NoError(t, err)
+			jwk, keyAuth := mustAccountAndKeyAuthorization(t, "token")
+			payload, leaf, root := mustAttestYubikey(t, "nonce", keyAuth, 12345678)
+
+			caRoot := pem.EncodeToMemory(&pem.Block{Type: "CERTIFICATE", Bytes: root.Raw})
 			ctx := NewProvisionerContext(context.Background(), mustAttestationProvisioner(t, caRoot))
-			makeLeaf := func(signer crypto.Signer, serialNumber []byte) *x509.Certificate {
-				leaf, err := ca.Sign(&x509.Certificate{
-					Subject:   pkix.Name{CommonName: "attestation cert"},
-					PublicKey: signer.Public(),
-					ExtraExtensions: []pkix.Extension{
-						{Id: oidYubicoSerialNumber, Value: serialNumber},
-					},
-				})
-				if err != nil {
-					t.Fatal(err)
-				}
-				return leaf
-			}
-			require.NoError(t, err)
-			serialNumber, err := asn1.Marshal(12345678)
-			require.NoError(t, err)
-			leaf := makeLeaf(signer, serialNumber)
-			attObj, err := cbor.Marshal(struct {
-				Format       string                 `json:"fmt"`
-				AttStatement map[string]interface{} `json:"attStmt,omitempty"`
-			}{
-				Format: "step",
-				AttStatement: map[string]interface{}{
-					"x5c": []interface{}{leaf.Raw, ca.Intermediate.Raw},
-					"alg": -7,
-					"sig": cborSig,
-				},
-			})
-			require.NoError(t, err)
-			payload, err := json.Marshal(struct {
-				AttObj string `json:"attObj"`
-			}{
-				AttObj: base64.RawURLEncoding.EncodeToString(attObj),
-			})
-			require.NoError(t, err)
+
 			return test{
 				args: args{
 					ctx: ctx,
+					jwk: jwk,
 					ch: &Challenge{
-						ID:     "chID",
-						Token:  "token",
-						Type:   "device-attest-01",
-						Status: StatusPending,
-						Value:  "12345678",
+						ID:              "chID",
+						AuthorizationID: "azID",
+						Token:           "token",
+						Type:            "device-attest-01",
+						Status:          StatusPending,
+						Value:           "12345678",
 					},
 					payload: payload,
 					db: &MockDB{
+						MockGetAuthorization: func(ctx context.Context, id string) (*Authorization, error) {
+							assert.Equal(t, "azID", id)
+							return &Authorization{ID: "azID"}, nil
+						},
+						MockUpdateAuthorization: func(ctx context.Context, az *Authorization) error {
+							fingerprint, err := keyutil.Fingerprint(leaf.PublicKey)
+							assert.NoError(t, err)
+							assert.Equal(t, "azID", az.ID)
+							assert.Equal(t, fingerprint, az.Fingerprint)
+							return nil
+						},
 						MockUpdateChallenge: func(ctx context.Context, updch *Challenge) error {
 							assert.Equal(t, "chID", updch.ID)
 							assert.Equal(t, "token", updch.Token)
@@ -3980,7 +3989,6 @@ func Test_deviceAttest01Validate(t *testing.T) {
 							return nil
 						},
 					},
-					jwk: jwk,
 				},
 				wantErr: nil,
 			}
