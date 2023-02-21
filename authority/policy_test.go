@@ -127,7 +127,7 @@ func TestAuthority_checkPolicy(t *testing.T) {
 				},
 				err: &PolicyError{
 					Typ: AdminLockOut,
-					Err: errors.New("the provided policy would lock out [otherAdmin] from the CA. Please update your policy to include [otherAdmin] as an allowed name"),
+					Err: errors.New("the provided policy would lock out [otherAdmin] from the CA. Please create an x509 policy to include [otherAdmin] as an allowed DNS name"),
 				},
 			}
 		},
