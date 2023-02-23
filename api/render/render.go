@@ -25,7 +25,10 @@ func JSON(w http.ResponseWriter, v interface{}) {
 // specified.
 func JSONStatus(w http.ResponseWriter, v interface{}, status int) {
 	var b bytes.Buffer
-	if err := json.NewEncoder(&b).Encode(v); err != nil {
+	enc := json.NewEncoder(&b)
+	enc.SetIndent("", "\t")
+
+	if err := enc.Encode(v); err != nil {
 		panic(err)
 	}
 
