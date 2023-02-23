@@ -230,7 +230,7 @@ func (o *OIDC) ValidatePayload(p openIDPayload) error {
 			}
 		}
 		if !found {
-			return errs.Unauthorized("validatePayload: failed to validate oidc token payload: email is not allowed")
+			return errs.Unauthorized("validatePayload: failed to validate oidc token payload: email %q is not allowed", p.Email)
 		}
 	}
 
