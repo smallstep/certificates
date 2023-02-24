@@ -315,7 +315,7 @@ func NewErrorISE(msg string, args ...interface{}) *Error {
 
 // WrapError attempts to wrap the internal error.
 func WrapError(typ ProblemType, err error, msg string, args ...interface{}) *Error {
-	log.Printf(msg, args)
+	log.Printf(msg+"%#v", err)
 	var e *Error
 	switch {
 	case err == nil:
@@ -334,7 +334,7 @@ func WrapError(typ ProblemType, err error, msg string, args ...interface{}) *Err
 
 // WrapErrorISE shortcut to wrap an internal server error type.
 func WrapErrorISE(err error, msg string, args ...interface{}) *Error {
-	log.Printf(msg, args)
+	log.Printf(msg+"%#v", err)
 	return WrapError(ErrorServerInternalType, err, msg, args...)
 }
 
