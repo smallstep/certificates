@@ -812,6 +812,11 @@ func (p *PKI) GenerateConfig(opt ...ConfigOption) (*authconfig.Config, error) {
 		Templates: p.getTemplates(),
 	}
 
+	// Disable the database when WithNoDB() option is passed.
+	if p.options.noDB {
+		cfg.DB = nil
+	}
+
 	// Add linked as a deployment type to detect it on start and provide a
 	// message if the token is not given.
 	if p.options.deploymentType == LinkedDeployment {
