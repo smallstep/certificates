@@ -599,8 +599,6 @@ func (ca *CA) runCompactJob() {
 		return
 	}
 
-	var err error
-
 	// Compact database at start.
 	runCompact(compactor)
 
@@ -614,9 +612,6 @@ func (ca *CA) runCompactJob() {
 			return
 		case <-ticker.C:
 			runCompact(compactor)
-			for err == nil {
-				err = compactor.Compact(0.7)
-			}
 		}
 	}
 }
