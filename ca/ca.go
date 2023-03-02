@@ -13,6 +13,7 @@ import (
 	"reflect"
 	"strings"
 	"sync"
+	"time"
 
 	"github.com/go-chi/chi"
 	"github.com/go-chi/chi/middleware"
@@ -126,13 +127,15 @@ type CA struct {
 	insecureSrv *server.Server
 	opts        *options
 	renewer     *TLSRenewer
+	compactStop chan struct{}
 }
 
 // New creates and initializes the CA with the given configuration and options.
 func New(cfg *config.Config, opts ...Option) (*CA, error) {
 	ca := &CA{
-		config: cfg,
-		opts:   new(options),
+		config:      cfg,
+		opts:        new(options),
+		compactStop: make(chan struct{}),
 	}
 	ca.opts.apply(opts)
 	return ca.Init(cfg)
@@ -370,6 +373,12 @@ func (ca *CA) Run() error {
 		}
 	}
 
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		ca.runCompactJob()
+	}()
+
 	if ca.insecureSrv != nil {
 		wg.Add(1)
 		go func() {
@@ -394,6 +403,7 @@ func (ca *CA) Run() error {
 
 // Stop stops the CA calling to the server Shutdown method.
 func (ca *CA) Stop() error {
+	close(ca.compactStop)
 	ca.renewer.Stop()
 	if err := ca.auth.Shutdown(); err != nil {
 		log.Printf("error stopping ca.Authority: %+v\n", err)
@@ -575,4 +585,40 @@ func (ca *CA) getConfigFileOutput() string {
 		return ca.config.Filepath()
 	}
 	return "loaded from token"
+}
+
+// runCompactJob will run the value log garbage collector if the nosql database
+// supports it.
+func (ca *CA) runCompactJob() {
+	caDB, ok := ca.auth.GetDatabase().(*db.DB)
+	if !ok {
+		return
+	}
+	compactor, ok := caDB.DB.(nosql.Compactor)
+	if !ok {
+		return
+	}
+
+	// Compact database at start.
+	runCompact(compactor)
+
+	// Compact database every minute.
+	ticker := time.NewTicker(time.Minute)
+	defer ticker.Stop()
+
+	for {
+		select {
+		case <-ca.compactStop:
+			return
+		case <-ticker.C:
+			runCompact(compactor)
+		}
+	}
+}
+
+// runCompact executes the compact job until it returns an error.
+func runCompact(c nosql.Compactor) {
+	for err := error(nil); err == nil; {
+		err = c.Compact(0.7)
+	}
 }
