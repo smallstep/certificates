@@ -27,6 +27,11 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
 
 ## [Unreleased]
 
+### Fixed
+
+- Fixed support for PKCS #7 RSA-OAEP decryption through 
+  [smallstep/pkcs7#4](https://github.com/smallstep/pkcs7/pull/4), as used in SCEP.
+
 ## [v0.23.2] - 2023-02-02
 
 ### Added
