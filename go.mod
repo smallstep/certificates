@@ -141,4 +141,4 @@ require (
 // replace go.step.sm/linkedca => ../linkedca
 
 // use github.com/smallstep/pkcs7 fork with patches applied
-replace go.mozilla.org/pkcs7 => github.com/smallstep/pkcs7 v0.0.0-20221024180420-e1aab68dda05
+replace go.mozilla.org/pkcs7 => github.com/smallstep/pkcs7 v0.0.0-20230302202335-4c094085c948
