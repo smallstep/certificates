@@ -9,9 +9,9 @@ RUN apt-get install -y --no-install-recommends \
 RUN make V=1 download
 RUN make V=1 GOFLAGS="" build
 
-FROM smallstep/step-kms-plugin:debian AS kms
+FROM smallstep/step-kms-plugin:bullseye AS kms
 
-FROM smallstep/step-cli:debian
+FROM smallstep/step-cli:bullseye
 
 COPY --from=builder /src/bin/step-ca /usr/local/bin/step-ca
 COPY --from=kms /usr/local/bin/step-kms-plugin /usr/local/bin/step-kms-plugin
