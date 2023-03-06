@@ -54,7 +54,7 @@ func (n *NewOrderRequest) Validate() error {
 			if err != nil {
 				return acme.NewError(acme.ErrorMalformedType, "ID cannot be parsed")
 			}
-			if !strings.HasPrefix(orderValue.ClientID, "impp:wireapp=") {
+			if !strings.HasPrefix(orderValue.ClientID, "im:wireapp=") {
 				return acme.NewError(acme.ErrorMalformedType, "missing client ID prefix")
 			}
 		default:

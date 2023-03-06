@@ -199,7 +199,7 @@ func TestIMIntegration(t *testing.T) {
 			Identifiers: []acme.Identifier{
 				{
 					Type:  "wireapp-id",
-					Value: `{"name": "Smith, Alice M (QA)", "domain": "example.com", "client-id": "impp:wireapp=75d73550-16e0-4027-abfd-0137e32180cc/ed416ce8ecdd9fad@example.com", "handle": "impp:wireapp=alice.smith.qa@example.com"}`,
+					Value: `{"name": "Smith, Alice M (QA)", "domain": "example.com", "client-id": "im:wireapp=75d73550-16e0-4027-abfd-0137e32180cc/ed416ce8ecdd9fad@example.com", "handle": "im:wireapp=alice.smith.qa@example.com"}`,
 				},
 			},
 		}
@@ -377,12 +377,12 @@ func TestIMIntegration(t *testing.T) {
 			},
 		})
 
-		qUserID, err := url.Parse("impp:wireapp=75d73550-16e0-4027-abfd-0137e32180cc/ed416ce8ecdd9fad@example.com")
+		qUserID, err := url.Parse("im:wireapp=75d73550-16e0-4027-abfd-0137e32180cc/ed416ce8ecdd9fad@example.com")
 		if err != nil {
 			t.Fatal("parse user ID URI", err)
 		}
 		_ = qUserID
-		qUserName, err := url.Parse("impp:wireapp=alice.smith.qa@example.com")
+		qUserName, err := url.Parse("im:wireapp=alice.smith.qa@example.com")
 		if err != nil {
 			t.Fatal("parse user name URI", err)
 		}
