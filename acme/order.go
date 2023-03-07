@@ -354,8 +354,11 @@ func (o *Order) sans(csr *x509.CertificateRequest) ([]x509util.SubjectAlternativ
 			if err != nil {
 				return sans, NewErrorISE("unsupported identifier value in order: %s", n.Value)
 			}
-			orderNames[indexDNS] = wireID.Name
-			indexDNS++
+			//orderNames[indexDNS] = wireID.Name
+			//indexDNS++
+			if wireID.Name != csr.Subject.CommonName {
+				return sans, NewError(ErrorBadCSRType, "CSR Subject CommonName should match displayName exactly: CSR Subj CN = %v, displayName = %v", csr.Subject.CommonName, wireID.Name)
+			}
 			orderURIs[indexURI] = wireID.ClientID
 			indexURI++
 			orderURIs[indexURI] = wireID.Handle
