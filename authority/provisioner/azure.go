@@ -26,7 +26,12 @@ import (
 const azureOIDCBaseURL = "https://login.microsoftonline.com"
 
 //nolint:gosec // azureIdentityTokenURL is the URL to get the identity token for an instance.
-const azureIdentityTokenURL = "http://169.254.169.254/metadata/identity/oauth2/token?api-version=2018-02-01&resource=https%3A%2F%2Fmanagement.azure.com%2F"
+const azureIdentityTokenURL = "http://169.254.169.254/metadata/identity/oauth2/token"
+
+const azureIdentityTokenAPIVersion = "2018-02-01"
+
+// azureInstanceComputeURL is the URL to get the instance compute metadata.
+const azureInstanceComputeURL = "http://169.254.169.254/metadata/instance/compute/azEnvironment"
 
 // azureDefaultAudience is the default audience used.
 const azureDefaultAudience = "https://management.azure.com/"
@@ -35,15 +40,25 @@ const azureDefaultAudience = "https://management.azure.com/"
 // Using case insensitive as resourceGroups appears as resourcegroups.
 var azureXMSMirIDRegExp = regexp.MustCompile(`(?i)^/subscriptions/([^/]+)/resourceGroups/([^/]+)/providers/Microsoft.(Compute/virtualMachines|ManagedIdentity/userAssignedIdentities)/([^/]+)$`)
 
+// azureEnvironments is the list of all Azure environments.
+var azureEnvironments = map[string]string{
+	"AzurePublicCloud":       "https://management.azure.com/",
+	"AzureUSGovernmentCloud": "https://management.usgovcloudapi.net/",
+	"AzureChinaCloud":        "https://management.chinacloudapi.cn/",
+	"AzureGermanCloud":       "https://management.microsoftazure.de/",
+}
+
 type azureConfig struct {
-	oidcDiscoveryURL string
-	identityTokenURL string
+	oidcDiscoveryURL   string
+	identityTokenURL   string
+	instanceComputeURL string
 }
 
 func newAzureConfig(tenantID string) *azureConfig {
 	return &azureConfig{
-		oidcDiscoveryURL: azureOIDCBaseURL + "/" + tenantID + "/.well-known/openid-configuration",
-		identityTokenURL: azureIdentityTokenURL,
+		oidcDiscoveryURL:   azureOIDCBaseURL + "/" + tenantID + "/.well-known/openid-configuration",
+		identityTokenURL:   azureIdentityTokenURL,
+		instanceComputeURL: azureInstanceComputeURL,
 	}
 }
 
@@ -167,11 +182,28 @@ func (p *Azure) GetIdentityToken(subject, caURL string) (string, error) {
 	// Initialize the config if this method is used from the cli.
 	p.assertConfig()
 
+	// default to AzurePublicCloud to keep existing behavior
+	identityTokenResource := azureEnvironments["AzurePublicCloud"]
+	environment, err := p.getAzureEnvironment()
+	if err != nil {
+		return "", errors.Wrap(err, "error getting azure environment")
+	}
+
+	if resource, ok := azureEnvironments[environment]; ok {
+		identityTokenResource = resource
+	}
+
 	req, err := http.NewRequest("GET", p.config.identityTokenURL, http.NoBody)
 	if err != nil {
 		return "", errors.Wrap(err, "error creating request")
 	}
 	req.Header.Set("Metadata", "true")
+
+	query := req.URL.Query()
+	query.Add("resource", identityTokenResource)
+	query.Add("api-version", azureIdentityTokenAPIVersion)
+	req.URL.RawQuery = query.Encode()
+
 	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
 		return "", errors.Wrap(err, "error getting identity token, are you in a Azure VM?")
@@ -443,4 +475,34 @@ func (p *Azure) assertConfig() {
 	if p.config == nil {
 		p.config = newAzureConfig(p.TenantID)
 	}
+}
+
+// getAzureEnvironment returns the Azure environment for the current instance
+func (p *Azure) getAzureEnvironment() (string, error) {
+	req, err := http.NewRequest("GET", p.config.instanceComputeURL, http.NoBody)
+	if err != nil {
+		return "", errors.Wrap(err, "error creating request")
+	}
+	req.Header.Add("Metadata", "True")
+
+	query := req.URL.Query()
+	query.Add("format", "text")
+	query.Add("api-version", "2021-02-01")
+	req.URL.RawQuery = query.Encode()
+
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		return "", errors.Wrap(err, "error getting azure instance environment, are you in a Azure VM?")
+	}
+	defer resp.Body.Close()
+
+	b, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return "", errors.Wrap(err, "error reading azure environment response")
+	}
+	if resp.StatusCode >= 400 {
+		return "", errors.Errorf("error getting azure environment: status=%d, response=%s", resp.StatusCode, b)
+	}
+
+	return string(b), nil
 }

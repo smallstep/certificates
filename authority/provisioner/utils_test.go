@@ -665,6 +665,9 @@ func generateAzureWithServer() (*Azure, *httptest.Server, error) {
 					AccessToken: tok,
 				})
 			}
+		case "/metadata/instance/compute/azEnvironment":
+			w.Header().Add("Content-Type", "text/plain")
+			w.Write([]byte("AzurePublicCloud"))
 		default:
 			http.NotFound(w, r)
 		}
@@ -672,6 +675,7 @@ func generateAzureWithServer() (*Azure, *httptest.Server, error) {
 	srv.Start()
 	az.config.oidcDiscoveryURL = srv.URL + "/" + az.TenantID + "/.well-known/openid-configuration"
 	az.config.identityTokenURL = srv.URL + "/metadata/identity/oauth2/token"
+	az.config.instanceComputeURL = srv.URL + "/metadata/instance/compute/azEnvironment"
 	return az, srv, nil
 }
 
