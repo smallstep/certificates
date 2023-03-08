@@ -5,6 +5,7 @@ import (
 	"context"
 	"crypto/subtle"
 	"crypto/x509"
+	"encoding/asn1"
 	"encoding/json"
 	"net"
 	"net/url"
@@ -307,12 +308,21 @@ func (o *Order) subject(csr *x509.CertificateRequest) (subject x509util.Subject,
 			if err != nil {
 				return subject, NewErrorISE("unmarshal wireID: %s", err)
 			}
-			if csr.Subject.CommonName != wireID.Name {
-				return subject, NewErrorISE("expected CN %v, found %v", wireID.Name, csr.Subject.CommonName)
+
+			// TODO: temporarily using a custom OIDC for carrying the display name without having it listed as a DNS SAN.
+			// reusing LDAP's OID for diplay name see http://oid-info.com/get/2.16.840.1.113730.3.1.241
+			displayNameOid := asn1.ObjectIdentifier{1, 2, 840, 113549, 1, 9, 1}
+			for _, entry := range csr.Subject.Names {
+				if entry.Type.Equal(displayNameOid) {
+					displayName := entry.Value.(string)
+					if displayName != wireID.Name {
+						return subject, NewErrorISE("expected displayName %v, found %v", wireID.Name, displayName)
+					}
+				}
 			}
 
 			if len(csr.Subject.Organization) == 0 || !strings.EqualFold(csr.Subject.Organization[0], wireID.Domain) {
-				return subject, NewErrorISE("expected Organiztion [%s], found %v", wireID.Domain, csr.Subject.Organization)
+				return subject, NewErrorISE("expected Organization [%s], found %v", wireID.Domain, csr.Subject.Organization)
 			}
 			subject.CommonName = wireID.Name
 			subject.Organization = []string{wireID.Domain}
@@ -354,11 +364,6 @@ func (o *Order) sans(csr *x509.CertificateRequest) ([]x509util.SubjectAlternativ
 			if err != nil {
 				return sans, NewErrorISE("unsupported identifier value in order: %s", n.Value)
 			}
-			//orderNames[indexDNS] = wireID.Name
-			//indexDNS++
-			//if wireID.Name != csr.Subject.CommonName {
-			//	return sans, NewError(ErrorBadCSRType, "CSR Subject CommonName should match displayName exactly: CSR Subj CN = %v, displayName = %v", csr.Subject.CommonName, wireID.Name)
-			//}
 			orderURIs[indexURI] = wireID.ClientID
 			indexURI++
 			orderURIs[indexURI] = wireID.Handle
