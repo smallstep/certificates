@@ -26,6 +26,7 @@ import (
 	"time"
 
 	"github.com/fxamacker/cbor/v2"
+	"github.com/google/go-attestation/attest"
 	"github.com/google/go-tpm/tpm2"
 	"github.com/ryboe/q"
 
@@ -426,20 +427,23 @@ func deviceAttest01Validate(ctx context.Context, ch *Challenge, db DB, jwk *jose
 		if data.SerialNumber != ch.Value {
 			return storeError(ctx, db, ch, true, NewError(ErrorBadAttestationStatementType, "permanent identifier does not match"))
 		}
-	case "tpm": // TODO(hs): this may end up being a different case; this is the generic `tpm` format from `WebAuthn`
+	case "tpm":
 		data, err := doTPMAttestationFormat(ctx, ch, db, &att)
 		if err != nil {
-			q.Q("attestation error:", err)
-			return err
+			var acmeError *Error
+			if errors.As(err, &acmeError) {
+				if acmeError.Status == 500 {
+					return acmeError
+				}
+				return storeError(ctx, db, ch, true, acmeError)
+			}
+			return WrapErrorISE(err, "error validating attestation")
 		}
 
 		expectedDigest, err := keyAuthDigest(jwk, ch.Token)
 		if err != nil {
 			return fmt.Errorf("error creating key auth digest: %w", err)
 		}
-
-		q.Q(data)
-		q.Q(expectedDigest)
 
 		// verify the WebAuthn object contains the expect key authorization digest, which is carried
 		// within the encoded `certInfo` property of the attestation statement.
@@ -465,6 +469,7 @@ func deviceAttest01Validate(ctx context.Context, ch *Challenge, db DB, jwk *jose
 }
 
 // Borrowed from: https://github.com/golang/crypto/blob/master/acme/acme.go#L748
+// TODO(hs): the hash algorithm in use should match the request data
 func keyAuthDigest(jwk *jose.JSONWebKey, token string) ([]byte, error) {
 	th, err := jwk.Thumbprint(crypto.SHA256) // TODO(hs): verify this is the correct thumbprint
 	digest := sha256.Sum256([]byte(fmt.Sprintf("%s.%s", token, th)))
@@ -485,21 +490,29 @@ func doTPMAttestationFormat(ctx context.Context, ch *Challenge, db DB, att *Atte
 		return nil, NewErrorISE("provisioner in context is not an ACME provisioner")
 	}
 
+	ver, ok := att.AttStatement["ver"].(string)
+	if !ok {
+		return nil, NewError(ErrorBadAttestationStatementType, "ver not present")
+	}
+	if ver != "2.0" {
+		return nil, NewError(ErrorBadAttestationStatementType, "%q is not supported", ver)
+	}
+
 	x5c, ok := att.AttStatement["x5c"].([]interface{})
 	if !ok {
-		return nil, storeError(ctx, db, ch, true, NewError(ErrorBadAttestationStatementType, "x5c not present"))
+		return nil, NewError(ErrorBadAttestationStatementType, "x5c not present")
 	}
 	if len(x5c) == 0 {
-		return nil, storeError(ctx, db, ch, true, NewError(ErrorBadAttestationStatementType, "x5c is empty"))
+		return nil, NewError(ErrorBadAttestationStatementType, "x5c is empty")
 	}
 
 	der, ok := x5c[0].([]byte)
 	if !ok {
-		return nil, storeError(ctx, db, ch, true, NewError(ErrorBadAttestationStatementType, "x5c is malformed"))
+		return nil, NewError(ErrorBadAttestationStatementType, "x5c is malformed")
 	}
 	leaf, err := x509.ParseCertificate(der)
 	if err != nil {
-		return nil, storeError(ctx, db, ch, true, WrapError(ErrorBadAttestationStatementType, err, "x5c is malformed"))
+		return nil, WrapError(ErrorBadAttestationStatementType, err, "x5c is malformed")
 	}
 
 	intermediates := x509.NewCertPool()
@@ -507,11 +520,11 @@ func doTPMAttestationFormat(ctx context.Context, ch *Challenge, db DB, att *Atte
 		for _, v := range x5c[1:] {
 			der, ok = v.([]byte)
 			if !ok {
-				return nil, storeError(ctx, db, ch, true, NewError(ErrorBadAttestationStatementType, "x5c is malformed"))
+				return nil, NewError(ErrorBadAttestationStatementType, "x5c is malformed")
 			}
 			cert, err := x509.ParseCertificate(der)
 			if err != nil {
-				return nil, storeError(ctx, db, ch, true, WrapError(ErrorBadAttestationStatementType, err, "x5c is malformed"))
+				return nil, WrapError(ErrorBadAttestationStatementType, err, "x5c is malformed")
 			}
 			intermediates.AddCert(cert)
 		}
@@ -520,13 +533,11 @@ func doTPMAttestationFormat(ctx context.Context, ch *Challenge, db DB, att *Atte
 	// TODO(hs): this can be removed when permanent-identifier/hardware-module-name are handled correctly in
 	// the stdlib in https://cs.opensource.google/go/go/+/refs/tags/go1.19:src/crypto/x509/parser.go;drc=b5b2cf519fe332891c165077f3723ee74932a647;l=362,
 	// but I doubt that will happen.
-	// TODO(hs): decide on the right logic for handling unhandled critical extensions
 	if len(leaf.UnhandledCriticalExtensions) > 0 {
 		unhandledCriticalExtensions := leaf.UnhandledCriticalExtensions[:0]
 		for _, extOID := range leaf.UnhandledCriticalExtensions {
 			switch {
-			// TODO(hs): extend the switch statement with other allowed OIDs; this might have to become configurable too
-			case extOID.Equal(asn1.ObjectIdentifier{2, 5, 29, 17}):
+			case extOID.Equal(asn1.ObjectIdentifier{2, 5, 29, 17}): // Subject Alternative Name
 				// TODO(hs): decide when the processed extension is "OK"; permanent-identifier/hardware-module-name
 				for _, e := range leaf.Extensions {
 					if e.Id.Equal(extOID) {
@@ -555,29 +566,62 @@ func doTPMAttestationFormat(ctx context.Context, ch *Challenge, db DB, att *Atte
 		KeyUsages:     []x509.ExtKeyUsage{x509.ExtKeyUsageAny},
 	})
 	if err != nil {
-		if storeErr := storeError(ctx, db, ch, true, WrapError(ErrorBadAttestationStatementType, err, "x5c is not valid")); storeErr != nil {
-			return nil, fmt.Errorf("error saving order error: %w", storeErr)
-		}
-		return nil, fmt.Errorf("error verifying x5c leaf: %w", err)
+		return nil, WrapError(ErrorBadAttestationStatementType, err, "x5c is not valid")
 	}
 
 	// TODO(hs): implement revocation check; Verify() doesn't perform CRL check nor OCSP lookup.
-	// TODO(hs): more properties to verify and/or return?
 
-	q.Q(att.AttStatement)
+	pubArea, ok := att.AttStatement["pubArea"].([]byte)
+	if !ok {
+		return nil, NewError(ErrorBadAttestationStatementType, "invalid pubArea in attestation statement")
+	}
+
+	sig, ok := att.AttStatement["sig"].([]byte)
+	if !ok {
+		return nil, NewError(ErrorBadAttestationStatementType, "invalid sig in attestation statement")
+	}
+
+	alg, ok := att.AttStatement["alg"].(int64)
+	if !ok {
+		return nil, NewError(ErrorBadAttestationStatementType, "invalid alg in attestation statement")
+	}
+
+	var hash crypto.Hash
+	switch alg {
+	case -257: // RS256
+		hash = crypto.SHA256
+	case -8: // EdDSA
+		hash = crypto.Hash(0)
+	case -7: // ES256
+		hash = crypto.SHA256
+	default:
+		return nil, NewError(ErrorBadAttestationStatementType, "invalid alg %d in attestation statement", alg)
+	}
 
 	certInfo, ok := att.AttStatement["certInfo"].([]byte)
 	if !ok {
-		return nil, errors.New("invalid certInfo in attestation statement")
+		return nil, NewError(ErrorBadAttestationStatementType, "invalid certInfo in attestation statement")
+	}
+
+	certificationParameters := &attest.CertificationParameters{
+		Public:            pubArea,
+		CreateSignature:   sig,
+		CreateAttestation: certInfo,
+	}
+	opts := attest.VerifyOpts{
+		Public: leaf.PublicKey, // signature created by the AK that attested the key
+		Hash:   hash,
+	}
+	if err = certificationParameters.Verify(opts); err != nil {
+		return nil, WrapError(ErrorBadAttestationStatementType, err, "invalid certification parameters")
 	}
 
 	tpmCertInfo, err := tpm2.DecodeAttestationData([]byte(certInfo))
 	if err != nil {
-		return nil, fmt.Errorf("invalid certInfo: %w", err)
+		return nil, WrapError(ErrorBadAttestationStatementType, err, "failed decoding attestation data")
 	}
 
-	q.Q(tpmCertInfo.ExtraData)
-
+	// TODO(hs): pass more attestation data, so that that can be recorded too?
 	return &tpmAttestationData{
 		Certificate:    leaf,
 		VerifiedChains: verifiedChains,
