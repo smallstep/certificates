@@ -866,7 +866,6 @@ func TestHandler_validateExternalAccountBinding(t *testing.T) {
 					assert.Equals(t, ae.Status, tc.err.Status)
 					assert.HasPrefix(t, ae.Err.Error(), tc.err.Err.Error())
 					assert.Equals(t, ae.Detail, tc.err.Detail)
-					assert.Equals(t, ae.Identifier, tc.err.Identifier)
 					assert.Equals(t, ae.Subproblems, tc.err.Subproblems)
 				}
 			} else {
@@ -1145,7 +1144,6 @@ func Test_validateEABJWS(t *testing.T) {
 				assert.Equals(t, tc.err.Status, err.Status)
 				assert.HasPrefix(t, err.Err.Error(), tc.err.Err.Error())
 				assert.Equals(t, tc.err.Detail, err.Detail)
-				assert.Equals(t, tc.err.Identifier, err.Identifier)
 				assert.Equals(t, tc.err.Subproblems, err.Subproblems)
 			} else {
 				assert.Nil(t, err)

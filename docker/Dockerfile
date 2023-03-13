@@ -5,13 +5,14 @@ COPY . .
 
 RUN apk add --no-cache curl git make
 RUN make V=1 download
-RUN make V=1 bin/step-ca bin/step-awskms-init bin/step-cloudkms-init
+RUN make V=1 bin/step-ca
+
+FROM smallstep/step-kms-plugin-cloud:latest AS kms
 
 FROM smallstep/step-cli:latest
 
 COPY --from=builder /src/bin/step-ca /usr/local/bin/step-ca
-COPY --from=builder /src/bin/step-awskms-init /usr/local/bin/step-awskms-init
-COPY --from=builder /src/bin/step-cloudkms-init /usr/local/bin/step-cloudkms-init
+COPY --from=kms /usr/local/bin/step-kms-plugin /usr/local/bin/step-kms-plugin
 
 USER root
 RUN apk add --no-cache libcap && setcap CAP_NET_BIND_SERVICE=+eip /usr/local/bin/step-ca

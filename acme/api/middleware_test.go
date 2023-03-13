@@ -93,7 +93,6 @@ func TestHandler_addNonce(t *testing.T) {
 
 				assert.Equals(t, ae.Type, tc.err.Type)
 				assert.Equals(t, ae.Detail, tc.err.Detail)
-				assert.Equals(t, ae.Identifier, tc.err.Identifier)
 				assert.Equals(t, ae.Subproblems, tc.err.Subproblems)
 				assert.Equals(t, res.Header["Content-Type"], []string{"application/problem+json"})
 			} else {
@@ -147,7 +146,6 @@ func TestHandler_addDirLink(t *testing.T) {
 
 				assert.Equals(t, ae.Type, tc.err.Type)
 				assert.Equals(t, ae.Detail, tc.err.Detail)
-				assert.Equals(t, ae.Identifier, tc.err.Identifier)
 				assert.Equals(t, ae.Subproblems, tc.err.Subproblems)
 				assert.Equals(t, res.Header["Content-Type"], []string{"application/problem+json"})
 			} else {
@@ -252,7 +250,6 @@ func TestHandler_verifyContentType(t *testing.T) {
 
 				assert.Equals(t, ae.Type, tc.err.Type)
 				assert.Equals(t, ae.Detail, tc.err.Detail)
-				assert.Equals(t, ae.Identifier, tc.err.Identifier)
 				assert.Equals(t, ae.Subproblems, tc.err.Subproblems)
 				assert.Equals(t, res.Header["Content-Type"], []string{"application/problem+json"})
 			} else {
@@ -320,7 +317,6 @@ func TestHandler_isPostAsGet(t *testing.T) {
 
 				assert.Equals(t, ae.Type, tc.err.Type)
 				assert.Equals(t, ae.Detail, tc.err.Detail)
-				assert.Equals(t, ae.Identifier, tc.err.Identifier)
 				assert.Equals(t, ae.Subproblems, tc.err.Subproblems)
 				assert.Equals(t, res.Header["Content-Type"], []string{"application/problem+json"})
 			} else {
@@ -410,7 +406,6 @@ func TestHandler_parseJWS(t *testing.T) {
 
 				assert.Equals(t, ae.Type, tc.err.Type)
 				assert.Equals(t, ae.Detail, tc.err.Detail)
-				assert.Equals(t, ae.Identifier, tc.err.Identifier)
 				assert.Equals(t, ae.Subproblems, tc.err.Subproblems)
 				assert.Equals(t, res.Header["Content-Type"], []string{"application/problem+json"})
 			} else {
@@ -606,7 +601,6 @@ func TestHandler_verifyAndExtractJWSPayload(t *testing.T) {
 
 				assert.Equals(t, ae.Type, tc.err.Type)
 				assert.Equals(t, ae.Detail, tc.err.Detail)
-				assert.Equals(t, ae.Identifier, tc.err.Identifier)
 				assert.Equals(t, ae.Subproblems, tc.err.Subproblems)
 				assert.Equals(t, res.Header["Content-Type"], []string{"application/problem+json"})
 			} else {
@@ -808,7 +802,6 @@ func TestHandler_lookupJWK(t *testing.T) {
 
 				assert.Equals(t, ae.Type, tc.err.Type)
 				assert.Equals(t, ae.Detail, tc.err.Detail)
-				assert.Equals(t, ae.Identifier, tc.err.Identifier)
 				assert.Equals(t, ae.Subproblems, tc.err.Subproblems)
 				assert.Equals(t, res.Header["Content-Type"], []string{"application/problem+json"})
 			} else {
@@ -1008,7 +1001,6 @@ func TestHandler_extractJWK(t *testing.T) {
 
 				assert.Equals(t, ae.Type, tc.err.Type)
 				assert.Equals(t, ae.Detail, tc.err.Detail)
-				assert.Equals(t, ae.Identifier, tc.err.Identifier)
 				assert.Equals(t, ae.Subproblems, tc.err.Subproblems)
 				assert.Equals(t, res.Header["Content-Type"], []string{"application/problem+json"})
 			} else {
@@ -1384,7 +1376,6 @@ func TestHandler_validateJWS(t *testing.T) {
 
 				assert.Equals(t, ae.Type, tc.err.Type)
 				assert.Equals(t, ae.Detail, tc.err.Detail)
-				assert.Equals(t, ae.Identifier, tc.err.Identifier)
 				assert.Equals(t, ae.Subproblems, tc.err.Subproblems)
 				assert.Equals(t, res.Header["Content-Type"], []string{"application/problem+json"})
 			} else {
@@ -1567,7 +1558,6 @@ func TestHandler_extractOrLookupJWK(t *testing.T) {
 
 				assert.Equals(t, ae.Type, tc.err.Type)
 				assert.Equals(t, ae.Detail, tc.err.Detail)
-				assert.Equals(t, ae.Identifier, tc.err.Identifier)
 				assert.Equals(t, ae.Subproblems, tc.err.Subproblems)
 				assert.Equals(t, res.Header["Content-Type"], []string{"application/problem+json"})
 			} else {
@@ -1652,7 +1642,6 @@ func TestHandler_checkPrerequisites(t *testing.T) {
 				assert.FatalError(t, json.Unmarshal(bytes.TrimSpace(body), &ae))
 				assert.Equals(t, ae.Type, tc.err.Type)
 				assert.Equals(t, ae.Detail, tc.err.Detail)
-				assert.Equals(t, ae.Identifier, tc.err.Identifier)
 				assert.Equals(t, ae.Subproblems, tc.err.Subproblems)
 				assert.Equals(t, res.Header["Content-Type"], []string{"application/problem+json"})
 			} else {

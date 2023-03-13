@@ -486,7 +486,6 @@ func TestHandler_GetOrder(t *testing.T) {
 
 				assert.Equals(t, ae.Type, tc.err.Type)
 				assert.Equals(t, ae.Detail, tc.err.Detail)
-				assert.Equals(t, ae.Identifier, tc.err.Identifier)
 				assert.Equals(t, ae.Subproblems, tc.err.Subproblems)
 				assert.Equals(t, res.Header["Content-Type"], []string{"application/problem+json"})
 			} else {
@@ -1846,7 +1845,6 @@ func TestHandler_NewOrder(t *testing.T) {
 
 				assert.Equals(t, ae.Type, tc.err.Type)
 				assert.Equals(t, ae.Detail, tc.err.Detail)
-				assert.Equals(t, ae.Identifier, tc.err.Identifier)
 				assert.Equals(t, ae.Subproblems, tc.err.Subproblems)
 				assert.Equals(t, res.Header["Content-Type"], []string{"application/problem+json"})
 			} else {
@@ -2144,7 +2142,6 @@ func TestHandler_FinalizeOrder(t *testing.T) {
 
 				assert.Equals(t, ae.Type, tc.err.Type)
 				assert.Equals(t, ae.Detail, tc.err.Detail)
-				assert.Equals(t, ae.Identifier, tc.err.Identifier)
 				assert.Equals(t, ae.Subproblems, tc.err.Subproblems)
 				assert.Equals(t, res.Header["Content-Type"], []string{"application/problem+json"})
 			} else {

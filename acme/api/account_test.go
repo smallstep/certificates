@@ -388,7 +388,6 @@ func TestHandler_GetOrdersByAccountID(t *testing.T) {
 
 				assert.Equals(t, ae.Type, tc.err.Type)
 				assert.Equals(t, ae.Detail, tc.err.Detail)
-				assert.Equals(t, ae.Identifier, tc.err.Identifier)
 				assert.Equals(t, ae.Subproblems, tc.err.Subproblems)
 				assert.Equals(t, res.Header["Content-Type"], []string{"application/problem+json"})
 			} else {
@@ -828,7 +827,6 @@ func TestHandler_NewAccount(t *testing.T) {
 
 				assert.Equals(t, ae.Type, tc.err.Type)
 				assert.Equals(t, ae.Detail, tc.err.Detail)
-				assert.Equals(t, ae.Identifier, tc.err.Identifier)
 				assert.Equals(t, ae.Subproblems, tc.err.Subproblems)
 				assert.Equals(t, res.Header["Content-Type"], []string{"application/problem+json"})
 			} else {
@@ -1032,7 +1030,6 @@ func TestHandler_GetOrUpdateAccount(t *testing.T) {
 
 				assert.Equals(t, ae.Type, tc.err.Type)
 				assert.Equals(t, ae.Detail, tc.err.Detail)
-				assert.Equals(t, ae.Identifier, tc.err.Identifier)
 				assert.Equals(t, ae.Subproblems, tc.err.Subproblems)
 				assert.Equals(t, res.Header["Content-Type"], []string{"application/problem+json"})
 			} else {

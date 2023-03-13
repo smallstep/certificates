@@ -31,6 +31,7 @@ import (
 	"github.com/ryboe/q"
 
 	"go.step.sm/crypto/jose"
+	"go.step.sm/crypto/keyutil"
 	"go.step.sm/crypto/pemutil"
 
 	"github.com/smallstep/certificates/authority/provisioner"
@@ -84,10 +85,9 @@ func (ch *Challenge) ToLog() (interface{}, error) {
 	return string(b), nil
 }
 
-// Validate attempts to validate the challenge. Stores changes to the Challenge
-// type using the DB interface.
-// satisfactorily validated, the 'status' and 'validated' attributes are
-// updated.
+// Validate attempts to validate the Challenge. Stores changes to the Challenge
+// type using the DB interface. If the Challenge is validated, the 'status' and
+// 'validated' attributes are updated.
 func (ch *Challenge) Validate(ctx context.Context, db DB, jwk *jose.JSONWebKey, payload []byte) error {
 	// If already valid or invalid then return without performing validation.
 	if ch.Status != StatusPending {
@@ -340,20 +340,26 @@ func dns01Validate(ctx context.Context, ch *Challenge, db DB, jwk *jose.JSONWebK
 	return nil
 }
 
-type Payload struct {
+type payloadType struct {
 	AttObj string `json:"attObj"`
 	Error  string `json:"error"`
 }
 
-type AttestationObject struct {
+type attestationObject struct {
 	Format       string                 `json:"fmt"`
 	AttStatement map[string]interface{} `json:"attStmt,omitempty"`
 }
 
 // TODO(bweeks): move attestation verification to a shared package.
-// TODO(bweeks): define new error type for failed attestation validation.
 func deviceAttest01Validate(ctx context.Context, ch *Challenge, db DB, jwk *jose.JSONWebKey, payload []byte) error {
-	var p Payload
+	// Load authorization to store the key fingerprint.
+	az, err := db.GetAuthorization(ctx, ch.AuthorizationID)
+	if err != nil {
+		return WrapErrorISE(err, "error loading authorization")
+	}
+
+	// Parse payload.
+	var p payloadType
 	if err := json.Unmarshal(payload, &p); err != nil {
 		return WrapErrorISE(err, "error unmarshalling JSON")
 	}
@@ -367,7 +373,7 @@ func deviceAttest01Validate(ctx context.Context, ch *Challenge, db DB, jwk *jose
 		return WrapErrorISE(err, "error base64 decoding attObj")
 	}
 
-	att := AttestationObject{}
+	att := attestationObject{}
 	if err := cbor.Unmarshal(attObj, &att); err != nil {
 		return WrapErrorISE(err, "error unmarshalling CBOR")
 	}
@@ -391,7 +397,6 @@ func deviceAttest01Validate(ctx context.Context, ch *Challenge, db DB, jwk *jose
 			}
 			return WrapErrorISE(err, "error validating attestation")
 		}
-
 		// Validate nonce with SHA-256 of the token.
 		if len(data.Nonce) != 0 {
 			sum := sha256.Sum256([]byte(ch.Token))
@@ -407,6 +412,9 @@ func deviceAttest01Validate(ctx context.Context, ch *Challenge, db DB, jwk *jose
 		if data.UDID != ch.Value && data.SerialNumber != ch.Value {
 			return storeError(ctx, db, ch, true, NewError(ErrorBadAttestationStatementType, "permanent identifier does not match"))
 		}
+
+		// Update attestation key fingerprint to compare against the CSR
+		az.Fingerprint = data.Fingerprint
 	case "step":
 		data, err := doStepAttestationFormat(ctx, prov, ch, jwk, &att)
 		if err != nil {
@@ -420,13 +428,22 @@ func deviceAttest01Validate(ctx context.Context, ch *Challenge, db DB, jwk *jose
 			return WrapErrorISE(err, "error validating attestation")
 		}
 
-		// Validate Apple's ClientIdentifier (Identifier.Value) with device
-		// identifiers.
+		// Validate the YubiKey serial number from the attestation
+		// certificate with the challenged Order value.
 		//
 		// Note: We might want to use an external service for this.
 		if data.SerialNumber != ch.Value {
-			return storeError(ctx, db, ch, true, NewError(ErrorBadAttestationStatementType, "permanent identifier does not match"))
+			subproblem := NewSubproblemWithIdentifier(
+				ErrorMalformedType,
+				Identifier{Type: "permanent-identifier", Value: ch.Value},
+				"challenge identifier %q doesn't match the attested hardware identifier %q", ch.Value, data.SerialNumber,
+			)
+			return storeError(ctx, db, ch, true, NewError(ErrorBadAttestationStatementType, "permanent identifier does not match").AddSubproblems(subproblem))
 		}
+
+		// Update attestation key fingerprint to compare against the CSR
+		az.Fingerprint = data.Fingerprint
+
 	case "tpm":
 		data, err := doTPMAttestationFormat(ctx, ch, db, &att)
 		if err != nil {
@@ -462,6 +479,15 @@ func deviceAttest01Validate(ctx context.Context, ch *Challenge, db DB, jwk *jose
 	ch.Error = nil
 	ch.ValidatedAt = clock.Now().Format(time.RFC3339)
 
+	// Store the fingerprint in the authorization.
+	//
+	// TODO: add method to update authorization and challenge atomically.
+	if az.Fingerprint != "" {
+		if err := db.UpdateAuthorization(ctx, az); err != nil {
+			return WrapErrorISE(err, "error updating authorization")
+		}
+	}
+
 	if err := db.UpdateChallenge(ctx, ch); err != nil {
 		return WrapErrorISE(err, "error updating challenge")
 	}
@@ -482,7 +508,7 @@ type tpmAttestationData struct {
 	ExtraData      []byte // TODO(hs): rename this to KeyAuthorization to reflect its usage?
 }
 
-func doTPMAttestationFormat(ctx context.Context, ch *Challenge, db DB, att *AttestationObject) (*tpmAttestationData, error) {
+func doTPMAttestationFormat(ctx context.Context, ch *Challenge, db DB, att *attestationObject) (*tpmAttestationData, error) {
 
 	p := MustProvisionerFromContext(ctx)
 	prov, ok := p.(*provisioner.ACME)
@@ -659,9 +685,10 @@ type appleAttestationData struct {
 	UDID         string
 	SEPVersion   string
 	Certificate  *x509.Certificate
+	Fingerprint  string
 }
 
-func doAppleAttestationFormat(ctx context.Context, prov Provisioner, ch *Challenge, att *AttestationObject) (*appleAttestationData, error) {
+func doAppleAttestationFormat(ctx context.Context, prov Provisioner, ch *Challenge, att *attestationObject) (*appleAttestationData, error) {
 	// Use configured or default attestation roots if none is configured.
 	roots, ok := prov.GetAttestationRoots()
 	if !ok {
@@ -715,6 +742,9 @@ func doAppleAttestationFormat(ctx context.Context, prov Provisioner, ch *Challen
 	data := &appleAttestationData{
 		Certificate: leaf,
 	}
+	if data.Fingerprint, err = keyutil.Fingerprint(leaf.PublicKey); err != nil {
+		return nil, WrapErrorISE(err, "error calculating key fingerprint")
+	}
 	for _, ext := range leaf.Extensions {
 		switch {
 		case ext.Id.Equal(oidAppleSerialNumber):
@@ -760,9 +790,10 @@ var oidYubicoSerialNumber = asn1.ObjectIdentifier{1, 3, 6, 1, 4, 1, 41482, 3, 7}
 type stepAttestationData struct {
 	Certificate  *x509.Certificate
 	SerialNumber string
+	Fingerprint  string
 }
 
-func doStepAttestationFormat(ctx context.Context, prov Provisioner, ch *Challenge, jwk *jose.JSONWebKey, att *AttestationObject) (*stepAttestationData, error) {
+func doStepAttestationFormat(ctx context.Context, prov Provisioner, ch *Challenge, jwk *jose.JSONWebKey, att *attestationObject) (*stepAttestationData, error) {
 	// Use configured or default attestation roots if none is configured.
 	roots, ok := prov.GetAttestationRoots()
 	if !ok {
@@ -854,6 +885,9 @@ func doStepAttestationFormat(ctx context.Context, prov Provisioner, ch *Challeng
 	// TODO(mariano): add support for other extensions.
 	data := &stepAttestationData{
 		Certificate: leaf,
+	}
+	if data.Fingerprint, err = keyutil.Fingerprint(leaf.PublicKey); err != nil {
+		return nil, WrapErrorISE(err, "error calculating key fingerprint")
 	}
 	for _, ext := range leaf.Extensions {
 		if !ext.Id.Equal(oidYubicoSerialNumber) {

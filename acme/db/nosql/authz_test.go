@@ -473,6 +473,7 @@ func TestDB_UpdateAuthorization(t *testing.T) {
 		ExpiresAt:    now.Add(5 * time.Minute),
 		ChallengeIDs: []string{"foo", "bar"},
 		Wildcard:     true,
+		Fingerprint:  "fingerprint",
 	}
 	b, err := json.Marshal(dbaz)
 	assert.FatalError(t, err)
@@ -549,10 +550,11 @@ func TestDB_UpdateAuthorization(t *testing.T) {
 					{ID: "foo"},
 					{ID: "bar"},
 				},
-				Token:     dbaz.Token,
-				Wildcard:  dbaz.Wildcard,
-				ExpiresAt: dbaz.ExpiresAt,
-				Error:     acme.NewError(acme.ErrorMalformedType, "malformed"),
+				Token:       dbaz.Token,
+				Wildcard:    dbaz.Wildcard,
+				ExpiresAt:   dbaz.ExpiresAt,
+				Fingerprint: "fingerprint",
+				Error:       acme.NewError(acme.ErrorMalformedType, "malformed"),
 			}
 			return test{
 				az: updAz,
@@ -582,6 +584,7 @@ func TestDB_UpdateAuthorization(t *testing.T) {
 						assert.Equals(t, dbNew.Wildcard, dbaz.Wildcard)
 						assert.Equals(t, dbNew.CreatedAt, dbaz.CreatedAt)
 						assert.Equals(t, dbNew.ExpiresAt, dbaz.ExpiresAt)
+						assert.Equals(t, dbNew.Fingerprint, dbaz.Fingerprint)
 						assert.Equals(t, dbNew.Error.Error(), acme.NewError(acme.ErrorMalformedType, "The request message was malformed").Error())
 						return nu, true, nil
 					},

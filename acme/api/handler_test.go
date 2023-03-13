@@ -193,7 +193,6 @@ func TestHandler_GetDirectory(t *testing.T) {
 
 				assert.Equals(t, ae.Type, tc.err.Type)
 				assert.Equals(t, ae.Detail, tc.err.Detail)
-				assert.Equals(t, ae.Identifier, tc.err.Identifier)
 				assert.Equals(t, ae.Subproblems, tc.err.Subproblems)
 				assert.Equals(t, res.Header["Content-Type"], []string{"application/problem+json"})
 			} else {
@@ -366,7 +365,6 @@ func TestHandler_GetAuthorization(t *testing.T) {
 
 				assert.Equals(t, ae.Type, tc.err.Type)
 				assert.Equals(t, ae.Detail, tc.err.Detail)
-				assert.Equals(t, ae.Identifier, tc.err.Identifier)
 				assert.Equals(t, ae.Subproblems, tc.err.Subproblems)
 				assert.Equals(t, res.Header["Content-Type"], []string{"application/problem+json"})
 			} else {
@@ -509,7 +507,6 @@ func TestHandler_GetCertificate(t *testing.T) {
 
 				assert.Equals(t, ae.Type, tc.err.Type)
 				assert.HasPrefix(t, ae.Detail, tc.err.Detail)
-				assert.Equals(t, ae.Identifier, tc.err.Identifier)
 				assert.Equals(t, ae.Subproblems, tc.err.Subproblems)
 				assert.Equals(t, res.Header["Content-Type"], []string{"application/problem+json"})
 			} else {
@@ -768,7 +765,6 @@ func TestHandler_GetChallenge(t *testing.T) {
 
 				assert.Equals(t, ae.Type, tc.err.Type)
 				assert.Equals(t, ae.Detail, tc.err.Detail)
-				assert.Equals(t, ae.Identifier, tc.err.Identifier)
 				assert.Equals(t, ae.Subproblems, tc.err.Subproblems)
 				assert.Equals(t, res.Header["Content-Type"], []string{"application/problem+json"})
 			} else {
