@@ -3,7 +3,7 @@ module github.com/smallstep/certificates
 go 1.18
 
 require (
-	cloud.google.com/go v0.107.0 // indirect
+	cloud.google.com/go v0.110.0 // indirect
 	cloud.google.com/go/longrunning v0.4.1
 	cloud.google.com/go/security v1.12.0
 	github.com/Azure/azure-sdk-for-go v68.0.0+incompatible // indirect
@@ -23,7 +23,7 @@ require (
 	github.com/golang/mock v1.6.0
 	github.com/google/go-cmp v0.5.9
 	github.com/google/uuid v1.3.0
-	github.com/googleapis/gax-go/v2 v2.7.0
+	github.com/googleapis/gax-go/v2 v2.7.1
 	github.com/hashicorp/vault/api v1.9.0
 	github.com/hashicorp/vault/api/auth/approle v0.4.0
 	github.com/hashicorp/vault/api/auth/kubernetes v0.4.0
@@ -49,7 +49,7 @@ require (
 	golang.org/x/sys v0.6.0 // indirect
 	golang.org/x/time v0.0.0-20210220033141-f8bda1e9f3ba // indirect
 	google.golang.org/api v0.111.0
-	google.golang.org/genproto v0.0.0-20230223222841-637eb2293923 // indirect
+	google.golang.org/genproto v0.0.0-20230303212802-e74f57abe488 // indirect
 	google.golang.org/grpc v1.53.0
 	google.golang.org/protobuf v1.29.0
 	gopkg.in/square/go-jose.v2 v2.6.0
@@ -58,7 +58,7 @@ require (
 require (
 	cloud.google.com/go/compute v1.18.0 // indirect
 	cloud.google.com/go/compute/metadata v0.2.3 // indirect
-	cloud.google.com/go/iam v0.11.0 // indirect
+	cloud.google.com/go/iam v0.12.0 // indirect
 	cloud.google.com/go/kms v1.8.0 // indirect
 	filippo.io/edwards25519 v1.0.0 // indirect
 	github.com/AndreasBriese/bbloom v0.0.0-20190825152654-46b345b51c96 // indirect
