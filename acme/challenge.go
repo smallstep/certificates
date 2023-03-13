@@ -445,9 +445,10 @@ func deviceAttest01Validate(ctx context.Context, ch *Challenge, db DB, jwk *jose
 		az.Fingerprint = data.Fingerprint
 
 	case "tpm":
-		data, err := doTPMAttestationFormat(ctx, ch, db, &att)
+		data, err := doTPMAttestationFormat(ctx, ch, db, jwk, &att)
 		if err != nil {
 			var acmeError *Error
+			q.Q("att error: %w", err)
 			if errors.As(err, &acmeError) {
 				if acmeError.Status == 500 {
 					return acmeError
@@ -457,19 +458,10 @@ func deviceAttest01Validate(ctx context.Context, ch *Challenge, db DB, jwk *jose
 			return WrapErrorISE(err, "error validating attestation")
 		}
 
-		expectedDigest, err := keyAuthDigest(jwk, ch.Token)
-		if err != nil {
-			return fmt.Errorf("error creating key auth digest: %w", err)
-		}
-
-		// verify the WebAuthn object contains the expect key authorization digest, which is carried
-		// within the encoded `certInfo` property of the attestation statement.
-		if subtle.ConstantTimeCompare(expectedDigest, data.ExtraData) == 0 {
-			return storeError(ctx, db, ch, true, NewError(ErrorBadAttestationStatementType, "key authorization doesn't match"))
-		}
-
 		// TODO(hs): more properties to verify? Apple method has nonce, check for permanent identifier.
 
+		// Update attestation key fingerprint to compare against the CSR
+		az.Fingerprint = data.Fingerprint
 	default:
 		return storeError(ctx, db, ch, true, NewError(ErrorBadAttestationStatementType, "unexpected attestation object format"))
 	}
@@ -505,11 +497,10 @@ func keyAuthDigest(jwk *jose.JSONWebKey, token string) ([]byte, error) {
 type tpmAttestationData struct {
 	Certificate    *x509.Certificate
 	VerifiedChains [][]*x509.Certificate
-	ExtraData      []byte // TODO(hs): rename this to KeyAuthorization to reflect its usage?
+	Fingerprint    string
 }
 
-func doTPMAttestationFormat(ctx context.Context, ch *Challenge, db DB, att *attestationObject) (*tpmAttestationData, error) {
-
+func doTPMAttestationFormat(ctx context.Context, ch *Challenge, db DB, jwk *jose.JSONWebKey, att *attestationObject) (*tpmAttestationData, error) {
 	p := MustProvisionerFromContext(ctx)
 	prov, ok := p.(*provisioner.ACME)
 	if !ok {
@@ -634,25 +625,51 @@ func doTPMAttestationFormat(ctx context.Context, ch *Challenge, db DB, att *atte
 		CreateSignature:   sig,
 		CreateAttestation: certInfo,
 	}
-	opts := attest.VerifyOpts{
+	verifyOpts := attest.VerifyOpts{
 		Public: leaf.PublicKey, // signature created by the AK that attested the key
 		Hash:   hash,
 	}
-	if err = certificationParameters.Verify(opts); err != nil {
+	if err = certificationParameters.Verify(verifyOpts); err != nil {
 		return nil, WrapError(ErrorBadAttestationStatementType, err, "invalid certification parameters")
 	}
 
-	tpmCertInfo, err := tpm2.DecodeAttestationData([]byte(certInfo))
+	tpmCertInfo, err := tpm2.DecodeAttestationData(certInfo)
 	if err != nil {
 		return nil, WrapError(ErrorBadAttestationStatementType, err, "failed decoding attestation data")
 	}
 
-	// TODO(hs): pass more attestation data, so that that can be recorded too?
-	return &tpmAttestationData{
+	expectedDigest, err := keyAuthDigest(jwk, ch.Token)
+	if err != nil {
+		return nil, WrapError(ErrorBadAttestationStatementType, err, "failed creating key auth digest")
+	}
+
+	// verify the WebAuthn object contains the expect key authorization digest, which is carried
+	// within the encoded `certInfo` property of the attestation statement.
+	if subtle.ConstantTimeCompare(expectedDigest, []byte(tpmCertInfo.ExtraData)) == 0 {
+		return nil, NewError(ErrorBadAttestationStatementType, "key authorization doesn not match")
+	}
+
+	pub, err := tpm2.DecodePublic(pubArea)
+	if err != nil {
+		return nil, WrapError(ErrorBadAttestationStatementType, err, "failed decoding pubArea")
+	}
+
+	publicKey, err := pub.Key()
+	if err != nil {
+		return nil, WrapError(ErrorBadAttestationStatementType, err, "failed getting public key")
+	}
+
+	data := &tpmAttestationData{
 		Certificate:    leaf,
 		VerifiedChains: verifiedChains,
-		ExtraData:      []byte(tpmCertInfo.ExtraData),
-	}, nil
+	}
+
+	if data.Fingerprint, err = keyutil.Fingerprint(publicKey); err != nil {
+		return nil, WrapErrorISE(err, "error calculating key fingerprint")
+	}
+
+	// TODO(hs): pass more attestation data, so that that can be used/recorded too?
+	return data, nil
 }
 
 // Apple Enterprise Attestation Root CA from
