@@ -28,7 +28,6 @@ import (
 	"github.com/fxamacker/cbor/v2"
 	"github.com/google/go-attestation/attest"
 	"github.com/google/go-tpm/tpm2"
-	"github.com/ryboe/q"
 
 	"go.step.sm/crypto/jose"
 	"go.step.sm/crypto/keyutil"
@@ -448,7 +447,6 @@ func deviceAttest01Validate(ctx context.Context, ch *Challenge, db DB, jwk *jose
 		data, err := doTPMAttestationFormat(ctx, ch, db, jwk, &att)
 		if err != nil {
 			var acmeError *Error
-			q.Q("att error: %w", err)
 			if errors.As(err, &acmeError) {
 				if acmeError.Status == 500 {
 					return acmeError
@@ -493,6 +491,10 @@ func keyAuthDigest(jwk *jose.JSONWebKey, token string) ([]byte, error) {
 	digest := sha256.Sum256([]byte(fmt.Sprintf("%s.%s", token, th)))
 	return digest[:], err
 }
+
+var (
+	oidSubjectAlternativeName = asn1.ObjectIdentifier{2, 5, 29, 17}
+)
 
 type tpmAttestationData struct {
 	Certificate    *x509.Certificate
@@ -554,17 +556,10 @@ func doTPMAttestationFormat(ctx context.Context, ch *Challenge, db DB, jwk *jose
 		unhandledCriticalExtensions := leaf.UnhandledCriticalExtensions[:0]
 		for _, extOID := range leaf.UnhandledCriticalExtensions {
 			switch {
-			case extOID.Equal(asn1.ObjectIdentifier{2, 5, 29, 17}): // Subject Alternative Name
-				// TODO(hs): decide when the processed extension is "OK"; permanent-identifier/hardware-module-name
-				for _, e := range leaf.Extensions {
-					if e.Id.Equal(extOID) {
-						// TODO(hs): validate this is in fact a valid PermanentIdentifier/HardwareModuleName
-						q.Q(e)
-					}
-				}
-				continue
+			case extOID.Equal(oidSubjectAlternativeName):
+				// allow Subject Alternative Names, including PermanentIdentifier, HardwareModuleName, TPM attributes, etc
 			default:
-				// OIDs that are not in the switch remain unhandled
+				// OIDs that are not in the switch with explicitly allowed OIDs remain unhandled
 				unhandledCriticalExtensions = append(unhandledCriticalExtensions, extOID)
 			}
 		}
@@ -573,7 +568,7 @@ func doTPMAttestationFormat(ctx context.Context, ch *Challenge, db DB, jwk *jose
 
 	roots, ok := prov.GetAttestationRoots()
 	if !ok {
-		return nil, NewErrorISE("error getting tpm attestation root CAs")
+		return nil, NewErrorISE("failed getting tpm attestation root CAs")
 	}
 
 	verifiedChains, err := leaf.Verify(x509.VerifyOptions{
@@ -620,19 +615,22 @@ func doTPMAttestationFormat(ctx context.Context, ch *Challenge, db DB, jwk *jose
 		return nil, NewError(ErrorBadAttestationStatementType, "invalid certInfo in attestation statement")
 	}
 
+	// recreate the generated key certification parameter values and verify
+	// the attested key using the public key of the AK.
 	certificationParameters := &attest.CertificationParameters{
-		Public:            pubArea,
-		CreateSignature:   sig,
-		CreateAttestation: certInfo,
+		Public:            pubArea,  // the public key that was attested
+		CreateAttestation: certInfo, // the attested properties of the key
+		CreateSignature:   sig,      // signature over the attested properties
 	}
 	verifyOpts := attest.VerifyOpts{
-		Public: leaf.PublicKey, // signature created by the AK that attested the key
+		Public: leaf.PublicKey, // public key of the AK that attested the key
 		Hash:   hash,
 	}
 	if err = certificationParameters.Verify(verifyOpts); err != nil {
 		return nil, WrapError(ErrorBadAttestationStatementType, err, "invalid certification parameters")
 	}
 
+	// decode the "certInfo" data
 	tpmCertInfo, err := tpm2.DecodeAttestationData(certInfo)
 	if err != nil {
 		return nil, WrapError(ErrorBadAttestationStatementType, err, "failed decoding attestation data")
@@ -649,6 +647,7 @@ func doTPMAttestationFormat(ctx context.Context, ch *Challenge, db DB, jwk *jose
 		return nil, NewError(ErrorBadAttestationStatementType, "key authorization doesn not match")
 	}
 
+	// decode the (attested) public key and determine its fingerprint
 	pub, err := tpm2.DecodePublic(pubArea)
 	if err != nil {
 		return nil, WrapError(ErrorBadAttestationStatementType, err, "failed decoding pubArea")

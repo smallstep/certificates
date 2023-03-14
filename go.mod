@@ -35,7 +35,6 @@ require (
 	github.com/newrelic/go-agent/v3 v3.20.4
 	github.com/pkg/errors v0.9.1
 	github.com/rs/xid v1.4.0
-	github.com/ryboe/q v1.0.17
 	github.com/sirupsen/logrus v1.9.0
 	github.com/slackhq/nebula v1.6.1
 	github.com/smallstep/assert v0.0.0-20200723003110-82e2b9b3b262
@@ -116,7 +115,6 @@ require (
 	github.com/jackc/pgx/v4 v4.18.0 // indirect
 	github.com/jmespath/go-jmespath v0.4.0 // indirect
 	github.com/klauspost/compress v1.15.11 // indirect
-	github.com/kr/text v0.2.0 // indirect
 	github.com/manifoldco/promptui v0.9.0 // indirect
 	github.com/mgutz/ansi v0.0.0-20200706080929-d51e80ef957d // indirect
 	github.com/miekg/pkcs11 v1.1.1 // indirect
@@ -125,7 +123,6 @@ require (
 	github.com/mitchellh/mapstructure v1.5.0 // indirect
 	github.com/mitchellh/reflectwalk v1.0.2 // indirect
 	github.com/pmezard/go-difflib v1.0.0 // indirect
-	github.com/rogpeppe/go-internal v1.9.0 // indirect
 	github.com/russross/blackfriday/v2 v2.1.0 // indirect
 	github.com/ryanuber/go-glob v1.0.0 // indirect
 	github.com/shopspring/decimal v1.2.0 // indirect
