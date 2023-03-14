@@ -11,6 +11,7 @@ import (
 	"crypto/subtle"
 	"crypto/tls"
 	"crypto/x509"
+	"crypto/x509/pkix"
 	"encoding/asn1"
 	"encoding/base64"
 	"encoding/hex"
@@ -27,7 +28,9 @@ import (
 
 	"github.com/fxamacker/cbor/v2"
 	"github.com/google/go-attestation/attest"
+	x509ext "github.com/google/go-attestation/x509"
 	"github.com/google/go-tpm/tpm2"
+	"golang.org/x/exp/slices"
 
 	"go.step.sm/crypto/jose"
 	"go.step.sm/crypto/keyutil"
@@ -446,6 +449,8 @@ func deviceAttest01Validate(ctx context.Context, ch *Challenge, db DB, jwk *jose
 	case "tpm":
 		data, err := doTPMAttestationFormat(ctx, ch, db, jwk, &att)
 		if err != nil {
+			// TODO(hs): we should provide more details in the error reported to the client;
+			// "Attestation statement cannot be verified" is VERY generic. Also holds true for the other formats.
 			var acmeError *Error
 			if errors.As(err, &acmeError) {
 				if acmeError.Status == 500 {
@@ -456,7 +461,19 @@ func deviceAttest01Validate(ctx context.Context, ch *Challenge, db DB, jwk *jose
 			return WrapErrorISE(err, "error validating attestation")
 		}
 
-		// TODO(hs): more properties to verify? Apple method has nonce, check for permanent identifier.
+		// TODO(hs): currently this will allow a request for which no PermanentIdentifiers have been
+		// extracted from the AK certificate. This is currently the case for AK certs from the CLI, as we
+		// haven't implemented a way for AK certs requested by the CLI to always contain the requested
+		// PermanentIdentifier. Omitting the check below doesn't allow just any request, as the Order can
+		// still fail if the challenge value isn't equal to the CSR subject.
+		if len(data.PermanentIdentifiers) > 0 && !slices.Contains(data.PermanentIdentifiers, ch.Value) { // TODO(hs): add support for HardwareModuleName
+			subproblem := NewSubproblemWithIdentifier(
+				ErrorMalformedType,
+				Identifier{Type: "permanent-identifier", Value: ch.Value},
+				"challenge identifier %q doesn't match any of the attested hardware identifiers %q", ch.Value, data.PermanentIdentifiers,
+			)
+			return storeError(ctx, db, ch, true, NewError(ErrorRejectedIdentifierType, "permanent identifier does not match").AddSubproblems(subproblem))
+		}
 
 		// Update attestation key fingerprint to compare against the CSR
 		az.Fingerprint = data.Fingerprint
@@ -484,22 +501,15 @@ func deviceAttest01Validate(ctx context.Context, ch *Challenge, db DB, jwk *jose
 	return nil
 }
 
-// Borrowed from: https://github.com/golang/crypto/blob/master/acme/acme.go#L748
-// TODO(hs): the hash algorithm in use should match the request data
-func keyAuthDigest(jwk *jose.JSONWebKey, token string) ([]byte, error) {
-	th, err := jwk.Thumbprint(crypto.SHA256) // TODO(hs): verify this is the correct thumbprint
-	digest := sha256.Sum256([]byte(fmt.Sprintf("%s.%s", token, th)))
-	return digest[:], err
-}
-
 var (
 	oidSubjectAlternativeName = asn1.ObjectIdentifier{2, 5, 29, 17}
 )
 
 type tpmAttestationData struct {
-	Certificate    *x509.Certificate
-	VerifiedChains [][]*x509.Certificate
-	Fingerprint    string
+	Certificate          *x509.Certificate
+	VerifiedChains       [][]*x509.Certificate
+	PermanentIdentifiers []string
+	Fingerprint          string
 }
 
 func doTPMAttestationFormat(ctx context.Context, ch *Challenge, db DB, jwk *jose.JSONWebKey, att *attestationObject) (*tpmAttestationData, error) {
@@ -514,7 +524,7 @@ func doTPMAttestationFormat(ctx context.Context, ch *Challenge, db DB, jwk *jose
 		return nil, NewError(ErrorBadAttestationStatementType, "ver not present")
 	}
 	if ver != "2.0" {
-		return nil, NewError(ErrorBadAttestationStatementType, "%q is not supported", ver)
+		return nil, NewError(ErrorBadAttestationStatementType, "version %q is not supported", ver)
 	}
 
 	x5c, ok := att.AttStatement["x5c"].([]interface{})
@@ -525,11 +535,11 @@ func doTPMAttestationFormat(ctx context.Context, ch *Challenge, db DB, jwk *jose
 		return nil, NewError(ErrorBadAttestationStatementType, "x5c is empty")
 	}
 
-	der, ok := x5c[0].([]byte)
+	akCertBytes, ok := x5c[0].([]byte)
 	if !ok {
 		return nil, NewError(ErrorBadAttestationStatementType, "x5c is malformed")
 	}
-	leaf, err := x509.ParseCertificate(der)
+	akCert, err := x509.ParseCertificate(akCertBytes)
 	if err != nil {
 		return nil, WrapError(ErrorBadAttestationStatementType, err, "x5c is malformed")
 	}
@@ -537,24 +547,24 @@ func doTPMAttestationFormat(ctx context.Context, ch *Challenge, db DB, jwk *jose
 	intermediates := x509.NewCertPool()
 	if len(x5c[1:]) > 0 {
 		for _, v := range x5c[1:] {
-			der, ok = v.([]byte)
-			if !ok {
+			intCertBytes, vok := v.([]byte)
+			if !vok {
 				return nil, NewError(ErrorBadAttestationStatementType, "x5c is malformed")
 			}
-			cert, err := x509.ParseCertificate(der)
+			intCert, err := x509.ParseCertificate(intCertBytes)
 			if err != nil {
 				return nil, WrapError(ErrorBadAttestationStatementType, err, "x5c is malformed")
 			}
-			intermediates.AddCert(cert)
+			intermediates.AddCert(intCert)
 		}
 	}
 
 	// TODO(hs): this can be removed when permanent-identifier/hardware-module-name are handled correctly in
 	// the stdlib in https://cs.opensource.google/go/go/+/refs/tags/go1.19:src/crypto/x509/parser.go;drc=b5b2cf519fe332891c165077f3723ee74932a647;l=362,
 	// but I doubt that will happen.
-	if len(leaf.UnhandledCriticalExtensions) > 0 {
-		unhandledCriticalExtensions := leaf.UnhandledCriticalExtensions[:0]
-		for _, extOID := range leaf.UnhandledCriticalExtensions {
+	if len(akCert.UnhandledCriticalExtensions) > 0 {
+		unhandledCriticalExtensions := akCert.UnhandledCriticalExtensions[:0]
+		for _, extOID := range akCert.UnhandledCriticalExtensions {
 			switch {
 			case extOID.Equal(oidSubjectAlternativeName):
 				// allow Subject Alternative Names, including PermanentIdentifier, HardwareModuleName, TPM attributes, etc
@@ -563,7 +573,7 @@ func doTPMAttestationFormat(ctx context.Context, ch *Challenge, db DB, jwk *jose
 				unhandledCriticalExtensions = append(unhandledCriticalExtensions, extOID)
 			}
 		}
-		leaf.UnhandledCriticalExtensions = unhandledCriticalExtensions
+		akCert.UnhandledCriticalExtensions = unhandledCriticalExtensions
 	}
 
 	roots, ok := prov.GetAttestationRoots()
@@ -571,7 +581,7 @@ func doTPMAttestationFormat(ctx context.Context, ch *Challenge, db DB, jwk *jose
 		return nil, NewErrorISE("failed getting tpm attestation root CAs")
 	}
 
-	verifiedChains, err := leaf.Verify(x509.VerifyOptions{
+	verifiedChains, err := akCert.Verify(x509.VerifyOptions{
 		Roots:         roots,
 		Intermediates: intermediates,
 		CurrentTime:   time.Now().Truncate(time.Second),
@@ -583,14 +593,57 @@ func doTPMAttestationFormat(ctx context.Context, ch *Challenge, db DB, jwk *jose
 
 	// TODO(hs): implement revocation check; Verify() doesn't perform CRL check nor OCSP lookup.
 
+	// extract and validate Subject Alternative Name extension to contain at least one PermanentIdentifier
+	var sanExtension pkix.Extension
+	for _, ext := range akCert.Extensions {
+		if ext.Id.Equal(oidSubjectAlternativeName) {
+			sanExtension = ext
+		}
+	}
+
+	if sanExtension.Value == nil {
+		return nil, NewError(ErrorBadAttestationStatementType, "AK certificate is missing Subject Alternative Name extension")
+	}
+
+	san, err := x509ext.ParseSubjectAltName(sanExtension) // TODO(hs): move to a package under our control?
+	if err != nil {
+		return nil, WrapError(ErrorBadAttestationStatementType, err, "failed parsing Subject Alternative Name extension")
+	}
+
+	var permanentIdentifiers = make([]string, len(san.PermanentIdentifiers))
+	for i, p := range san.PermanentIdentifiers {
+		permanentIdentifiers[i] = p.IdentifierValue
+	}
+
+	// TODO(hs): reenable this check when we want to enforce a PermanentIdentifier to be present in
+	// the AK certificate.
+	// if len(permanentIdentifiers) == 0 {
+	// 	return nil, NewError(ErrorBadAttestationStatementType, "AK certificate doesn't contain a PermanentIdentifier")
+	// }
+
+	// extract and validate pubArea, sig, certInfo and alg properties from the request body
 	pubArea, ok := att.AttStatement["pubArea"].([]byte)
 	if !ok {
 		return nil, NewError(ErrorBadAttestationStatementType, "invalid pubArea in attestation statement")
+	}
+	if len(pubArea) == 0 {
+		return nil, NewError(ErrorBadAttestationStatementType, "pubArea is empty")
 	}
 
 	sig, ok := att.AttStatement["sig"].([]byte)
 	if !ok {
 		return nil, NewError(ErrorBadAttestationStatementType, "invalid sig in attestation statement")
+	}
+	if len(sig) == 0 {
+		return nil, NewError(ErrorBadAttestationStatementType, "sig is empty")
+	}
+
+	certInfo, ok := att.AttStatement["certInfo"].([]byte)
+	if !ok {
+		return nil, NewError(ErrorBadAttestationStatementType, "invalid certInfo in attestation statement")
+	}
+	if len(certInfo) == 0 {
+		return nil, NewError(ErrorBadAttestationStatementType, "certInfo is empty")
 	}
 
 	alg, ok := att.AttStatement["alg"].(int64)
@@ -610,11 +663,6 @@ func doTPMAttestationFormat(ctx context.Context, ch *Challenge, db DB, jwk *jose
 		return nil, NewError(ErrorBadAttestationStatementType, "invalid alg %d in attestation statement", alg)
 	}
 
-	certInfo, ok := att.AttStatement["certInfo"].([]byte)
-	if !ok {
-		return nil, NewError(ErrorBadAttestationStatementType, "invalid certInfo in attestation statement")
-	}
-
 	// recreate the generated key certification parameter values and verify
 	// the attested key using the public key of the AK.
 	certificationParameters := &attest.CertificationParameters{
@@ -623,7 +671,7 @@ func doTPMAttestationFormat(ctx context.Context, ch *Challenge, db DB, jwk *jose
 		CreateSignature:   sig,      // signature over the attested properties
 	}
 	verifyOpts := attest.VerifyOpts{
-		Public: leaf.PublicKey, // public key of the AK that attested the key
+		Public: akCert.PublicKey, // public key of the AK that attested the key
 		Hash:   hash,
 	}
 	if err = certificationParameters.Verify(verifyOpts); err != nil {
@@ -636,15 +684,16 @@ func doTPMAttestationFormat(ctx context.Context, ch *Challenge, db DB, jwk *jose
 		return nil, WrapError(ErrorBadAttestationStatementType, err, "failed decoding attestation data")
 	}
 
-	expectedDigest, err := keyAuthDigest(jwk, ch.Token)
+	keyAuth, err := KeyAuthorization(ch.Token, jwk)
 	if err != nil {
 		return nil, WrapError(ErrorBadAttestationStatementType, err, "failed creating key auth digest")
 	}
+	hashedKeyAuth := sha256.Sum256([]byte(keyAuth))
 
 	// verify the WebAuthn object contains the expect key authorization digest, which is carried
 	// within the encoded `certInfo` property of the attestation statement.
-	if subtle.ConstantTimeCompare(expectedDigest, []byte(tpmCertInfo.ExtraData)) == 0 {
-		return nil, NewError(ErrorBadAttestationStatementType, "key authorization doesn not match")
+	if subtle.ConstantTimeCompare(hashedKeyAuth[:], []byte(tpmCertInfo.ExtraData)) == 0 {
+		return nil, NewError(ErrorBadAttestationStatementType, "key authorization does not match")
 	}
 
 	// decode the (attested) public key and determine its fingerprint
@@ -659,8 +708,9 @@ func doTPMAttestationFormat(ctx context.Context, ch *Challenge, db DB, jwk *jose
 	}
 
 	data := &tpmAttestationData{
-		Certificate:    leaf,
-		VerifiedChains: verifiedChains,
+		Certificate:          akCert,
+		VerifiedChains:       verifiedChains,
+		PermanentIdentifiers: permanentIdentifiers,
 	}
 
 	if data.Fingerprint, err = keyutil.Fingerprint(publicKey); err != nil {
