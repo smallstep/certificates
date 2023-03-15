@@ -51,7 +51,7 @@ require (
 	google.golang.org/api v0.112.0
 	google.golang.org/genproto v0.0.0-20230303212802-e74f57abe488 // indirect
 	google.golang.org/grpc v1.53.0
-	google.golang.org/protobuf v1.29.0
+	google.golang.org/protobuf v1.29.1
 	gopkg.in/square/go-jose.v2 v2.6.0
 )
 
