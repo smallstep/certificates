@@ -36,6 +36,7 @@ archives:
     # Most common use case is to archive as zip on Windows.
     # Default is empty.
     name_template: "{{ .ProjectName }}_{{ .Os }}_{{ .Version }}_{{ .Arch }}{{ if .Arm }}v{{ .Arm }}{{ end }}{{ if .Mips }}_{{ .Mips }}{{ end }}"
+    rlcp: true
     format_overrides:
       - goos: windows
         format: zip
@@ -78,6 +79,7 @@ nfpms:
 
 source:
   enabled: true
+  rlcp: true
   name_template: '{{ .ProjectName }}_{{ .Version }}'
 
 checksum:
