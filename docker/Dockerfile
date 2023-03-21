@@ -7,7 +7,7 @@ RUN apk add --no-cache curl git make
 RUN make V=1 download
 RUN make V=1 bin/step-ca
 
-FROM smallstep/step-kms-plugin-cloud:latest AS kms
+FROM smallstep/step-kms-plugin:cloud AS kms
 
 FROM smallstep/step-cli:latest
 
