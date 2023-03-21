@@ -6,8 +6,9 @@ COPY . .
 RUN apt-get update
 RUN apt-get install -y --no-install-recommends \
         gcc pkgconf libpcsclite-dev
-RUN make V=1 download
-RUN make V=1 GOFLAGS="" build
+RUN make V=1 GOFLAGS="" bin/step-ca
+RUN apt-get install -y --no-install-recommends libcap2-bin && \
+    setcap CAP_NET_BIND_SERVICE=+eip bin/step-ca
 
 FROM smallstep/step-kms-plugin:bullseye AS kms
 
@@ -18,8 +19,6 @@ COPY --from=kms /usr/local/bin/step-kms-plugin /usr/local/bin/step-kms-plugin
 
 USER root
 RUN apt-get update
-RUN apt-get install -y --no-install-recommends libcap2-bin && \
-    setcap CAP_NET_BIND_SERVICE=+eip /usr/local/bin/step-ca
 RUN apt-get install -y --no-install-recommends pcscd libpcsclite1
 RUN mkdir -p /run/pcscd
 RUN chown step:step /run/pcscd
