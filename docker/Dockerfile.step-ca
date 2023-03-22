@@ -1,4 +1,4 @@
-ARG STEP_CLI_VERSION=0.23.0
+ARG STEP_CLI_VERSION=0.23.4
 FROM golang:alpine AS gobuilder
 
 WORKDIR /src
@@ -12,7 +12,7 @@ RUN make V=1 bin/step-ca
 FROM rust:alpine AS rustbuilder
 
 RUN apk add --no-cache git musl-dev perl
-RUN git clone -b dex https://github.com/wireapp/rusty-jwt-tools.git /src
+RUN git clone https://github.com/wireapp/rusty-jwt-tools.git /src
 
 RUN cd /src && \
     cargo build --release --verbose
