@@ -27,6 +27,11 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
 
 ## [Unreleased]
 
+### Added
+
+- Added support for new Azure SDK, sovereign clouds, and HSM keys on Azure KMS
+  (smallstep/crypto#192, smallstep/crypto#197, smallstep/crypto#198).
+
 ### Fixed
 
 - Fixed support for PKCS #7 RSA-OAEP decryption through 
