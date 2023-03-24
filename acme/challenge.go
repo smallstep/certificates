@@ -28,8 +28,8 @@ import (
 
 	"github.com/fxamacker/cbor/v2"
 	"github.com/google/go-attestation/attest"
-	x509ext "github.com/google/go-attestation/x509"
 	"github.com/google/go-tpm/tpm2"
+	"github.com/ryboe/q"
 	"golang.org/x/exp/slices"
 
 	"go.step.sm/crypto/jose"
@@ -420,6 +420,7 @@ func deviceAttest01Validate(ctx context.Context, ch *Challenge, db DB, jwk *jose
 	case "step":
 		data, err := doStepAttestationFormat(ctx, prov, ch, jwk, &att)
 		if err != nil {
+			q.Q(err)
 			var acmeError *Error
 			if errors.As(err, &acmeError) {
 				if acmeError.Status == 500 {
@@ -451,6 +452,7 @@ func deviceAttest01Validate(ctx context.Context, ch *Challenge, db DB, jwk *jose
 		if err != nil {
 			// TODO(hs): we should provide more details in the error reported to the client;
 			// "Attestation statement cannot be verified" is VERY generic. Also holds true for the other formats.
+			q.Q(err)
 			var acmeError *Error
 			if errors.As(err, &acmeError) {
 				if acmeError.Status == 500 {
@@ -598,6 +600,7 @@ func doTPMAttestationFormat(ctx context.Context, ch *Challenge, db DB, jwk *jose
 	for _, ext := range akCert.Extensions {
 		if ext.Id.Equal(oidSubjectAlternativeName) {
 			sanExtension = ext
+			break
 		}
 	}
 
@@ -605,15 +608,17 @@ func doTPMAttestationFormat(ctx context.Context, ch *Challenge, db DB, jwk *jose
 		return nil, NewError(ErrorBadAttestationStatementType, "AK certificate is missing Subject Alternative Name extension")
 	}
 
-	san, err := x509ext.ParseSubjectAltName(sanExtension) // TODO(hs): move to a package under our control?
-	if err != nil {
-		return nil, WrapError(ErrorBadAttestationStatementType, err, "failed parsing Subject Alternative Name extension")
-	}
+	// TODO(hs): below code fails if there's a URI SAN, for example. Needs more complete parsing of SANS,
+	// or skip ASN1 tags that can't be parsed.
+	// san, err := x509ext.ParseSubjectAltName(sanExtension) // TODO(hs): move to a package under our control?
+	// if err != nil {
+	// 	return nil, WrapError(ErrorBadAttestationStatementType, err, "failed parsing Subject Alternative Name extension")
+	// }
 
-	var permanentIdentifiers = make([]string, len(san.PermanentIdentifiers))
-	for i, p := range san.PermanentIdentifiers {
-		permanentIdentifiers[i] = p.IdentifierValue
-	}
+	// var permanentIdentifiers = make([]string, len(san.PermanentIdentifiers))
+	// for i, p := range san.PermanentIdentifiers {
+	// 	permanentIdentifiers[i] = p.IdentifierValue
+	// }
 
 	// TODO(hs): reenable this check when we want to enforce a PermanentIdentifier to be present in
 	// the AK certificate.
@@ -708,9 +713,9 @@ func doTPMAttestationFormat(ctx context.Context, ch *Challenge, db DB, jwk *jose
 	}
 
 	data := &tpmAttestationData{
-		Certificate:          akCert,
-		VerifiedChains:       verifiedChains,
-		PermanentIdentifiers: permanentIdentifiers,
+		Certificate:    akCert,
+		VerifiedChains: verifiedChains,
+		//PermanentIdentifiers: permanentIdentifiers,
 	}
 
 	if data.Fingerprint, err = keyutil.Fingerprint(publicKey); err != nil {
