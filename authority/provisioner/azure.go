@@ -43,7 +43,9 @@ var azureXMSMirIDRegExp = regexp.MustCompile(`(?i)^/subscriptions/([^/]+)/resour
 // azureEnvironments is the list of all Azure environments.
 var azureEnvironments = map[string]string{
 	"AzurePublicCloud":       "https://management.azure.com/",
+	"AzureCloud":             "https://management.azure.com/",
 	"AzureUSGovernmentCloud": "https://management.usgovcloudapi.net/",
+	"AzureUSGovernment":      "https://management.usgovcloudapi.net/",
 	"AzureChinaCloud":        "https://management.chinacloudapi.cn/",
 	"AzureGermanCloud":       "https://management.microsoftazure.de/",
 }
@@ -118,6 +120,7 @@ type Azure struct {
 	oidcConfig             openIDConfiguration
 	keyStore               *keyStore
 	ctl                    *Controller
+	environment            string
 }
 
 // GetID returns the provisioner unique identifier.
@@ -184,12 +187,14 @@ func (p *Azure) GetIdentityToken(subject, caURL string) (string, error) {
 
 	// default to AzurePublicCloud to keep existing behavior
 	identityTokenResource := azureEnvironments["AzurePublicCloud"]
-	environment, err := p.getAzureEnvironment()
+
+	var err error
+	p.environment, err = p.getAzureEnvironment()
 	if err != nil {
 		return "", errors.Wrap(err, "error getting azure environment")
 	}
 
-	if resource, ok := azureEnvironments[environment]; ok {
+	if resource, ok := azureEnvironments[p.environment]; ok {
 		identityTokenResource = resource
 	}
 
@@ -479,6 +484,10 @@ func (p *Azure) assertConfig() {
 
 // getAzureEnvironment returns the Azure environment for the current instance
 func (p *Azure) getAzureEnvironment() (string, error) {
+	if p.environment != "" {
+		return p.environment, nil
+	}
+
 	req, err := http.NewRequest("GET", p.config.instanceComputeURL, http.NoBody)
 	if err != nil {
 		return "", errors.Wrap(err, "error creating request")

@@ -166,6 +166,8 @@ func TestAzure_GetIdentityToken(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			// reset environment between tests to avoid caching issues
+			p1.environment = ""
 			tt.azure.config.identityTokenURL = tt.identityTokenURL + "?want_resource=" + azureEnvironments[tt.wantEnvironment]
 			tt.azure.config.instanceComputeURL = tt.instanceComputeURL + "/" + tt.wantEnvironment
 			got, err := tt.azure.GetIdentityToken(tt.args.subject, tt.args.caURL)
