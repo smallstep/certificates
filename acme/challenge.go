@@ -382,8 +382,11 @@ func wireOIDC01Validate(ctx context.Context, ch *Challenge, db DB, jwk *jose.JSO
 	}
 
 	var claims struct {
-		Name   string `json:"preferred_username"`
-		Handle string `json:"name"`
+		Name       string `json:"preferred_username,omitempty"`
+		Handle     string `json:"name"`
+		Issuer     string `json:"iss,omitempty"`
+		GivenName  string `json:"given_name,omitempty"`
+		FamilyName string `json:"family_name,omitempty"`
 	}
 	err = idToken.Claims(&claims)
 	if err != nil {
@@ -405,8 +408,15 @@ func wireOIDC01Validate(ctx context.Context, ch *Challenge, db DB, jwk *jose.JSO
 			"keyAuthorization does not match; expected %s, but got %s", expectedKeyAuth, wireChallengePayload.KeyAuth))
 	}
 
-	if challengeValues.Name != claims.Name || challengeValues.Handle != claims.Handle {
-		return storeError(ctx, db, ch, false, NewError(ErrorRejectedIdentifierType, "OIDC claims don't match"))
+	if claims.Issuer == "https://accounts.google.com" {
+		var handle = fmt.Sprintf("%s.%s@wire.com", strings.ToLower(claims.GivenName), strings.ToLower(claims.FamilyName))
+		if challengeValues.Name != claims.Name || challengeValues.Handle != handle {
+			return storeError(ctx, db, ch, false, NewError(ErrorRejectedIdentifierType, "OIDC claims don't match"))
+		}
+	} else {
+		if challengeValues.Name != claims.Name || challengeValues.Handle != claims.Handle {
+			return storeError(ctx, db, ch, false, NewError(ErrorRejectedIdentifierType, "OIDC claims don't match"))
+		}
 	}
 
 	// Update and store the challenge.
