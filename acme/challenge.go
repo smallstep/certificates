@@ -418,8 +418,6 @@ func wireOIDC01Validate(ctx context.Context, ch *Challenge, db DB, jwk *jose.JSO
 		log.Printf("domain: %s", domain)
 		var handle = fmt.Sprintf("im:wireapp=%s.%s@%s", strings.ToLower(claims.GivenName), strings.ToLower(claims.FamilyName), domain)
 		var displayName = claims.Handle
-		log.Printf("handle, actual: '%s', expected: '%s'", handle, challengeValues.Handle)
-		log.Printf("displayName, actual: '%s', expected: '%s'", displayName, challengeValues.Name)
 		if challengeValues.Name != displayName || challengeValues.Handle != handle {
 			return storeError(ctx, db, ch, false, NewError(ErrorRejectedIdentifierType, "OIDC claims don't match"))
 		}
