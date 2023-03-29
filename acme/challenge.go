@@ -19,8 +19,8 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"log"
 	"net"
+	"net/mail"
 	"net/url"
 	"os"
 	"os/exec"
@@ -384,6 +384,7 @@ func wireOIDC01Validate(ctx context.Context, ch *Challenge, db DB, jwk *jose.JSO
 		Issuer     string `json:"iss,omitempty"`
 		GivenName  string `json:"given_name,omitempty"`
 		FamilyName string `json:"family_name,omitempty"`
+		Email      string `json:"email,omitempty"`
 	}
 
 	err = idToken.Claims(&claims)
@@ -407,10 +408,14 @@ func wireOIDC01Validate(ctx context.Context, ch *Challenge, db DB, jwk *jose.JSO
 	}
 
 	if claims.Issuer == "https://accounts.google.com" {
-		var handle = fmt.Sprintf("im:wireapp=%s.%s@wire.com", strings.ToLower(claims.GivenName), strings.ToLower(claims.FamilyName))
+		// for internal demo purpose only
+		email, err := mail.ParseAddress(claims.Email)
+		if err != nil {
+			return storeError(ctx, db, ch, false, NewError(ErrorRejectedIdentifierType, "invalid email address"))
+		}
+		var domain = strings.Split(email.Address, "@")[1]
+		var handle = fmt.Sprintf("im:wireapp=%s.%s@%s", strings.ToLower(claims.GivenName), strings.ToLower(claims.FamilyName), domain)
 		var displayName = claims.Handle
-		log.Printf("handle, actual: '%s', expected: '%s'", handle, challengeValues.Handle)
-		log.Printf("displayName, actual: '%s', expected: '%s'", displayName, challengeValues.Name)
 		if challengeValues.Name != displayName || challengeValues.Handle != handle {
 			return storeError(ctx, db, ch, false, NewError(ErrorRejectedIdentifierType, "OIDC claims don't match"))
 		}
