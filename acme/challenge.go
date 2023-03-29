@@ -19,6 +19,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"log"
 	"net"
 	"net/url"
 	"os"
@@ -409,8 +410,11 @@ func wireOIDC01Validate(ctx context.Context, ch *Challenge, db DB, jwk *jose.JSO
 	}
 
 	if claims.Issuer == "https://accounts.google.com" {
-		var handle = fmt.Sprintf("%s.%s@wire.com", strings.ToLower(claims.GivenName), strings.ToLower(claims.FamilyName))
-		if challengeValues.Name != claims.Name || challengeValues.Handle != handle {
+		var handle = fmt.Sprintf("im:wireapp=%s.%s@wire.com", strings.ToLower(claims.GivenName), strings.ToLower(claims.FamilyName))
+		var displayName = claims.Handle
+		log.Printf("handle, actual: '%s', expected: '%s'", handle, challengeValues.Handle)
+		log.Printf("displayName, actual: '%s', expected: '%s'", displayName, challengeValues.Name)
+		if challengeValues.Name != displayName || challengeValues.Handle != handle {
 			return storeError(ctx, db, ch, false, NewError(ErrorRejectedIdentifierType, "OIDC claims don't match"))
 		}
 	} else {
