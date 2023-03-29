@@ -8,7 +8,7 @@ require (
 	cloud.google.com/go/security v1.13.0
 	github.com/Masterminds/sprig/v3 v3.2.3
 	github.com/ThalesIgnite/crypto11 v1.2.5 // indirect
-	github.com/aws/aws-sdk-go v1.44.225 // indirect
+	github.com/aws/aws-sdk-go v1.44.231 // indirect
 	github.com/dgraph-io/ristretto v0.1.0 // indirect
 	github.com/fxamacker/cbor/v2 v2.4.0
 	github.com/go-chi/chi v4.1.2+incompatible
@@ -38,7 +38,7 @@ require (
 	github.com/urfave/cli v1.22.12
 	go.mozilla.org/pkcs7 v0.0.0-20210826202110-33d05740a352
 	go.step.sm/cli-utils v0.7.5
-	go.step.sm/crypto v0.28.0
+	go.step.sm/crypto v0.28.1-0.20230329145110-4ccd51b601c7
 	go.step.sm/linkedca v0.19.0
 	golang.org/x/crypto v0.7.0
 	golang.org/x/net v0.8.0
@@ -88,7 +88,9 @@ require (
 	github.com/golang/groupcache v0.0.0-20210331224755-41bb18bfe9da // indirect
 	github.com/golang/protobuf v1.5.2 // indirect
 	github.com/golang/snappy v0.0.4 // indirect
+	github.com/google/btree v1.1.2 // indirect
 	github.com/google/certificate-transparency-go v1.1.4 // indirect
+	github.com/google/go-tpm-tools v0.3.10 // indirect
 	github.com/google/go-tspi v0.3.0 // indirect
 	github.com/googleapis/enterprise-certificate-proxy v0.2.3 // indirect
 	github.com/hashicorp/errwrap v1.1.0 // indirect
@@ -121,11 +123,13 @@ require (
 	github.com/mitchellh/go-homedir v1.1.0 // indirect
 	github.com/mitchellh/mapstructure v1.5.0 // indirect
 	github.com/mitchellh/reflectwalk v1.0.2 // indirect
+	github.com/peterbourgon/diskv/v3 v3.0.1 // indirect
 	github.com/pkg/browser v0.0.0-20210911075715-681adbf594b8 // indirect
 	github.com/pmezard/go-difflib v1.0.0 // indirect
 	github.com/rogpeppe/go-internal v1.9.0 // indirect
 	github.com/russross/blackfriday/v2 v2.1.0 // indirect
 	github.com/ryanuber/go-glob v1.0.0 // indirect
+	github.com/schollz/jsonstore v1.1.0 // indirect
 	github.com/shopspring/decimal v1.2.0 // indirect
 	github.com/shurcooL/sanitized_anchor_name v1.0.0 // indirect
 	github.com/spf13/cast v1.4.1 // indirect
