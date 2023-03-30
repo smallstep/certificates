@@ -100,7 +100,14 @@ func TestAzure_GetIdentityToken(t *testing.T) {
 		time.Now(), &p1.keyStore.keySet.Keys[0])
 	assert.FatalError(t, err)
 
-	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	srvIdentity := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		wantResource := r.URL.Query().Get("want_resource")
+		resource := r.URL.Query().Get("resource")
+		if wantResource == "" || resource != wantResource {
+			http.Error(w, fmt.Sprintf("Azure query param resource = %s, wantResource %s", resource, wantResource), http.StatusBadRequest)
+			return
+		}
+
 		switch r.URL.Path {
 		case "/bad-request":
 			http.Error(w, http.StatusText(http.StatusBadRequest), http.StatusBadRequest)
@@ -111,29 +118,58 @@ func TestAzure_GetIdentityToken(t *testing.T) {
 			fmt.Fprintf(w, `{"access_token":"%s"}`, t1)
 		}
 	}))
-	defer srv.Close()
+	defer srvIdentity.Close()
+
+	srvInstance := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch r.URL.Path {
+		case "/bad-request":
+			http.Error(w, http.StatusText(http.StatusBadRequest), http.StatusBadRequest)
+		case "/AzureChinaCloud":
+			w.Header().Add("Content-Type", "text/plain")
+			w.Write([]byte("AzureChinaCloud"))
+		case "/AzureGermanCloud":
+			w.Header().Add("Content-Type", "text/plain")
+			w.Write([]byte("AzureGermanCloud"))
+		case "/AzureUSGovernmentCloud":
+			w.Header().Add("Content-Type", "text/plain")
+			w.Write([]byte("AzureUSGovernmentCloud"))
+		default:
+			w.Header().Add("Content-Type", "text/plain")
+			w.Write([]byte("AzurePublicCloud"))
+		}
+	}))
+	defer srvInstance.Close()
 
 	type args struct {
 		subject string
 		caURL   string
 	}
 	tests := []struct {
-		name             string
-		azure            *Azure
-		args             args
-		identityTokenURL string
-		want             string
-		wantErr          bool
+		name               string
+		azure              *Azure
+		args               args
+		identityTokenURL   string
+		instanceComputeURL string
+		wantEnvironment    string
+		want               string
+		wantErr            bool
 	}{
-		{"ok", p1, args{"subject", "caURL"}, srv.URL, t1, false},
-		{"fail request", p1, args{"subject", "caURL"}, srv.URL + "/bad-request", "", true},
-		{"fail unmarshal", p1, args{"subject", "caURL"}, srv.URL + "/bad-json", "", true},
-		{"fail url", p1, args{"subject", "caURL"}, "://ca.smallstep.com", "", true},
-		{"fail connect", p1, args{"subject", "caURL"}, "foobarzar", "", true},
+		{"ok", p1, args{"subject", "caURL"}, srvIdentity.URL, srvInstance.URL, "AzurePublicCloud", t1, false},
+		{"ok azure china", p1, args{"subject", "caURL"}, srvIdentity.URL, srvInstance.URL, "AzurePublicCloud", t1, false},
+		{"ok azure germany", p1, args{"subject", "caURL"}, srvIdentity.URL, srvInstance.URL, "AzureGermanCloud", t1, false},
+		{"ok azure us gov", p1, args{"subject", "caURL"}, srvIdentity.URL, srvInstance.URL, "AzureUSGovernmentCloud", t1, false},
+		{"fail instance request", p1, args{"subject", "caURL"}, srvIdentity.URL + "/bad-request", srvInstance.URL + "/bad-request", "AzurePublicCloud", "", true},
+		{"fail request", p1, args{"subject", "caURL"}, srvIdentity.URL + "/bad-request", srvInstance.URL, "AzurePublicCloud", "", true},
+		{"fail unmarshal", p1, args{"subject", "caURL"}, srvIdentity.URL + "/bad-json", srvInstance.URL, "AzurePublicCloud", "", true},
+		{"fail url", p1, args{"subject", "caURL"}, "://ca.smallstep.com", srvInstance.URL, "AzurePublicCloud", "", true},
+		{"fail connect", p1, args{"subject", "caURL"}, "foobarzar", srvInstance.URL, "AzurePublicCloud", "", true},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			tt.azure.config.identityTokenURL = tt.identityTokenURL
+			// reset environment between tests to avoid caching issues
+			p1.environment = ""
+			tt.azure.config.identityTokenURL = tt.identityTokenURL + "?want_resource=" + azureEnvironments[tt.wantEnvironment]
+			tt.azure.config.instanceComputeURL = tt.instanceComputeURL + "/" + tt.wantEnvironment
 			got, err := tt.azure.GetIdentityToken(tt.args.subject, tt.args.caURL)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("Azure.GetIdentityToken() error = %v, wantErr %v", err, tt.wantErr)
