@@ -29,7 +29,6 @@ import (
 	"github.com/fxamacker/cbor/v2"
 	"github.com/google/go-attestation/attest"
 	"github.com/google/go-tpm/tpm2"
-	"github.com/ryboe/q"
 	"golang.org/x/exp/slices"
 
 	"go.step.sm/crypto/jose"
@@ -420,7 +419,6 @@ func deviceAttest01Validate(ctx context.Context, ch *Challenge, db DB, jwk *jose
 	case "step":
 		data, err := doStepAttestationFormat(ctx, prov, ch, jwk, &att)
 		if err != nil {
-			q.Q(err)
 			var acmeError *Error
 			if errors.As(err, &acmeError) {
 				if acmeError.Status == 500 {
@@ -452,7 +450,6 @@ func deviceAttest01Validate(ctx context.Context, ch *Challenge, db DB, jwk *jose
 		if err != nil {
 			// TODO(hs): we should provide more details in the error reported to the client;
 			// "Attestation statement cannot be verified" is VERY generic. Also holds true for the other formats.
-			q.Q(err)
 			var acmeError *Error
 			if errors.As(err, &acmeError) {
 				if acmeError.Status == 500 {

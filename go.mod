@@ -23,7 +23,6 @@ require (
 	github.com/hashicorp/vault/api v1.9.0
 	github.com/hashicorp/vault/api/auth/approle v0.4.0
 	github.com/hashicorp/vault/api/auth/kubernetes v0.4.0
-	github.com/kr/pretty v0.3.1 // indirect
 	github.com/mattn/go-colorable v0.1.8 // indirect
 	github.com/mattn/go-isatty v0.0.13 // indirect
 	github.com/micromdm/scep/v2 v2.1.0
@@ -53,7 +52,6 @@ require (
 
 require (
 	github.com/google/go-attestation v0.4.4-0.20220404204839-8820d49b18d9
-	github.com/ryboe/q v1.0.19
 	golang.org/x/exp v0.0.0-20230310171629-522b1b587ee0
 )
 
@@ -114,7 +112,6 @@ require (
 	github.com/jackc/pgx/v4 v4.18.0 // indirect
 	github.com/jmespath/go-jmespath v0.4.0 // indirect
 	github.com/klauspost/compress v1.15.11 // indirect
-	github.com/kr/text v0.2.0 // indirect
 	github.com/kylelemons/godebug v1.1.0 // indirect
 	github.com/manifoldco/promptui v0.9.0 // indirect
 	github.com/mgutz/ansi v0.0.0-20200706080929-d51e80ef957d // indirect

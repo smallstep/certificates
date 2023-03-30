@@ -72,14 +72,14 @@ func mustAttestTPM(t *testing.T, keyAuthorization string) ([]byte, crypto.Signer
 	require.NoError(t, err)
 
 	// prepare simulated TPM and create an AK
-	ctpm := newSimulatedTPM(t)
-	eks, err := ctpm.GetEKs(context.Background())
+	stpm := newSimulatedTPM(t)
+	eks, err := stpm.GetEKs(context.Background())
 	require.NoError(t, err)
-	ak, err := ctpm.CreateAK(context.Background(), "first-ak")
+	ak, err := stpm.CreateAK(context.Background(), "first-ak")
 	require.NoError(t, err)
 	require.NotNil(t, ak)
 
-	// extract the AK public key
+	// extract the AK public key // TODO(hs): replace this when there's a simpler method to get the AK public key (e.g. ak.Public())
 	ap, err := ak.AttestationParameters(context.Background())
 	require.NoError(t, err)
 	akp, err := attest.ParseAKPublic(attest.TPMVersion20, ap.Public)
@@ -108,7 +108,7 @@ func mustAttestTPM(t *testing.T, keyAuthorization string) ([]byte, crypto.Signer
 		Size:           2048,
 		QualifyingData: keyAuthSum[:],
 	}
-	key, err := ctpm.AttestKey(context.Background(), "first-ak", "first-key", config)
+	key, err := stpm.AttestKey(context.Background(), "first-ak", "first-key", config)
 	require.NoError(t, err)
 	require.NotNil(t, key)
 	require.Equal(t, "first-key", key.Name())
@@ -165,6 +165,75 @@ func Test_deviceAttest01ValidateWithTPMSimulator(t *testing.T) {
 		wantErr *Error
 	}
 	tests := map[string]func(t *testing.T) test{
+		"ok/doTPMAttestationFormat-storeError": func(t *testing.T) test {
+			_, keyAuth := mustAccountAndKeyAuthorization(t, "token")
+			payload, _, root := mustAttestTPM(t, keyAuth) // TODO: value(s) for AK cert?
+			caRoot := pem.EncodeToMemory(&pem.Block{Type: "CERTIFICATE", Bytes: root.Raw})
+			ctx := NewProvisionerContext(context.Background(), mustAttestationProvisioner(t, caRoot))
+
+			// parse payload, set invalid "ver", remarshal
+			var p payloadType
+			err := json.Unmarshal(payload, &p)
+			require.NoError(t, err)
+			attObj, err := base64.RawURLEncoding.DecodeString(p.AttObj)
+			require.NoError(t, err)
+			att := attestationObject{}
+			err = cbor.Unmarshal(attObj, &att)
+			require.NoError(t, err)
+			att.AttStatement["ver"] = "bogus"
+			attObj, err = cbor.Marshal(struct {
+				Format       string                 `json:"fmt"`
+				AttStatement map[string]interface{} `json:"attStmt,omitempty"`
+			}{
+				Format:       "tpm",
+				AttStatement: att.AttStatement,
+			})
+			require.NoError(t, err)
+			payload, err = json.Marshal(struct {
+				AttObj string `json:"attObj"`
+			}{
+				AttObj: base64.RawURLEncoding.EncodeToString(attObj),
+			})
+			require.NoError(t, err)
+			return test{
+				args: args{
+					ctx: ctx,
+					ch: &Challenge{
+						ID:              "chID",
+						AuthorizationID: "azID",
+						Token:           "token",
+						Type:            "device-attest-01",
+						Status:          StatusPending,
+						Value:           "device.id.12345678",
+					},
+					payload: payload,
+					db: &MockDB{
+						MockGetAuthorization: func(ctx context.Context, id string) (*Authorization, error) {
+							assert.Equal(t, "azID", id)
+							return &Authorization{ID: "azID"}, nil
+						},
+						MockUpdateChallenge: func(ctx context.Context, updch *Challenge) error {
+							assert.Equal(t, "chID", updch.ID)
+							assert.Equal(t, "token", updch.Token)
+							assert.Equal(t, StatusInvalid, updch.Status)
+							assert.Equal(t, ChallengeType("device-attest-01"), updch.Type)
+							assert.Equal(t, "device.id.12345678", updch.Value)
+
+							err := NewError(ErrorBadAttestationStatementType, `version "bogus" is not supported`)
+
+							assert.EqualError(t, updch.Error.Err, err.Err.Error())
+							assert.Equal(t, err.Type, updch.Error.Type)
+							assert.Equal(t, err.Detail, updch.Error.Detail)
+							assert.Equal(t, err.Status, updch.Error.Status)
+							assert.Equal(t, err.Subproblems, updch.Error.Subproblems)
+
+							return nil
+						},
+					},
+				},
+				wantErr: nil,
+			}
+		},
 		"ok": func(t *testing.T) test {
 			jwk, keyAuth := mustAccountAndKeyAuthorization(t, "token")
 			payload, signer, root := mustAttestTPM(t, keyAuth) // TODO: value(s) for AK cert?
