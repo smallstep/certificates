@@ -742,7 +742,6 @@ func parsePermanentIdentifier(der []byte) (permanentIdentifier, error) {
 }
 
 func parseSANs(ext pkix.Extension) (sans []x509util.SubjectAlternativeName, err error) {
-
 	_, otherNames, err := parseSubjectAltName(ext)
 	if err != nil {
 		return nil, fmt.Errorf("parseSubjectAltName: %w", err)
@@ -778,15 +777,15 @@ func parseSubjectAltName(ext pkix.Extension) (dirNames []pkix.Name, otherNames [
 	err = forEachSAN(ext.Value, func(generalName asn1.RawValue) error {
 		switch generalName.Tag {
 		case 0: // otherName
-			var otherName otherName
-			if _, err := asn1.UnmarshalWithParams(generalName.FullBytes, &otherName, "tag:0"); err != nil {
-				return fmt.Errorf("OtherName: asn1.UnmarshalWithParams: %v", err)
+			var on otherName
+			if _, err := asn1.UnmarshalWithParams(generalName.FullBytes, &on, "tag:0"); err != nil {
+				return fmt.Errorf("OtherName: asn1.UnmarshalWithParams: %w", err)
 			}
-			otherNames = append(otherNames, otherName)
+			otherNames = append(otherNames, on)
 		case 4: // directoryName
 			var rdns pkix.RDNSequence
 			if _, err := asn1.Unmarshal(generalName.Bytes, &rdns); err != nil {
-				return fmt.Errorf("DirectoryName: asn1.Unmarshal: %v", err)
+				return fmt.Errorf("DirectoryName: asn1.Unmarshal: %w", err)
 			}
 			var dirName pkix.Name
 			dirName.FillFromRDNSequence(&rdns)
