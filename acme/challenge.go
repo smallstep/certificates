@@ -446,7 +446,7 @@ func deviceAttest01Validate(ctx context.Context, ch *Challenge, db DB, jwk *jose
 		az.Fingerprint = data.Fingerprint
 
 	case "tpm":
-		data, err := doTPMAttestationFormat(ctx, ch, db, jwk, &att)
+		data, err := doTPMAttestationFormat(ctx, prov, ch, jwk, &att)
 		if err != nil {
 			// TODO(hs): we should provide more details in the error reported to the client;
 			// "Attestation statement cannot be verified" is VERY generic. Also holds true for the other formats.
@@ -511,13 +511,7 @@ type tpmAttestationData struct {
 	Fingerprint          string
 }
 
-func doTPMAttestationFormat(ctx context.Context, ch *Challenge, db DB, jwk *jose.JSONWebKey, att *attestationObject) (*tpmAttestationData, error) {
-	p := MustProvisionerFromContext(ctx)
-	prov, ok := p.(*provisioner.ACME)
-	if !ok {
-		return nil, NewErrorISE("provisioner in context is not an ACME provisioner")
-	}
-
+func doTPMAttestationFormat(ctx context.Context, prov Provisioner, ch *Challenge, jwk *jose.JSONWebKey, att *attestationObject) (*tpmAttestationData, error) {
 	ver, ok := att.AttStatement["ver"].(string)
 	if !ok {
 		return nil, NewError(ErrorBadAttestationStatementType, "ver not present")
@@ -577,7 +571,7 @@ func doTPMAttestationFormat(ctx context.Context, ch *Challenge, db DB, jwk *jose
 
 	roots, ok := prov.GetAttestationRoots()
 	if !ok {
-		return nil, NewErrorISE("failed getting tpm attestation root CAs")
+		return nil, NewErrorISE("failed getting TPM attestation root CAs")
 	}
 
 	verifiedChains, err := akCert.Verify(x509.VerifyOptions{
@@ -604,24 +598,6 @@ func doTPMAttestationFormat(ctx context.Context, ch *Challenge, db DB, jwk *jose
 	if sanExtension.Value == nil {
 		return nil, NewError(ErrorBadAttestationStatementType, "AK certificate is missing Subject Alternative Name extension")
 	}
-
-	// TODO(hs): below code fails if there's a URI SAN, for example. Needs more complete parsing of SANS,
-	// or skip ASN1 tags that can't be parsed.
-	// san, err := x509ext.ParseSubjectAltName(sanExtension) // TODO(hs): move to a package under our control?
-	// if err != nil {
-	// 	return nil, WrapError(ErrorBadAttestationStatementType, err, "failed parsing Subject Alternative Name extension")
-	// }
-
-	// var permanentIdentifiers = make([]string, len(san.PermanentIdentifiers))
-	// for i, p := range san.PermanentIdentifiers {
-	// 	permanentIdentifiers[i] = p.IdentifierValue
-	// }
-
-	// TODO(hs): reenable this check when we want to enforce a PermanentIdentifier to be present in
-	// the AK certificate.
-	// if len(permanentIdentifiers) == 0 {
-	// 	return nil, NewError(ErrorBadAttestationStatementType, "AK certificate doesn't contain a PermanentIdentifier")
-	// }
 
 	// extract and validate pubArea, sig, certInfo and alg properties from the request body
 	pubArea, ok := att.AttStatement["pubArea"].([]byte)
@@ -680,7 +656,7 @@ func doTPMAttestationFormat(ctx context.Context, ch *Challenge, db DB, jwk *jose
 		return nil, WrapError(ErrorBadAttestationStatementType, err, "invalid certification parameters")
 	}
 
-	// decode the "certInfo" data
+	// decode the "certInfo" data. This won't fail, as it's also done as part of Verify().
 	tpmCertInfo, err := tpm2.DecodeAttestationData(certInfo)
 	if err != nil {
 		return nil, WrapError(ErrorBadAttestationStatementType, err, "failed decoding attestation data")
@@ -698,7 +674,7 @@ func doTPMAttestationFormat(ctx context.Context, ch *Challenge, db DB, jwk *jose
 		return nil, NewError(ErrorBadAttestationStatementType, "key authorization does not match")
 	}
 
-	// decode the (attested) public key and determine its fingerprint
+	// decode the (attested) public key and determine its fingerprint.  This won't fail, as it's also done as part of Verify().
 	pub, err := tpm2.DecodePublic(pubArea)
 	if err != nil {
 		return nil, WrapError(ErrorBadAttestationStatementType, err, "failed decoding pubArea")
@@ -712,7 +688,6 @@ func doTPMAttestationFormat(ctx context.Context, ch *Challenge, db DB, jwk *jose
 	data := &tpmAttestationData{
 		Certificate:    akCert,
 		VerifiedChains: verifiedChains,
-		//PermanentIdentifiers: permanentIdentifiers,
 	}
 
 	if data.Fingerprint, err = keyutil.Fingerprint(publicKey); err != nil {
