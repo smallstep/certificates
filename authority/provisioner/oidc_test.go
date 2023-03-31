@@ -338,8 +338,6 @@ func TestOIDC_AuthorizeSign(t *testing.T) {
 					case *validityValidator:
 						assert.Equals(t, v.min, tt.prov.ctl.Claimer.MinTLSCertDuration())
 						assert.Equals(t, v.max, tt.prov.ctl.Claimer.MaxTLSCertDuration())
-					case emailOnlyIdentity:
-						assert.Equals(t, string(v), "name@smallstep.com")
 					case *x509NamePolicyValidator:
 						assert.Equals(t, nil, v.policyEngine)
 					case *WebhookController:
