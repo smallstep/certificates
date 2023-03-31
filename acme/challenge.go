@@ -34,6 +34,7 @@ import (
 	"go.step.sm/crypto/jose"
 	"go.step.sm/crypto/keyutil"
 	"go.step.sm/crypto/pemutil"
+	"go.step.sm/crypto/x509util"
 
 	"github.com/smallstep/certificates/authority/provisioner"
 )
@@ -599,6 +600,18 @@ func doTPMAttestationFormat(ctx context.Context, prov Provisioner, ch *Challenge
 		return nil, NewError(ErrorBadAttestationStatementType, "AK certificate is missing Subject Alternative Name extension")
 	}
 
+	sans, err := parseSANs(sanExtension)
+	if err != nil {
+		return nil, WrapError(ErrorBadAttestationStatementType, err, "failed parsing AK certificate SAN extension")
+	}
+
+	var permanentIdentifiers []string
+	for _, san := range sans {
+		if san.Type == x509util.PermanentIdentifierType {
+			permanentIdentifiers = append(permanentIdentifiers, san.Value)
+		}
+	}
+
 	// extract and validate pubArea, sig, certInfo and alg properties from the request body
 	pubArea, ok := att.AttStatement["pubArea"].([]byte)
 	if !ok {
@@ -686,8 +699,9 @@ func doTPMAttestationFormat(ctx context.Context, prov Provisioner, ch *Challenge
 	}
 
 	data := &tpmAttestationData{
-		Certificate:    akCert,
-		VerifiedChains: verifiedChains,
+		Certificate:          akCert,
+		VerifiedChains:       verifiedChains,
+		PermanentIdentifiers: permanentIdentifiers,
 	}
 
 	if data.Fingerprint, err = keyutil.Fingerprint(publicKey); err != nil {
@@ -696,6 +710,123 @@ func doTPMAttestationFormat(ctx context.Context, prov Provisioner, ch *Challenge
 
 	// TODO(hs): pass more attestation data, so that that can be used/recorded too?
 	return data, nil
+}
+
+// RFC 4043
+//
+// https://tools.ietf.org/html/rfc4043
+var (
+	oidPermanentIdentifier = []int{1, 3, 6, 1, 5, 5, 7, 8, 3}
+)
+
+// PermanentIdentifier represents an ASN.1 encoded "permanent identifier" as
+// defined by RFC4043.
+//
+//	PermanentIdentifier ::= SEQUENCE {
+//	    identifierValue    UTF8String OPTIONAL,
+//	    assigner           OBJECT IDENTIFIER OPTIONAL
+//	   }
+//
+// https://datatracker.ietf.org/doc/html/rfc4043
+type permanentIdentifier struct {
+	IdentifierValue string                `asn1:"utf8,optional"`
+	Assigner        asn1.ObjectIdentifier `asn1:"optional"`
+}
+
+func parsePermanentIdentifier(der []byte) (permanentIdentifier, error) {
+	var permID permanentIdentifier
+	if _, err := asn1.UnmarshalWithParams(der, &permID, "explicit,tag:0"); err != nil {
+		return permanentIdentifier{}, err
+	}
+	return permID, nil
+}
+
+func parseSANs(ext pkix.Extension) (sans []x509util.SubjectAlternativeName, err error) {
+
+	_, otherNames, err := parseSubjectAltName(ext)
+	if err != nil {
+		return nil, fmt.Errorf("parseSubjectAltName: %w", err)
+	}
+
+	for _, otherName := range otherNames {
+		if otherName.TypeID.Equal(oidPermanentIdentifier) {
+			permID, err := parsePermanentIdentifier(otherName.Value.FullBytes)
+			if err != nil {
+				return nil, fmt.Errorf("parsePermanentIdentifier: %w", err)
+			}
+			permanentIdentifier := x509util.SubjectAlternativeName{
+				Type:  x509util.PermanentIdentifierType,
+				Value: permID.IdentifierValue, // TODO(hs): change how these are returned
+			}
+			sans = append(sans, permanentIdentifier)
+		}
+	}
+
+	return
+}
+
+//	OtherName ::= SEQUENCE {
+//	  type-id    OBJECT IDENTIFIER,
+//	  value      [0] EXPLICIT ANY DEFINED BY type-id }
+type otherName struct {
+	TypeID asn1.ObjectIdentifier
+	Value  asn1.RawValue
+}
+
+// https://datatracker.ietf.org/doc/html/rfc5280#page-35
+func parseSubjectAltName(ext pkix.Extension) (dirNames []pkix.Name, otherNames []otherName, err error) {
+	err = forEachSAN(ext.Value, func(generalName asn1.RawValue) error {
+		switch generalName.Tag {
+		case 0: // otherName
+			var otherName otherName
+			if _, err := asn1.UnmarshalWithParams(generalName.FullBytes, &otherName, "tag:0"); err != nil {
+				return fmt.Errorf("OtherName: asn1.UnmarshalWithParams: %v", err)
+			}
+			otherNames = append(otherNames, otherName)
+		case 4: // directoryName
+			var rdns pkix.RDNSequence
+			if _, err := asn1.Unmarshal(generalName.Bytes, &rdns); err != nil {
+				return fmt.Errorf("DirectoryName: asn1.Unmarshal: %v", err)
+			}
+			var dirName pkix.Name
+			dirName.FillFromRDNSequence(&rdns)
+			dirNames = append(dirNames, dirName)
+		default:
+			//return fmt.Errorf("expected tag %d", generalName.Tag)
+			// TODO(hs): implement the others ... skipping for now
+		}
+		return nil
+	})
+	return
+}
+
+// Borrowed from the x509 package.
+func forEachSAN(extension []byte, callback func(ext asn1.RawValue) error) error {
+	var seq asn1.RawValue
+	rest, err := asn1.Unmarshal(extension, &seq)
+	if err != nil {
+		return err
+	} else if len(rest) != 0 {
+		return errors.New("x509: trailing data after X.509 extension")
+	}
+	if !seq.IsCompound || seq.Tag != 16 || seq.Class != 0 {
+		return asn1.StructuralError{Msg: "bad SAN sequence"}
+	}
+
+	rest = seq.Bytes
+	for len(rest) > 0 {
+		var v asn1.RawValue
+		rest, err = asn1.Unmarshal(rest, &v)
+		if err != nil {
+			return err
+		}
+
+		if err := callback(v); err != nil {
+			return err
+		}
+	}
+
+	return nil
 }
 
 // Apple Enterprise Attestation Root CA from

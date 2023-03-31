@@ -9,10 +9,12 @@ import (
 	"crypto/sha256"
 	"crypto/x509"
 	"crypto/x509/pkix"
+	"encoding/asn1"
 	"encoding/base64"
 	"encoding/json"
 	"encoding/pem"
 	"errors"
+	"fmt"
 	"net/url"
 	"testing"
 
@@ -27,6 +29,7 @@ import (
 	"go.step.sm/crypto/tpm"
 	"go.step.sm/crypto/tpm/simulator"
 	tpmstorage "go.step.sm/crypto/tpm/storage"
+	"go.step.sm/crypto/x509util"
 )
 
 func newSimulatedTPM(t *testing.T) *tpm.TPM {
@@ -61,7 +64,7 @@ func generateKeyID(t *testing.T, pub crypto.PublicKey) []byte {
 	return hash[:]
 }
 
-func mustAttestTPM(t *testing.T, keyAuthorization string) ([]byte, crypto.Signer, *x509.Certificate) {
+func mustAttestTPM(t *testing.T, keyAuthorization string, permanentIdentifiers []string) ([]byte, crypto.Signer, *x509.Certificate) {
 	t.Helper()
 	aca, err := minica.New(
 		minica.WithName("TPM Testing"),
@@ -90,13 +93,26 @@ func mustAttestTPM(t *testing.T, keyAuthorization string) ([]byte, crypto.Signer
 	// create template and sign certificate for the AK public key
 	keyID := generateKeyID(t, eks[0].Public())
 	template := &x509.Certificate{
-		Subject: pkix.Name{
-			CommonName: "testakcert",
-		},
 		PublicKey: akp.Public,
-		URIs: []*url.URL{
+	}
+	if len(permanentIdentifiers) == 0 {
+		template.URIs = []*url.URL{
 			{Scheme: "urn", Opaque: "ek:sha256:" + base64.StdEncoding.EncodeToString(keyID)},
-		},
+		}
+	} else {
+		san := x509util.SubjectAlternativeName{
+			Type:  x509util.PermanentIdentifierType,
+			Value: permanentIdentifiers[0], // TODO(hs): multiple?
+		}
+		ext, err := createSubjectAltNameExtension(nil, nil, nil, nil, []x509util.SubjectAlternativeName{san}, true)
+		require.NoError(t, err)
+		template.ExtraExtensions = append(template.ExtraExtensions,
+			pkix.Extension{
+				Id:       asn1.ObjectIdentifier(ext.ID),
+				Critical: ext.Critical,
+				Value:    ext.Value,
+			},
+		)
 	}
 	akCert, err := aca.Sign(template)
 	require.NoError(t, err)
@@ -168,8 +184,8 @@ func Test_deviceAttest01ValidateWithTPMSimulator(t *testing.T) {
 	}
 	tests := map[string]func(t *testing.T) test{
 		"ok/doTPMAttestationFormat-storeError": func(t *testing.T) test {
-			_, keyAuth := mustAccountAndKeyAuthorization(t, "token")
-			payload, _, root := mustAttestTPM(t, keyAuth) // TODO: value(s) for AK cert?
+			jwk, keyAuth := mustAccountAndKeyAuthorization(t, "token")
+			payload, _, root := mustAttestTPM(t, keyAuth, nil) // TODO: value(s) for AK cert?
 			caRoot := pem.EncodeToMemory(&pem.Block{Type: "CERTIFICATE", Bytes: root.Raw})
 			ctx := NewProvisionerContext(context.Background(), mustAttestationProvisioner(t, caRoot))
 
@@ -200,6 +216,7 @@ func Test_deviceAttest01ValidateWithTPMSimulator(t *testing.T) {
 			return test{
 				args: args{
 					ctx: ctx,
+					jwk: jwk,
 					ch: &Challenge{
 						ID:              "chID",
 						AuthorizationID: "azID",
@@ -236,9 +253,102 @@ func Test_deviceAttest01ValidateWithTPMSimulator(t *testing.T) {
 				wantErr: nil,
 			}
 		},
+		"ok with invalid PermanentIdentifier SAN": func(t *testing.T) test {
+			jwk, keyAuth := mustAccountAndKeyAuthorization(t, "token")
+			payload, _, root := mustAttestTPM(t, keyAuth, []string{"device.id.12345678"}) // TODO: value(s) for AK cert?
+			caRoot := pem.EncodeToMemory(&pem.Block{Type: "CERTIFICATE", Bytes: root.Raw})
+			ctx := NewProvisionerContext(context.Background(), mustAttestationProvisioner(t, caRoot))
+			return test{
+				args: args{
+					ctx: ctx,
+					jwk: jwk,
+					ch: &Challenge{
+						ID:              "chID",
+						AuthorizationID: "azID",
+						Token:           "token",
+						Type:            "device-attest-01",
+						Status:          StatusPending,
+						Value:           "device.id.99999999",
+					},
+					payload: payload,
+					db: &MockDB{
+						MockGetAuthorization: func(ctx context.Context, id string) (*Authorization, error) {
+							assert.Equal(t, "azID", id)
+							return &Authorization{ID: "azID"}, nil
+						},
+						MockUpdateChallenge: func(ctx context.Context, updch *Challenge) error {
+							assert.Equal(t, "chID", updch.ID)
+							assert.Equal(t, "token", updch.Token)
+							assert.Equal(t, StatusInvalid, updch.Status)
+							assert.Equal(t, ChallengeType("device-attest-01"), updch.Type)
+							assert.Equal(t, "device.id.99999999", updch.Value)
+
+							err := NewError(ErrorRejectedIdentifierType, `permanent identifier does not match`).
+								AddSubproblems(NewSubproblemWithIdentifier(
+									ErrorMalformedType,
+									Identifier{Type: "permanent-identifier", Value: "device.id.99999999"},
+									`challenge identifier "device.id.99999999" doesn't match any of the attested hardware identifiers ["device.id.12345678"]`,
+								))
+
+							assert.EqualError(t, updch.Error.Err, err.Err.Error())
+							assert.Equal(t, err.Type, updch.Error.Type)
+							assert.Equal(t, err.Detail, updch.Error.Detail)
+							assert.Equal(t, err.Status, updch.Error.Status)
+							assert.Equal(t, err.Subproblems, updch.Error.Subproblems)
+
+							return nil
+						},
+					},
+				},
+				wantErr: nil,
+			}
+		},
 		"ok": func(t *testing.T) test {
 			jwk, keyAuth := mustAccountAndKeyAuthorization(t, "token")
-			payload, signer, root := mustAttestTPM(t, keyAuth) // TODO: value(s) for AK cert?
+			payload, signer, root := mustAttestTPM(t, keyAuth, nil) // TODO: value(s) for AK cert?
+			caRoot := pem.EncodeToMemory(&pem.Block{Type: "CERTIFICATE", Bytes: root.Raw})
+			ctx := NewProvisionerContext(context.Background(), mustAttestationProvisioner(t, caRoot))
+			return test{
+				args: args{
+					ctx: ctx,
+					jwk: jwk,
+					ch: &Challenge{
+						ID:              "chID",
+						AuthorizationID: "azID",
+						Token:           "token",
+						Type:            "device-attest-01",
+						Status:          StatusPending,
+						Value:           "device.id.12345678",
+					},
+					payload: payload,
+					db: &MockDB{
+						MockGetAuthorization: func(ctx context.Context, id string) (*Authorization, error) {
+							assert.Equal(t, "azID", id)
+							return &Authorization{ID: "azID"}, nil
+						},
+						MockUpdateAuthorization: func(ctx context.Context, az *Authorization) error {
+							fingerprint, err := keyutil.Fingerprint(signer.Public())
+							assert.NoError(t, err)
+							assert.Equal(t, "azID", az.ID)
+							assert.Equal(t, fingerprint, az.Fingerprint)
+							return nil
+						},
+						MockUpdateChallenge: func(ctx context.Context, updch *Challenge) error {
+							assert.Equal(t, "chID", updch.ID)
+							assert.Equal(t, "token", updch.Token)
+							assert.Equal(t, StatusValid, updch.Status)
+							assert.Equal(t, ChallengeType("device-attest-01"), updch.Type)
+							assert.Equal(t, "device.id.12345678", updch.Value)
+							return nil
+						},
+					},
+				},
+				wantErr: nil,
+			}
+		},
+		"ok with PermanentIdentifier SAN": func(t *testing.T) test {
+			jwk, keyAuth := mustAccountAndKeyAuthorization(t, "token")
+			payload, signer, root := mustAttestTPM(t, keyAuth, []string{"device.id.12345678"}) // TODO: value(s) for AK cert?
 			caRoot := pem.EncodeToMemory(&pem.Block{Type: "CERTIFICATE", Bytes: root.Raw})
 			ctx := NewProvisionerContext(context.Background(), mustAttestationProvisioner(t, caRoot))
 			return test{
@@ -341,9 +451,6 @@ func Test_doTPMAttestationFormat(t *testing.T) {
 	// create template and sign certificate for the AK public key
 	keyID := generateKeyID(t, eks[0].Public())
 	template := &x509.Certificate{
-		Subject: pkix.Name{
-			CommonName: "testakcert",
-		},
 		PublicKey: akp.Public,
 		URIs: []*url.URL{
 			{Scheme: "urn", Opaque: "ek:sha256:" + base64.StdEncoding.EncodeToString(keyID)},
@@ -738,4 +845,83 @@ func Test_doTPMAttestationFormat(t *testing.T) {
 			}
 		})
 	}
+}
+
+// createSubjectAltNameExtension will construct an Extension containing all
+// SubjectAlternativeNames held in a Certificate. It implements more types than
+// the golang x509 library, so it is used whenever OtherName or RegisteredID
+// type SANs are present in the certificate.
+//
+// See also https://datatracker.ietf.org/doc/html/rfc5280.html#section-4.2.1.6
+//
+// TODO(hs): this was copied from go.step.sm/crypto/x509util. Should it be
+// exposed instead?
+func createSubjectAltNameExtension(dnsNames, emailAddresses x509util.MultiString, ipAddresses x509util.MultiIP, uris x509util.MultiURL, sans []x509util.SubjectAlternativeName, subjectIsEmpty bool) (x509util.Extension, error) {
+	var zero x509util.Extension
+
+	var rawValues []asn1.RawValue
+	for _, dnsName := range dnsNames {
+		rawValue, err := x509util.SubjectAlternativeName{
+			Type: x509util.DNSType, Value: dnsName,
+		}.RawValue()
+		if err != nil {
+			return zero, err
+		}
+
+		rawValues = append(rawValues, rawValue)
+	}
+
+	for _, emailAddress := range emailAddresses {
+		rawValue, err := x509util.SubjectAlternativeName{
+			Type: x509util.EmailType, Value: emailAddress,
+		}.RawValue()
+		if err != nil {
+			return zero, err
+		}
+
+		rawValues = append(rawValues, rawValue)
+	}
+
+	for _, ip := range ipAddresses {
+		rawValue, err := x509util.SubjectAlternativeName{
+			Type: x509util.IPType, Value: ip.String(),
+		}.RawValue()
+		if err != nil {
+			return zero, err
+		}
+
+		rawValues = append(rawValues, rawValue)
+	}
+
+	for _, uri := range uris {
+		rawValue, err := x509util.SubjectAlternativeName{
+			Type: x509util.URIType, Value: uri.String(),
+		}.RawValue()
+		if err != nil {
+			return zero, err
+		}
+
+		rawValues = append(rawValues, rawValue)
+	}
+
+	for _, san := range sans {
+		rawValue, err := san.RawValue()
+		if err != nil {
+			return zero, err
+		}
+
+		rawValues = append(rawValues, rawValue)
+	}
+
+	// Now marshal the rawValues into the ASN1 sequence, and create an Extension object to hold the extension
+	rawBytes, err := asn1.Marshal(rawValues)
+	if err != nil {
+		return zero, fmt.Errorf("error marshaling SubjectAlternativeName extension to ASN1: %w", err)
+	}
+
+	return x509util.Extension{
+		ID:       x509util.ObjectIdentifier(oidSubjectAlternativeName),
+		Critical: subjectIsEmpty,
+		Value:    rawBytes,
+	}, nil
 }
