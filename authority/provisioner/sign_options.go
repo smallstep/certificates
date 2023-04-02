@@ -83,31 +83,6 @@ type AttestationData struct {
 	PermanentIdentifier string
 }
 
-// emailOnlyIdentity is a CertificateRequestValidator that checks that the only
-// SAN provided is the given email address.
-type emailOnlyIdentity string
-
-func (e emailOnlyIdentity) Valid(req *x509.CertificateRequest) error {
-	switch {
-	case len(req.DNSNames) > 0:
-		return errs.Forbidden("certificate request cannot contain DNS names")
-	case len(req.IPAddresses) > 0:
-		return errs.Forbidden("certificate request cannot contain IP addresses")
-	case len(req.URIs) > 0:
-		return errs.Forbidden("certificate request cannot contain URIs")
-	case len(req.EmailAddresses) == 0:
-		return errs.Forbidden("certificate request does not contain any email address")
-	case len(req.EmailAddresses) > 1:
-		return errs.Forbidden("certificate request contains too many email addresses")
-	case req.EmailAddresses[0] == "":
-		return errs.Forbidden("certificate request cannot contain an empty email address")
-	case req.EmailAddresses[0] != string(e):
-		return errs.Forbidden("certificate request does not contain the valid email address - got %s, want %s", req.EmailAddresses[0], e)
-	default:
-		return nil
-	}
-}
-
 // defaultPublicKeyValidator validates the public key of a certificate request.
 type defaultPublicKeyValidator struct{}
 
