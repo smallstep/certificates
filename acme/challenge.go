@@ -409,7 +409,7 @@ func wireOIDC01Validate(ctx context.Context, ch *Challenge, db DB, jwk *jose.JSO
 
 	if claims.Issuer == "https://accounts.google.com" {
 		// for internal demo purpose only
-		var handle = fmt.Sprintf("%s_wire", strings.ToLower(claims.GivenName))
+		var handle = fmt.Sprintf("im:wireapp=%s_wire", strings.ToLower(claims.GivenName))
 		var displayName = claims.Handle
 		if challengeValues.Name != displayName || challengeValues.Handle != handle {
 			return storeError(ctx, db, ch, false, NewError(ErrorRejectedIdentifierType, "OIDC claims don't match"))
