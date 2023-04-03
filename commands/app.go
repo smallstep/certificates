@@ -85,7 +85,7 @@ Requires **--insecure** flag.`,
 		},
 		cli.StringFlag{
 			Name:  "pidfile",
-			Usage: "that path to the <file> to write the process ID.",
+			Usage: "the path to the <file> to write the process ID.",
 		},
 		cli.BoolFlag{
 			Name:  "insecure",
