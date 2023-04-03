@@ -621,15 +621,13 @@ func doTPMAttestationFormat(ctx context.Context, prov Provisioner, ch *Challenge
 		return nil, NewError(ErrorBadAttestationStatementType, "invalid alg in attestation statement")
 	}
 
-	var hash crypto.Hash
-	switch alg {
-	case -257: // RS256
-		hash = crypto.SHA256
-	case -7: // ES256
-		hash = crypto.SHA256
-	default:
+	// only RS256 and ES256 are allowed
+	if alg != -257 && alg != -1 {
 		return nil, NewError(ErrorBadAttestationStatementType, "invalid alg %d in attestation statement", alg)
 	}
+
+	// set the hash algorithm to use to SHA256
+	hash := crypto.SHA256
 
 	// recreate the generated key certification parameter values and verify
 	// the attested key using the public key of the AK.
