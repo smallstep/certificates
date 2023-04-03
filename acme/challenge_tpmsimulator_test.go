@@ -421,6 +421,11 @@ func newInternalServerError(msg string) *Error {
 	}
 }
 
+var (
+	oidPermanentIdentifier          = asn1.ObjectIdentifier{1, 3, 6, 1, 5, 5, 7, 8, 3}
+	oidHardwareModuleNameIdentifier = asn1.ObjectIdentifier{1, 3, 6, 1, 5, 5, 7, 8, 4}
+)
+
 func Test_doTPMAttestationFormat(t *testing.T) {
 	ctx := context.Background()
 	aca, err := minica.New(
@@ -457,16 +462,6 @@ func Test_doTPMAttestationFormat(t *testing.T) {
 		},
 	}
 	akCert, err := aca.Sign(template)
-	require.NoError(t, err)
-	require.NotNil(t, akCert)
-
-	templateMissingSAN := &x509.Certificate{
-		Subject: pkix.Name{
-			CommonName: "testakcertmissingsan",
-		},
-		PublicKey: akp.Public,
-	}
-	akCertMissingSAN, err := aca.Sign(templateMissingSAN)
 	require.NoError(t, err)
 	require.NotNil(t, akCert)
 
@@ -656,17 +651,6 @@ func Test_doTPMAttestationFormat(t *testing.T) {
 				"pubArea":  params.Public,
 			},
 		}}, nil, newBadAttestationStatementError("x5c is not valid: x509: certificate signed by unknown authority")},
-		{"fail missing SAN extension", args{ctx, mustAttestationProvisioner(t, acaRoot), &Challenge{Token: "token"}, jwk, &attestationObject{
-			Format: "tpm",
-			AttStatement: map[string]interface{}{
-				"ver":      "2.0",
-				"x5c":      []interface{}{akCertMissingSAN.Raw, aca.Intermediate.Raw},
-				"alg":      int64(-257), // RS256
-				"sig":      params.CreateSignature,
-				"certInfo": params.CreateAttestation,
-				"pubArea":  params.Public,
-			},
-		}}, nil, newBadAttestationStatementError("AK certificate is missing Subject Alternative Name extension")},
 		{"fail pubArea not present", args{ctx, mustAttestationProvisioner(t, acaRoot), &Challenge{Token: "token"}, jwk, &attestationObject{
 			Format: "tpm",
 			AttStatement: map[string]interface{}{
@@ -854,8 +838,8 @@ func Test_doTPMAttestationFormat(t *testing.T) {
 //
 // See also https://datatracker.ietf.org/doc/html/rfc5280.html#section-4.2.1.6
 //
-// TODO(hs): this was copied from go.step.sm/crypto/x509util. Should it be
-// exposed instead?
+// TODO(hs): this was copied from go.step.sm/crypto/x509util to make it easier
+// to create the SAN extension for testing purposes. Should it be exposed instead?
 func createSubjectAltNameExtension(dnsNames, emailAddresses x509util.MultiString, ipAddresses x509util.MultiIP, uris x509util.MultiURL, sans []x509util.SubjectAlternativeName, subjectIsEmpty bool) (x509util.Extension, error) {
 	var zero x509util.Extension
 

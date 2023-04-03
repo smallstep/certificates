@@ -29,7 +29,7 @@ require (
 	github.com/urfave/cli v1.22.12
 	go.mozilla.org/pkcs7 v0.0.0-20210826202110-33d05740a352
 	go.step.sm/cli-utils v0.7.5
-	go.step.sm/crypto v0.28.1-0.20230329145110-4ccd51b601c7
+	go.step.sm/crypto v0.28.1-0.20230403133050-c4ef6cdd0c34
 	go.step.sm/linkedca v0.19.0
 	golang.org/x/crypto v0.7.0
 	golang.org/x/exp v0.0.0-20230310171629-522b1b587ee0
