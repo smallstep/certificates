@@ -644,7 +644,7 @@ func Test_doTPMAttestationFormat(t *testing.T) {
 				"certInfo": params.CreateAttestation,
 				"pubArea":  params.Public,
 			},
-		}}, nil, newInternalServerError("failed getting TPM attestation root CAs")},
+		}}, nil, newInternalServerError("no root CA bundle available to verify the attestation certificate")},
 		{"fail verify", args{ctx, mustAttestationProvisioner(t, acaRoot), &Challenge{Token: "token"}, jwk, &attestationObject{
 			Format: "step",
 			AttStatement: map[string]interface{}{

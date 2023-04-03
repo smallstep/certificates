@@ -539,18 +539,16 @@ func doTPMAttestationFormat(ctx context.Context, prov Provisioner, ch *Challenge
 	}
 
 	intermediates := x509.NewCertPool()
-	if len(x5c[1:]) > 0 {
-		for _, v := range x5c[1:] {
-			intCertBytes, vok := v.([]byte)
-			if !vok {
-				return nil, NewError(ErrorBadAttestationStatementType, "x5c is malformed")
-			}
-			intCert, err := x509.ParseCertificate(intCertBytes)
-			if err != nil {
-				return nil, WrapError(ErrorBadAttestationStatementType, err, "x5c is malformed")
-			}
-			intermediates.AddCert(intCert)
+	for _, v := range x5c[1:] {
+		intCertBytes, vok := v.([]byte)
+		if !vok {
+			return nil, NewError(ErrorBadAttestationStatementType, "x5c is malformed")
 		}
+		intCert, err := x509.ParseCertificate(intCertBytes)
+		if err != nil {
+			return nil, WrapError(ErrorBadAttestationStatementType, err, "x5c is malformed")
+		}
+		intermediates.AddCert(intCert)
 	}
 
 	// TODO(hs): this can be removed when permanent-identifier/hardware-module-name are handled correctly in
@@ -559,11 +557,8 @@ func doTPMAttestationFormat(ctx context.Context, prov Provisioner, ch *Challenge
 	if len(akCert.UnhandledCriticalExtensions) > 0 {
 		unhandledCriticalExtensions := akCert.UnhandledCriticalExtensions[:0]
 		for _, extOID := range akCert.UnhandledCriticalExtensions {
-			switch {
-			case extOID.Equal(oidSubjectAlternativeName):
-				// allow Subject Alternative Names, including PermanentIdentifier, HardwareModuleName, TPM attributes, etc
-			default:
-				// OIDs that are not in the switch with explicitly allowed OIDs remain unhandled
+			if !extOID.Equal(oidSubjectAlternativeName) {
+				// critical extensions other than the Subject Alternative Name remain unhandled
 				unhandledCriticalExtensions = append(unhandledCriticalExtensions, extOID)
 			}
 		}
@@ -572,7 +567,7 @@ func doTPMAttestationFormat(ctx context.Context, prov Provisioner, ch *Challenge
 
 	roots, ok := prov.GetAttestationRoots()
 	if !ok {
-		return nil, NewErrorISE("failed getting TPM attestation root CAs")
+		return nil, NewErrorISE("no root CA bundle available to verify the attestation certificate")
 	}
 
 	verifiedChains, err := akCert.Verify(x509.VerifyOptions{
@@ -646,8 +641,6 @@ func doTPMAttestationFormat(ctx context.Context, prov Provisioner, ch *Challenge
 	switch alg {
 	case -257: // RS256
 		hash = crypto.SHA256
-	case -8: // EdDSA
-		hash = crypto.Hash(0)
 	case -7: // ES256
 		hash = crypto.SHA256
 	default:
