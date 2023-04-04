@@ -346,7 +346,7 @@ func (o *Order) sans(csr *x509.CertificateRequest) ([]x509util.SubjectAlternativ
 	orderNames := make([]string, numberOfIdentifierType(DNS, o.Identifiers)+2*numberOfIdentifierType(WireID, o.Identifiers))
 	orderIPs := make([]net.IP, numberOfIdentifierType(IP, o.Identifiers))
 	orderPIDs := make([]string, numberOfIdentifierType(PermanentIdentifier, o.Identifiers))
-	orderURIs := make([]string, 2*numberOfIdentifierType(WireID, o.Identifiers))
+	tmpOrderURIs := make([]*url.URL, 2*numberOfIdentifierType(WireID, o.Identifiers))
 	indexDNS, indexIP, indexPID, indexURI := 0, 0, 0, 0
 	for _, n := range o.Identifiers {
 		switch n.Type {
@@ -364,9 +364,18 @@ func (o *Order) sans(csr *x509.CertificateRequest) ([]x509util.SubjectAlternativ
 			if err != nil {
 				return sans, NewErrorISE("unsupported identifier value in order: %s", n.Value)
 			}
-			orderURIs[indexURI] = wireID.ClientID
+			clientId, err := url.Parse(wireID.ClientID)
+			if err != nil {
+				return sans, NewErrorISE("clientId must be a URI: %s", wireID.ClientID)
+			}
+			tmpOrderURIs[indexURI] = clientId
 			indexURI++
-			orderURIs[indexURI] = wireID.Handle
+
+			handle, err := url.Parse(wireID.Handle)
+			if err != nil {
+				return sans, NewErrorISE("handle must be a URI: %s", wireID.Handle)
+			}
+			tmpOrderURIs[indexURI] = handle
 			indexURI++
 		default:
 			return sans, NewErrorISE("unsupported identifier type in order: %s", n.Type)
@@ -374,7 +383,7 @@ func (o *Order) sans(csr *x509.CertificateRequest) ([]x509util.SubjectAlternativ
 	}
 	orderNames = uniqueSortedLowerNames(orderNames)
 	orderIPs = uniqueSortedIPs(orderIPs)
-	orderURIs = uniqueSortedLowerNames(orderURIs)
+	orderURIs := uniqueSortedURIStrings(tmpOrderURIs)
 
 	totalNumberOfSANs := len(csr.DNSNames) + len(csr.IPAddresses) + len(csr.URIs)
 	sans = make([]x509util.SubjectAlternativeName, totalNumberOfSANs)
@@ -419,9 +428,9 @@ func (o *Order) sans(csr *x509.CertificateRequest) ([]x509util.SubjectAlternativ
 		index++
 	}
 
-	if len(csr.URIs) != len(orderURIs) {
+	if len(csr.URIs) != len(tmpOrderURIs) {
 		return sans, NewError(ErrorBadCSRType, "CSR URIs do not match identifiers exactly: "+
-			"CSR URIs = %v, Order URIs = %v", csr.URIs, orderURIs)
+			"CSR URIs = %v, Order URIs = %v", csr.URIs, tmpOrderURIs)
 	}
 
 	// sort URI list
@@ -430,7 +439,7 @@ func (o *Order) sans(csr *x509.CertificateRequest) ([]x509util.SubjectAlternativ
 	for i := range csrURIs {
 		if csrURIs[i] != orderURIs[i] {
 			return sans, NewError(ErrorBadCSRType, "CSR URIs do not match identifiers exactly: "+
-				"CSR URIs = %v, Order URIs = %v", csr.URIs, orderURIs)
+				"CSR URIs = %v, Order URIs = %v", csr.URIs, tmpOrderURIs)
 		}
 		sans[index] = x509util.SubjectAlternativeName{
 			Type:  x509util.URIType,
