@@ -578,6 +578,13 @@ func doTPMAttestationFormat(ctx context.Context, prov Provisioner, ch *Challenge
 		return nil, NewErrorISE("no root CA bundle available to verify the attestation certificate")
 	}
 
+	// verify that the AK certificate was signed by a trusted root,
+	// chained to by the intermediates provided by the client. As part
+	// of building the verified certificate chain, the signature over the
+	// AK certificate is checked to be a valid signature of one of the
+	// provided intermediates. Signatures over the intermediates are in
+	// turn also verified to be valid signatures from one of the trusted
+	// roots.
 	verifiedChains, err := akCert.Verify(x509.VerifyOptions{
 		Roots:         roots,
 		Intermediates: intermediates,
@@ -586,6 +593,11 @@ func doTPMAttestationFormat(ctx context.Context, prov Provisioner, ch *Challenge
 	})
 	if err != nil {
 		return nil, WrapError(ErrorBadAttestationStatementType, err, "x5c is not valid")
+	}
+
+	// validate additional AK certificate requirements
+	if err := validateAKCertificate(akCert); err != nil {
+		return nil, WrapError(ErrorBadAttestationStatementType, err, "AK certificate is not valid")
 	}
 
 	// TODO(hs): implement revocation check; Verify() doesn't perform CRL check nor OCSP lookup.
@@ -695,6 +707,93 @@ func doTPMAttestationFormat(ctx context.Context, prov Provisioner, ch *Challenge
 
 	// TODO(hs): pass more attestation data, so that that can be used/recorded too?
 	return data, nil
+}
+
+var (
+	oidExtensionExtendedKeyUsage = asn1.ObjectIdentifier{2, 5, 29, 37}
+	oidTCGKpAIKCertificate       = asn1.ObjectIdentifier{2, 23, 133, 8, 3}
+)
+
+// validateAKCertifiate validates the X.509 AK certificate to be
+// in accordance with the required properties. The requirements come from:
+// https://www.w3.org/TR/webauthn-2/#sctn-tpm-cert-requirements.
+//
+// 	- Version MUST be set to 3.
+// 	- Subject field MUST be set to empty.
+//	- The Subject Alternative Name extension MUST be set as defined
+//	  in [TPMv2-EK-Profile] section 3.2.9.
+//	- The Extended Key Usage extension MUST contain the OID 2.23.133.8.3
+//	  ("joint-iso-itu-t(2) internationalorganizations(23) 133 tcg-kp(8) tcg-kp-AIKCertificate(3)").
+//	- The Basic Constraints extension MUST have the CA component set to false.
+//	- An Authority Information Access (AIA) extension with entry id-ad-ocsp
+// 	  and a CRL Distribution Point extension [RFC5280] are both OPTIONAL as
+//	  the status of many attestation certificates is available through metadata
+// 	  services. See, for example, the FIDO Metadata Service.
+
+func validateAKCertificate(c *x509.Certificate) error {
+	if c.Version != 3 {
+		return fmt.Errorf("AK certificate has invalid version %d; only version 3 is allowed", c.Version)
+	}
+	if c.Subject.String() != "" {
+		return fmt.Errorf("AK certificate subject must be empty; got %s", c.Subject)
+	}
+	if err := validateAKCertificateSubjectAlternativeNames(c); err != nil {
+		return err
+	}
+	if err := validateAKCertificateExtendedKeyUsage(c); err != nil {
+		return err
+	}
+	if c.IsCA {
+		return errors.New("AK certificate must not be a CA")
+	}
+
+	return nil
+}
+
+func validateAKCertificateSubjectAlternativeNames(c *x509.Certificate) error {
+	return nil // TODO(hs): remove this early return when we require AK certificates to set these
+
+	sans, err := x509util.ParseSubjectAlternativeNames(c)
+	if err != nil {
+		return fmt.Errorf("failed parsing AK certificate Subject Alternative Names: %w", err)
+	}
+
+	details := sans.TPMHardwareDetails
+	manufacturer, model, version := details.Manufacturer, details.Model, details.Version
+
+	switch {
+	case manufacturer == "":
+		return errors.New("missing TPM manufacturer")
+	case model == "":
+		return errors.New("missing TPM model")
+	case version == "":
+		return errors.New("missing TPM version")
+	}
+
+	return nil
+}
+
+// validateAKCertificateExtendedKeyUsage checks if the AK certificate
+// has the "tcg-kp-AIKCertificate" Extended Key Usage set.
+func validateAKCertificateExtendedKeyUsage(c *x509.Certificate) error {
+	var (
+		valid = false
+		ekus  []asn1.ObjectIdentifier
+	)
+	for _, ext := range c.Extensions {
+		if ext.Id.Equal(oidExtensionExtendedKeyUsage) {
+			if _, err := asn1.Unmarshal(ext.Value, &ekus); err != nil || !ekus[0].Equal(oidTCGKpAIKCertificate) {
+				return errors.New("AK certificate is missing Extended Key Usage value tcg-kp-AIKCertificate (2.23.133.8.3)")
+			}
+			valid = true
+		}
+	}
+
+	if !valid {
+		return errors.New("AK certificate is missing Extended Key Usage extension")
+	}
+
+	return nil
 }
 
 // Apple Enterprise Attestation Root CA from

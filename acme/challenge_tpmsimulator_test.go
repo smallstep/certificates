@@ -93,7 +93,9 @@ func mustAttestTPM(t *testing.T, keyAuthorization string, permanentIdentifiers [
 	// create template and sign certificate for the AK public key
 	keyID := generateKeyID(t, eks[0].Public())
 	template := &x509.Certificate{
-		PublicKey: akp.Public,
+		PublicKey:          akp.Public,
+		IsCA:               false,
+		UnknownExtKeyUsage: []asn1.ObjectIdentifier{oidTCGKpAIKCertificate},
 	}
 	if len(permanentIdentifiers) == 0 {
 		template.URIs = []*url.URL{
@@ -456,7 +458,9 @@ func Test_doTPMAttestationFormat(t *testing.T) {
 	// create template and sign certificate for the AK public key
 	keyID := generateKeyID(t, eks[0].Public())
 	template := &x509.Certificate{
-		PublicKey: akp.Public,
+		PublicKey:          akp.Public,
+		IsCA:               false,
+		UnknownExtKeyUsage: []asn1.ObjectIdentifier{oidTCGKpAIKCertificate},
 		URIs: []*url.URL{
 			{Scheme: "urn", Opaque: "ek:sha256:" + base64.StdEncoding.EncodeToString(keyID)},
 		},
