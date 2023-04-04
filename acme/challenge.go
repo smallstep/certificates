@@ -511,6 +511,15 @@ type tpmAttestationData struct {
 	Fingerprint          string
 }
 
+// coseAlgorithmIdentifier models a COSEAlgorithmIdentifier.
+// Also see https://www.w3.org/TR/webauthn-2/#sctn-alg-identifier.
+type coseAlgorithmIdentifier int32
+
+const (
+	coseAlgES256 coseAlgorithmIdentifier = -7
+	coseAlgRS256 coseAlgorithmIdentifier = -257
+)
+
 func doTPMAttestationFormat(ctx context.Context, prov Provisioner, ch *Challenge, jwk *jose.JSONWebKey, att *attestationObject) (*tpmAttestationData, error) {
 	ver, ok := att.AttStatement["ver"].(string)
 	if !ok {
@@ -622,7 +631,8 @@ func doTPMAttestationFormat(ctx context.Context, prov Provisioner, ch *Challenge
 	}
 
 	// only RS256 and ES256 are allowed
-	if alg != -257 && alg != -1 {
+	coseAlg := coseAlgorithmIdentifier(alg)
+	if coseAlg != coseAlgRS256 && coseAlg != coseAlgES256 {
 		return nil, NewError(ErrorBadAttestationStatementType, "invalid alg %d in attestation statement", alg)
 	}
 

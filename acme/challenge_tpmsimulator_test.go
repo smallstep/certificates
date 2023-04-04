@@ -515,7 +515,7 @@ func Test_doTPMAttestationFormat(t *testing.T) {
 			AttStatement: map[string]interface{}{
 				"ver":      "2.0",
 				"x5c":      []interface{}{akCert.Raw, aca.Intermediate.Raw},
-				"alg":      int64(-257), //
+				"alg":      int64(-257), // RS256
 				"sig":      params.CreateSignature,
 				"certInfo": params.CreateAttestation,
 				"pubArea":  params.Public,
