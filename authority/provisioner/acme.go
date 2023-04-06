@@ -48,7 +48,7 @@ func (c ACMEChallenge) Validate() error {
 type ACMEAttestationFormat string
 
 const (
-	// APPLE is the format used to enable device-attest-01 on apple devices.
+	// APPLE is the format used to enable device-attest-01 on Apple devices.
 	APPLE ACMEAttestationFormat = "apple"
 
 	// STEP is the format used to enable device-attest-01 on devices that
@@ -57,7 +57,7 @@ const (
 	// TODO(mariano): should we rename this to something else.
 	STEP ACMEAttestationFormat = "step"
 
-	// TPM is the format used to enable device-attest-01 on TPMs.
+	// TPM is the format used to enable device-attest-01 with TPMs.
 	TPM ACMEAttestationFormat = "tpm"
 )
 
@@ -184,7 +184,7 @@ func (p *ACME) Init(config Config) (err error) {
 	}
 
 	// Parse attestation roots.
-	// The pool will be nil if the there are not roots.
+	// The pool will be nil if there are no roots.
 	if rest := p.AttestationRoots; len(rest) > 0 {
 		var block *pem.Block
 		var hasCert bool

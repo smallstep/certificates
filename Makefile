@@ -90,13 +90,21 @@ generate:
 #########################################
 # Test
 #########################################
-test:
-	$Q $(GOFLAGS) gotestsum -- -coverprofile=coverage.out -short -covermode=atomic ./...
+test: testdefault testtpmsimulator combinecoverage
+
+testdefault:
+	$Q $(GOFLAGS) gotestsum -- -coverprofile=defaultcoverage.out -short -covermode=atomic ./...
+
+testtpmsimulator:
+	$Q CGO_ENALBED=1 gotestsum -- -coverprofile=tpmsimulatorcoverage.out -short -covermode=atomic -tags tpmsimulator ./acme 
 
 testcgo:
 	$Q gotestsum -- -coverprofile=coverage.out -short -covermode=atomic ./...
 
-.PHONY: test testcgo
+combinecoverage:
+	cat defaultcoverage.out tpmsimulatorcoverage.out > coverage.out
+
+.PHONY: test testdefault testtpmsimulator testcgo combinecoverage
 
 integrate: integration
 

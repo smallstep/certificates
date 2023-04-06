@@ -23,4 +23,5 @@ jobs:
       os-dependencies: "libpcsclite-dev"
       run-gitleaks: true
       run-codeql: true
+      make-test: true # run `make test` instead of the default test workflow
     secrets: inherit
