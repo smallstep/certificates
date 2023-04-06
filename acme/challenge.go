@@ -718,41 +718,40 @@ var (
 // in accordance with the required properties. The requirements come from:
 // https://www.w3.org/TR/webauthn-2/#sctn-tpm-cert-requirements.
 //
-// 	- Version MUST be set to 3.
-// 	- Subject field MUST be set to empty.
-//	- The Subject Alternative Name extension MUST be set as defined
-//	  in [TPMv2-EK-Profile] section 3.2.9.
-//	- The Extended Key Usage extension MUST contain the OID 2.23.133.8.3
-//	  ("joint-iso-itu-t(2) internationalorganizations(23) 133 tcg-kp(8) tcg-kp-AIKCertificate(3)").
-//	- The Basic Constraints extension MUST have the CA component set to false.
-//	- An Authority Information Access (AIA) extension with entry id-ad-ocsp
-// 	  and a CRL Distribution Point extension [RFC5280] are both OPTIONAL as
-//	  the status of many attestation certificates is available through metadata
-// 	  services. See, for example, the FIDO Metadata Service.
-
+//   - Version MUST be set to 3.
+//   - Subject field MUST be set to empty.
+//   - The Subject Alternative Name extension MUST be set as defined
+//     in [TPMv2-EK-Profile] section 3.2.9.
+//   - The Extended Key Usage extension MUST contain the OID 2.23.133.8.3
+//     ("joint-iso-itu-t(2) internationalorganizations(23) 133 tcg-kp(8) tcg-kp-AIKCertificate(3)").
+//   - The Basic Constraints extension MUST have the CA component set to false.
+//   - An Authority Information Access (AIA) extension with entry id-ad-ocsp
+//     and a CRL Distribution Point extension [RFC5280] are both OPTIONAL as
+//     the status of many attestation certificates is available through metadata
+//     services. See, for example, the FIDO Metadata Service.
 func validateAKCertificate(c *x509.Certificate) error {
 	if c.Version != 3 {
 		return fmt.Errorf("AK certificate has invalid version %d; only version 3 is allowed", c.Version)
 	}
 	if c.Subject.String() != "" {
-		return fmt.Errorf("AK certificate subject must be empty; got %s", c.Subject)
+		return fmt.Errorf("AK certificate subject must be empty; got %q", c.Subject)
 	}
-	if err := validateAKCertificateSubjectAlternativeNames(c); err != nil {
-		return err
+	if c.IsCA {
+		return errors.New("AK certificate must not be a CA")
 	}
 	if err := validateAKCertificateExtendedKeyUsage(c); err != nil {
 		return err
 	}
-	if c.IsCA {
-		return errors.New("AK certificate must not be a CA")
+	if err := validateAKCertificateSubjectAlternativeNames(c); err != nil {
+		return err
 	}
 
 	return nil
 }
 
+// validateAKCertificateSubjectAlternativeNames checks if the AK certificate
+// has TPM hardware details set.
 func validateAKCertificateSubjectAlternativeNames(c *x509.Certificate) error {
-	return nil // TODO(hs): remove this early return when we require AK certificates to set these
-
 	sans, err := x509util.ParseSubjectAlternativeNames(c)
 	if err != nil {
 		return fmt.Errorf("failed parsing AK certificate Subject Alternative Names: %w", err)

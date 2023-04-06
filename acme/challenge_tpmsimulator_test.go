@@ -8,7 +8,6 @@ import (
 	"crypto"
 	"crypto/sha256"
 	"crypto/x509"
-	"crypto/x509/pkix"
 	"encoding/asn1"
 	"encoding/base64"
 	"encoding/json"
@@ -97,25 +96,22 @@ func mustAttestTPM(t *testing.T, keyAuthorization string, permanentIdentifiers [
 		IsCA:               false,
 		UnknownExtKeyUsage: []asn1.ObjectIdentifier{oidTCGKpAIKCertificate},
 	}
-	if len(permanentIdentifiers) == 0 {
-		template.URIs = []*url.URL{
-			{Scheme: "urn", Opaque: "ek:sha256:" + base64.StdEncoding.EncodeToString(keyID)},
-		}
-	} else {
-		san := x509util.SubjectAlternativeName{
+	sans := []x509util.SubjectAlternativeName{}
+	uris := []*url.URL{{Scheme: "urn", Opaque: "ek:sha256:" + base64.StdEncoding.EncodeToString(keyID)}}
+	for _, pi := range permanentIdentifiers {
+		sans = append(sans, x509util.SubjectAlternativeName{
 			Type:  x509util.PermanentIdentifierType,
-			Value: permanentIdentifiers[0], // TODO(hs): multiple?
-		}
-		ext, err := createSubjectAltNameExtension(nil, nil, nil, nil, []x509util.SubjectAlternativeName{san}, true)
-		require.NoError(t, err)
-		template.ExtraExtensions = append(template.ExtraExtensions,
-			pkix.Extension{
-				Id:       asn1.ObjectIdentifier(ext.ID),
-				Critical: ext.Critical,
-				Value:    ext.Value,
-			},
-		)
+			Value: pi,
+		})
 	}
+	asn1Value := []byte(fmt.Sprintf(`{"extraNames":[{"type": %q, "value": %q},{"type": %q, "value": %q},{"type": %q, "value": %q}]}`, oidTPMManufacturer, "1414747215", oidTPMModel, "SLB 9670 TPM2.0", oidTPMVersion, "7.55"))
+	sans = append(sans, x509util.SubjectAlternativeName{
+		Type:      x509util.DirectoryNameType,
+		ASN1Value: asn1Value,
+	})
+	ext, err := createSubjectAltNameExtension(nil, nil, nil, uris, sans, true)
+	require.NoError(t, err)
+	ext.Set(template)
 	akCert, err := aca.Sign(template)
 	require.NoError(t, err)
 	require.NotNil(t, akCert)
@@ -461,13 +457,29 @@ func Test_doTPMAttestationFormat(t *testing.T) {
 		PublicKey:          akp.Public,
 		IsCA:               false,
 		UnknownExtKeyUsage: []asn1.ObjectIdentifier{oidTCGKpAIKCertificate},
-		URIs: []*url.URL{
-			{Scheme: "urn", Opaque: "ek:sha256:" + base64.StdEncoding.EncodeToString(keyID)},
-		},
 	}
+	sans := []x509util.SubjectAlternativeName{}
+	uris := []*url.URL{{Scheme: "urn", Opaque: "ek:sha256:" + base64.StdEncoding.EncodeToString(keyID)}}
+	asn1Value := []byte(fmt.Sprintf(`{"extraNames":[{"type": %q, "value": %q},{"type": %q, "value": %q},{"type": %q, "value": %q}]}`, oidTPMManufacturer, "1414747215", oidTPMModel, "SLB 9670 TPM2.0", oidTPMVersion, "7.55"))
+	sans = append(sans, x509util.SubjectAlternativeName{
+		Type:      x509util.DirectoryNameType,
+		ASN1Value: asn1Value,
+	})
+	ext, err := createSubjectAltNameExtension(nil, nil, nil, uris, sans, true)
+	require.NoError(t, err)
+	ext.Set(template)
 	akCert, err := aca.Sign(template)
 	require.NoError(t, err)
 	require.NotNil(t, akCert)
+
+	invalidTemplate := &x509.Certificate{
+		PublicKey:          akp.Public,
+		IsCA:               false,
+		UnknownExtKeyUsage: []asn1.ObjectIdentifier{oidTCGKpAIKCertificate},
+	}
+	invalidAKCert, err := aca.Sign(invalidTemplate)
+	require.NoError(t, err)
+	require.NotNil(t, invalidAKCert)
 
 	// generate a JWK and the key authorization value
 	jwk, err := jose.GenerateJWK("EC", "P-256", "ES256", "sig", "", 0)
@@ -655,6 +667,17 @@ func Test_doTPMAttestationFormat(t *testing.T) {
 				"pubArea":  params.Public,
 			},
 		}}, nil, newBadAttestationStatementError("x5c is not valid: x509: certificate signed by unknown authority")},
+		{"fail validateAKCertificate", args{ctx, mustAttestationProvisioner(t, acaRoot), &Challenge{Token: "token"}, jwk, &attestationObject{
+			Format: "tpm",
+			AttStatement: map[string]interface{}{
+				"ver":      "2.0",
+				"x5c":      []interface{}{invalidAKCert.Raw, aca.Intermediate.Raw},
+				"alg":      int64(-257), // RS256
+				"sig":      params.CreateSignature,
+				"certInfo": params.CreateAttestation,
+				"pubArea":  params.Public,
+			},
+		}}, nil, newBadAttestationStatementError("AK certificate is not valid: missing TPM manufacturer")},
 		{"fail pubArea not present", args{ctx, mustAttestationProvisioner(t, acaRoot), &Challenge{Token: "token"}, jwk, &attestationObject{
 			Format: "tpm",
 			AttStatement: map[string]interface{}{
@@ -833,83 +856,4 @@ func Test_doTPMAttestationFormat(t *testing.T) {
 			}
 		})
 	}
-}
-
-// createSubjectAltNameExtension will construct an Extension containing all
-// SubjectAlternativeNames held in a Certificate. It implements more types than
-// the golang x509 library, so it is used whenever OtherName or RegisteredID
-// type SANs are present in the certificate.
-//
-// See also https://datatracker.ietf.org/doc/html/rfc5280.html#section-4.2.1.6
-//
-// TODO(hs): this was copied from go.step.sm/crypto/x509util to make it easier
-// to create the SAN extension for testing purposes. Should it be exposed instead?
-func createSubjectAltNameExtension(dnsNames, emailAddresses x509util.MultiString, ipAddresses x509util.MultiIP, uris x509util.MultiURL, sans []x509util.SubjectAlternativeName, subjectIsEmpty bool) (x509util.Extension, error) {
-	var zero x509util.Extension
-
-	var rawValues []asn1.RawValue
-	for _, dnsName := range dnsNames {
-		rawValue, err := x509util.SubjectAlternativeName{
-			Type: x509util.DNSType, Value: dnsName,
-		}.RawValue()
-		if err != nil {
-			return zero, err
-		}
-
-		rawValues = append(rawValues, rawValue)
-	}
-
-	for _, emailAddress := range emailAddresses {
-		rawValue, err := x509util.SubjectAlternativeName{
-			Type: x509util.EmailType, Value: emailAddress,
-		}.RawValue()
-		if err != nil {
-			return zero, err
-		}
-
-		rawValues = append(rawValues, rawValue)
-	}
-
-	for _, ip := range ipAddresses {
-		rawValue, err := x509util.SubjectAlternativeName{
-			Type: x509util.IPType, Value: ip.String(),
-		}.RawValue()
-		if err != nil {
-			return zero, err
-		}
-
-		rawValues = append(rawValues, rawValue)
-	}
-
-	for _, uri := range uris {
-		rawValue, err := x509util.SubjectAlternativeName{
-			Type: x509util.URIType, Value: uri.String(),
-		}.RawValue()
-		if err != nil {
-			return zero, err
-		}
-
-		rawValues = append(rawValues, rawValue)
-	}
-
-	for _, san := range sans {
-		rawValue, err := san.RawValue()
-		if err != nil {
-			return zero, err
-		}
-
-		rawValues = append(rawValues, rawValue)
-	}
-
-	// Now marshal the rawValues into the ASN1 sequence, and create an Extension object to hold the extension
-	rawBytes, err := asn1.Marshal(rawValues)
-	if err != nil {
-		return zero, fmt.Errorf("error marshaling SubjectAlternativeName extension to ASN1: %w", err)
-	}
-
-	return x509util.Extension{
-		ID:       x509util.ObjectIdentifier(oidSubjectAlternativeName),
-		Critical: subjectIsEmpty,
-		Value:    rawBytes,
-	}, nil
 }
