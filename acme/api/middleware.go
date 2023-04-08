@@ -7,6 +7,7 @@ import (
 	"io"
 	"net/http"
 	"net/url"
+	"path"
 	"strings"
 
 	"go.step.sm/crypto/jose"
@@ -293,7 +294,6 @@ func lookupJWK(next nextHTTP) nextHTTP {
 	return func(w http.ResponseWriter, r *http.Request) {
 		ctx := r.Context()
 		db := acme.MustDatabaseFromContext(ctx)
-		linker := acme.MustLinkerFromContext(ctx)
 
 		jws, err := jwsFromContext(ctx)
 		if err != nil {
@@ -301,16 +301,7 @@ func lookupJWK(next nextHTTP) nextHTTP {
 			return
 		}
 
-		kidPrefix := linker.GetLink(ctx, acme.AccountLinkType, "")
-		kid := jws.Signatures[0].Protected.KeyID
-		if !strings.HasPrefix(kid, kidPrefix) {
-			render.Error(w, acme.NewError(acme.ErrorMalformedType,
-				"kid does not have required prefix; expected %s, but got %s",
-				kidPrefix, kid))
-			return
-		}
-
-		accID := strings.TrimPrefix(kid, kidPrefix)
+		accID := path.Base(jws.Signatures[0].Protected.KeyID)
 		acc, err := db.GetAccount(ctx, accID)
 		switch {
 		case nosql.IsErrNotFound(err):
