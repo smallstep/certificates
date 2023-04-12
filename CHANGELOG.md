@@ -25,17 +25,38 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
 
 ---
 
-## [Unreleased]
+## [v0.24.0] - 2023-04-12
 
 ### Added
 
-- Added support for new Azure SDK, sovereign clouds, and HSM keys on Azure KMS
-  (smallstep/crypto#192, smallstep/crypto#197, smallstep/crypto#198).
+- Add ACME `device-attest-01` support with TPM 2.0
+  (smallstep/certificates#1063).
+- Add support for new Azure SDK, sovereign clouds, and HSM keys on Azure KMS
+  (smallstep/crypto#192, smallstep/crypto#197, smallstep/crypto#198,
+  smallstep/certificates#1323, smallstep/certificates#1309).
+- Add support for ASN.1 functions on certificate templates
+  (smallstep/crypto#208, smallstep/certificates#1345)
+- Add `DOCKER_STEPCA_INIT_ADDRESS` to configure the address to use in a docker
+  container (smallstep/certificates#1262).
+- Make sure that the CSR used matches the attested key when using AME
+  `device-attest-01` challenge (smallstep/certificates#1265).
+- Add support for compacting the Badger DB (smallstep/certificates#1298).
+- Build and release cleanups (smallstep/certificates#1322,
+  smallstep/certificates#1329, smallstep/certificates#1340).
 
 ### Fixed
 
-- Fixed support for PKCS #7 RSA-OAEP decryption through 
-  [smallstep/pkcs7#4](https://github.com/smallstep/pkcs7/pull/4), as used in SCEP.
+- Fix support for PKCS #7 RSA-OAEP decryption through
+  [smallstep/pkcs7#4](https://github.com/smallstep/pkcs7/pull/4), as used in
+  SCEP.
+- Fix RA installation using `scripts/install-step-ra.sh`
+  (smallstep/certificates#1255).
+- Clarify error messages on policy errors (smallstep/certificates#1287,
+  smallstep/certificates#1278).
+- Clarify error message on OIDC email validation (smallstep/certificates#1290).
+- Mark the IDP critical in the generated CRL data (smallstep/certificates#1293).
+- Disable database if CA is initialized with the `--no-db` flag
+  (smallstep/certificates#1294).
 
 ## [v0.23.2] - 2023-02-02
 
