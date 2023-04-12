@@ -17,7 +17,6 @@ jobs:
     runs-on: ubuntu-latest
     env:
       DOCKER_IMAGE: smallstep/step-ca
-      DOCKER_IMAGE_HSM: smallstep/step-ca-hsm
     outputs:
       version: ${{ steps.extract-tag.outputs.VERSION }}
       is_prerelease: ${{ steps.is_prerelease.outputs.IS_PRERELEASE }}
@@ -38,12 +37,12 @@ jobs:
           VERSION=${GITHUB_REF#refs/tags/v}
           echo "VERSION=${VERSION}" >> ${GITHUB_OUTPUT}
           echo "DOCKER_TAGS=${{ env.DOCKER_IMAGE }}:${VERSION}" >> ${GITHUB_ENV}
-          echo "DOCKER_TAGS_HSM=${{ env.DOCKER_IMAGE_HSM }}:${VERSION}" >> ${GITHUB_ENV}
+          echo "DOCKER_TAGS_HSM=${{ env.DOCKER_IMAGE }}:${VERSION}-hsm" >> ${GITHUB_ENV}
       - name: Add Latest Tag
         if: steps.is_prerelease.outputs.IS_PRERELEASE == 'false'
         run: |
           echo "DOCKER_TAGS=${{ env.DOCKER_TAGS }},${{ env.DOCKER_IMAGE }}:latest" >> ${GITHUB_ENV}
-          echo "DOCKER_TAGS_HSM=${{ env.DOCKER_TAGS_HSM }},${{ env.DOCKER_IMAGE_HSM }}:latest" >> ${GITHUB_ENV}
+          echo "DOCKER_TAGS_HSM=${{ env.DOCKER_TAGS_HSM }},${{ env.DOCKER_IMAGE }}:hsm" >> ${GITHUB_ENV}
       - name: Create Release
         id: create_release
         uses: actions/create-release@v1

@@ -3,19 +3,17 @@ FROM golang:alpine AS builder
 WORKDIR /src
 COPY . .
 
-RUN apk add --no-cache curl git make
-RUN make V=1 download
+RUN apk add --no-cache curl git make libcap
 RUN make V=1 bin/step-ca
+RUN setcap CAP_NET_BIND_SERVICE=+eip bin/step-ca
 
-FROM smallstep/step-kms-plugin-cloud:latest AS kms
+FROM smallstep/step-kms-plugin:cloud AS kms
 
 FROM smallstep/step-cli:latest
 
 COPY --from=builder /src/bin/step-ca /usr/local/bin/step-ca
 COPY --from=kms /usr/local/bin/step-kms-plugin /usr/local/bin/step-kms-plugin
 
-USER root
-RUN apk add --no-cache libcap && setcap CAP_NET_BIND_SERVICE=+eip /usr/local/bin/step-ca
 USER step
 
 ENV CONFIGPATH="/home/step/config/ca.json"
