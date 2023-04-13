@@ -112,6 +112,6 @@ jobs:
     with:
       platforms: linux/amd64,linux/386,linux/arm,linux/arm64
       tags: ${{ needs.create_release.outputs.docker_tags_hsm }}
-      docker_image: smallstep/step-ca:hsm
+      docker_image: smallstep/step-ca
       docker_file: docker/Dockerfile.hsm
     secrets: inherit
