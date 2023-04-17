@@ -28,7 +28,7 @@ require (
 	github.com/stretchr/testify v1.8.2
 	github.com/urfave/cli v1.22.12
 	go.mozilla.org/pkcs7 v0.0.0-20210826202110-33d05740a352
-	go.step.sm/cli-utils v0.7.5
+	go.step.sm/cli-utils v0.7.6
 	go.step.sm/crypto v0.29.1
 	go.step.sm/linkedca v0.19.0
 	golang.org/x/crypto v0.8.0
@@ -62,7 +62,7 @@ require (
 	github.com/cenkalti/backoff/v3 v3.0.0 // indirect
 	github.com/cespare/xxhash v1.1.0 // indirect
 	github.com/cespare/xxhash/v2 v2.2.0 // indirect
-	github.com/chzyer/readline v0.0.0-20180603132655-2972be24d48e // indirect
+	github.com/chzyer/readline v1.5.1 // indirect
 	github.com/cpuguy83/go-md2man/v2 v2.0.2 // indirect
 	github.com/davecgh/go-spew v1.1.1 // indirect
 	github.com/dgraph-io/badger v1.6.2 // indirect
