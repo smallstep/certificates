@@ -90,10 +90,10 @@ github.com/Azure/azure-sdk-for-go/sdk/azidentity v1.2.2 h1:uqM+VoHjVH6zdlkLF2b6O
 github.com/Azure/azure-sdk-for-go/sdk/azidentity v1.2.2/go.mod h1:twTKAa1E6hLmSDjLhaCkbTMQKc7p/rNLU40rLxGEOCI=
 github.com/Azure/azure-sdk-for-go/sdk/internal v1.3.0 h1:sXr+ck84g/ZlZUOZiNELInmMgOsuGwdjjVkEIde0OtY=
 github.com/Azure/azure-sdk-for-go/sdk/internal v1.3.0/go.mod h1:okt5dMMTOFjX/aovMlrjvvXoPMBVSPzk9185BT0+eZM=
-github.com/Azure/azure-sdk-for-go/sdk/keyvault/azkeys v0.9.0 h1:TOFrNxfjslms5nLLIMjW7N0+zSALX4KiGsptmpb16AA=
-github.com/Azure/azure-sdk-for-go/sdk/keyvault/azkeys v0.9.0/go.mod h1:EAyXOW1F6BTJPiK2pDvmnvxOHPxoTYWoqBeIlql+QhI=
-github.com/Azure/azure-sdk-for-go/sdk/keyvault/internal v0.7.0 h1:Lg6BW0VPmCwcMlvOviL3ruHFO+H9tZNqscK0AeuFjGM=
-github.com/Azure/azure-sdk-for-go/sdk/keyvault/internal v0.7.0/go.mod h1:9V2j0jn9jDEkCkv8w/bKTNppX/d0FVA1ud77xCIP4KA=
+github.com/Azure/azure-sdk-for-go/sdk/keyvault/azkeys v0.10.0 h1:m/sWOGCREuSBqg2htVQTBY8nOZpyajYztF0vUvSZTuM=
+github.com/Azure/azure-sdk-for-go/sdk/keyvault/azkeys v0.10.0/go.mod h1:Pu5Zksi2KrU7LPbZbNINx6fuVrUp/ffvpxdDj+i8LeE=
+github.com/Azure/azure-sdk-for-go/sdk/keyvault/internal v0.7.1 h1:FbH3BbSb4bvGluTesZZ+ttN/MDsnMmQP36OSnDuSXqw=
+github.com/Azure/azure-sdk-for-go/sdk/keyvault/internal v0.7.1/go.mod h1:9V2j0jn9jDEkCkv8w/bKTNppX/d0FVA1ud77xCIP4KA=
 github.com/Azure/azure-service-bus-go v0.9.1/go.mod h1:yzBx6/BUGfjfeqbRZny9AQIbIe3AcV9WZbAdpkoXOa0=
 github.com/Azure/azure-storage-blob-go v0.8.0/go.mod h1:lPI3aLPpuLTeUwh1sViKXFxwl2B6teiRqI0deQUvsw0=
 github.com/Azure/go-autorest v12.0.0+incompatible/go.mod h1:r+4oMnoxhatjLLJ6zxSWATqVooLgysK6ZNox3g/xq24=
