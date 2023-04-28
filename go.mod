@@ -30,7 +30,7 @@ require (
 	go.mozilla.org/pkcs7 v0.0.0-20210826202110-33d05740a352
 	go.step.sm/cli-utils v0.7.6
 	go.step.sm/crypto v0.29.3
-	go.step.sm/linkedca v0.19.1-0.20230428150007-f95d2903af82
+	go.step.sm/linkedca v0.19.1
 	golang.org/x/crypto v0.8.0
 	golang.org/x/exp v0.0.0-20230310171629-522b1b587ee0
 	golang.org/x/net v0.9.0

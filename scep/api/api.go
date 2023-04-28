@@ -308,20 +308,9 @@ func PKIOperation(ctx context.Context, req request) (Response, error) {
 	// NOTE: at this point we have sufficient information for returning nicely signed CertReps
 	csr := msg.CSRReqMessage.CSR
 
-	prov, err := scep.ProvisionerFromContext(ctx) // TODO(hs): should this be retrieved in the API?
+	prov, err := scep.ProvisionerFromContext(ctx)
 	if err != nil {
 		return Response{}, err
-	}
-
-	const checkMethodWebhook string = "webhook"
-	checkMethod := ""
-	for _, wh := range prov.GetOptions().GetWebhooks() {
-		// if there's at least one webhook for validating SCEP challenges, the
-		// webhook will be used to perform challenge validation.
-		if wh.Kind == linkedca.Webhook_SCEPCHALLENGE.String() {
-			checkMethod = checkMethodWebhook
-			break
-		}
 	}
 
 	// NOTE: we're blocking the RenewalReq if the challenge does not match, because otherwise we don't have any authentication.
@@ -334,13 +323,16 @@ func PKIOperation(ctx context.Context, req request) (Response, error) {
 		// auth.MatchChallengePassword interface/method. Will need to think about methods
 		// that don't just check the password, but do different things on success and
 		// failure too.
-		switch checkMethod {
-		case checkMethodWebhook:
+		switch selectValidationMethod(prov) {
+		case validationMethodWebhook:
 			c, err := webhook.New(prov.GetOptions().GetWebhooks())
 			if err != nil {
 				return createFailureResponse(ctx, csr, msg, microscep.BadRequest, errors.New("failed creating SCEP validation webhook controller"))
 			}
-			if err := c.Validate(msg.CSRReqMessage.ChallengePassword); err != nil {
+			if err := c.Validate(ctx, msg.CSRReqMessage.ChallengePassword); err != nil {
+				if errors.Is(err, provisioner.ErrWebhookDenied) {
+					return createFailureResponse(ctx, csr, msg, microscep.BadRequest, errors.New("invalid challenge password provided"))
+				}
 				return createFailureResponse(ctx, csr, msg, microscep.BadRequest, errors.New("failed validating challenge password"))
 			}
 		default:
@@ -350,7 +342,7 @@ func PKIOperation(ctx context.Context, req request) (Response, error) {
 			}
 			if !challengeMatches {
 				// TODO: can this be returned safely to the client? In the end, if the password was correct, that gains a bit of info too.
-				return createFailureResponse(ctx, csr, msg, microscep.BadRequest, errors.New("wrong chalenge password provided"))
+				return createFailureResponse(ctx, csr, msg, microscep.BadRequest, errors.New("invalid challenge password provided"))
 			}
 		}
 	}
@@ -375,6 +367,28 @@ func PKIOperation(ctx context.Context, req request) (Response, error) {
 	}
 
 	return res, nil
+}
+
+type validationMethod string
+
+const (
+	validationMethodStatic  validationMethod = "static"
+	validationMethodWebhook validationMethod = "webhook"
+)
+
+// selectValidationMethod returns the method to validate SCEP
+// challenges. If a webhook is configured with kind `SCEPCHALLENGE`,
+// the webhook will be used. Otherwise it will default to the
+// static challenge value.
+func selectValidationMethod(p scep.Provisioner) validationMethod {
+	for _, wh := range p.GetOptions().GetWebhooks() {
+		// if there's at least one webhook for validating SCEP challenges, the
+		// webhook will be used to perform challenge validation.
+		if wh.Kind == linkedca.Webhook_SCEPCHALLENGE.String() {
+			return validationMethodWebhook
+		}
+	}
+	return validationMethodStatic
 }
 
 func formatCapabilities(caps []string) []byte {
