@@ -161,7 +161,7 @@ func (a *Authority) GetCACertificates(ctx context.Context) ([]*x509.Certificate,
 	// The certificate to use should probably depend on the (configured) provisioner and may
 	// use a distinct certificate, apart from the intermediate.
 
-	p, err := provisionerFromContext(ctx)
+	p, err := ProvisionerFromContext(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -235,7 +235,7 @@ func (a *Authority) SignCSR(ctx context.Context, csr *x509.CertificateRequest, m
 	// poll for the status. It seems to be similar as what can happen in ACME, so might want to model
 	// the implementation after the one in the ACME authority. Requires storage, etc.
 
-	p, err := provisionerFromContext(ctx)
+	p, err := ProvisionerFromContext(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -458,7 +458,7 @@ func (a *Authority) CreateFailureResponse(ctx context.Context, csr *x509.Certifi
 
 // MatchChallengePassword verifies a SCEP challenge password
 func (a *Authority) MatchChallengePassword(ctx context.Context, password string) (bool, error) {
-	p, err := provisionerFromContext(ctx)
+	p, err := ProvisionerFromContext(ctx)
 	if err != nil {
 		return false, err
 	}
@@ -476,7 +476,7 @@ func (a *Authority) MatchChallengePassword(ctx context.Context, password string)
 
 // GetCACaps returns the CA capabilities
 func (a *Authority) GetCACaps(ctx context.Context) []string {
-	p, err := provisionerFromContext(ctx)
+	p, err := ProvisionerFromContext(ctx)
 	if err != nil {
 		return defaultCapabilities
 	}

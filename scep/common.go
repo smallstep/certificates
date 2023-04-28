@@ -14,9 +14,9 @@ const (
 	ProvisionerContextKey = ContextKey("provisioner")
 )
 
-// provisionerFromContext searches the context for a SCEP provisioner.
+// ProvisionerFromContext searches the context for a SCEP provisioner.
 // Returns the provisioner or an error.
-func provisionerFromContext(ctx context.Context) (Provisioner, error) {
+func ProvisionerFromContext(ctx context.Context) (Provisioner, error) {
 	val := ctx.Value(ProvisionerContextKey)
 	if val == nil {
 		return nil, errors.New("provisioner expected in request context")

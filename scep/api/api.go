@@ -14,12 +14,14 @@ import (
 
 	"github.com/go-chi/chi"
 	microscep "github.com/micromdm/scep/v2/scep"
+	"github.com/ryboe/q"
 	"go.mozilla.org/pkcs7"
 
 	"github.com/smallstep/certificates/api"
 	"github.com/smallstep/certificates/api/log"
 	"github.com/smallstep/certificates/authority/provisioner"
 	"github.com/smallstep/certificates/scep"
+	"github.com/smallstep/certificates/scep/api/webhook"
 )
 
 const (
@@ -306,19 +308,61 @@ func PKIOperation(ctx context.Context, req request) (Response, error) {
 	// NOTE: at this point we have sufficient information for returning nicely signed CertReps
 	csr := msg.CSRReqMessage.CSR
 
+	prov, err := scep.ProvisionerFromContext(ctx) // TODO(hs): should this be retrieved in the API?
+	if err != nil {
+		return Response{}, err
+	}
+
+	_ = prov
+	q.Q(prov)
+
+	// TODO(hs): set the checking method based on what's configured in provisioner. Or try something dynamic.
+	const checkMethodWebhook string = "webhook"
+	checkMethod := checkMethodWebhook
+
 	// NOTE: we're blocking the RenewalReq if the challenge does not match, because otherwise we don't have any authentication.
 	// The macOS SCEP client performs renewals using PKCSreq. The CertNanny SCEP client will use PKCSreq with challenge too, it seems,
 	// even if using the renewal flow as described in the README.md. MicroMDM SCEP client also only does PKCSreq by default, unless
 	// a certificate exists; then it will use RenewalReq. Adding the challenge check here may be a small breaking change for clients.
 	// We'll have to see how it works out.
 	if msg.MessageType == microscep.PKCSReq || msg.MessageType == microscep.RenewalReq {
-		challengeMatches, err := auth.MatchChallengePassword(ctx, msg.CSRReqMessage.ChallengePassword)
-		if err != nil {
-			return createFailureResponse(ctx, csr, msg, microscep.BadRequest, errors.New("error when checking password"))
-		}
-		if !challengeMatches {
-			// TODO: can this be returned safely to the client? In the end, if the password was correct, that gains a bit of info too.
-			return createFailureResponse(ctx, csr, msg, microscep.BadRequest, errors.New("wrong password provided"))
+		// TODO(hs): might be nice use strategy pattern implementation; maybe behind the
+		// auth.MatchChallengePassword interface/method. Will need to think about methods
+		// that don't just check the password, but do different things on success and
+		// failure too.
+		switch checkMethod {
+		case checkMethodWebhook:
+			// TODO(hs): implement webhook call: needs endpoint, auth, request body
+			// TODO(hs): integrate this with the existing webhook implementation by extending it
+			fmt.Println("test")
+			q.Q("HERE")
+			q.Q(msg.CSRReqMessage)
+			opts := []webhook.ControllerOption{
+				webhook.WithURL("http://127.0.0.1:8081/scepvalidate"),
+				webhook.WithBearerToken("fake-token"),
+			}
+			c, err := webhook.New(opts...)
+			if err != nil {
+				return createFailureResponse(ctx, csr, msg, microscep.BadRequest, errors.New("failed creating SCEP validation webhook controller"))
+			}
+			q.Q(c)
+			ok, err := c.Validate(msg.CSRReqMessage.ChallengePassword)
+			if err != nil {
+				q.Q(err)
+				return createFailureResponse(ctx, csr, msg, microscep.BadRequest, errors.New("failed validating challenge password"))
+			}
+			if !ok {
+				return createFailureResponse(ctx, csr, msg, microscep.BadRequest, errors.New("wrong challenge password provided"))
+			}
+		default:
+			challengeMatches, err := auth.MatchChallengePassword(ctx, msg.CSRReqMessage.ChallengePassword)
+			if err != nil {
+				return createFailureResponse(ctx, csr, msg, microscep.BadRequest, errors.New("error when checking password"))
+			}
+			if !challengeMatches {
+				// TODO: can this be returned safely to the client? In the end, if the password was correct, that gains a bit of info too.
+				return createFailureResponse(ctx, csr, msg, microscep.BadRequest, errors.New("wrong chalenge password provided"))
+			}
 		}
 	}
 
