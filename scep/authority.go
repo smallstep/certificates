@@ -284,6 +284,7 @@ func (a *Authority) SignCSR(ctx context.Context, csr *x509.CertificateRequest, m
 	// Unlike most of the provisioners, scep's AuthorizeSign method doesn't
 	// define the templates, and the template data used in WebHooks is not
 	// available.
+	// TODO(hs): pass in challenge password to this webhook controller too?
 	for _, signOp := range signOps {
 		if wc, ok := signOp.(*provisioner.WebhookController); ok {
 			wc.TemplateData = data

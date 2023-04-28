@@ -14,8 +14,8 @@ import (
 
 	"github.com/go-chi/chi"
 	microscep "github.com/micromdm/scep/v2/scep"
-	"github.com/ryboe/q"
 	"go.mozilla.org/pkcs7"
+	"go.step.sm/linkedca"
 
 	"github.com/smallstep/certificates/api"
 	"github.com/smallstep/certificates/api/log"
@@ -313,12 +313,16 @@ func PKIOperation(ctx context.Context, req request) (Response, error) {
 		return Response{}, err
 	}
 
-	_ = prov
-	q.Q(prov)
-
-	// TODO(hs): set the checking method based on what's configured in provisioner. Or try something dynamic.
 	const checkMethodWebhook string = "webhook"
-	checkMethod := checkMethodWebhook
+	checkMethod := ""
+	for _, wh := range prov.GetOptions().GetWebhooks() {
+		// if there's at least one webhook for validating SCEP challenges, the
+		// webhook will be used to perform challenge validation.
+		if wh.Kind == linkedca.Webhook_SCEPCHALLENGE.String() {
+			checkMethod = checkMethodWebhook
+			break
+		}
+	}
 
 	// NOTE: we're blocking the RenewalReq if the challenge does not match, because otherwise we don't have any authentication.
 	// The macOS SCEP client performs renewals using PKCSreq. The CertNanny SCEP client will use PKCSreq with challenge too, it seems,
@@ -332,27 +336,12 @@ func PKIOperation(ctx context.Context, req request) (Response, error) {
 		// failure too.
 		switch checkMethod {
 		case checkMethodWebhook:
-			// TODO(hs): implement webhook call: needs endpoint, auth, request body
-			// TODO(hs): integrate this with the existing webhook implementation by extending it
-			fmt.Println("test")
-			q.Q("HERE")
-			q.Q(msg.CSRReqMessage)
-			opts := []webhook.ControllerOption{
-				webhook.WithURL("http://127.0.0.1:8081/scepvalidate"),
-				webhook.WithBearerToken("fake-token"),
-			}
-			c, err := webhook.New(opts...)
+			c, err := webhook.New(prov.GetOptions().GetWebhooks())
 			if err != nil {
 				return createFailureResponse(ctx, csr, msg, microscep.BadRequest, errors.New("failed creating SCEP validation webhook controller"))
 			}
-			q.Q(c)
-			ok, err := c.Validate(msg.CSRReqMessage.ChallengePassword)
-			if err != nil {
-				q.Q(err)
+			if err := c.Validate(msg.CSRReqMessage.ChallengePassword); err != nil {
 				return createFailureResponse(ctx, csr, msg, microscep.BadRequest, errors.New("failed validating challenge password"))
-			}
-			if !ok {
-				return createFailureResponse(ctx, csr, msg, microscep.BadRequest, errors.New("wrong challenge password provided"))
 			}
 		default:
 			challengeMatches, err := auth.MatchChallengePassword(ctx, msg.CSRReqMessage.ChallengePassword)
