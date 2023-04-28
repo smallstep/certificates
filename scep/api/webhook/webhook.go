@@ -54,8 +54,11 @@ func (c *Controller) Validate(ctx context.Context, challenge string) error {
 	return provisioner.ErrWebhookDenied
 }
 
-// isCertTypeOK returns whether or not the webhook is for X.509
-// certificates.
+// isCertTypeOK returns whether or not the webhook can be used
+// with the SCEP challenge validation webhook controller.
 func (c *Controller) isCertTypeOK(wh *provisioner.Webhook) bool {
+	if wh.CertType == linkedca.Webhook_ALL.String() || wh.CertType == "" {
+		return true
+	}
 	return linkedca.Webhook_X509.String() == wh.CertType
 }

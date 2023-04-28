@@ -180,6 +180,26 @@ func TestWebhookAdminResponder_CreateProvisionerWebhook(t *testing.T) {
 				statusCode: 400,
 			}
 		},
+		"fail/unsupported-webhook-kind": func(t *testing.T) test {
+			prov := &linkedca.Provisioner{
+				Name: "provName",
+			}
+			ctx := linkedca.NewContextWithProvisioner(context.Background(), prov)
+			adminErr := admin.NewError(admin.ErrorBadRequestType, `(line 5:13): invalid value for enum type: "UNSUPPORTED"`)
+			adminErr.Message = `(line 5:13): invalid value for enum type: "UNSUPPORTED"`
+			body := []byte(`
+			{
+				"name": "metadata",
+				"url": "https://example.com",
+				"kind": "UNSUPPORTED",
+			}`)
+			return test{
+				ctx:        ctx,
+				body:       body,
+				err:        adminErr,
+				statusCode: 400,
+			}
+		},
 		"fail/auth.UpdateProvisioner-error": func(t *testing.T) test {
 			adm := &linkedca.Admin{
 				Subject: "step",
