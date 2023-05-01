@@ -31,7 +31,7 @@ func New(webhooks []*provisioner.Webhook) (*Controller, error) {
 // webhooks will not be executed. If none of the webhooks
 // indicates the challenge is accepted, an error is
 // returned.
-func (c *Controller) Validate(ctx context.Context, challenge string) error {
+func (c *Controller) Validate(ctx context.Context, challenge, transactionID string) error {
 	for _, wh := range c.webhooks {
 		if wh.Kind != linkedca.Webhook_SCEPCHALLENGE.String() {
 			continue
@@ -40,7 +40,8 @@ func (c *Controller) Validate(ctx context.Context, challenge string) error {
 			continue
 		}
 		req := &webhook.RequestBody{
-			SCEPChallenge: challenge,
+			SCEPChallenge:     challenge,
+			SCEPTransactionID: transactionID,
 		}
 		resp, err := wh.DoWithContext(ctx, c.client, req, nil) // TODO(hs): support templated URL? Requires some refactoring
 		if err != nil {

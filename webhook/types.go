@@ -68,6 +68,7 @@ type RequestBody struct {
 	X509Certificate        *X509Certificate        `json:"x509Certificate,omitempty"`
 	SSHCertificateRequest  *SSHCertificateRequest  `json:"sshCertificateRequest,omitempty"`
 	SSHCertificate         *SSHCertificate         `json:"sshCertificate,omitempty"`
-	// Only set for SCEP requests
-	SCEPChallenge string `json:"scepChallenge,omitempty"`
+	// Only set for SCEP challenge validation requests
+	SCEPChallenge     string `json:"scepChallenge,omitempty"`
+	SCEPTransactionID string `json:"scepTransactionID,omitempty"`
 }
