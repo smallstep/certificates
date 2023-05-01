@@ -34,7 +34,7 @@ require (
 	golang.org/x/crypto v0.8.0
 	golang.org/x/exp v0.0.0-20230310171629-522b1b587ee0
 	golang.org/x/net v0.9.0
-	google.golang.org/api v0.119.0
+	google.golang.org/api v0.120.0
 	google.golang.org/grpc v1.54.0
 	google.golang.org/protobuf v1.30.0
 	gopkg.in/square/go-jose.v2 v2.6.0
