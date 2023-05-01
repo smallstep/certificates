@@ -2,7 +2,6 @@ package scep
 
 import (
 	"context"
-	"crypto/subtle"
 	"crypto/x509"
 	"errors"
 	"fmt"
@@ -161,7 +160,7 @@ func (a *Authority) GetCACertificates(ctx context.Context) ([]*x509.Certificate,
 	// The certificate to use should probably depend on the (configured) provisioner and may
 	// use a distinct certificate, apart from the intermediate.
 
-	p, err := ProvisionerFromContext(ctx)
+	p, err := provisionerFromContext(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -235,7 +234,7 @@ func (a *Authority) SignCSR(ctx context.Context, csr *x509.CertificateRequest, m
 	// poll for the status. It seems to be similar as what can happen in ACME, so might want to model
 	// the implementation after the one in the ACME authority. Requires storage, etc.
 
-	p, err := ProvisionerFromContext(ctx)
+	p, err := provisionerFromContext(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -456,27 +455,9 @@ func (a *Authority) CreateFailureResponse(ctx context.Context, csr *x509.Certifi
 	return crepMsg, nil
 }
 
-// MatchChallengePassword verifies a SCEP challenge password
-func (a *Authority) MatchChallengePassword(ctx context.Context, password string) (bool, error) {
-	p, err := ProvisionerFromContext(ctx)
-	if err != nil {
-		return false, err
-	}
-
-	if subtle.ConstantTimeCompare([]byte(p.GetChallengePassword()), []byte(password)) == 1 {
-		return true, nil
-	}
-
-	// TODO: support dynamic challenges, i.e. a list of challenges instead of one?
-	// That's probably a bit harder to configure, though; likely requires some data store
-	// that can be interacted with more easily, via some internal API, for example.
-
-	return false, nil
-}
-
 // GetCACaps returns the CA capabilities
 func (a *Authority) GetCACaps(ctx context.Context) []string {
-	p, err := ProvisionerFromContext(ctx)
+	p, err := provisionerFromContext(ctx)
 	if err != nil {
 		return defaultCapabilities
 	}
@@ -493,4 +474,12 @@ func (a *Authority) GetCACaps(ctx context.Context) []string {
 	// not be reported in cacaps operation.
 
 	return caps
+}
+
+func (a *Authority) ValidateChallenge(ctx context.Context, challenge, transactionID string) error {
+	p, err := provisionerFromContext(ctx)
+	if err != nil {
+		return err
+	}
+	return p.ValidateChallenge(ctx, challenge, transactionID)
 }

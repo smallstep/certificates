@@ -2,10 +2,16 @@ package provisioner
 
 import (
 	"context"
+	"crypto/subtle"
+	"fmt"
+	"net/http"
 	"time"
 
 	"github.com/pkg/errors"
+
 	"go.step.sm/linkedca"
+
+	"github.com/smallstep/certificates/webhook"
 )
 
 // SCEP is the SCEP provisioner type, an entity that can authorize the
@@ -35,6 +41,7 @@ type SCEP struct {
 	ctl                           *Controller
 	secretChallengePassword       string
 	encryptionAlgorithm           int
+	challengeValidationController *challengeValidationController
 }
 
 // GetID returns the provisioner unique identifier.
@@ -82,6 +89,67 @@ func (s *SCEP) DefaultTLSCertDuration() time.Duration {
 	return s.ctl.Claimer.DefaultTLSCertDuration()
 }
 
+type challengeValidationController struct {
+	client   *http.Client
+	webhooks []*Webhook
+}
+
+// newChallengeValidationController creates a new challengeValidationController
+// that performs challenge validation through webhooks.
+func newChallengeValidationController(client *http.Client, webhooks []*Webhook) (*challengeValidationController, error) {
+	scepHooks := []*Webhook{}
+	for _, wh := range webhooks {
+		if wh.Kind != linkedca.Webhook_SCEPCHALLENGE.String() {
+			continue
+		}
+		if !isCertTypeOK(wh) {
+			continue
+		}
+		scepHooks = append(scepHooks, wh)
+	}
+	return &challengeValidationController{
+		client:   client,
+		webhooks: scepHooks,
+	}, nil
+}
+
+var (
+	ErrSCEPChallengeInvalid = errors.New("webhook server did not allow request")
+)
+
+// Validate executes zero or more configured webhooks to
+// validate the SCEP challenge. If at least one of them indicates
+// the challenge value is accepted, validation succeeds. In
+// that case, the other webhooks will be skipped. If none of
+// the webhooks indicates the value of the challenge was accepted,
+// an error is returned.
+func (c *challengeValidationController) Validate(ctx context.Context, challenge, transactionID string) error {
+	for _, wh := range c.webhooks {
+		req := &webhook.RequestBody{
+			SCEPChallenge:     challenge,
+			SCEPTransactionID: transactionID,
+		}
+		resp, err := wh.DoWithContext(ctx, c.client, req, nil) // TODO(hs): support templated URL? Requires some refactoring
+		if err != nil {
+			return fmt.Errorf("failed executing webhook request: %w", err)
+		}
+		if resp.Allow {
+			return nil // return early when response is positive
+		}
+	}
+
+	return ErrSCEPChallengeInvalid
+}
+
+// isCertTypeOK returns whether or not the webhook can be used
+// with the SCEP challenge validation webhook controller.
+func isCertTypeOK(wh *Webhook) bool {
+	if wh.CertType == linkedca.Webhook_ALL.String() || wh.CertType == "" {
+		return true
+	}
+	return linkedca.Webhook_X509.String() == wh.CertType
+}
+
 // Init initializes and validates the fields of a SCEP type.
 func (s *SCEP) Init(config Config) (err error) {
 	switch {
@@ -107,6 +175,13 @@ func (s *SCEP) Init(config Config) (err error) {
 	s.encryptionAlgorithm = s.EncryptionAlgorithmIdentifier // TODO(hs): we might want to upgrade the default security to AES-CBC?
 	if s.encryptionAlgorithm < 0 || s.encryptionAlgorithm > 4 {
 		return errors.New("only encryption algorithm identifiers from 0 to 4 are valid")
+	}
+
+	if s.challengeValidationController, err = newChallengeValidationController(
+		config.WebhookClient,
+		s.GetOptions().GetWebhooks(),
+	); err != nil {
+		return fmt.Errorf("failed creating challenge validation controller: %w", err)
 	}
 
 	// TODO: add other, SCEP specific, options?
@@ -155,4 +230,44 @@ func (s *SCEP) ShouldIncludeRootInChain() bool {
 // for the pkcs7 package encryption algorithm to use.
 func (s *SCEP) GetContentEncryptionAlgorithm() int {
 	return s.encryptionAlgorithm
+}
+
+// ValidateChallenge validates the provided challenge. It starts by
+// selecting the validation method to use, then performs validation
+// according to that method.
+func (s *SCEP) ValidateChallenge(ctx context.Context, challenge, transactionID string) error {
+	if s.challengeValidationController == nil {
+		return fmt.Errorf("provisioner %q wasn't initialized", s.Name)
+	}
+	switch s.selectValidationMethod() {
+	case validationMethodWebhook:
+		return s.challengeValidationController.Validate(ctx, challenge, transactionID)
+	default:
+		if subtle.ConstantTimeCompare([]byte(s.secretChallengePassword), []byte(challenge)) == 0 {
+			return errors.New("invalid challenge password provided")
+		}
+		return nil
+	}
+}
+
+type validationMethod string
+
+const (
+	validationMethodNone    validationMethod = "none"
+	validationMethodStatic  validationMethod = "static"
+	validationMethodWebhook validationMethod = "webhook"
+)
+
+// selectValidationMethod returns the method to validate SCEP
+// challenges. If a webhook is configured with kind `SCEPCHALLENGE`,
+// the webhook method will be used. If a challenge password is set,
+// the static method is used. It will default to the `none` method.
+func (s *SCEP) selectValidationMethod() validationMethod {
+	if len(s.challengeValidationController.webhooks) > 0 {
+		return validationMethodWebhook
+	}
+	if s.secretChallengePassword != "" {
+		return validationMethodStatic
+	}
+	return validationMethodNone
 }

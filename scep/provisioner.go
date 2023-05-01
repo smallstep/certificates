@@ -14,8 +14,8 @@ type Provisioner interface {
 	GetName() string
 	DefaultTLSCertDuration() time.Duration
 	GetOptions() *provisioner.Options
-	GetChallengePassword() string
 	GetCapabilities() []string
 	ShouldIncludeRootInChain() bool
 	GetContentEncryptionAlgorithm() int
+	ValidateChallenge(ctx context.Context, challenge, transactionID string) error
 }

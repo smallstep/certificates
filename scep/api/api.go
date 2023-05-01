@@ -15,13 +15,11 @@ import (
 	"github.com/go-chi/chi"
 	microscep "github.com/micromdm/scep/v2/scep"
 	"go.mozilla.org/pkcs7"
-	"go.step.sm/linkedca"
 
 	"github.com/smallstep/certificates/api"
 	"github.com/smallstep/certificates/api/log"
 	"github.com/smallstep/certificates/authority/provisioner"
 	"github.com/smallstep/certificates/scep"
-	"github.com/smallstep/certificates/scep/api/webhook"
 )
 
 const (
@@ -305,16 +303,6 @@ func PKIOperation(ctx context.Context, req request) (Response, error) {
 		return Response{}, err
 	}
 
-	prov, err := scep.ProvisionerFromContext(ctx)
-	if err != nil {
-		return Response{}, err
-	}
-
-	scepProv, ok := prov.(*provisioner.SCEP)
-	if !ok {
-		return Response{}, errors.New("wrong type of provisioner in context")
-	}
-
 	// NOTE: at this point we have sufficient information for returning nicely signed CertReps
 	csr := msg.CSRReqMessage.CSR
 	transactionID := string(msg.TransactionID)
@@ -326,30 +314,11 @@ func PKIOperation(ctx context.Context, req request) (Response, error) {
 	// a certificate exists; then it will use RenewalReq. Adding the challenge check here may be a small breaking change for clients.
 	// We'll have to see how it works out.
 	if msg.MessageType == microscep.PKCSReq || msg.MessageType == microscep.RenewalReq {
-		// TODO(hs): might be nice to use strategy pattern implementation; maybe behind the
-		// auth.MatchChallengePassword interface/method. Will need to think about methods
-		// that don't just check the password, but do different things on success and
-		// failure too.
-		switch selectValidationMethod(scepProv) {
-		case validationMethodWebhook:
-			c, err := webhook.New(scepProv.GetOptions().GetWebhooks())
-			if err != nil {
-				return createFailureResponse(ctx, csr, msg, microscep.BadRequest, errors.New("failed creating SCEP validation webhook controller"))
+		if err := auth.ValidateChallenge(ctx, challengePassword, transactionID); err != nil {
+			if errors.Is(err, provisioner.ErrSCEPChallengeInvalid) {
+				return createFailureResponse(ctx, csr, msg, microscep.BadRequest, err)
 			}
-			if err := c.Validate(ctx, challengePassword, transactionID); err != nil {
-				if errors.Is(err, provisioner.ErrWebhookDenied) {
-					return createFailureResponse(ctx, csr, msg, microscep.BadRequest, errors.New("invalid challenge password provided"))
-				}
-				return createFailureResponse(ctx, csr, msg, microscep.BadRequest, errors.New("failed validating challenge password"))
-			}
-		default:
-			challengeMatches, err := auth.MatchChallengePassword(ctx, challengePassword)
-			if err != nil {
-				return createFailureResponse(ctx, csr, msg, microscep.BadRequest, errors.New("failed checking password"))
-			}
-			if !challengeMatches {
-				return createFailureResponse(ctx, csr, msg, microscep.BadRequest, errors.New("invalid challenge password provided"))
-			}
+			return createFailureResponse(ctx, csr, msg, microscep.BadRequest, errors.New("failed validating challenge password"))
 		}
 	}
 
@@ -373,33 +342,6 @@ func PKIOperation(ctx context.Context, req request) (Response, error) {
 	}
 
 	return res, nil
-}
-
-type validationMethod string
-
-const (
-	validationMethodNone    validationMethod = "none"
-	validationMethodStatic  validationMethod = "static"
-	validationMethodWebhook validationMethod = "webhook"
-)
-
-// selectValidationMethod returns the method to validate SCEP
-// challenges. If a webhook is configured with kind `SCEPCHALLENGE`,
-// the webhook method will be used. If a challenge password is set,
-// the static method is used. It will default to the `none` method.
-func selectValidationMethod(p *provisioner.SCEP) validationMethod {
-	for _, wh := range p.GetOptions().GetWebhooks() {
-		// if at least one webhook for validating SCEP challenges has
-		// been configured, that will be used to perform challenge
-		// validation.
-		if wh.Kind == linkedca.Webhook_SCEPCHALLENGE.String() {
-			return validationMethodWebhook
-		}
-	}
-	if challenge := p.GetChallengePassword(); challenge != "" {
-		return validationMethodStatic
-	}
-	return validationMethodNone
 }
 
 func formatCapabilities(caps []string) []byte {

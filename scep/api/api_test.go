@@ -9,12 +9,6 @@ import (
 	"reflect"
 	"testing"
 	"testing/iotest"
-
-	"github.com/smallstep/certificates/authority/config"
-	"github.com/smallstep/certificates/authority/provisioner"
-	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
-	"go.step.sm/linkedca"
 )
 
 func Test_decodeRequest(t *testing.T) {
@@ -114,68 +108,6 @@ func Test_decodeRequest(t *testing.T) {
 			if !reflect.DeepEqual(got, tt.want) {
 				t.Errorf("decodeRequest() = %v, want %v", got, tt.want)
 			}
-		})
-	}
-}
-
-func Test_selectValidationMethod(t *testing.T) {
-	tests := []struct {
-		name string
-		p    *provisioner.SCEP
-		want validationMethod
-	}{
-		{"webhooks", &provisioner.SCEP{
-			Name: "SCEP",
-			Type: "SCEP",
-			Options: &provisioner.Options{
-				Webhooks: []*provisioner.Webhook{
-					{
-						Kind: linkedca.Webhook_SCEPCHALLENGE.String(),
-					},
-				},
-			},
-		}, "webhook"},
-		{"challenge", &provisioner.SCEP{
-			Name:              "SCEP",
-			Type:              "SCEP",
-			ChallengePassword: "pass",
-		}, "static"},
-		{"challenge-with-different-webhook", &provisioner.SCEP{
-			Name:              "SCEP",
-			Type:              "SCEP",
-			ChallengePassword: "pass",
-			Options: &provisioner.Options{
-				Webhooks: []*provisioner.Webhook{
-					{
-						Kind: linkedca.Webhook_AUTHORIZING.String(),
-					},
-				},
-			},
-		}, "static"},
-		{"none", &provisioner.SCEP{
-			Name: "SCEP",
-			Type: "SCEP",
-		}, "none"},
-		{"none-with-different-webhook", &provisioner.SCEP{
-			Name: "SCEP",
-			Type: "SCEP",
-			Options: &provisioner.Options{
-				Webhooks: []*provisioner.Webhook{
-					{
-						Kind: linkedca.Webhook_AUTHORIZING.String(),
-					},
-				},
-			},
-		}, "none"},
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			err := tt.p.Init(provisioner.Config{
-				Claims: config.GlobalProvisionerClaims,
-			})
-			require.NoError(t, err)
-			got := selectValidationMethod(tt.p)
-			assert.Equal(t, tt.want, got)
 		})
 	}
 }
