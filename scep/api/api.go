@@ -326,7 +326,7 @@ func PKIOperation(ctx context.Context, req request) (Response, error) {
 	// a certificate exists; then it will use RenewalReq. Adding the challenge check here may be a small breaking change for clients.
 	// We'll have to see how it works out.
 	if msg.MessageType == microscep.PKCSReq || msg.MessageType == microscep.RenewalReq {
-		// TODO(hs): might be nice use strategy pattern implementation; maybe behind the
+		// TODO(hs): might be nice to use strategy pattern implementation; maybe behind the
 		// auth.MatchChallengePassword interface/method. Will need to think about methods
 		// that don't just check the password, but do different things on success and
 		// failure too.
@@ -348,7 +348,6 @@ func PKIOperation(ctx context.Context, req request) (Response, error) {
 				return createFailureResponse(ctx, csr, msg, microscep.BadRequest, errors.New("failed checking password"))
 			}
 			if !challengeMatches {
-				// TODO: can this be returned safely to the client? In the end, if the password was correct, that gains a bit of info too.
 				return createFailureResponse(ctx, csr, msg, microscep.BadRequest, errors.New("invalid challenge password provided"))
 			}
 		}
@@ -386,8 +385,8 @@ const (
 
 // selectValidationMethod returns the method to validate SCEP
 // challenges. If a webhook is configured with kind `SCEPCHALLENGE`,
-// the webhook will be used. Otherwise it will default to the
-// static challenge value.
+// the webhook method will be used. If a challenge password is set,
+// the static method is used. It will default to the `none` method.
 func selectValidationMethod(p *provisioner.SCEP) validationMethod {
 	for _, wh := range p.GetOptions().GetWebhooks() {
 		// if at least one webhook for validating SCEP challenges has

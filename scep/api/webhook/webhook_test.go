@@ -168,9 +168,8 @@ func TestController_Validate(t *testing.T) {
 }
 
 func TestController_isCertTypeOK(t *testing.T) {
-	c := &Controller{}
-	assert.True(t, c.isCertTypeOK(&provisioner.Webhook{CertType: linkedca.Webhook_X509.String()}))
-	assert.True(t, c.isCertTypeOK(&provisioner.Webhook{CertType: linkedca.Webhook_ALL.String()}))
-	assert.True(t, c.isCertTypeOK(&provisioner.Webhook{CertType: ""}))
-	assert.False(t, c.isCertTypeOK(&provisioner.Webhook{CertType: linkedca.Webhook_SSH.String()}))
+	assert.True(t, isCertTypeOK(&provisioner.Webhook{CertType: linkedca.Webhook_X509.String()}))
+	assert.True(t, isCertTypeOK(&provisioner.Webhook{CertType: linkedca.Webhook_ALL.String()}))
+	assert.True(t, isCertTypeOK(&provisioner.Webhook{CertType: ""}))
+	assert.False(t, isCertTypeOK(&provisioner.Webhook{CertType: linkedca.Webhook_SSH.String()}))
 }

@@ -26,17 +26,17 @@ func New(webhooks []*provisioner.Webhook) (*Controller, error) {
 }
 
 // Validate executes zero or more configured webhooks to
-// validate the SCEP challenge. If at least one of indicates
-// the challenge value is accepted, validation succeeds. Other
-// webhooks will not be executed. If none of the webhooks
-// indicates the challenge is accepted, an error is
-// returned.
+// validate the SCEP challenge. If at least one of them indicates
+// the challenge value is accepted, validation succeeds. In
+// that case, the other webhooks will be skipped. If none of
+// the webhooks indicates the value of the challenge was accepted,
+// an error is returned.
 func (c *Controller) Validate(ctx context.Context, challenge, transactionID string) error {
 	for _, wh := range c.webhooks {
 		if wh.Kind != linkedca.Webhook_SCEPCHALLENGE.String() {
 			continue
 		}
-		if !c.isCertTypeOK(wh) {
+		if !isCertTypeOK(wh) {
 			continue
 		}
 		req := &webhook.RequestBody{
@@ -57,7 +57,7 @@ func (c *Controller) Validate(ctx context.Context, challenge, transactionID stri
 
 // isCertTypeOK returns whether or not the webhook can be used
 // with the SCEP challenge validation webhook controller.
-func (c *Controller) isCertTypeOK(wh *provisioner.Webhook) bool {
+func isCertTypeOK(wh *provisioner.Webhook) bool {
 	if wh.CertType == linkedca.Webhook_ALL.String() || wh.CertType == "" {
 		return true
 	}

@@ -134,20 +134,38 @@ func Test_selectValidationMethod(t *testing.T) {
 					},
 				},
 			},
-			Claims: &provisioner.Claims{},
 		}, "webhook"},
 		{"challenge", &provisioner.SCEP{
 			Name:              "SCEP",
 			Type:              "SCEP",
 			ChallengePassword: "pass",
-			Options:           &provisioner.Options{},
-			Claims:            &provisioner.Claims{},
+		}, "static"},
+		{"challenge-with-different-webhook", &provisioner.SCEP{
+			Name:              "SCEP",
+			Type:              "SCEP",
+			ChallengePassword: "pass",
+			Options: &provisioner.Options{
+				Webhooks: []*provisioner.Webhook{
+					{
+						Kind: linkedca.Webhook_AUTHORIZING.String(),
+					},
+				},
+			},
 		}, "static"},
 		{"none", &provisioner.SCEP{
-			Name:    "SCEP",
-			Type:    "SCEP",
-			Options: &provisioner.Options{},
-			Claims:  &provisioner.Claims{},
+			Name: "SCEP",
+			Type: "SCEP",
+		}, "none"},
+		{"none-with-different-webhook", &provisioner.SCEP{
+			Name: "SCEP",
+			Type: "SCEP",
+			Options: &provisioner.Options{
+				Webhooks: []*provisioner.Webhook{
+					{
+						Kind: linkedca.Webhook_AUTHORIZING.String(),
+					},
+				},
+			},
 		}, "none"},
 	}
 	for _, tt := range tests {
