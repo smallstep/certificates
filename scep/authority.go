@@ -2,7 +2,6 @@ package scep
 
 import (
 	"context"
-	"crypto/subtle"
 	"crypto/x509"
 	"errors"
 	"fmt"
@@ -456,24 +455,6 @@ func (a *Authority) CreateFailureResponse(ctx context.Context, csr *x509.Certifi
 	return crepMsg, nil
 }
 
-// MatchChallengePassword verifies a SCEP challenge password
-func (a *Authority) MatchChallengePassword(ctx context.Context, password string) (bool, error) {
-	p, err := provisionerFromContext(ctx)
-	if err != nil {
-		return false, err
-	}
-
-	if subtle.ConstantTimeCompare([]byte(p.GetChallengePassword()), []byte(password)) == 1 {
-		return true, nil
-	}
-
-	// TODO: support dynamic challenges, i.e. a list of challenges instead of one?
-	// That's probably a bit harder to configure, though; likely requires some data store
-	// that can be interacted with more easily, via some internal API, for example.
-
-	return false, nil
-}
-
 // GetCACaps returns the CA capabilities
 func (a *Authority) GetCACaps(ctx context.Context) []string {
 	p, err := provisionerFromContext(ctx)
@@ -493,4 +474,12 @@ func (a *Authority) GetCACaps(ctx context.Context) []string {
 	// not be reported in cacaps operation.
 
 	return caps
+}
+
+func (a *Authority) ValidateChallenge(ctx context.Context, challenge, transactionID string) error {
+	p, err := provisionerFromContext(ctx)
+	if err != nil {
+		return err
+	}
+	return p.ValidateChallenge(ctx, challenge, transactionID)
 }

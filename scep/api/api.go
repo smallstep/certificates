@@ -305,6 +305,8 @@ func PKIOperation(ctx context.Context, req request) (Response, error) {
 
 	// NOTE: at this point we have sufficient information for returning nicely signed CertReps
 	csr := msg.CSRReqMessage.CSR
+	transactionID := string(msg.TransactionID)
+	challengePassword := msg.CSRReqMessage.ChallengePassword
 
 	// NOTE: we're blocking the RenewalReq if the challenge does not match, because otherwise we don't have any authentication.
 	// The macOS SCEP client performs renewals using PKCSreq. The CertNanny SCEP client will use PKCSreq with challenge too, it seems,
@@ -312,13 +314,11 @@ func PKIOperation(ctx context.Context, req request) (Response, error) {
 	// a certificate exists; then it will use RenewalReq. Adding the challenge check here may be a small breaking change for clients.
 	// We'll have to see how it works out.
 	if msg.MessageType == microscep.PKCSReq || msg.MessageType == microscep.RenewalReq {
-		challengeMatches, err := auth.MatchChallengePassword(ctx, msg.CSRReqMessage.ChallengePassword)
-		if err != nil {
-			return createFailureResponse(ctx, csr, msg, microscep.BadRequest, errors.New("error when checking password"))
-		}
-		if !challengeMatches {
-			// TODO: can this be returned safely to the client? In the end, if the password was correct, that gains a bit of info too.
-			return createFailureResponse(ctx, csr, msg, microscep.BadRequest, errors.New("wrong password provided"))
+		if err := auth.ValidateChallenge(ctx, challengePassword, transactionID); err != nil {
+			if errors.Is(err, provisioner.ErrSCEPChallengeInvalid) {
+				return createFailureResponse(ctx, csr, msg, microscep.BadRequest, err)
+			}
+			return createFailureResponse(ctx, csr, msg, microscep.BadRequest, errors.New("failed validating challenge password"))
 		}
 	}
 
