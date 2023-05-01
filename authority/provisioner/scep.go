@@ -96,7 +96,7 @@ type challengeValidationController struct {
 
 // newChallengeValidationController creates a new challengeValidationController
 // that performs challenge validation through webhooks.
-func newChallengeValidationController(client *http.Client, webhooks []*Webhook) (*challengeValidationController, error) {
+func newChallengeValidationController(client *http.Client, webhooks []*Webhook) *challengeValidationController {
 	scepHooks := []*Webhook{}
 	for _, wh := range webhooks {
 		if wh.Kind != linkedca.Webhook_SCEPCHALLENGE.String() {
@@ -110,7 +110,7 @@ func newChallengeValidationController(client *http.Client, webhooks []*Webhook) 
 	return &challengeValidationController{
 		client:   client,
 		webhooks: scepHooks,
-	}, nil
+	}
 }
 
 var (
@@ -177,12 +177,10 @@ func (s *SCEP) Init(config Config) (err error) {
 		return errors.New("only encryption algorithm identifiers from 0 to 4 are valid")
 	}
 
-	if s.challengeValidationController, err = newChallengeValidationController(
+	s.challengeValidationController = newChallengeValidationController(
 		config.WebhookClient,
 		s.GetOptions().GetWebhooks(),
-	); err != nil {
-		return fmt.Errorf("failed creating challenge validation controller: %w", err)
-	}
+	)
 
 	// TODO: add other, SCEP specific, options?
 

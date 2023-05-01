@@ -134,15 +134,14 @@ func Test_challengeValidationController_Validate(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			c, err := newChallengeValidationController(tt.fields.client, tt.fields.webhooks)
-			require.NoError(t, err)
+			c := newChallengeValidationController(tt.fields.client, tt.fields.webhooks)
 
 			if tt.server != nil {
 				defer tt.server.Close()
 			}
 
 			ctx := context.Background()
-			err = c.Validate(ctx, tt.args.challenge, tt.args.transactionID)
+			err := c.Validate(ctx, tt.args.challenge, tt.args.transactionID)
 
 			if tt.expErr != nil {
 				assert.EqualError(t, err, tt.expErr.Error())
