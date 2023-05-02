@@ -196,7 +196,11 @@ func (ca *CA) Init(cfg *config.Config) (*CA, error) {
 		api.Route(r)
 	})
 
-	//Add ACME api endpoints in /acme and /1.0/acme
+	// Mount the CRL to the insecure mux
+	insecureMux.Get("/crl", api.CRL)
+	insecureMux.Get("/1.0/crl", api.CRL)
+
+	// Add ACME api endpoints in /acme and /1.0/acme
 	dns := cfg.DNSNames[0]
 	u, err := url.Parse("https://" + cfg.Address)
 	if err != nil {
@@ -276,6 +280,7 @@ func (ca *CA) Init(cfg *config.Config) (*CA, error) {
 
 	// helpful routine for logging all routes
 	//dumpRoutes(mux)
+	//dumpRoutes(insecureMux)
 
 	// Add monitoring if configured
 	if len(cfg.Monitoring) > 0 {
@@ -307,7 +312,7 @@ func (ca *CA) Init(cfg *config.Config) (*CA, error) {
 
 	// only start the insecure server if the insecure address is configured
 	// and, currently, also only when it should serve SCEP endpoints.
-	if ca.shouldServeSCEPEndpoints() && cfg.InsecureAddress != "" {
+	if ca.shouldServeInsecureServer() {
 		// TODO: instead opt for having a single server.Server but two
 		// http.Servers handling the HTTP and HTTPS handler? The latter
 		// will probably introduce more complexity in terms of graceful
@@ -319,6 +324,23 @@ func (ca *CA) Init(cfg *config.Config) (*CA, error) {
 	}
 
 	return ca, nil
+}
+
+// shouldServeInsecureServer returns whether or not the insecure
+// server should also be started. This is (currently) only the case
+// if the insecure address has been configured AND when a SCEP
+// provisioner is configured or when a CRL is configured.
+func (ca *CA) shouldServeInsecureServer() bool {
+	switch {
+	case ca.config.InsecureAddress == "":
+		return false
+	case ca.shouldServeSCEPEndpoints():
+		return true
+	case ca.config.CRL != nil && ca.config.CRL.Enabled:
+		return true
+	default:
+		return false
+	}
 }
 
 // buildContext builds the server base context.
