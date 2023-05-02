@@ -336,7 +336,7 @@ func (ca *CA) shouldServeInsecureServer() bool {
 		return false
 	case ca.shouldServeSCEPEndpoints():
 		return true
-	case ca.config.CRL != nil && ca.config.CRL.Enabled:
+	case ca.config.CRL.IsEnabled():
 		return true
 	default:
 		return false
