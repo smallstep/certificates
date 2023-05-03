@@ -6,6 +6,8 @@ type DPOPOptions struct {
 	ValidationExecPath string `json:"validation-exec-path,omitempty"`
 	// Backend signing key for DPoP access token
 	SigningKey string `json:"key"`
+	// URI template acme client must call to fetch the challenge proof
+	DpopTarget string `json:"dpop-target"`
 }
 
 func (o *DPOPOptions) GetValidationExecPath() string {

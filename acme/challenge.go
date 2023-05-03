@@ -81,6 +81,7 @@ type Challenge struct {
 	Token           string        `json:"token"`
 	ValidatedAt     string        `json:"validated,omitempty"`
 	URL             string        `json:"url"`
+	Target          string        `json:"target"`
 	Error           *Error        `json:"error,omitempty"`
 }
 
