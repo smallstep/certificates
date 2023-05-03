@@ -1,13 +1,16 @@
 package api
 
 import (
+	"bytes"
 	"context"
 	"crypto/x509"
 	"encoding/base64"
+	"encoding/hex"
 	"encoding/json"
 	"net"
 	"net/http"
 	"strings"
+	"text/template"
 	"time"
 
 	"github.com/go-chi/chi"
@@ -272,12 +275,50 @@ func newAuthorization(ctx context.Context, az *acme.Authorization) error {
 			continue
 		}
 
+		targetTemplate := prov.GetOptions().GetDPOPOptions().DpopTarget
+
+		var target = ""
+
+		switch az.Identifier.Type {
+		case acme.WireID:
+			wireId, err := wire.ParseID([]byte(az.Identifier.Value))
+			if err != nil {
+				if err != nil {
+					return acme.NewError(acme.ErrorMalformedType, "DeviceId cannot be parsed")
+				}
+			}
+			clientID := wireId.ClientID
+			deviceId := strings.Split(strings.Split(clientID, "@")[0], "/")[1]
+			decoded, err := hex.DecodeString(deviceId)
+			if err != nil {
+				return acme.NewError(acme.ErrorMalformedType, "DeviceId is not hexadecimal")
+			}
+			_ = decoded
+			tmpl, err := template.New("DevideId").Parse(targetTemplate)
+			if err != nil {
+				return acme.NewError(acme.ErrorMalformedType, "Misconfigured target template configuration")
+			}
+			type ClientIdTmpl struct {
+				DeviceId string
+			}
+			clientIdTmpl := ClientIdTmpl{deviceId}
+
+			var buff bytes.Buffer
+			if err := tmpl.Execute(&buff, clientIdTmpl); err != nil {
+				return acme.NewError(acme.ErrorMalformedType, "Invalid Go template registered for 'target'")
+			}
+			target = buff.String()
+
+		default:
+		}
+
 		ch := &acme.Challenge{
 			AccountID: az.AccountID,
 			Value:     az.Identifier.Value,
 			Type:      typ,
 			Token:     az.Token,
 			Status:    acme.StatusPending,
+			Target:    target,
 		}
 		if err := db.CreateChallenge(ctx, ch); err != nil {
 			return acme.WrapErrorISE(err, "error creating challenge")
