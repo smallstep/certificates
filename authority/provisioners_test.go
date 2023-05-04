@@ -13,6 +13,8 @@ import (
 	"go.step.sm/crypto/keyutil"
 	"go.step.sm/linkedca"
 
+	"github.com/stretchr/testify/require"
+
 	"github.com/smallstep/assert"
 	"github.com/smallstep/certificates/api/render"
 	"github.com/smallstep/certificates/authority/admin"
@@ -30,9 +32,9 @@ func TestGetEncryptedKey(t *testing.T) {
 	tests := map[string]func(t *testing.T) *ek{
 		"ok": func(t *testing.T) *ek {
 			c, err := LoadConfiguration("../ca/testdata/ca.json")
-			assert.FatalError(t, err)
+			require.NoError(t, err)
 			a, err := New(c)
-			assert.FatalError(t, err)
+			require.NoError(t, err)
 			return &ek{
 				a:   a,
 				kid: c.AuthorityConfig.Provisioners[1].(*provisioner.JWK).Key.KeyID,
@@ -40,9 +42,9 @@ func TestGetEncryptedKey(t *testing.T) {
 		},
 		"fail-not-found": func(t *testing.T) *ek {
 			c, err := LoadConfiguration("../ca/testdata/ca.json")
-			assert.FatalError(t, err)
+			require.NoError(t, err)
 			a, err := New(c)
-			assert.FatalError(t, err)
+			require.NoError(t, err)
 			return &ek{
 				a:    a,
 				kid:  "foo",
@@ -96,16 +98,16 @@ func TestGetProvisioners(t *testing.T) {
 	tests := map[string]func(t *testing.T) *gp{
 		"ok": func(t *testing.T) *gp {
 			c, err := LoadConfiguration("../ca/testdata/ca.json")
-			assert.FatalError(t, err)
+			require.NoError(t, err)
 			a, err := New(c)
-			assert.FatalError(t, err)
+			require.NoError(t, err)
 			return &gp{a: a}
 		},
 		"ok/rsa": func(t *testing.T) *gp {
 			c, err := LoadConfiguration("../ca/testdata/rsaca.json")
-			assert.FatalError(t, err)
+			require.NoError(t, err)
 			a, err := New(c)
-			assert.FatalError(t, err)
+			require.NoError(t, err)
 			return &gp{a: a}
 		},
 	}
@@ -135,20 +137,20 @@ func TestGetProvisioners(t *testing.T) {
 
 func TestAuthority_LoadProvisionerByCertificate(t *testing.T) {
 	_, priv, err := keyutil.GenerateDefaultKeyPair()
-	assert.FatalError(t, err)
+	require.NoError(t, err)
 	csr := getCSR(t, priv)
 
 	sign := func(a *Authority, extraOpts ...provisioner.SignOption) *x509.Certificate {
 		key, err := jose.ReadKey("testdata/secrets/step_cli_key_priv.jwk", jose.WithPassword([]byte("pass")))
-		assert.FatalError(t, err)
+		require.NoError(t, err)
 		token, err := generateToken("smallstep test", "step-cli", testAudiences.Sign[0], []string{"test.smallstep.com"}, time.Now(), key)
-		assert.FatalError(t, err)
+		require.NoError(t, err)
 		ctx := provisioner.NewContextWithMethod(context.Background(), provisioner.SignMethod)
 		opts, err := a.Authorize(ctx, token)
-		assert.FatalError(t, err)
+		require.NoError(t, err)
 		opts = append(opts, extraOpts...)
 		certs, err := a.Sign(csr, provisioner.SignOptions{}, opts...)
-		assert.FatalError(t, err)
+		require.NoError(t, err)
 		return certs[0]
 	}
 	getProvisioner := func(a *Authority, name string) provisioner.Interface {
@@ -177,9 +179,7 @@ func TestAuthority_LoadProvisionerByCertificate(t *testing.T) {
 		},
 		MGetCertificateData: func(serialNumber string) (*db.CertificateData, error) {
 			p, err := a1.LoadProvisionerByName("dev")
-			if err != nil {
-				t.Fatal(err)
-			}
+			require.NoError(t, err)
 			return &db.CertificateData{
 				Provisioner: &db.ProvisionerData{
 					ID:   p.GetID(),
@@ -194,9 +194,7 @@ func TestAuthority_LoadProvisionerByCertificate(t *testing.T) {
 	a2.adminDB = &mockAdminDB{
 		MGetCertificateData: (func(s string) (*db.CertificateData, error) {
 			p, err := a2.LoadProvisionerByName("dev")
-			if err != nil {
-				t.Fatal(err)
-			}
+			require.NoError(t, err)
 			return &db.CertificateData{
 				Provisioner: &db.ProvisionerData{
 					ID:   p.GetID(),
