@@ -1681,8 +1681,8 @@ func TestLogSSHCertificate(t *testing.T) {
 	sassert.Equal(t, uint64(14376510277651266987), fields["serial"])
 	sassert.Equal(t, []string{"herman"}, fields["principals"])
 	sassert.Equal(t, "user", fields["certificate-type"])
-	sassert.Equal(t, "2023-01-19T12:53:11+01:00", fields["valid-from"])
-	sassert.Equal(t, "2023-01-20T04:54:11+01:00", fields["valid-to"])
+	sassert.Equal(t, time.Unix(1674129191, 0).Format(time.RFC3339), fields["valid-from"])
+	sassert.Equal(t, time.Unix(1674186851, 0).Format(time.RFC3339), fields["valid-to"])
 	sassert.Equal(t, "ecdsa-sha2-nistp256-cert-v01@openssh.com AAAAKGVjZHNhLXNoYTItbmlzdHAyNTYtY2VydC12MDFAb3BlbnNzaC5jb20AAAAgLnkvSk4odlo3b1R+RDw+LmorL3RkN354IilCIVFVen4AAAAIbmlzdHAyNTYAAABBBHjKHss8WM2ffMYlavisoLXR0I6UEIU+cidV1ogEH1U6+/SYaFPrlzQo0tGLM5CNkMbhInbyasQsrHzn8F1Rt7nHg5/tcSf9qwAAAAEAAAAGaGVybWFuAAAACgAAAAZoZXJtYW4AAAAAY8kvJwAAAABjyhBjAAAAAAAAAIIAAAAVcGVybWl0LVgxMS1mb3J3YXJkaW5nAAAAAAAAABdwZXJtaXQtYWdlbnQtZm9yd2FyZGluZwAAAAAAAAAWcGVybWl0LXBvcnQtZm9yd2FyZGluZwAAAAAAAAAKcGVybWl0LXB0eQAAAAAAAAAOcGVybWl0LXVzZXItcmMAAAAAAAAAAAAAAGgAAAATZWNkc2Etc2hhMi1uaXN0cDI1NgAAAAhuaXN0cDI1NgAAAEEE/ayqpPrZZF5uA1UlDt4FreTf15agztQIzpxnWq/XoxAHzagRSkFGkdgFpjgsfiRpP8URHH3BZScqc0ZDCTxhoQAAAGQAAAATZWNkc2Etc2hhMi1uaXN0cDI1NgAAAEkAAAAhAJuP1wCVwoyrKrEtHGfFXrVbRHySDjvXtS1tVTdHyqymAAAAIBa/CSSzfZb4D2NLP+eEmOOMJwSjYOiNM8fiOoAaqglI", fields["certificate"])
 	sassert.Equal(t, "256 SHA256:RvkDPGwl/G9d7LUFm1kmWhvOD9I/moPq4yxcb0STwr0 no comment (ECDSA-CERT)", fields["public-key"])
 }
