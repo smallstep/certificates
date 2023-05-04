@@ -61,7 +61,7 @@ func Bootstrap(token string) (*Client, error) {
 //	}
 //	resp, err := client.Get("https://internal.smallstep.com")
 func BootstrapClient(ctx context.Context, token string, options ...TLSOption) (*http.Client, error) {
-	b, err := createBootstrap(token)
+	b, err := createBootstrap(token) //nolint:contextcheck // deeply nested context; temporary
 	if err != nil {
 		return nil, err
 	}
@@ -120,7 +120,7 @@ func BootstrapServer(ctx context.Context, token string, base *http.Server, optio
 		return nil, errors.New("server TLSConfig is already set")
 	}
 
-	b, err := createBootstrap(token)
+	b, err := createBootstrap(token) //nolint:contextcheck // deeply nested context; temporary
 	if err != nil {
 		return nil, err
 	}
@@ -169,7 +169,7 @@ func BootstrapServer(ctx context.Context, token string, base *http.Server, optio
 //	... // register services
 //	srv.Serve(lis)
 func BootstrapListener(ctx context.Context, token string, inner net.Listener, options ...TLSOption) (net.Listener, error) {
-	b, err := createBootstrap(token)
+	b, err := createBootstrap(token) //nolint:contextcheck // deeply nested context; temporary
 	if err != nil {
 		return nil, err
 	}

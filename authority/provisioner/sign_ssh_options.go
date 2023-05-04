@@ -125,35 +125,6 @@ func (o SignSSHOptions) match(got SignSSHOptions) error {
 	return nil
 }
 
-// sshCertPrincipalsModifier is an SSHCertModifier that sets the
-// principals to the SSH certificate.
-type sshCertPrincipalsModifier []string
-
-// Modify the ValidPrincipals value of the cert.
-func (o sshCertPrincipalsModifier) Modify(cert *ssh.Certificate, _ SignSSHOptions) error {
-	cert.ValidPrincipals = []string(o)
-	return nil
-}
-
-// sshCertKeyIDModifier is an SSHCertModifier that sets the given
-// Key ID in the SSH certificate.
-type sshCertKeyIDModifier string
-
-func (m sshCertKeyIDModifier) Modify(cert *ssh.Certificate, _ SignSSHOptions) error {
-	cert.KeyId = string(m)
-	return nil
-}
-
-// sshCertTypeModifier is an SSHCertModifier that sets the
-// certificate type.
-type sshCertTypeModifier string
-
-// Modify sets the CertType for the ssh certificate.
-func (m sshCertTypeModifier) Modify(cert *ssh.Certificate, _ SignSSHOptions) error {
-	cert.CertType = sshCertTypeUInt32(string(m))
-	return nil
-}
-
 // sshCertValidAfterModifier is an SSHCertModifier that sets the
 // ValidAfter in the SSH certificate.
 type sshCertValidAfterModifier uint64
@@ -170,51 +141,6 @@ type sshCertValidBeforeModifier uint64
 func (m sshCertValidBeforeModifier) Modify(cert *ssh.Certificate, _ SignSSHOptions) error {
 	cert.ValidBefore = uint64(m)
 	return nil
-}
-
-// sshCertDefaultsModifier implements a SSHCertModifier that
-// modifies the certificate with the given options if they are not set.
-type sshCertDefaultsModifier SignSSHOptions
-
-// Modify implements the SSHCertModifier interface.
-func (m sshCertDefaultsModifier) Modify(cert *ssh.Certificate, _ SignSSHOptions) error {
-	if cert.CertType == 0 {
-		cert.CertType = sshCertTypeUInt32(m.CertType)
-	}
-	if len(cert.ValidPrincipals) == 0 {
-		cert.ValidPrincipals = m.Principals
-	}
-	if cert.ValidAfter == 0 && !m.ValidAfter.IsZero() {
-		cert.ValidAfter = uint64(m.ValidAfter.Unix())
-	}
-	if cert.ValidBefore == 0 && !m.ValidBefore.IsZero() {
-		cert.ValidBefore = uint64(m.ValidBefore.Unix())
-	}
-	return nil
-}
-
-// sshDefaultExtensionModifier implements an SSHCertModifier that sets
-// the default extensions in an SSH certificate.
-type sshDefaultExtensionModifier struct{}
-
-func (m *sshDefaultExtensionModifier) Modify(cert *ssh.Certificate, _ SignSSHOptions) error {
-	switch cert.CertType {
-	// Default to no extensions for HostCert.
-	case ssh.HostCert:
-		return nil
-	case ssh.UserCert:
-		if cert.Extensions == nil {
-			cert.Extensions = make(map[string]string)
-		}
-		cert.Extensions["permit-X11-forwarding"] = ""
-		cert.Extensions["permit-agent-forwarding"] = ""
-		cert.Extensions["permit-port-forwarding"] = ""
-		cert.Extensions["permit-pty"] = ""
-		cert.Extensions["permit-user-rc"] = ""
-		return nil
-	default:
-		return errs.BadRequest("ssh certificate has an unknown type '%d'", cert.CertType)
-	}
 }
 
 // sshDefaultDuration is an SSHCertModifier that sets the certificate

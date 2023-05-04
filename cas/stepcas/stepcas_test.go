@@ -245,7 +245,7 @@ func testJWKIssuer(t *testing.T, caURL *url.URL, password string) *jwkIssuer {
 		key = testEncryptedKeyPath
 		password = testPassword
 	}
-	jwk, err := newJWKIssuer(caURL, client, &apiv1.CertificateIssuer{
+	jwk, err := newJWKIssuer(context.TODO(), caURL, client, &apiv1.CertificateIssuer{
 		Type:        "jwk",
 		Provisioner: "ra@doe.org",
 		Key:         key,

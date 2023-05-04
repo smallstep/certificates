@@ -2,9 +2,12 @@ package acme
 
 import (
 	"context"
+	"crypto"
 	"crypto/x509"
 	"crypto/x509/pkix"
+	"encoding/asn1"
 	"encoding/json"
+	"fmt"
 	"net"
 	"net/url"
 	"reflect"
@@ -16,6 +19,7 @@ import (
 	"github.com/smallstep/assert"
 	"github.com/smallstep/certificates/authority"
 	"github.com/smallstep/certificates/authority/provisioner"
+	"go.step.sm/crypto/keyutil"
 	"go.step.sm/crypto/x509util"
 )
 
@@ -306,6 +310,14 @@ func (m *mockSignAuth) Revoke(context.Context, *authority.RevokeOptions) error {
 }
 
 func TestOrder_Finalize(t *testing.T) {
+	mustSigner := func(kty, crv string, size int) crypto.Signer {
+		s, err := keyutil.GenerateSigner(kty, crv, size)
+		if err != nil {
+			t.Fatal(err)
+		}
+		return s
+	}
+
 	type test struct {
 		o    *Order
 		err  *Error
@@ -386,6 +398,72 @@ func TestOrder_Finalize(t *testing.T) {
 				err: NewErrorISE("unrecognized order status: %s", o.Status),
 			}
 		},
+		"fail/non-matching-permanent-identifier-common-name": func(t *testing.T) test {
+			now := clock.Now()
+			o := &Order{
+				ID:               "oID",
+				AccountID:        "accID",
+				Status:           StatusReady,
+				ExpiresAt:        now.Add(5 * time.Minute),
+				AuthorizationIDs: []string{"a", "b"},
+				Identifiers: []Identifier{
+					{Type: "permanent-identifier", Value: "a-permanent-identifier"},
+				},
+			}
+
+			signer := mustSigner("EC", "P-256", 0)
+			fingerprint, err := keyutil.Fingerprint(signer.Public())
+			if err != nil {
+				t.Fatal(err)
+			}
+
+			csr := &x509.CertificateRequest{
+				Subject: pkix.Name{
+					CommonName: "a-different-identifier",
+				},
+				PublicKey: signer.Public(),
+				ExtraExtensions: []pkix.Extension{
+					{
+						Id:    asn1.ObjectIdentifier{1, 3, 6, 1, 5, 5, 7, 8, 3},
+						Value: []byte("a-permanent-identifier"),
+					},
+				},
+			}
+			return test{
+				o:   o,
+				csr: csr,
+				db: &MockDB{
+					MockGetAuthorization: func(ctx context.Context, id string) (*Authorization, error) {
+						switch id {
+						case "a":
+							return &Authorization{
+								ID:     id,
+								Status: StatusValid,
+							}, nil
+						case "b":
+							return &Authorization{
+								ID:          id,
+								Fingerprint: fingerprint,
+								Status:      StatusValid,
+							}, nil
+						default:
+							assert.FatalError(t, errors.Errorf("unexpected authorization %s", id))
+							return nil, errors.New("force")
+						}
+					},
+					MockUpdateOrder: func(ctx context.Context, o *Order) error {
+						return nil
+					},
+				},
+				err: &Error{
+					Type:   "urn:ietf:params:acme:error:badCSR",
+					Detail: "The CSR is unacceptable",
+					Status: 400,
+					Err: fmt.Errorf("CSR Subject Common Name does not match identifiers exactly: "+
+						"CSR Subject Common Name = %s, Order Permanent Identifier = %s", csr.Subject.CommonName, "a-permanent-identifier"),
+				},
+			}
+		},
 		"fail/error-provisioner-auth": func(t *testing.T) test {
 			now := clock.Now()
 			o := &Order{
@@ -413,6 +491,11 @@ func TestOrder_Finalize(t *testing.T) {
 					MauthorizeSign: func(ctx context.Context, token string) ([]provisioner.SignOption, error) {
 						assert.Equals(t, token, "")
 						return nil, errors.New("force")
+					},
+				},
+				db: &MockDB{
+					MockGetAuthorization: func(ctx context.Context, id string) (*Authorization, error) {
+						return &Authorization{ID: id, Status: StatusValid}, nil
 					},
 				},
 				err: NewErrorISE("error retrieving authorization options from ACME provisioner: force"),
@@ -454,6 +537,11 @@ func TestOrder_Finalize(t *testing.T) {
 						}
 					},
 				},
+				db: &MockDB{
+					MockGetAuthorization: func(ctx context.Context, id string) (*Authorization, error) {
+						return &Authorization{ID: id, Status: StatusValid}, nil
+					},
+				},
 				err: NewErrorISE("error creating template options from ACME provisioner: error unmarshaling template data: invalid character 'o' in literal false (expecting 'a')"),
 			}
 		},
@@ -493,6 +581,11 @@ func TestOrder_Finalize(t *testing.T) {
 					sign: func(_csr *x509.CertificateRequest, signOpts provisioner.SignOptions, extraOpts ...provisioner.SignOption) ([]*x509.Certificate, error) {
 						assert.Equals(t, _csr, csr)
 						return nil, errors.New("force")
+					},
+				},
+				db: &MockDB{
+					MockGetAuthorization: func(ctx context.Context, id string) (*Authorization, error) {
+						return &Authorization{ID: id, Status: StatusValid}, nil
 					},
 				},
 				err: NewErrorISE("error signing certificate for order oID: force"),
@@ -541,6 +634,9 @@ func TestOrder_Finalize(t *testing.T) {
 					},
 				},
 				db: &MockDB{
+					MockGetAuthorization: func(ctx context.Context, id string) (*Authorization, error) {
+						return &Authorization{ID: id, Status: StatusValid}, nil
+					},
 					MockCreateCertificate: func(ctx context.Context, cert *Certificate) error {
 						assert.Equals(t, cert.AccountID, o.AccountID)
 						assert.Equals(t, cert.OrderID, o.ID)
@@ -595,6 +691,9 @@ func TestOrder_Finalize(t *testing.T) {
 					},
 				},
 				db: &MockDB{
+					MockGetAuthorization: func(ctx context.Context, id string) (*Authorization, error) {
+						return &Authorization{ID: id, Status: StatusValid}, nil
+					},
 					MockCreateCertificate: func(ctx context.Context, cert *Certificate) error {
 						cert.ID = "certID"
 						assert.Equals(t, cert.AccountID, o.AccountID)
@@ -615,6 +714,297 @@ func TestOrder_Finalize(t *testing.T) {
 					},
 				},
 				err: NewErrorISE("error updating order oID: force"),
+			}
+		},
+		"fail/csr-fingerprint": func(t *testing.T) test {
+			now := clock.Now()
+			o := &Order{
+				ID:               "oID",
+				AccountID:        "accID",
+				Status:           StatusReady,
+				ExpiresAt:        now.Add(5 * time.Minute),
+				AuthorizationIDs: []string{"a", "b"},
+				Identifiers: []Identifier{
+					{Type: "permanent-identifier", Value: "a-permanent-identifier"},
+				},
+			}
+
+			signer := mustSigner("EC", "P-256", 0)
+
+			csr := &x509.CertificateRequest{
+				Subject: pkix.Name{
+					CommonName: "a-permanent-identifier",
+				},
+				PublicKey: signer.Public(),
+				ExtraExtensions: []pkix.Extension{
+					{
+						Id:    asn1.ObjectIdentifier{1, 3, 6, 1, 5, 5, 7, 8, 3},
+						Value: []byte("a-permanent-identifier"),
+					},
+				},
+			}
+
+			leaf := &x509.Certificate{
+				Subject:   pkix.Name{CommonName: "a-permanent-identifier"},
+				PublicKey: signer.Public(),
+				ExtraExtensions: []pkix.Extension{
+					{
+						Id:    asn1.ObjectIdentifier{1, 3, 6, 1, 5, 5, 7, 8, 3},
+						Value: []byte("a-permanent-identifier"),
+					},
+				},
+			}
+			inter := &x509.Certificate{Subject: pkix.Name{CommonName: "inter"}}
+			root := &x509.Certificate{Subject: pkix.Name{CommonName: "root"}}
+
+			return test{
+				o:   o,
+				csr: csr,
+				prov: &MockProvisioner{
+					MauthorizeSign: func(ctx context.Context, token string) ([]provisioner.SignOption, error) {
+						assert.Equals(t, token, "")
+						return nil, nil
+					},
+					MgetOptions: func() *provisioner.Options {
+						return nil
+					},
+				},
+				ca: &mockSignAuth{
+					sign: func(_csr *x509.CertificateRequest, signOpts provisioner.SignOptions, extraOpts ...provisioner.SignOption) ([]*x509.Certificate, error) {
+						assert.Equals(t, _csr, csr)
+						return []*x509.Certificate{leaf, inter, root}, nil
+					},
+				},
+				db: &MockDB{
+					MockGetAuthorization: func(ctx context.Context, id string) (*Authorization, error) {
+						return &Authorization{
+							ID:          id,
+							Fingerprint: "other-fingerprint",
+							Status:      StatusValid,
+						}, nil
+					},
+					MockCreateCertificate: func(ctx context.Context, cert *Certificate) error {
+						cert.ID = "certID"
+						assert.Equals(t, cert.AccountID, o.AccountID)
+						assert.Equals(t, cert.OrderID, o.ID)
+						assert.Equals(t, cert.Leaf, leaf)
+						assert.Equals(t, cert.Intermediates, []*x509.Certificate{inter, root})
+						return nil
+					},
+					MockUpdateOrder: func(ctx context.Context, updo *Order) error {
+						assert.Equals(t, updo.CertificateID, "certID")
+						assert.Equals(t, updo.Status, StatusValid)
+						assert.Equals(t, updo.ID, o.ID)
+						assert.Equals(t, updo.AccountID, o.AccountID)
+						assert.Equals(t, updo.ExpiresAt, o.ExpiresAt)
+						assert.Equals(t, updo.AuthorizationIDs, o.AuthorizationIDs)
+						assert.Equals(t, updo.Identifiers, o.Identifiers)
+						return nil
+					},
+				},
+				err: NewError(ErrorUnauthorizedType, "order oID csr does not match the attested key"),
+			}
+		},
+		"ok/permanent-identifier": func(t *testing.T) test {
+			now := clock.Now()
+			o := &Order{
+				ID:               "oID",
+				AccountID:        "accID",
+				Status:           StatusReady,
+				ExpiresAt:        now.Add(5 * time.Minute),
+				AuthorizationIDs: []string{"a", "b"},
+				Identifiers: []Identifier{
+					{Type: "permanent-identifier", Value: "a-permanent-identifier"},
+				},
+			}
+
+			signer := mustSigner("EC", "P-256", 0)
+			fingerprint, err := keyutil.Fingerprint(signer.Public())
+			if err != nil {
+				t.Fatal(err)
+			}
+
+			csr := &x509.CertificateRequest{
+				Subject: pkix.Name{
+					CommonName: "a-permanent-identifier",
+				},
+				PublicKey: signer.Public(),
+				ExtraExtensions: []pkix.Extension{
+					{
+						Id:    asn1.ObjectIdentifier{1, 3, 6, 1, 5, 5, 7, 8, 3},
+						Value: []byte("a-permanent-identifier"),
+					},
+				},
+			}
+
+			leaf := &x509.Certificate{
+				Subject:   pkix.Name{CommonName: "a-permanent-identifier"},
+				PublicKey: signer.Public(),
+				ExtraExtensions: []pkix.Extension{
+					{
+						Id:    asn1.ObjectIdentifier{1, 3, 6, 1, 5, 5, 7, 8, 3},
+						Value: []byte("a-permanent-identifier"),
+					},
+				},
+			}
+			inter := &x509.Certificate{Subject: pkix.Name{CommonName: "inter"}}
+			root := &x509.Certificate{Subject: pkix.Name{CommonName: "root"}}
+
+			return test{
+				o:   o,
+				csr: csr,
+				prov: &MockProvisioner{
+					MauthorizeSign: func(ctx context.Context, token string) ([]provisioner.SignOption, error) {
+						assert.Equals(t, token, "")
+						return nil, nil
+					},
+					MgetOptions: func() *provisioner.Options {
+						return nil
+					},
+				},
+				ca: &mockSignAuth{
+					sign: func(_csr *x509.CertificateRequest, signOpts provisioner.SignOptions, extraOpts ...provisioner.SignOption) ([]*x509.Certificate, error) {
+						assert.Equals(t, _csr, csr)
+						return []*x509.Certificate{leaf, inter, root}, nil
+					},
+				},
+				db: &MockDB{
+					MockGetAuthorization: func(ctx context.Context, id string) (*Authorization, error) {
+						switch id {
+						case "a":
+							return &Authorization{
+								ID:     id,
+								Status: StatusValid,
+							}, nil
+						case "b":
+							return &Authorization{
+								ID:          id,
+								Fingerprint: fingerprint,
+								Status:      StatusValid,
+							}, nil
+						default:
+							assert.FatalError(t, errors.Errorf("unexpected authorization %s", id))
+							return nil, errors.New("force")
+						}
+					},
+					MockCreateCertificate: func(ctx context.Context, cert *Certificate) error {
+						cert.ID = "certID"
+						assert.Equals(t, cert.AccountID, o.AccountID)
+						assert.Equals(t, cert.OrderID, o.ID)
+						assert.Equals(t, cert.Leaf, leaf)
+						assert.Equals(t, cert.Intermediates, []*x509.Certificate{inter, root})
+						return nil
+					},
+					MockUpdateOrder: func(ctx context.Context, updo *Order) error {
+						assert.Equals(t, updo.CertificateID, "certID")
+						assert.Equals(t, updo.Status, StatusValid)
+						assert.Equals(t, updo.ID, o.ID)
+						assert.Equals(t, updo.AccountID, o.AccountID)
+						assert.Equals(t, updo.ExpiresAt, o.ExpiresAt)
+						assert.Equals(t, updo.AuthorizationIDs, o.AuthorizationIDs)
+						assert.Equals(t, updo.Identifiers, o.Identifiers)
+						return nil
+					},
+				},
+			}
+		},
+		"ok/permanent-identifier-only": func(t *testing.T) test {
+			now := clock.Now()
+			o := &Order{
+				ID:               "oID",
+				AccountID:        "accID",
+				Status:           StatusReady,
+				ExpiresAt:        now.Add(5 * time.Minute),
+				AuthorizationIDs: []string{"a", "b"},
+				Identifiers: []Identifier{
+					{Type: "dns", Value: "foo.internal"},
+					{Type: "permanent-identifier", Value: "a-permanent-identifier"},
+				},
+			}
+
+			signer := mustSigner("EC", "P-256", 0)
+			fingerprint, err := keyutil.Fingerprint(signer.Public())
+			if err != nil {
+				t.Fatal(err)
+			}
+
+			csr := &x509.CertificateRequest{
+				Subject: pkix.Name{
+					CommonName: "a-permanent-identifier",
+				},
+				DNSNames:  []string{"foo.internal"},
+				PublicKey: signer.Public(),
+				ExtraExtensions: []pkix.Extension{
+					{
+						Id:    asn1.ObjectIdentifier{1, 3, 6, 1, 5, 5, 7, 8, 3},
+						Value: []byte("a-permanent-identifier"),
+					},
+				},
+			}
+
+			leaf := &x509.Certificate{
+				Subject:   pkix.Name{CommonName: "a-permanent-identifier"},
+				PublicKey: signer.Public(),
+				ExtraExtensions: []pkix.Extension{
+					{
+						Id:    asn1.ObjectIdentifier{1, 3, 6, 1, 5, 5, 7, 8, 3},
+						Value: []byte("a-permanent-identifier"),
+					},
+				},
+			}
+			inter := &x509.Certificate{Subject: pkix.Name{CommonName: "inter"}}
+			root := &x509.Certificate{Subject: pkix.Name{CommonName: "root"}}
+
+			return test{
+				o:   o,
+				csr: csr,
+				prov: &MockProvisioner{
+					MauthorizeSign: func(ctx context.Context, token string) ([]provisioner.SignOption, error) {
+						assert.Equals(t, token, "")
+						return nil, nil
+					},
+					MgetOptions: func() *provisioner.Options {
+						return nil
+					},
+				},
+				// TODO(hs): we should work on making the mocks more realistic. Ideally, we should get rid of
+				// the mock entirely, relying on an instances of provisioner, authority and DB (possibly hardest), so
+				// that behavior of the tests is what an actual CA would do. We could gradually phase them out by
+				// using the mocking functions as a wrapper for actual test helpers generated per test case or per
+				// function that's tested.
+				ca: &mockSignAuth{
+					sign: func(_csr *x509.CertificateRequest, signOpts provisioner.SignOptions, extraOpts ...provisioner.SignOption) ([]*x509.Certificate, error) {
+						assert.Equals(t, _csr, csr)
+						return []*x509.Certificate{leaf, inter, root}, nil
+					},
+				},
+				db: &MockDB{
+					MockGetAuthorization: func(ctx context.Context, id string) (*Authorization, error) {
+						return &Authorization{
+							ID:          id,
+							Fingerprint: fingerprint,
+							Status:      StatusValid,
+						}, nil
+					},
+					MockCreateCertificate: func(ctx context.Context, cert *Certificate) error {
+						cert.ID = "certID"
+						assert.Equals(t, cert.AccountID, o.AccountID)
+						assert.Equals(t, cert.OrderID, o.ID)
+						assert.Equals(t, cert.Leaf, leaf)
+						assert.Equals(t, cert.Intermediates, []*x509.Certificate{inter, root})
+						return nil
+					},
+					MockUpdateOrder: func(ctx context.Context, updo *Order) error {
+						assert.Equals(t, updo.CertificateID, "certID")
+						assert.Equals(t, updo.Status, StatusValid)
+						assert.Equals(t, updo.ID, o.ID)
+						assert.Equals(t, updo.AccountID, o.AccountID)
+						assert.Equals(t, updo.ExpiresAt, o.ExpiresAt)
+						assert.Equals(t, updo.AuthorizationIDs, o.AuthorizationIDs)
+						assert.Equals(t, updo.Identifiers, o.Identifiers)
+						return nil
+					},
+				},
 			}
 		},
 		"ok/new-cert-dns": func(t *testing.T) test {
@@ -660,6 +1050,9 @@ func TestOrder_Finalize(t *testing.T) {
 					},
 				},
 				db: &MockDB{
+					MockGetAuthorization: func(ctx context.Context, id string) (*Authorization, error) {
+						return &Authorization{ID: id, Status: StatusValid}, nil
+					},
 					MockCreateCertificate: func(ctx context.Context, cert *Certificate) error {
 						cert.ID = "certID"
 						assert.Equals(t, cert.AccountID, o.AccountID)
@@ -721,6 +1114,9 @@ func TestOrder_Finalize(t *testing.T) {
 					},
 				},
 				db: &MockDB{
+					MockGetAuthorization: func(ctx context.Context, id string) (*Authorization, error) {
+						return &Authorization{ID: id, Status: StatusValid}, nil
+					},
 					MockCreateCertificate: func(ctx context.Context, cert *Certificate) error {
 						cert.ID = "certID"
 						assert.Equals(t, cert.AccountID, o.AccountID)
@@ -785,6 +1181,9 @@ func TestOrder_Finalize(t *testing.T) {
 					},
 				},
 				db: &MockDB{
+					MockGetAuthorization: func(ctx context.Context, id string) (*Authorization, error) {
+						return &Authorization{ID: id, Status: StatusValid}, nil
+					},
 					MockCreateCertificate: func(ctx context.Context, cert *Certificate) error {
 						cert.ID = "certID"
 						assert.Equals(t, cert.AccountID, o.AccountID)
@@ -1488,6 +1887,58 @@ func TestOrder_sans(t *testing.T) {
 			}
 			if !reflect.DeepEqual(got, tt.want) {
 				t.Errorf("Order.sans() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
+func TestOrder_getAuthorizationFingerprint(t *testing.T) {
+	ctx := context.Background()
+	type fields struct {
+		AuthorizationIDs []string
+	}
+	type args struct {
+		ctx context.Context
+		db  DB
+	}
+	tests := []struct {
+		name    string
+		fields  fields
+		args    args
+		want    string
+		wantErr bool
+	}{
+		{"ok", fields{[]string{"az1", "az2"}}, args{ctx, &MockDB{
+			MockGetAuthorization: func(ctx context.Context, id string) (*Authorization, error) {
+				return &Authorization{ID: id, Status: StatusValid}, nil
+			},
+		}}, "", false},
+		{"ok fingerprint", fields{[]string{"az1", "az2"}}, args{ctx, &MockDB{
+			MockGetAuthorization: func(ctx context.Context, id string) (*Authorization, error) {
+				if id == "az1" {
+					return &Authorization{ID: id, Status: StatusValid}, nil
+				}
+				return &Authorization{ID: id, Fingerprint: "fingerprint", Status: StatusValid}, nil
+			},
+		}}, "fingerprint", false},
+		{"fail", fields{[]string{"az1", "az2"}}, args{ctx, &MockDB{
+			MockGetAuthorization: func(ctx context.Context, id string) (*Authorization, error) {
+				return nil, errors.New("force")
+			},
+		}}, "", true},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			o := &Order{
+				AuthorizationIDs: tt.fields.AuthorizationIDs,
+			}
+			got, err := o.getAuthorizationFingerprint(tt.args.ctx, tt.args.db)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("Order.getAuthorizationFingerprint() error = %v, wantErr %v", err, tt.wantErr)
+				return
+			}
+			if got != tt.want {
+				t.Errorf("Order.getAuthorizationFingerprint() = %v, want %v", got, tt.want)
 			}
 		})
 	}

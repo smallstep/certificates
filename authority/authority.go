@@ -545,50 +545,6 @@ func (a *Authority) init() error {
 		tmplVars.SSH.UserFederatedKeys = append(tmplVars.SSH.UserFederatedKeys, a.sshCAUserFederatedCerts...)
 	}
 
-	// Check if a KMS with decryption capability is required and available
-	if a.requiresDecrypter() {
-		if _, ok := a.keyManager.(kmsapi.Decrypter); !ok {
-			return errors.New("keymanager doesn't provide crypto.Decrypter")
-		}
-	}
-
-	// TODO: decide if this is a good approach for providing the SCEP functionality
-	// It currently mirrors the logic for the x509CAService
-	if a.requiresSCEPService() && a.scepService == nil {
-		var options scep.Options
-
-		// Read intermediate and create X509 signer and decrypter for default CAS.
-		options.CertificateChain, err = pemutil.ReadCertificateBundle(a.config.IntermediateCert)
-		if err != nil {
-			return err
-		}
-		options.CertificateChain = append(options.CertificateChain, a.rootX509Certs...)
-		options.Signer, err = a.keyManager.CreateSigner(&kmsapi.CreateSignerRequest{
-			SigningKey: a.config.IntermediateKey,
-			Password:   a.password,
-		})
-		if err != nil {
-			return err
-		}
-
-		if km, ok := a.keyManager.(kmsapi.Decrypter); ok {
-			options.Decrypter, err = km.CreateDecrypter(&kmsapi.CreateDecrypterRequest{
-				DecryptionKey: a.config.IntermediateKey,
-				Password:      a.password,
-			})
-			if err != nil {
-				return err
-			}
-		}
-
-		a.scepService, err = scep.NewService(ctx, options)
-		if err != nil {
-			return err
-		}
-
-		// TODO: mimick the x509CAService GetCertificateAuthority here too?
-	}
-
 	if a.config.AuthorityConfig.EnableAdmin {
 		// Initialize step-ca Admin Database if it's not already initialized using
 		// WithAdminDB.
@@ -682,6 +638,50 @@ func (a *Authority) init() error {
 	// Load Provisioners and Admins
 	if err := a.ReloadAdminResources(ctx); err != nil {
 		return err
+	}
+
+	// Check if a KMS with decryption capability is required and available
+	if a.requiresDecrypter() {
+		if _, ok := a.keyManager.(kmsapi.Decrypter); !ok {
+			return errors.New("keymanager doesn't provide crypto.Decrypter")
+		}
+	}
+
+	// TODO: decide if this is a good approach for providing the SCEP functionality
+	// It currently mirrors the logic for the x509CAService
+	if a.requiresSCEPService() && a.scepService == nil {
+		var options scep.Options
+
+		// Read intermediate and create X509 signer and decrypter for default CAS.
+		options.CertificateChain, err = pemutil.ReadCertificateBundle(a.config.IntermediateCert)
+		if err != nil {
+			return err
+		}
+		options.CertificateChain = append(options.CertificateChain, a.rootX509Certs...)
+		options.Signer, err = a.keyManager.CreateSigner(&kmsapi.CreateSignerRequest{
+			SigningKey: a.config.IntermediateKey,
+			Password:   a.password,
+		})
+		if err != nil {
+			return err
+		}
+
+		if km, ok := a.keyManager.(kmsapi.Decrypter); ok {
+			options.Decrypter, err = km.CreateDecrypter(&kmsapi.CreateDecrypterRequest{
+				DecryptionKey: a.config.IntermediateKey,
+				Password:      a.password,
+			})
+			if err != nil {
+				return err
+			}
+		}
+
+		a.scepService, err = scep.NewService(ctx, options)
+		if err != nil {
+			return err
+		}
+
+		// TODO: mimick the x509CAService GetCertificateAuthority here too?
 	}
 
 	// Load X509 constraints engine.

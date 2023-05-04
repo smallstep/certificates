@@ -36,6 +36,7 @@ archives:
     # Most common use case is to archive as zip on Windows.
     # Default is empty.
     name_template: "{{ .ProjectName }}_{{ .Os }}_{{ .Version }}_{{ .Arch }}{{ if .Arm }}v{{ .Arm }}{{ end }}{{ if .Mips }}_{{ .Mips }}{{ end }}"
+    rlcp: true
     format_overrides:
       - goos: windows
         format: zip
@@ -78,6 +79,7 @@ nfpms:
 
 source:
   enabled: true
+  rlcp: true
   name_template: '{{ .ProjectName }}_{{ .Version }}'
 
 checksum:
@@ -140,7 +142,7 @@ release:
 
     #### Windows
 
-    - 📦 [step-ca_windows_{{ .Version }}_arm64.zip](https://dl.step.sm/gh-release/certificates/gh-release-header/{{ .Tag }}/step-ca_windows_{{ .Version }}_amd64.zip)
+    - 📦 [step-ca_windows_{{ .Version }}_amd64.zip](https://dl.step.sm/gh-release/certificates/gh-release-header/{{ .Tag }}/step-ca_windows_{{ .Version }}_amd64.zip)
 
     For more builds across platforms and architectures, see the `Assets` section below.
     And for packaged versions (Docker, k8s, Homebrew), see our [installation docs](https://smallstep.com/docs/step-ca/installation).
@@ -154,9 +156,11 @@ release:
     Below is an example using `cosign` to verify a release artifact:
 
     ```
-    COSIGN_EXPERIMENTAL=1 cosign verify-blob \
+    cosign verify-blob \
       --certificate ~/Downloads/step-ca_darwin_{{ .Version }}_amd64.tar.gz.sig.pem \
       --signature ~/Downloads/step-ca_darwin_{{ .Version }}_amd64.tar.gz.sig \
+      --certificate-identity-regexp "https://github\.com/smallstep/certificates/.*" \
+      --certificate-oidc-issuer https://token.actions.githubusercontent.com \
       ~/Downloads/step-ca_darwin_{{ .Version }}_amd64.tar.gz
     ```
 
@@ -185,3 +189,40 @@ release:
   #  - glob: ./path/to/file.txt
   #  - glob: ./glob/**/to/**/file/**/*
   #  - glob: ./glob/foo/to/bar/file/foobar/override_from_previous
+
+scoop:
+  # Template for the url which is determined by the given Token (github or gitlab)
+  # Default for github is "https://github.com/<repo_owner>/<repo_name>/releases/download/{{ .Tag }}/{{ .ArtifactName }}"
+  # Default for gitlab is "https://gitlab.com/<repo_owner>/<repo_name>/uploads/{{ .ArtifactUploadHash }}/{{ .ArtifactName }}"
+  # Default for gitea is "https://gitea.com/<repo_owner>/<repo_name>/releases/download/{{ .Tag }}/{{ .ArtifactName }}"
+  url_template: "http://github.com/smallstep/certificates/releases/download/{{ .Tag }}/{{ .ArtifactName }}"
+
+  # Repository to push the app manifest to.
+  bucket:
+    owner: smallstep
+    name: scoop-bucket
+
+  # Git author used to commit to the repository.
+  # Defaults are shown.
+  commit_author:
+    name: goreleaserbot
+    email: goreleaser@smallstep.com
+
+  # The project name and current git tag are used in the format string.
+  commit_msg_template: "Scoop update for {{ .ProjectName }} version {{ .Tag }}"
+
+  # Your app's homepage.
+  # Default is empty.
+  homepage: "https://smallstep.com/docs/step-ca"
+
+  # Skip uploads for prerelease.
+  skip_upload: auto
+
+  # Your app's description.
+  # Default is empty.
+  description: "A private certificate authority (X.509 & SSH) & ACME server for secure automated certificate management, so you can use TLS everywhere & SSO for SSH."
+
+  # Your app's license
+  # Default is empty.
+  license: "Apache-2.0"
+

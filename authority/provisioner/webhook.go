@@ -107,6 +107,13 @@ type Webhook struct {
 }
 
 func (w *Webhook) Do(client *http.Client, reqBody *webhook.RequestBody, data any) (*webhook.ResponseBody, error) {
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second*10)
+	defer cancel()
+
+	return w.DoWithContext(ctx, client, reqBody, data)
+}
+
+func (w *Webhook) DoWithContext(ctx context.Context, client *http.Client, reqBody *webhook.RequestBody, data any) (*webhook.ResponseBody, error) {
 	tmpl, err := template.New("url").Funcs(templates.StepFuncMap()).Parse(w.URL)
 	if err != nil {
 		return nil, err
@@ -129,8 +136,6 @@ func (w *Webhook) Do(client *http.Client, reqBody *webhook.RequestBody, data any
 			reqBody.Token = tmpl[sshutil.TokenKey]
 		}
 	*/
-	ctx, cancel := context.WithTimeout(context.Background(), time.Second*10)
-	defer cancel()
 
 	reqBody.Timestamp = time.Now()
 

@@ -13,6 +13,7 @@ import (
 	"reflect"
 	"strings"
 	"sync"
+	"time"
 
 	"github.com/go-chi/chi"
 	"github.com/go-chi/chi/middleware"
@@ -126,13 +127,15 @@ type CA struct {
 	insecureSrv *server.Server
 	opts        *options
 	renewer     *TLSRenewer
+	compactStop chan struct{}
 }
 
 // New creates and initializes the CA with the given configuration and options.
 func New(cfg *config.Config, opts ...Option) (*CA, error) {
 	ca := &CA{
-		config: cfg,
-		opts:   new(options),
+		config:      cfg,
+		opts:        new(options),
+		compactStop: make(chan struct{}),
 	}
 	ca.opts.apply(opts)
 	return ca.Init(cfg)
@@ -193,7 +196,11 @@ func (ca *CA) Init(cfg *config.Config) (*CA, error) {
 		api.Route(r)
 	})
 
-	//Add ACME api endpoints in /acme and /1.0/acme
+	// Mount the CRL to the insecure mux
+	insecureMux.Get("/crl", api.CRL)
+	insecureMux.Get("/1.0/crl", api.CRL)
+
+	// Add ACME api endpoints in /acme and /1.0/acme
 	dns := cfg.DNSNames[0]
 	u, err := url.Parse("https://" + cfg.Address)
 	if err != nil {
@@ -273,6 +280,7 @@ func (ca *CA) Init(cfg *config.Config) (*CA, error) {
 
 	// helpful routine for logging all routes
 	//dumpRoutes(mux)
+	//dumpRoutes(insecureMux)
 
 	// Add monitoring if configured
 	if len(cfg.Monitoring) > 0 {
@@ -304,7 +312,7 @@ func (ca *CA) Init(cfg *config.Config) (*CA, error) {
 
 	// only start the insecure server if the insecure address is configured
 	// and, currently, also only when it should serve SCEP endpoints.
-	if ca.shouldServeSCEPEndpoints() && cfg.InsecureAddress != "" {
+	if ca.shouldServeInsecureServer() {
 		// TODO: instead opt for having a single server.Server but two
 		// http.Servers handling the HTTP and HTTPS handler? The latter
 		// will probably introduce more complexity in terms of graceful
@@ -316,6 +324,23 @@ func (ca *CA) Init(cfg *config.Config) (*CA, error) {
 	}
 
 	return ca, nil
+}
+
+// shouldServeInsecureServer returns whether or not the insecure
+// server should also be started. This is (currently) only the case
+// if the insecure address has been configured AND when a SCEP
+// provisioner is configured or when a CRL is configured.
+func (ca *CA) shouldServeInsecureServer() bool {
+	switch {
+	case ca.config.InsecureAddress == "":
+		return false
+	case ca.shouldServeSCEPEndpoints():
+		return true
+	case ca.config.CRL.IsEnabled():
+		return true
+	default:
+		return false
+	}
 }
 
 // buildContext builds the server base context.
@@ -370,6 +395,12 @@ func (ca *CA) Run() error {
 		}
 	}
 
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		ca.runCompactJob()
+	}()
+
 	if ca.insecureSrv != nil {
 		wg.Add(1)
 		go func() {
@@ -394,6 +425,7 @@ func (ca *CA) Run() error {
 
 // Stop stops the CA calling to the server Shutdown method.
 func (ca *CA) Stop() error {
+	close(ca.compactStop)
 	ca.renewer.Stop()
 	if err := ca.auth.Shutdown(); err != nil {
 		log.Printf("error stopping ca.Authority: %+v\n", err)
@@ -575,4 +607,40 @@ func (ca *CA) getConfigFileOutput() string {
 		return ca.config.Filepath()
 	}
 	return "loaded from token"
+}
+
+// runCompactJob will run the value log garbage collector if the nosql database
+// supports it.
+func (ca *CA) runCompactJob() {
+	caDB, ok := ca.auth.GetDatabase().(*db.DB)
+	if !ok {
+		return
+	}
+	compactor, ok := caDB.DB.(nosql.Compactor)
+	if !ok {
+		return
+	}
+
+	// Compact database at start.
+	runCompact(compactor)
+
+	// Compact database every minute.
+	ticker := time.NewTicker(time.Minute)
+	defer ticker.Stop()
+
+	for {
+		select {
+		case <-ca.compactStop:
+			return
+		case <-ticker.C:
+			runCompact(compactor)
+		}
+	}
+}
+
+// runCompact executes the compact job until it returns an error.
+func runCompact(c nosql.Compactor) {
+	for err := error(nil); err == nil; {
+		err = c.Compact(0.7)
+	}
 }

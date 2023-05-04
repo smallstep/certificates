@@ -188,7 +188,7 @@ CA_VERSION=$(curl -s https://api.github.com/repos/smallstep/certificates/release
 
 curl -sLO https://github.com/smallstep/certificates/releases/download/$CA_VERSION/step-ca_linux_${CA_VERSION:1}_$arch.tar.gz
 tar -xf step-ca_linux_${CA_VERSION:1}_$arch.tar.gz
-install -m 0755 -t /usr/bin step-ca_${CA_VERSION:1}/bin/step-ca
+install -m 0755 -t /usr/bin step-ca_${CA_VERSION:1}/step-ca
 setcap CAP_NET_BIND_SERVICE=+eip $(which step-ca)
 rm step-ca_linux_${CA_VERSION:1}_$arch.tar.gz
 rm -rf step-ca_${CA_VERSION:1}

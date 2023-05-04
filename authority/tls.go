@@ -786,7 +786,7 @@ func (a *Authority) GenerateCertificateRevocationList() error {
 	// Note that this is currently using the port 443 by default.
 	if b, err := marshalDistributionPoint(fullName, false); err == nil {
 		revocationList.ExtraExtensions = []pkix.Extension{
-			{Id: oidExtensionIssuingDistributionPoint, Value: b},
+			{Id: oidExtensionIssuingDistributionPoint, Critical: true, Value: b},
 		}
 	}
 

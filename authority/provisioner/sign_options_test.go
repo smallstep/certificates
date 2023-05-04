@@ -16,38 +16,6 @@ import (
 	"go.step.sm/crypto/pemutil"
 )
 
-func Test_emailOnlyIdentity_Valid(t *testing.T) {
-	uri, err := url.Parse("https://example.com/1.0/getUser")
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	type args struct {
-		req *x509.CertificateRequest
-	}
-	tests := []struct {
-		name    string
-		e       emailOnlyIdentity
-		args    args
-		wantErr bool
-	}{
-		{"ok", "name@smallstep.com", args{&x509.CertificateRequest{EmailAddresses: []string{"name@smallstep.com"}}}, false},
-		{"DNSNames", "name@smallstep.com", args{&x509.CertificateRequest{DNSNames: []string{"foo.bar.zar"}}}, true},
-		{"IPAddresses", "name@smallstep.com", args{&x509.CertificateRequest{IPAddresses: []net.IP{net.IPv4(127, 0, 0, 1)}}}, true},
-		{"URIs", "name@smallstep.com", args{&x509.CertificateRequest{URIs: []*url.URL{uri}}}, true},
-		{"no-emails", "name@smallstep.com", args{&x509.CertificateRequest{EmailAddresses: []string{}}}, true},
-		{"empty-email", "", args{&x509.CertificateRequest{EmailAddresses: []string{""}}}, true},
-		{"multiple-emails", "name@smallstep.com", args{&x509.CertificateRequest{EmailAddresses: []string{"name@smallstep.com", "foo@smallstep.com"}}}, true},
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			if err := tt.e.Valid(tt.args.req); (err != nil) != tt.wantErr {
-				t.Errorf("emailOnlyIdentity.Valid() error = %v, wantErr %v", err, tt.wantErr)
-			}
-		})
-	}
-}
-
 func Test_defaultPublicKeyValidator_Valid(t *testing.T) {
 	_shortRSA, err := pemutil.Read("./testdata/certs/short-rsa.csr")
 	assert.FatalError(t, err)

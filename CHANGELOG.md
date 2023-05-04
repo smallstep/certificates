@@ -25,12 +25,85 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
 
 ---
 
-## [Unreleased]
+## [v0.24.0] - 2023-04-12
+
+### Added
+
+- Add ACME `device-attest-01` support with TPM 2.0
+  (smallstep/certificates#1063).
+- Add support for new Azure SDK, sovereign clouds, and HSM keys on Azure KMS
+  (smallstep/crypto#192, smallstep/crypto#197, smallstep/crypto#198,
+  smallstep/certificates#1323, smallstep/certificates#1309).
+- Add support for ASN.1 functions on certificate templates
+  (smallstep/crypto#208, smallstep/certificates#1345)
+- Add `DOCKER_STEPCA_INIT_ADDRESS` to configure the address to use in a docker
+  container (smallstep/certificates#1262).
+- Make sure that the CSR used matches the attested key when using AME
+  `device-attest-01` challenge (smallstep/certificates#1265).
+- Add support for compacting the Badger DB (smallstep/certificates#1298).
+- Build and release cleanups (smallstep/certificates#1322,
+  smallstep/certificates#1329, smallstep/certificates#1340).
+
+### Fixed
+
+- Fix support for PKCS #7 RSA-OAEP decryption through
+  [smallstep/pkcs7#4](https://github.com/smallstep/pkcs7/pull/4), as used in
+  SCEP.
+- Fix RA installation using `scripts/install-step-ra.sh`
+  (smallstep/certificates#1255).
+- Clarify error messages on policy errors (smallstep/certificates#1287,
+  smallstep/certificates#1278).
+- Clarify error message on OIDC email validation (smallstep/certificates#1290).
+- Mark the IDP critical in the generated CRL data (smallstep/certificates#1293).
+- Disable database if CA is initialized with the `--no-db` flag
+  (smallstep/certificates#1294).
+
+## [v0.23.2] - 2023-02-02
+
+### Added
+
+- Added [`step-kms-plugin`](https://github.com/smallstep/step-kms-plugin) to
+  docker images, and a new image, `smallstep/step-ca-hsm`, compiled with cgo
+  (smallstep/certificates#1243).
+- Added [`scoop`](https://scoop.sh) packages back to the release
+  (smallstep/certificates#1250).
+- Added optional flag `--pidfile` which allows passing a filename where step-ca
+  will write its process id (smallstep/certificates#1251).
+- Added helpful message on CA startup when config can't be opened
+  (smallstep/certificates#1252).
+- Improved validation and error messages on `device-attest-01` orders
+  (smallstep/certificates#1235).
+
+### Removed
+
+- The deprecated CLI utils `step-awskms-init`, `step-cloudkms-init`,
+  `step-pkcs11-init`, `step-yubikey-init` have been removed.
+  [`step`](https://github.com/smallstep/cli) and
+  [`step-kms-plugin`](https://github.com/smallstep/step-kms-plugin) should be
+  used instead (smallstep/certificates#1240).
+
+### Fixed
+
+- Fixed remote management flags in docker images (smallstep/certificates#1228).
+
+## [v0.23.1] - 2023-01-10
 
 ### Added
 
 - Added configuration property `.crl.idpURL`  to be able to set a custom Issuing
-  Distribution Point in the CRL.
+  Distribution Point in the CRL (smallstep/certificates#1178).
+- Added WithContext methods to the CA client (smallstep/certificates#1211).
+- Docker: Added environment variables for enabling Remote Management and ACME
+  provisioner (smallstep/certificates#1201).
+- Docker: The entrypoint script now generates and displays an initial JWK
+  provisioner password by default when the CA is being initialized
+  (smallstep/certificates#1223).
+
+### Changed
+
+- Ignore SSH principals validation when using an OIDC provisioner. The
+  provisioner will ignore the principals passed and set the defaults or the ones
+  including using WebHooks or templates (smallstep/certificates#1206).
 
 ## [v0.23.0] - 2022-11-11
 

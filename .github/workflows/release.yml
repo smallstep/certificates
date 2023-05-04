@@ -21,6 +21,7 @@ jobs:
       version: ${{ steps.extract-tag.outputs.VERSION }}
       is_prerelease: ${{ steps.is_prerelease.outputs.IS_PRERELEASE }}
       docker_tags: ${{ env.DOCKER_TAGS }}
+      docker_tags_hsm: ${{ env.DOCKER_TAGS_HSM }}
     steps:
       - name: Is Pre-release
         id: is_prerelease
@@ -36,10 +37,12 @@ jobs:
           VERSION=${GITHUB_REF#refs/tags/v}
           echo "VERSION=${VERSION}" >> ${GITHUB_OUTPUT}
           echo "DOCKER_TAGS=${{ env.DOCKER_IMAGE }}:${VERSION}" >> ${GITHUB_ENV}
+          echo "DOCKER_TAGS_HSM=${{ env.DOCKER_IMAGE }}:${VERSION}-hsm" >> ${GITHUB_ENV}
       - name: Add Latest Tag
         if: steps.is_prerelease.outputs.IS_PRERELEASE == 'false'
         run: |
           echo "DOCKER_TAGS=${{ env.DOCKER_TAGS }},${{ env.DOCKER_IMAGE }}:latest" >> ${GITHUB_ENV}
+          echo "DOCKER_TAGS_HSM=${{ env.DOCKER_TAGS_HSM }},${{ env.DOCKER_IMAGE }}:hsm" >> ${GITHUB_ENV}
       - name: Create Release
         id: create_release
         uses: actions/create-release@v1
@@ -79,7 +82,7 @@ jobs:
         uses: goreleaser/goreleaser-action@v3
         with:
           version: 'latest'
-          args: release --rm-dist
+          args: release --clean
         env:
           GITHUB_TOKEN: ${{ secrets.GORELEASER_PAT }}
           RELEASE_DATE: ${{ env.RELEASE_DATE }}
@@ -96,5 +99,19 @@ jobs:
       platforms: linux/amd64,linux/386,linux/arm,linux/arm64
       tags: ${{ needs.create_release.outputs.docker_tags }}
       docker_image: smallstep/step-ca
-      docker_file: docker/Dockerfile.step-ca
+      docker_file: docker/Dockerfile
+    secrets: inherit
+
+  build_upload_docker_hsm:
+    name: Build & Upload HSM Enabled Docker Images
+    needs: create_release
+    permissions:
+      id-token: write
+      contents: write
+    uses: smallstep/workflows/.github/workflows/docker-buildx-push.yml@main
+    with:
+      platforms: linux/amd64,linux/386,linux/arm,linux/arm64
+      tags: ${{ needs.create_release.outputs.docker_tags_hsm }}
+      docker_image: smallstep/step-ca
+      docker_file: docker/Dockerfile.hsm
     secrets: inherit
