@@ -438,8 +438,8 @@ func wireDPOP01Validate(ctx context.Context, ch *Challenge, db DB, jwk *jose.JSO
 		return NewErrorISE("missing provisioner")
 	}
 
-	//key := ed25519.PublicKey([]byte(provisioner.GetOptions().GetDPOPOptions().GetSigningKey()))
-	key := provisioner.GetOptions().GetDPOPOptions().GetSigningKey()
+	dpopOptions := provisioner.GetOptions().GetDPOPOptions()
+	key := dpopOptions.GetSigningKey()
 
 	var wireChallengePayload WireChallengePayload
 	err := json.Unmarshal(payload, &wireChallengePayload)
@@ -471,6 +471,9 @@ func wireDPOP01Validate(ctx context.Context, ch *Challenge, db DB, jwk *jose.JSO
 		return WrapErrorISE(err, "error unmarshalling challenge data")
 	}
 
+	issuer := dpopOptions.DpopTarget
+
+	expiry := strconv.FormatInt(time.Now().Add(time.Hour*24*365).Unix(), 10)
 	cmd := exec.CommandContext(
 		ctx,
 		provisioner.GetOptions().GetDPOPOptions().GetValidationExecPath(),
@@ -482,7 +485,9 @@ func wireDPOP01Validate(ctx context.Context, ch *Challenge, db DB, jwk *jose.JSO
 		"--leeway",
 		"360",
 		"--max-expiry",
-		strconv.FormatInt(time.Now().Add(time.Hour*24*365).Unix(), 10),
+		expiry,
+		"--issuer",
+		issuer,
 		"--hash-algorithm",
 		`"SHA-256"`,
 		"--key",
