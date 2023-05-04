@@ -36,7 +36,18 @@ func TestJSONPanicsOnUnsupportedValue(t *testing.T) {
 	jsonPanicTest[json.UnsupportedValueError](t, math.NaN())
 }
 
-func jsonPanicTest[T json.UnsupportedTypeError | json.UnsupportedValueError](t *testing.T, v any) {
+func TestJSONPanicsOnMarshalerError(t *testing.T) {
+	var v erroneousJSONMarshaler
+	jsonPanicTest[json.MarshalerError](t, v)
+}
+
+type erroneousJSONMarshaler struct{}
+
+func (erroneousJSONMarshaler) MarshalJSON() ([]byte, error) {
+	return nil, assert.AnError
+}
+
+func jsonPanicTest[T json.UnsupportedTypeError | json.UnsupportedValueError | json.MarshalerError](t *testing.T, v any) {
 	t.Helper()
 
 	defer func() {

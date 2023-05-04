@@ -36,6 +36,11 @@ func JSONStatus(w http.ResponseWriter, v interface{}, status int) {
 		if errors.As(err, &errUnsupportedValue) {
 			panic(err)
 		}
+
+		var errMarshalError *json.MarshalerError
+		if errors.As(err, &errMarshalError) {
+			panic(err)
+		}
 	}
 
 	log.EnabledResponse(w, v)
