@@ -298,7 +298,7 @@ func newAuthorization(ctx context.Context, az *acme.Authorization) error {
 			var targetTemplate = ""
 			switch typ {
 			case acme.WIREOIDC01:
-				targetTemplate = prov.GetOptions().GetDPOPOptions().OidcTarget
+				targetTemplate = prov.GetOptions().GetOIDCOptions().Provider.IssuerURL
 			case acme.WIREDPOP01:
 				targetTemplate = prov.GetOptions().GetDPOPOptions().DpopTarget
 			default:

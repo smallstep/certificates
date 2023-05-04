@@ -8,8 +8,6 @@ type DPOPOptions struct {
 	SigningKey string `json:"key"`
 	// URI template acme client must call to fetch the DPoP challenge proof (an access token from wire-server)
 	DpopTarget string `json:"dpop-target"`
-	// URI template acme client must call to fetch the OIDC challenge proof (an Id token)
-	OidcTarget string `json:"oidc-target"`
 }
 
 func (o *DPOPOptions) GetValidationExecPath() string {
