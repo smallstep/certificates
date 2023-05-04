@@ -17,6 +17,7 @@ type dbChallenge struct {
 	Status      acme.Status        `json:"status"`
 	Token       string             `json:"token"`
 	Value       string             `json:"value"`
+	Target      string             `json:"target"`
 	ValidatedAt string             `json:"validatedAt"`
 	CreatedAt   time.Time          `json:"createdAt"`
 	Error       *acme.Error        `json:"error"`
@@ -59,6 +60,7 @@ func (db *DB) CreateChallenge(ctx context.Context, ch *acme.Challenge) error {
 		Token:     ch.Token,
 		CreatedAt: clock.Now(),
 		Type:      ch.Type,
+		Target:    ch.Target,
 	}
 
 	return db.save(ctx, ch.ID, dbch, nil, "challenge", challengeTable)
@@ -81,6 +83,7 @@ func (db *DB) GetChallenge(ctx context.Context, id, authzID string) (*acme.Chall
 		Token:       dbch.Token,
 		Error:       dbch.Error,
 		ValidatedAt: dbch.ValidatedAt,
+		Target:      dbch.Target,
 	}
 	return ch, nil
 }
