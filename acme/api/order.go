@@ -276,10 +276,7 @@ func newAuthorization(ctx context.Context, az *acme.Authorization) error {
 			continue
 		}
 
-		targetTemplate := prov.GetOptions().GetDPOPOptions().DpopTarget
-
 		var target = ""
-
 		switch az.Identifier.Type {
 		case acme.WireID:
 			wireId, err := wire.ParseID([]byte(az.Identifier.Value))
@@ -297,7 +294,16 @@ func newAuthorization(ctx context.Context, az *acme.Authorization) error {
 				return acme.NewError(acme.ErrorMalformedType, "DeviceId is not hexadecimal")
 			}
 			_ = decoded
-			log.Printf("> template: %s", targetTemplate)
+
+			var targetTemplate = ""
+			switch typ {
+			case acme.WIREOIDC01:
+				targetTemplate = prov.GetOptions().GetDPOPOptions().OidcTarget
+			case acme.WIREDPOP01:
+				targetTemplate = prov.GetOptions().GetDPOPOptions().DpopTarget
+			default:
+			}
+
 			tmpl, err := template.New("DeviceId").Parse(targetTemplate)
 			if err != nil {
 				return acme.NewError(acme.ErrorMalformedType, "Misconfigured target template configuration")
