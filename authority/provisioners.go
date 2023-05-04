@@ -1223,7 +1223,7 @@ func ProvisionerToLinkedca(p provisioner.Interface) (*linkedca.Provisioner, erro
 				Data: &linkedca.ProvisionerDetails_SCEP{
 					SCEP: &linkedca.SCEPProvisioner{
 						ForceCn:                       p.ForceCN,
-						Challenge:                     p.GetChallengePassword(),
+						Challenge:                     p.ChallengePassword,
 						Capabilities:                  p.Capabilities,
 						MinimumPublicKeyLength:        int32(p.MinimumPublicKeyLength),
 						IncludeRoot:                   p.IncludeRoot,

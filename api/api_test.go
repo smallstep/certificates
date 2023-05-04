@@ -4,7 +4,7 @@ import (
 	"bytes"
 	"context"
 	"crypto"
-	"crypto/dsa" //nolint
+	"crypto/dsa" //nolint:staticcheck // support legacy algorithms
 	"crypto/ecdsa"
 	"crypto/ed25519"
 	"crypto/elliptic"
@@ -28,7 +28,9 @@ import (
 
 	"github.com/go-chi/chi"
 	"github.com/pkg/errors"
+	sassert "github.com/stretchr/testify/assert"
 	"golang.org/x/crypto/ssh"
+	squarejose "gopkg.in/square/go-jose.v2"
 
 	"go.step.sm/crypto/jose"
 	"go.step.sm/crypto/x509util"
@@ -1563,4 +1565,95 @@ func mustCertificate(t *testing.T, pub, priv interface{}) *x509.Certificate {
 		t.Fatal(err)
 	}
 	return cert
+}
+
+func TestProvisionersResponse_MarshalJSON(t *testing.T) {
+
+	k := map[string]any{
+		"use": "sig",
+		"kty": "EC",
+		"kid": "4UELJx8e0aS9m0CH3fZ0EB7D5aUPICb759zALHFejvc",
+		"crv": "P-256",
+		"alg": "ES256",
+		"x":   "7ZdAAMZCFU4XwgblI5RfZouBi8lYmF6DlZusNNnsbm8",
+		"y":   "sQr2JdzwD2fgyrymBEXWsxDxFNjjqN64qLLSbLdLZ9Y",
+	}
+	key := squarejose.JSONWebKey{}
+	b, err := json.Marshal(k)
+	assert.FatalError(t, err)
+	err = json.Unmarshal(b, &key)
+	assert.FatalError(t, err)
+
+	r := ProvisionersResponse{
+		Provisioners: provisioner.List{
+			&provisioner.SCEP{
+				Name:                          "scep",
+				Type:                          "scep",
+				ChallengePassword:             "not-so-secret",
+				MinimumPublicKeyLength:        2048,
+				EncryptionAlgorithmIdentifier: 2,
+			},
+			&provisioner.JWK{
+				EncryptedKey: "eyJhbGciOiJQQkVTMi1IUzI1NitBMTI4S1ciLCJlbmMiOiJBMTI4R0NNIiwicDJjIjoxMDAwMDAsInAycyI6IlhOdmYxQjgxSUlLMFA2NUkwcmtGTGcifQ.XaN9zcPQeWt49zchUDm34FECUTHfQTn_.tmNHPQDqR3ebsWfd.9WZr3YVdeOyJh36vvx0VlRtluhvYp4K7jJ1KGDr1qypwZ3ziBVSNbYYQ71du7fTtrnfG1wgGTVR39tWSzBU-zwQ5hdV3rpMAaEbod5zeW6SHd95H3Bvcb43YiiqJFNL5sGZzFb7FqzVmpsZ1efiv6sZaGDHtnCAL6r12UG5EZuqGfM0jGCZitUz2m9TUKXJL5DJ7MOYbFfkCEsUBPDm_TInliSVn2kMJhFa0VOe5wZk5YOuYM3lNYW64HGtbf-llN2Xk-4O9TfeSPizBx9ZqGpeu8pz13efUDT2WL9tWo6-0UE-CrG0bScm8lFTncTkHcu49_a5NaUBkYlBjEiw.thPcx3t1AUcWuEygXIY3Fg",
+				Key:          &key,
+				Name:         "step-cli",
+				Type:         "JWK",
+			},
+		},
+		NextCursor: "next",
+	}
+
+	expected := map[string]any{
+		"provisioners": []map[string]any{
+			{
+				"type":                          "scep",
+				"name":                          "scep",
+				"challenge":                     "*** REDACTED ***",
+				"minimumPublicKeyLength":        2048,
+				"encryptionAlgorithmIdentifier": 2,
+			},
+			{
+				"type": "JWK",
+				"name": "step-cli",
+				"key": map[string]any{
+					"use": "sig",
+					"kty": "EC",
+					"kid": "4UELJx8e0aS9m0CH3fZ0EB7D5aUPICb759zALHFejvc",
+					"crv": "P-256",
+					"alg": "ES256",
+					"x":   "7ZdAAMZCFU4XwgblI5RfZouBi8lYmF6DlZusNNnsbm8",
+					"y":   "sQr2JdzwD2fgyrymBEXWsxDxFNjjqN64qLLSbLdLZ9Y",
+				},
+				"encryptedKey": "eyJhbGciOiJQQkVTMi1IUzI1NitBMTI4S1ciLCJlbmMiOiJBMTI4R0NNIiwicDJjIjoxMDAwMDAsInAycyI6IlhOdmYxQjgxSUlLMFA2NUkwcmtGTGcifQ.XaN9zcPQeWt49zchUDm34FECUTHfQTn_.tmNHPQDqR3ebsWfd.9WZr3YVdeOyJh36vvx0VlRtluhvYp4K7jJ1KGDr1qypwZ3ziBVSNbYYQ71du7fTtrnfG1wgGTVR39tWSzBU-zwQ5hdV3rpMAaEbod5zeW6SHd95H3Bvcb43YiiqJFNL5sGZzFb7FqzVmpsZ1efiv6sZaGDHtnCAL6r12UG5EZuqGfM0jGCZitUz2m9TUKXJL5DJ7MOYbFfkCEsUBPDm_TInliSVn2kMJhFa0VOe5wZk5YOuYM3lNYW64HGtbf-llN2Xk-4O9TfeSPizBx9ZqGpeu8pz13efUDT2WL9tWo6-0UE-CrG0bScm8lFTncTkHcu49_a5NaUBkYlBjEiw.thPcx3t1AUcWuEygXIY3Fg",
+			},
+		},
+		"nextCursor": "next",
+	}
+
+	expBytes, err := json.Marshal(expected)
+	sassert.NoError(t, err)
+
+	br, err := r.MarshalJSON()
+	sassert.NoError(t, err)
+	sassert.JSONEq(t, string(expBytes), string(br))
+
+	keyCopy := key
+	expList := provisioner.List{
+		&provisioner.SCEP{
+			Name:                          "scep",
+			Type:                          "scep",
+			ChallengePassword:             "not-so-secret",
+			MinimumPublicKeyLength:        2048,
+			EncryptionAlgorithmIdentifier: 2,
+		},
+		&provisioner.JWK{
+			EncryptedKey: "eyJhbGciOiJQQkVTMi1IUzI1NitBMTI4S1ciLCJlbmMiOiJBMTI4R0NNIiwicDJjIjoxMDAwMDAsInAycyI6IlhOdmYxQjgxSUlLMFA2NUkwcmtGTGcifQ.XaN9zcPQeWt49zchUDm34FECUTHfQTn_.tmNHPQDqR3ebsWfd.9WZr3YVdeOyJh36vvx0VlRtluhvYp4K7jJ1KGDr1qypwZ3ziBVSNbYYQ71du7fTtrnfG1wgGTVR39tWSzBU-zwQ5hdV3rpMAaEbod5zeW6SHd95H3Bvcb43YiiqJFNL5sGZzFb7FqzVmpsZ1efiv6sZaGDHtnCAL6r12UG5EZuqGfM0jGCZitUz2m9TUKXJL5DJ7MOYbFfkCEsUBPDm_TInliSVn2kMJhFa0VOe5wZk5YOuYM3lNYW64HGtbf-llN2Xk-4O9TfeSPizBx9ZqGpeu8pz13efUDT2WL9tWo6-0UE-CrG0bScm8lFTncTkHcu49_a5NaUBkYlBjEiw.thPcx3t1AUcWuEygXIY3Fg",
+			Key:          &keyCopy,
+			Name:         "step-cli",
+			Type:         "JWK",
+		},
+	}
+
+	// MarshalJSON must not affect the struct properties itself
+	sassert.Equal(t, expList, r.Provisioners)
 }

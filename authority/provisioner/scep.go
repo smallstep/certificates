@@ -39,7 +39,6 @@ type SCEP struct {
 	Options                       *Options `json:"options,omitempty"`
 	Claims                        *Claims  `json:"claims,omitempty"`
 	ctl                           *Controller
-	secretChallengePassword       string
 	encryptionAlgorithm           int
 	challengeValidationController *challengeValidationController
 }
@@ -159,10 +158,6 @@ func (s *SCEP) Init(config Config) (err error) {
 		return errors.New("provisioner name cannot be empty")
 	}
 
-	// Mask the actual challenge value, so it won't be marshaled
-	s.secretChallengePassword = s.ChallengePassword
-	s.ChallengePassword = "*** redacted ***"
-
 	// Default to 2048 bits minimum public key length (for CSRs) if not set
 	if s.MinimumPublicKeyLength == 0 {
 		s.MinimumPublicKeyLength = 2048
@@ -206,11 +201,6 @@ func (s *SCEP) AuthorizeSign(ctx context.Context, token string) ([]SignOption, e
 	}, nil
 }
 
-// GetChallengePassword returns the challenge password
-func (s *SCEP) GetChallengePassword() string {
-	return s.secretChallengePassword
-}
-
 // GetCapabilities returns the CA capabilities
 func (s *SCEP) GetCapabilities() []string {
 	return s.Capabilities
@@ -241,7 +231,7 @@ func (s *SCEP) ValidateChallenge(ctx context.Context, challenge, transactionID s
 	case validationMethodWebhook:
 		return s.challengeValidationController.Validate(ctx, challenge, transactionID)
 	default:
-		if subtle.ConstantTimeCompare([]byte(s.secretChallengePassword), []byte(challenge)) == 0 {
+		if subtle.ConstantTimeCompare([]byte(s.ChallengePassword), []byte(challenge)) == 0 {
 			return errors.New("invalid challenge password provided")
 		}
 		return nil
@@ -264,7 +254,7 @@ func (s *SCEP) selectValidationMethod() validationMethod {
 	if len(s.challengeValidationController.webhooks) > 0 {
 		return validationMethodWebhook
 	}
-	if s.secretChallengePassword != "" {
+	if s.ChallengePassword != "" {
 		return validationMethodStatic
 	}
 	return validationMethodNone

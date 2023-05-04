@@ -10,8 +10,9 @@ import (
 	"strings"
 
 	"github.com/pkg/errors"
-	"github.com/smallstep/certificates/errs"
 	"golang.org/x/crypto/ssh"
+
+	"github.com/smallstep/certificates/errs"
 )
 
 // Interface is the interface that all provisioner types must implement.
