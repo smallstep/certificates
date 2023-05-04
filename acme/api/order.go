@@ -294,7 +294,7 @@ func newAuthorization(ctx context.Context, az *acme.Authorization) error {
 				return acme.NewError(acme.ErrorMalformedType, "DeviceId is not hexadecimal")
 			}
 			_ = decoded
-			tmpl, err := template.New("DevideId").Parse(targetTemplate)
+			tmpl, err := template.New("DeviceId").Parse(targetTemplate)
 			if err != nil {
 				return acme.NewError(acme.ErrorMalformedType, "Misconfigured target template configuration")
 			}
