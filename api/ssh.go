@@ -337,7 +337,7 @@ func SSHSign(w http.ResponseWriter, r *http.Request) {
 		}
 		identityCertificate = certChainToPEM(certChain)
 	}
-
+	LogSSHCertificate(w, cert)
 	render.JSONStatus(w, &SSHSignResponse{
 		Certificate:         SSHCertificate{cert},
 		AddUserCertificate:  addUserCertificate,

@@ -1,6 +1,7 @@
 package api
 
 import (
+	"bytes"
 	"context"
 	"crypto"
 	"crypto/dsa" //nolint:staticcheck // support legacy algorithms
@@ -20,6 +21,8 @@ import (
 
 	"github.com/go-chi/chi"
 	"github.com/pkg/errors"
+	"go.step.sm/crypto/sshutil"
+	"golang.org/x/crypto/ssh"
 
 	"github.com/smallstep/certificates/api/log"
 	"github.com/smallstep/certificates/api/render"
@@ -469,7 +472,7 @@ func logOtt(w http.ResponseWriter, token string) {
 	}
 }
 
-// LogCertificate add certificate fields to the log message.
+// LogCertificate adds certificate fields to the log message.
 func LogCertificate(w http.ResponseWriter, cert *x509.Certificate) {
 	if rl, ok := w.(logging.ResponseLogger); ok {
 		m := map[string]interface{}{
@@ -496,6 +499,30 @@ func LogCertificate(w http.ResponseWriter, cert *x509.Certificate) {
 				m["provisioner"] = string(val.Name)
 			}
 			break
+		}
+		rl.WithFields(m)
+	}
+}
+
+// LogSSHCertificate adds SSH certificate fields to the log message.
+func LogSSHCertificate(w http.ResponseWriter, cert *ssh.Certificate) {
+	if rl, ok := w.(logging.ResponseLogger); ok {
+		mak := bytes.TrimSpace(ssh.MarshalAuthorizedKey(cert))
+		certType := "user"
+		if cert.CertType == ssh.HostCert {
+			certType = "host"
+		}
+		m := map[string]interface{}{
+			"serial":           cert.Serial,
+			"principals":       cert.ValidPrincipals,
+			"valid-from":       time.Unix(int64(cert.ValidAfter), 0).Format(time.RFC3339),
+			"valid-to":         time.Unix(int64(cert.ValidBefore), 0).Format(time.RFC3339),
+			"certificate":      string(mak),
+			"certificate-type": certType,
+		}
+		fingerprint, err := sshutil.FormatFingerprint(mak, sshutil.DefaultFingerprint)
+		if err == nil {
+			m["public-key"] = fingerprint
 		}
 		rl.WithFields(m)
 	}
