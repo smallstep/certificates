@@ -5,7 +5,6 @@ import (
 	"context"
 	"crypto/x509"
 	"encoding/base64"
-	"encoding/hex"
 	"encoding/json"
 	"net"
 	"net/http"
@@ -275,7 +274,7 @@ func newAuthorization(ctx context.Context, az *acme.Authorization) error {
 			continue
 		}
 
-		var target = ""
+		var target string
 		switch az.Identifier.Type {
 		case acme.WireID:
 			wireId, err := wire.ParseID([]byte(az.Identifier.Value))
@@ -286,18 +285,13 @@ func newAuthorization(ctx context.Context, az *acme.Authorization) error {
 			}
 			clientID := wireId.ClientID
 			deviceId := strings.Split(strings.Split(clientID, "@")[0], "/")[1]
-			decoded, err := hex.DecodeString(deviceId)
-			if err != nil {
-				return acme.NewError(acme.ErrorMalformedType, "DeviceId is not hexadecimal")
-			}
-			_ = decoded
 
-			var targetTemplate = ""
+			var targetTemplate string
 			switch typ {
 			case acme.WIREOIDC01:
-				targetTemplate = prov.GetOptions().GetOIDCOptions().Provider.IssuerURL
+				targetTemplate = prov.GetOptions().GetOIDCOptions().GetProviderIssuerURL()
 			case acme.WIREDPOP01:
-				targetTemplate = prov.GetOptions().GetDPOPOptions().DpopTarget
+				targetTemplate = prov.GetOptions().GetDPOPOptions().GetDPOPTarget()
 			default:
 			}
 

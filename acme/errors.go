@@ -283,7 +283,7 @@ type Error struct {
 
 // NewError creates a new Error type.
 func NewError(pt ProblemType, msg string, args ...interface{}) *Error {
-	log.Printf(msg, args)
+	log.Printf(msg, args...)
 	return newError(pt, errors.Errorf(msg, args...))
 }
 
@@ -309,7 +309,7 @@ func newError(pt ProblemType, err error) *Error {
 
 // NewErrorISE creates a new ErrorServerInternalType Error.
 func NewErrorISE(msg string, args ...interface{}) *Error {
-	log.Printf(msg, args)
+	log.Printf(msg, args...)
 	return NewError(ErrorServerInternalType, msg, args...)
 }
 

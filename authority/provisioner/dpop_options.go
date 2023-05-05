@@ -23,3 +23,10 @@ func (o *DPOPOptions) GetSigningKey() string {
 	}
 	return o.SigningKey
 }
+
+func (o *DPOPOptions) GetDPOPTarget() string {
+	if o == nil {
+		return ""
+	}
+	return o.DpopTarget
+}

@@ -38,6 +38,13 @@ func (o *OIDCOptions) GetProvider(ctx context.Context) *oidc.Provider {
 	return toProviderConfig(o.Provider).NewProvider(ctx)
 }
 
+func (o *OIDCOptions) GetProviderIssuerURL() string {
+	if o == nil {
+		return ""
+	}
+	return o.Provider.IssuerURL
+}
+
 func (o *OIDCOptions) GetConfig() *oidc.Config {
 	if o == nil {
 		return &oidc.Config{}

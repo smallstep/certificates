@@ -468,7 +468,7 @@ func wireDPOP01Validate(ctx context.Context, ch *Challenge, db DB, jwk *jose.JSO
 		return WrapErrorISE(err, "error unmarshalling challenge data")
 	}
 
-	issuer := dpopOptions.DpopTarget
+	issuer := dpopOptions.GetDPOPTarget()
 
 	expiry := strconv.FormatInt(time.Now().Add(time.Hour*24*365).Unix(), 10)
 	cmd := exec.CommandContext(
