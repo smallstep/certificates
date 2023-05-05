@@ -19,6 +19,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"log"
 	"net"
 	"net/url"
 	"os"
@@ -469,6 +470,7 @@ func wireDPOP01Validate(ctx context.Context, ch *Challenge, db DB, jwk *jose.JSO
 	}
 
 	issuer := dpopOptions.GetDPOPTarget()
+	log.Printf(">> issuer: '%s'", issuer)
 
 	expiry := strconv.FormatInt(time.Now().Add(time.Hour*24*365).Unix(), 10)
 	cmd := exec.CommandContext(
