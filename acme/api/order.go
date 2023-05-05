@@ -7,7 +7,6 @@ import (
 	"encoding/base64"
 	"encoding/hex"
 	"encoding/json"
-	"log"
 	"net"
 	"net/http"
 	"strings"
@@ -286,9 +285,7 @@ func newAuthorization(ctx context.Context, az *acme.Authorization) error {
 				}
 			}
 			clientID := wireId.ClientID
-			log.Printf("> client-id: %s", clientID)
 			deviceId := strings.Split(strings.Split(clientID, "@")[0], "/")[1]
-			log.Printf("> device-id: %s", deviceId)
 			decoded, err := hex.DecodeString(deviceId)
 			if err != nil {
 				return acme.NewError(acme.ErrorMalformedType, "DeviceId is not hexadecimal")
@@ -312,15 +309,12 @@ func newAuthorization(ctx context.Context, az *acme.Authorization) error {
 				DeviceId string
 			}
 			clientIdTmpl := ClientIdTmpl{deviceId}
-			log.Printf("> client-id-tmpl: %v", clientIdTmpl)
 
 			var buff bytes.Buffer
 			if err := tmpl.Execute(&buff, clientIdTmpl); err != nil {
 				return acme.NewError(acme.ErrorMalformedType, "Invalid Go template registered for 'target'")
 			}
 			target = buff.String()
-			log.Printf("> target: %s", target)
-
 		default:
 		}
 
