@@ -469,13 +469,21 @@ func wireDPOP01Validate(ctx context.Context, ch *Challenge, db DB, jwk *jose.JSO
 		return WrapErrorISE(err, "error unmarshalling challenge data")
 	}
 
-	issuer := dpopOptions.GetDPOPTarget()
+	clientID, err := wire.ParseClientID(challengeValues.ClientID)
+	if err != nil {
+		return WrapErrorISE(err, "error parsing device id")
+	}
+
+	issuer, err := dpopOptions.GetTarget(clientID.DeviceID)
+	if err != nil {
+		return WrapErrorISE(err, "Invalid Go template registered for 'target'")
+	}
 	log.Printf(">> issuer: '%s'", issuer)
 
 	expiry := strconv.FormatInt(time.Now().Add(time.Hour*24*365).Unix(), 10)
 	cmd := exec.CommandContext(
 		ctx,
-		provisioner.GetOptions().GetDPOPOptions().GetValidationExecPath(),
+		dpopOptions.GetValidationExecPath(),
 		"verify-access",
 		"--client-id",
 		challengeValues.ClientID,
