@@ -12,7 +12,7 @@ RUN make V=1 bin/step-ca
 FROM rust:alpine AS rustbuilder
 
 RUN apk add --no-cache git musl-dev perl
-RUN git clone --branch feat/target-htu https://github.com/wireapp/rusty-jwt-tools.git /src
+RUN git clone https://github.com/wireapp/rusty-jwt-tools.git /src
 
 RUN cd /src && \
     cargo build --release --verbose
