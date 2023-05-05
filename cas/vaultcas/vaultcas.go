@@ -215,7 +215,7 @@ func (v *VaultCAS) createCertificate(cr *x509.CertificateRequest, lifetime time.
 			Bytes: cr.Raw,
 		})),
 		"format": "pem_bundle",
-		"ttl":    lifetime.Seconds(),
+		"ttl":    lifetime.String(),
 	}
 
 	secret, err := v.client.Logical().Write(v.config.PKIMountPath+"/sign/"+vaultPKIRole, vaultReq)
