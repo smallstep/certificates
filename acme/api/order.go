@@ -1,7 +1,6 @@
 package api
 
 import (
-	"bytes"
 	"context"
 	"crypto/x509"
 	"encoding/base64"
@@ -9,7 +8,6 @@ import (
 	"net"
 	"net/http"
 	"strings"
-	"text/template"
 	"time"
 
 	"github.com/go-chi/chi/v5"
@@ -280,36 +278,27 @@ func newAuthorization(ctx context.Context, az *acme.Authorization) error {
 			wireId, err := wire.ParseID([]byte(az.Identifier.Value))
 			if err != nil {
 				if err != nil {
-					return acme.NewError(acme.ErrorMalformedType, "DeviceId cannot be parsed")
+					return acme.NewError(acme.ErrorMalformedType, "WireID cannot be parsed")
 				}
 			}
-			clientID := wireId.ClientID
-			deviceId := strings.Split(strings.Split(clientID, "@")[0], "/")[1]
+			clientID, err := wire.ParseClientID(wireId.ClientID)
+			if err != nil {
+				return acme.NewError(acme.ErrorMalformedType, "DeviceID cannot be parsed")
+			}
 
-			var targetTemplate string
+			var targetProvider interface{ GetTarget(string) (string, error) }
 			switch typ {
 			case acme.WIREOIDC01:
-				targetTemplate = prov.GetOptions().GetOIDCOptions().GetProviderIssuerURL()
+				targetProvider = prov.GetOptions().GetOIDCOptions()
 			case acme.WIREDPOP01:
-				targetTemplate = prov.GetOptions().GetDPOPOptions().GetDPOPTarget()
+				targetProvider = prov.GetOptions().GetDPOPOptions()
 			default:
 			}
 
-			tmpl, err := template.New("DeviceId").Parse(targetTemplate)
+			target, err = targetProvider.GetTarget(clientID.DeviceID)
 			if err != nil {
-				return acme.NewError(acme.ErrorMalformedType, "Misconfigured target template configuration")
-			}
-			type ClientIdTmpl struct {
-				DeviceId string
-			}
-			clientIdTmpl := ClientIdTmpl{deviceId}
-
-			var buff bytes.Buffer
-			if err := tmpl.Execute(&buff, clientIdTmpl); err != nil {
 				return acme.NewError(acme.ErrorMalformedType, "Invalid Go template registered for 'target'")
 			}
-			target = buff.String()
-
 		default:
 		}
 
