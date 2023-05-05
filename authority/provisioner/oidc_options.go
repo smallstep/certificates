@@ -1,7 +1,10 @@
 package provisioner
 
 import (
+	"bytes"
 	"context"
+	"fmt"
+	"text/template"
 	"time"
 
 	"github.com/coreos/go-oidc/v3/oidc"
@@ -38,19 +41,23 @@ func (o *OIDCOptions) GetProvider(ctx context.Context) *oidc.Provider {
 	return toProviderConfig(o.Provider).NewProvider(ctx)
 }
 
-func (o *OIDCOptions) GetProviderIssuerURL() string {
-	if o == nil {
-		return ""
-	}
-	return o.Provider.IssuerURL
-}
-
 func (o *OIDCOptions) GetConfig() *oidc.Config {
 	if o == nil {
 		return &oidc.Config{}
 	}
 	config := oidc.Config(o.Config)
 	return &config
+}
+
+func (o *OIDCOptions) GetTarget(deviceID string) (string, error) {
+	if o == nil {
+		return "", fmt.Errorf("Misconfigured target template configuration")
+	}
+	targetTemplate := o.Provider.IssuerURL
+	tmpl, err := template.New("DeviceId").Parse(targetTemplate)
+	buf := new(bytes.Buffer)
+	err = tmpl.Execute(buf, struct{ DeviceId string }{deviceID})
+	return buf.String(), err
 }
 
 func toProviderConfig(in ProviderJSON) *oidc.ProviderConfig {

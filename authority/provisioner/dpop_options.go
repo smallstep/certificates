@@ -1,5 +1,11 @@
 package provisioner
 
+import (
+	"bytes"
+	"fmt"
+	"text/template"
+)
+
 type DPOPOptions struct {
 	// ValidationExecPath is the name of the executable to call for DPOP
 	// validation.
@@ -29,4 +35,15 @@ func (o *DPOPOptions) GetDPOPTarget() string {
 		return ""
 	}
 	return o.DpopTarget
+}
+
+func (o *DPOPOptions) GetTarget(deviceID string) (string, error) {
+	if o == nil {
+		return "", fmt.Errorf("Misconfigured target template configuration")
+	}
+	targetTemplate := o.GetDPOPTarget()
+	tmpl, err := template.New("DeviceId").Parse(targetTemplate)
+	buf := new(bytes.Buffer)
+	err = tmpl.Execute(buf, struct{ DeviceId string }{deviceID})
+	return buf.String(), err
 }
