@@ -17,6 +17,7 @@ type dbAccount struct {
 	Key           *jose.JSONWebKey `json:"key"`
 	Contact       []string         `json:"contact,omitempty"`
 	Status        acme.Status      `json:"status"`
+	Location      string           `json:"location"`
 	CreatedAt     time.Time        `json:"createdAt"`
 	DeactivatedAt time.Time        `json:"deactivatedAt"`
 }
@@ -62,10 +63,11 @@ func (db *DB) GetAccount(ctx context.Context, id string) (*acme.Account, error) 
 	}
 
 	return &acme.Account{
-		Status:  dbacc.Status,
-		Contact: dbacc.Contact,
-		Key:     dbacc.Key,
-		ID:      dbacc.ID,
+		Status:   dbacc.Status,
+		Contact:  dbacc.Contact,
+		Key:      dbacc.Key,
+		ID:       dbacc.ID,
+		Location: dbacc.Location + dbacc.ID,
 	}, nil
 }
 
@@ -92,6 +94,7 @@ func (db *DB) CreateAccount(ctx context.Context, acc *acme.Account) error {
 		Contact:   acc.Contact,
 		Status:    acc.Status,
 		CreatedAt: clock.Now(),
+		Location:  acc.Location,
 	}
 
 	kid, err := acme.KeyToID(dba.Key)

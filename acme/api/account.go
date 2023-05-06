@@ -125,9 +125,10 @@ func NewAccount(w http.ResponseWriter, r *http.Request) {
 		}
 
 		acc = &acme.Account{
-			Key:     jwk,
-			Contact: nar.Contact,
-			Status:  acme.StatusValid,
+			Key:      jwk,
+			Contact:  nar.Contact,
+			Status:   acme.StatusValid,
+			Location: linker.GetLink(r.Context(), acme.AccountLinkType, ""),
 		}
 		if err := db.CreateAccount(ctx, acc); err != nil {
 			render.Error(w, acme.WrapErrorISE(err, "error creating account"))

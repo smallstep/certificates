@@ -301,15 +301,8 @@ func lookupJWK(next nextHTTP) nextHTTP {
 			return
 		}
 
-		kidPrefix := linker.GetLink(ctx, acme.AccountLinkType, "")
 		kid := jws.Signatures[0].Protected.KeyID
-		if !strings.HasPrefix(kid, kidPrefix) {
-			render.Error(w, acme.NewError(acme.ErrorMalformedType,
-				"kid does not have required prefix; expected %s, but got %s",
-				kidPrefix, kid))
-			return
-		}
-
+		kidPrefix := linker.GetLink(ctx, acme.AccountLinkType, "")
 		accID := strings.TrimPrefix(kid, kidPrefix)
 		acc, err := db.GetAccount(ctx, accID)
 		switch {
@@ -322,6 +315,13 @@ func lookupJWK(next nextHTTP) nextHTTP {
 		default:
 			if !acc.IsValid() {
 				render.Error(w, acme.NewError(acme.ErrorUnauthorizedType, "account is not active"))
+				return
+			}
+
+			if kid != acc.Location {
+				render.Error(w, acme.NewError(acme.ErrorMalformedType,
+					"kid does not match cached account location; expected %s, but got %s",
+					kid, acc.Location))
 				return
 			}
 			ctx = context.WithValue(ctx, accContextKey, acc)
