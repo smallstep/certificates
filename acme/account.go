@@ -20,6 +20,7 @@ type Account struct {
 	Status                 Status           `json:"status"`
 	OrdersURL              string           `json:"orders"`
 	ExternalAccountBinding interface{}      `json:"externalAccountBinding,omitempty"`
+	Location               string           `json:"-"`
 }
 
 // ToLog enables response logging.
