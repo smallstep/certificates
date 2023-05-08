@@ -508,21 +508,32 @@ func LogCertificate(w http.ResponseWriter, cert *x509.Certificate) {
 func LogSSHCertificate(w http.ResponseWriter, cert *ssh.Certificate) {
 	if rl, ok := w.(logging.ResponseLogger); ok {
 		mak := bytes.TrimSpace(ssh.MarshalAuthorizedKey(cert))
-		certType := "user"
-		if cert.CertType == ssh.HostCert {
-			certType = "host"
+		var certificate string
+		parts := strings.Split(string(mak), " ")
+		if len(parts) > 1 {
+			certificate = parts[1]
 		}
+		var userOrHost string
+		if cert.CertType == ssh.HostCert {
+			userOrHost = "host"
+		} else {
+			userOrHost = "user"
+		}
+		certificateType := fmt.Sprintf("%s %s certificate", parts[0], userOrHost) // e.g. ecdsa-sha2-nistp256-cert-v01@openssh.com user certificate
 		m := map[string]interface{}{
 			"serial":           cert.Serial,
 			"principals":       cert.ValidPrincipals,
 			"valid-from":       time.Unix(int64(cert.ValidAfter), 0).Format(time.RFC3339),
 			"valid-to":         time.Unix(int64(cert.ValidBefore), 0).Format(time.RFC3339),
-			"certificate":      string(mak),
-			"certificate-type": certType,
+			"certificate":      certificate,
+			"certificate-type": certificateType,
 		}
 		fingerprint, err := sshutil.FormatFingerprint(mak, sshutil.DefaultFingerprint)
 		if err == nil {
-			m["public-key"] = fingerprint
+			fpParts := strings.Split(fingerprint, " ")
+			if len(fpParts) > 3 {
+				m["public-key"] = fmt.Sprintf("%s %s", fpParts[1], fpParts[len(fpParts)-1])
+			}
 		}
 		rl.WithFields(m)
 	}
