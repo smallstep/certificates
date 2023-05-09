@@ -81,6 +81,7 @@ func SSHRenew(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	LogSSHCertificate(w, newCert)
 	render.JSONStatus(w, &SSHSignResponse{
 		Certificate:         SSHCertificate{newCert},
 		IdentityCertificate: identity,

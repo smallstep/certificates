@@ -88,6 +88,7 @@ func Sign(w http.ResponseWriter, r *http.Request) {
 	if len(certChainPEM) > 1 {
 		caPEM = certChainPEM[1]
 	}
+
 	LogCertificate(w, certChain[0])
 	render.JSONStatus(w, &SignResponse{
 		ServerPEM:    certChainPEM[0],

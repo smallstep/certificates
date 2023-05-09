@@ -89,6 +89,7 @@ func SSHRekey(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	LogSSHCertificate(w, newCert)
 	render.JSONStatus(w, &SSHRekeyResponse{
 		Certificate:         SSHCertificate{newCert},
 		IdentityCertificate: identity,
