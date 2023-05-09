@@ -47,8 +47,8 @@ cloud.google.com/go/datastore v1.1.0/go.mod h1:umbIZjpQpHh4hmRpGhH4tLFup+FVzqBi1
 cloud.google.com/go/firestore v1.1.0/go.mod h1:ulACoGHTpvq5r8rxGJ4ddJZBZqakUQqClKRT5SZwBmk=
 cloud.google.com/go/iam v0.13.0 h1:+CmB+K0J/33d0zSQ9SlFWUeCCEn5XJA0ZMZ3pHE9u8k=
 cloud.google.com/go/iam v0.13.0/go.mod h1:ljOg+rcNfzZ5d6f1nAUJ8ZIxOaZUVoS14bKCtaLZ/D0=
-cloud.google.com/go/kms v1.10.1 h1:7hm1bRqGCA1GBRQUrp831TwJ9TWhP+tvLuP497CQS2g=
-cloud.google.com/go/kms v1.10.1/go.mod h1:rIWk/TryCkR59GMC3YtHtXeLzd634lBbKenvyySAyYI=
+cloud.google.com/go/kms v1.10.2 h1:8UePKEypK3SQ6g+4mn/s/VgE5L7XOh+FwGGRUqvY3Hw=
+cloud.google.com/go/kms v1.10.2/go.mod h1:9mX3Q6pdroWzL20pbK6RaOdBbXBEhMNgK4Pfz2bweb4=
 cloud.google.com/go/longrunning v0.4.1 h1:v+yFJOfKC3yZdY6ZUI933pIYdhyhV8S3NpWrXWmg7jM=
 cloud.google.com/go/longrunning v0.4.1/go.mod h1:4iWDqhBZ70CvZ6BfETbvam3T8FMvLK+eFj0E6AaRQTo=
 cloud.google.com/go/monitoring v0.1.0/go.mod h1:Hpm3XfzJv+UTiXzCG5Ffp0wijzHTC7Cv4eR7o3x/fEE=
@@ -84,8 +84,8 @@ github.com/Azure/azure-amqp-common-go/v2 v2.1.0/go.mod h1:R8rea+gJRuJR6QxTir/XuE
 github.com/Azure/azure-pipeline-go v0.2.1/go.mod h1:UGSo8XybXnIGZ3epmeBw7Jdz+HiUVpqIlpz/HKHylF4=
 github.com/Azure/azure-sdk-for-go v29.0.0+incompatible/go.mod h1:9XXNKU+eRnpl9moKnB4QOLf1HestfXbmab5FXxiDBjc=
 github.com/Azure/azure-sdk-for-go v30.1.0+incompatible/go.mod h1:9XXNKU+eRnpl9moKnB4QOLf1HestfXbmab5FXxiDBjc=
-github.com/Azure/azure-sdk-for-go/sdk/azcore v1.5.0 h1:xGLAFFd9D3iLGxYiUGPdITSzsFmU1K8VtfuUHWAoN7M=
-github.com/Azure/azure-sdk-for-go/sdk/azcore v1.5.0/go.mod h1:bjGvMhVMb+EEm3VRNQawDMUyMMjo+S5ewNjflkep/0Q=
+github.com/Azure/azure-sdk-for-go/sdk/azcore v1.6.0 h1:8kDqDngH+DmVBiCtIjCFTGa7MBnsIOkF9IccInFEbjk=
+github.com/Azure/azure-sdk-for-go/sdk/azcore v1.6.0/go.mod h1:bjGvMhVMb+EEm3VRNQawDMUyMMjo+S5ewNjflkep/0Q=
 github.com/Azure/azure-sdk-for-go/sdk/azidentity v1.2.2 h1:uqM+VoHjVH6zdlkLF2b6O0ZANcHoj3rO0PoQ3jglUJA=
 github.com/Azure/azure-sdk-for-go/sdk/azidentity v1.2.2/go.mod h1:twTKAa1E6hLmSDjLhaCkbTMQKc7p/rNLU40rLxGEOCI=
 github.com/Azure/azure-sdk-for-go/sdk/internal v1.3.0 h1:sXr+ck84g/ZlZUOZiNELInmMgOsuGwdjjVkEIde0OtY=
@@ -159,8 +159,8 @@ github.com/aws/aws-sdk-go v1.23.20/go.mod h1:KmX6BPdI08NWTb3/sm4ZGu5ShLoqVDhKgpi
 github.com/aws/aws-sdk-go v1.25.11/go.mod h1:KmX6BPdI08NWTb3/sm4ZGu5ShLoqVDhKgpiN924inxo=
 github.com/aws/aws-sdk-go v1.27.0/go.mod h1:KmX6BPdI08NWTb3/sm4ZGu5ShLoqVDhKgpiN924inxo=
 github.com/aws/aws-sdk-go v1.37.0/go.mod h1:hcU610XS61/+aQV88ixoOzUoG7v3b31pl2zKMmprdro=
-github.com/aws/aws-sdk-go v1.44.240 h1:38f1qBTuzotDC6bgSNLw1vrrYaoWL8MNNzwTsGjP6TY=
-github.com/aws/aws-sdk-go v1.44.240/go.mod h1:aVsgQcEevwlmQ7qHE9I3h+dtQgpqhFB+i8Phjh7fkwI=
+github.com/aws/aws-sdk-go v1.44.259 h1:7yDn1dcv4DZFMKpu+2exIH5O6ipNj9qXrKfdMUaIJwY=
+github.com/aws/aws-sdk-go v1.44.259/go.mod h1:aVsgQcEevwlmQ7qHE9I3h+dtQgpqhFB+i8Phjh7fkwI=
 github.com/aws/aws-sdk-go-v2 v0.18.0/go.mod h1:JWVYvqSMppoMJC0x5wdwiImzgXTI9FuZwxzkQq9wy+g=
 github.com/aybabtme/rgbterm v0.0.0-20170906152045-cc83f3b3ce59/go.mod h1:q/89r3U2H7sSsE2t6Kca0lfwTK8JdoNGS/yzM/4iH5I=
 github.com/benbjohnson/clock v1.0.3/go.mod h1:bGMdMPoPVvcYyt1gHDf4J2KE153Yf9BuiUKYMaxlTDM=
@@ -886,6 +886,8 @@ github.com/smallstep/assert v0.0.0-20200723003110-82e2b9b3b262 h1:unQFBIznI+VYD1
 github.com/smallstep/assert v0.0.0-20200723003110-82e2b9b3b262/go.mod h1:MyOHs9Po2fbM1LHej6sBUT8ozbxmMOFG+E+rx/GSGuc=
 github.com/smallstep/go-attestation v0.4.4-0.20230224121042-1bcb20a75add h1:nKji/LnfyxNGP6JM5EM2jVTnGus9Fblz9IGxQHRUI6M=
 github.com/smallstep/go-attestation v0.4.4-0.20230224121042-1bcb20a75add/go.mod h1:hYP3lyq8hO11DmeEBjZ28norJ2uCFhm/Jj5m8V+hmNE=
+github.com/smallstep/go-attestation v0.4.4-0.20230509120429-e17291421738 h1:h+cZgVniTaE0uuRMdxTThLaJeuxsv4aas6oStz6f5VQ=
+github.com/smallstep/go-attestation v0.4.4-0.20230509120429-e17291421738/go.mod h1:mk2hyNbyai1oon+ilW9t42BuBVw7ee8elDdgrPq4394=
 github.com/smallstep/nosql v0.6.0 h1:ur7ysI8s9st0cMXnTvB8tA3+x5Eifmkb6hl4uqNV5jc=
 github.com/smallstep/nosql v0.6.0/go.mod h1:jOXwLtockXORUPPZ2MCUcIkGR6w0cN1QGZniY9DITQA=
 github.com/smallstep/pkcs7 v0.0.0-20230302202335-4c094085c948 h1:/80FqDt6pzL9clNW8G2IsRAzKGNAuzsEs7g1Y5oaM/Y=
@@ -1030,8 +1032,8 @@ go.opentelemetry.io/otel/trace v0.20.0/go.mod h1:6GjCW8zgDjwGHGa6GkyeB8+/5vjT16g
 go.opentelemetry.io/proto/otlp v0.7.0/go.mod h1:PqfVotwruBrMGOCsRd/89rSnXhoiJIqeYNgFYFoEGnI=
 go.step.sm/cli-utils v0.7.6 h1:YkpLVrepmy2c5+eaz/wduiGxlgrRx3YdAStE37if25g=
 go.step.sm/cli-utils v0.7.6/go.mod h1:j+FxFZ2gbWkAJl0eded/rksuxmNqWpmyxbkXcukGJaY=
-go.step.sm/crypto v0.29.3 h1:lFCsFQQGic1VZIa0B/87iMCDy67+LW8eEl119GTyeWI=
-go.step.sm/crypto v0.29.3/go.mod h1:0lYeIyQMJbFJ27L4BOGaq2gnuTgOShf+Ju/cTsMULq4=
+go.step.sm/crypto v0.29.4 h1:Qc9wyD+32NWZwNYe4NKQTX4EQr27olpSFxaV5sYHHBE=
+go.step.sm/crypto v0.29.4/go.mod h1:6FMalLBWdTIEx8f6LIABRIKPv3943bTb9domACCNx0Q=
 go.step.sm/linkedca v0.19.1 h1:uY0ByT/uB3FCQ8zIo9mU7MWG7HKf5sDXNEBeN94MuP8=
 go.step.sm/linkedca v0.19.1/go.mod h1:vPV2ad3LFQJmV7XWt87VlnJSs6UOqgsbVGVWe3veEmI=
 go.uber.org/atomic v1.3.2/go.mod h1:gD2HeocX3+yG+ygLZcrzQJaqmWj9AIm7n08wl/qW/PE=
