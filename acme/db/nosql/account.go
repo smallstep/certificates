@@ -13,13 +13,13 @@ import (
 
 // dbAccount represents an ACME account.
 type dbAccount struct {
-	ID            string           `json:"id"`
-	Key           *jose.JSONWebKey `json:"key"`
-	Contact       []string         `json:"contact,omitempty"`
-	Status        acme.Status      `json:"status"`
-	Location      string           `json:"location"`
-	CreatedAt     time.Time        `json:"createdAt"`
-	DeactivatedAt time.Time        `json:"deactivatedAt"`
+	ID             string           `json:"id"`
+	Key            *jose.JSONWebKey `json:"key"`
+	Contact        []string         `json:"contact,omitempty"`
+	Status         acme.Status      `json:"status"`
+	LocationPrefix string           `json:"locationPrefix"`
+	CreatedAt      time.Time        `json:"createdAt"`
+	DeactivatedAt  time.Time        `json:"deactivatedAt"`
 }
 
 func (dba *dbAccount) clone() *dbAccount {
@@ -63,11 +63,11 @@ func (db *DB) GetAccount(ctx context.Context, id string) (*acme.Account, error) 
 	}
 
 	return &acme.Account{
-		Status:   dbacc.Status,
-		Contact:  dbacc.Contact,
-		Key:      dbacc.Key,
-		ID:       dbacc.ID,
-		Location: dbacc.Location + dbacc.ID,
+		Status:         dbacc.Status,
+		Contact:        dbacc.Contact,
+		Key:            dbacc.Key,
+		ID:             dbacc.ID,
+		LocationPrefix: dbacc.LocationPrefix,
 	}, nil
 }
 
@@ -89,12 +89,12 @@ func (db *DB) CreateAccount(ctx context.Context, acc *acme.Account) error {
 	}
 
 	dba := &dbAccount{
-		ID:        acc.ID,
-		Key:       acc.Key,
-		Contact:   acc.Contact,
-		Status:    acc.Status,
-		CreatedAt: clock.Now(),
-		Location:  acc.Location,
+		ID:             acc.ID,
+		Key:            acc.Key,
+		Contact:        acc.Contact,
+		Status:         acc.Status,
+		CreatedAt:      clock.Now(),
+		LocationPrefix: acc.LocationPrefix,
 	}
 
 	kid, err := acme.KeyToID(dba.Key)

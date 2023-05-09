@@ -20,7 +20,12 @@ type Account struct {
 	Status                 Status           `json:"status"`
 	OrdersURL              string           `json:"orders"`
 	ExternalAccountBinding interface{}      `json:"externalAccountBinding,omitempty"`
-	Location               string           `json:"-"`
+	LocationPrefix         string           `json:"-"`
+}
+
+// GetLocation returns the URL location of the given account.
+func (a *Account) GetLocation() string {
+	return a.LocationPrefix + a.ID
 }
 
 // ToLog enables response logging.
