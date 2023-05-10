@@ -318,10 +318,10 @@ func lookupJWK(next nextHTTP) nextHTTP {
 				return
 			}
 
-			if kid != acc.GetLocation() {
+			if storedLocation := acc.GetLocation(); kid != storedLocation {
 				render.Error(w, acme.NewError(acme.ErrorMalformedType,
-					"kid does not match cached account location; expected %s, but got %s",
-					kid, acc.GetLocation()))
+					"kid does not match stored account location; expected %q, but got %q",
+					storedLocation, kid))
 				return
 			}
 			ctx = context.WithValue(ctx, accContextKey, acc)
