@@ -148,7 +148,7 @@ func mustAttestApple(t *testing.T, nonce string) ([]byte, *x509.Certificate, *x5
 	return payload, leaf, ca.Root
 }
 
-func mustAttestYubikey(t *testing.T, nonce, keyAuthorization string, serial int) ([]byte, *x509.Certificate, *x509.Certificate) {
+func mustAttestYubikey(t *testing.T, _, keyAuthorization string, serial int) ([]byte, *x509.Certificate, *x509.Certificate) {
 	ca, err := minica.New()
 	fatalError(t, err)
 
@@ -888,7 +888,7 @@ func TestChallenge_Validate(t *testing.T) {
 
 type errReader int
 
-func (errReader) Read(p []byte) (n int, err error) {
+func (errReader) Read([]byte) (int, error) {
 	return 0, errors.New("force")
 }
 func (errReader) Close() error {
@@ -1631,14 +1631,14 @@ func newTestTLSALPNServer(validationCert *tls.Certificate, opts ...func(*httptes
 // noopConn is a mock net.Conn that does nothing.
 type noopConn struct{}
 
-func (c *noopConn) Read(_ []byte) (n int, err error)   { return 0, io.EOF }
-func (c *noopConn) Write(_ []byte) (n int, err error)  { return 0, io.EOF }
-func (c *noopConn) Close() error                       { return nil }
-func (c *noopConn) LocalAddr() net.Addr                { return &net.IPAddr{IP: net.IPv4zero, Zone: ""} }
-func (c *noopConn) RemoteAddr() net.Addr               { return &net.IPAddr{IP: net.IPv4zero, Zone: ""} }
-func (c *noopConn) SetDeadline(t time.Time) error      { return nil }
-func (c *noopConn) SetReadDeadline(t time.Time) error  { return nil }
-func (c *noopConn) SetWriteDeadline(t time.Time) error { return nil }
+func (c *noopConn) Read(_ []byte) (n int, err error)  { return 0, io.EOF }
+func (c *noopConn) Write(_ []byte) (n int, err error) { return 0, io.EOF }
+func (c *noopConn) Close() error                      { return nil }
+func (c *noopConn) LocalAddr() net.Addr               { return &net.IPAddr{IP: net.IPv4zero, Zone: ""} }
+func (c *noopConn) RemoteAddr() net.Addr              { return &net.IPAddr{IP: net.IPv4zero, Zone: ""} }
+func (c *noopConn) SetDeadline(time.Time) error       { return nil }
+func (c *noopConn) SetReadDeadline(time.Time) error   { return nil }
+func (c *noopConn) SetWriteDeadline(time.Time) error  { return nil }
 
 func newTLSALPNValidationCert(keyAuthHash []byte, obsoleteOID, critical bool, names ...string) (*tls.Certificate, error) {
 	privateKey, err := rsa.GenerateKey(rand.Reader, 2048)

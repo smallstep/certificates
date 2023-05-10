@@ -55,7 +55,7 @@ func (m sshTestModifier) Modify(cert *ssh.Certificate, _ provisioner.SignSSHOpti
 
 type sshTestCertModifier string
 
-func (m sshTestCertModifier) Modify(cert *ssh.Certificate, opts provisioner.SignSSHOptions) error {
+func (m sshTestCertModifier) Modify(*ssh.Certificate, provisioner.SignSSHOptions) error {
 	if m == "" {
 		return nil
 	}
@@ -64,7 +64,7 @@ func (m sshTestCertModifier) Modify(cert *ssh.Certificate, opts provisioner.Sign
 
 type sshTestCertValidator string
 
-func (v sshTestCertValidator) Valid(crt *ssh.Certificate, opts provisioner.SignSSHOptions) error {
+func (v sshTestCertValidator) Valid(*ssh.Certificate, provisioner.SignSSHOptions) error {
 	if v == "" {
 		return nil
 	}
@@ -73,7 +73,7 @@ func (v sshTestCertValidator) Valid(crt *ssh.Certificate, opts provisioner.SignS
 
 type sshTestOptionsValidator string
 
-func (v sshTestOptionsValidator) Valid(opts provisioner.SignSSHOptions) error {
+func (v sshTestOptionsValidator) Valid(provisioner.SignSSHOptions) error {
 	if v == "" {
 		return nil
 	}
@@ -82,7 +82,7 @@ func (v sshTestOptionsValidator) Valid(opts provisioner.SignSSHOptions) error {
 
 type sshTestOptionsModifier string
 
-func (m sshTestOptionsModifier) Modify(cert *ssh.Certificate, opts provisioner.SignSSHOptions) error {
+func (m sshTestOptionsModifier) Modify(*ssh.Certificate, provisioner.SignSSHOptions) error {
 	if m == "" {
 		return nil
 	}

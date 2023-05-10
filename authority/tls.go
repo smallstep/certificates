@@ -303,7 +303,7 @@ func (a *Authority) isAllowedToSignX509Certificate(cert *x509.Certificate) error
 
 // AreSANsAllowed evaluates the provided sans against the
 // authority X.509 policy.
-func (a *Authority) AreSANsAllowed(ctx context.Context, sans []string) error {
+func (a *Authority) AreSANsAllowed(_ context.Context, sans []string) error {
 	return a.policyEngine.AreSANsAllowed(sans)
 }
 
@@ -969,11 +969,7 @@ func callEnrichingWebhooksX509(webhookCtl webhookController, attData *provisione
 	if err != nil {
 		return err
 	}
-	if err := webhookCtl.Enrich(whEnrichReq); err != nil {
-		return err
-	}
-
-	return nil
+	return webhookCtl.Enrich(whEnrichReq)
 }
 
 func callAuthorizingWebhooksX509(webhookCtl webhookController, cert *x509util.Certificate, leaf *x509.Certificate, attData *provisioner.AttestationData) error {
@@ -993,9 +989,5 @@ func callAuthorizingWebhooksX509(webhookCtl webhookController, cert *x509util.Ce
 	if err != nil {
 		return err
 	}
-	if err := webhookCtl.Authorize(whAuthBody); err != nil {
-		return err
-	}
-
-	return nil
+	return webhookCtl.Authorize(whAuthBody)
 }

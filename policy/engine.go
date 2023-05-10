@@ -244,30 +244,21 @@ func (e *NamePolicyEngine) IsX509CertificateRequestAllowed(csr *x509.Certificate
 	return nil
 }
 
-// AreSANSAllowed verifies that all names in the slice of SANs are allowed.
+// AreSANsAllowed verifies that all names in the slice of SANs are allowed.
 // The SANs are first split into DNS names, IPs, email addresses and URIs.
 func (e *NamePolicyEngine) AreSANsAllowed(sans []string) error {
 	dnsNames, ips, emails, uris := x509util.SplitSANs(sans)
-	if err := e.validateNames(dnsNames, ips, emails, uris, []string{}); err != nil {
-		return err
-	}
-	return nil
+	return e.validateNames(dnsNames, ips, emails, uris, []string{})
 }
 
 // IsDNSAllowed verifies a single DNS domain is allowed.
 func (e *NamePolicyEngine) IsDNSAllowed(dns string) error {
-	if err := e.validateNames([]string{dns}, []net.IP{}, []string{}, []*url.URL{}, []string{}); err != nil {
-		return err
-	}
-	return nil
+	return e.validateNames([]string{dns}, []net.IP{}, []string{}, []*url.URL{}, []string{})
 }
 
 // IsIPAllowed verifies a single IP domain is allowed.
 func (e *NamePolicyEngine) IsIPAllowed(ip net.IP) error {
-	if err := e.validateNames([]string{}, []net.IP{ip}, []string{}, []*url.URL{}, []string{}); err != nil {
-		return err
-	}
-	return nil
+	return e.validateNames([]string{}, []net.IP{ip}, []string{}, []*url.URL{}, []string{})
 }
 
 // IsSSHCertificateAllowed verifies that all principals in an SSH certificate are allowed.
@@ -276,10 +267,7 @@ func (e *NamePolicyEngine) IsSSHCertificateAllowed(cert *ssh.Certificate) error 
 	if err != nil {
 		return err
 	}
-	if err := e.validateNames(dnsNames, ips, emails, []*url.URL{}, principals); err != nil {
-		return err
-	}
-	return nil
+	return e.validateNames(dnsNames, ips, emails, []*url.URL{}, principals)
 }
 
 // splitPrincipals splits SSH certificate principals into DNS names, emails and usernames.

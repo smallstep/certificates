@@ -36,7 +36,7 @@ type SoftCAS struct {
 
 // New creates a new CertificateAuthorityService implementation using Golang or KMS
 // crypto.
-func New(ctx context.Context, opts apiv1.Options) (*SoftCAS, error) {
+func New(_ context.Context, opts apiv1.Options) (*SoftCAS, error) {
 	if !opts.IsCreator {
 		switch {
 		case len(opts.CertificateChain) == 0 && opts.CertificateSigner == nil:

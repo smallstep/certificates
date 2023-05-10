@@ -157,7 +157,7 @@ func (s *StepCAS) RevokeCertificate(req *apiv1.RevokeCertificateRequest) (*apiv1
 
 // GetCertificateAuthority returns the root certificate of the certificate
 // authority using the configured fingerprint.
-func (s *StepCAS) GetCertificateAuthority(req *apiv1.GetCertificateAuthorityRequest) (*apiv1.GetCertificateAuthorityResponse, error) {
+func (s *StepCAS) GetCertificateAuthority(*apiv1.GetCertificateAuthorityRequest) (*apiv1.GetCertificateAuthorityResponse, error) {
 	resp, err := s.client.Root(s.fingerprint)
 	if err != nil {
 		return nil, err

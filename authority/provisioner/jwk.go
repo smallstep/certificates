@@ -143,14 +143,14 @@ func (p *JWK) authorizeToken(token string, audiences []string) (*jwtPayload, err
 
 // AuthorizeRevoke returns an error if the provisioner does not have rights to
 // revoke the certificate with serial number in the `sub` property.
-func (p *JWK) AuthorizeRevoke(ctx context.Context, token string) error {
+func (p *JWK) AuthorizeRevoke(_ context.Context, token string) error {
 	_, err := p.authorizeToken(token, p.ctl.Audiences.Revoke)
 	// TODO(hs): authorize the SANs using x509 name policy allow/deny rules (also for other provisioners with AuthorizeRevoke)
 	return errs.Wrap(http.StatusInternalServerError, err, "jwk.AuthorizeRevoke")
 }
 
 // AuthorizeSign validates the given token.
-func (p *JWK) AuthorizeSign(ctx context.Context, token string) ([]SignOption, error) {
+func (p *JWK) AuthorizeSign(_ context.Context, token string) ([]SignOption, error) {
 	claims, err := p.authorizeToken(token, p.ctl.Audiences.Sign)
 	if err != nil {
 		return nil, errs.Wrap(http.StatusInternalServerError, err, "jwk.AuthorizeSign")
@@ -209,7 +209,7 @@ func (p *JWK) AuthorizeRenew(ctx context.Context, cert *x509.Certificate) error 
 }
 
 // AuthorizeSSHSign returns the list of SignOption for a SignSSH request.
-func (p *JWK) AuthorizeSSHSign(ctx context.Context, token string) ([]SignOption, error) {
+func (p *JWK) AuthorizeSSHSign(_ context.Context, token string) ([]SignOption, error) {
 	if !p.ctl.Claimer.IsSSHCAEnabled() {
 		return nil, errs.Unauthorized("jwk.AuthorizeSSHSign; sshCA is disabled for jwk provisioner '%s'", p.GetName())
 	}
@@ -286,7 +286,7 @@ func (p *JWK) AuthorizeSSHSign(ctx context.Context, token string) ([]SignOption,
 }
 
 // AuthorizeSSHRevoke returns nil if the token is valid, false otherwise.
-func (p *JWK) AuthorizeSSHRevoke(ctx context.Context, token string) error {
+func (p *JWK) AuthorizeSSHRevoke(_ context.Context, token string) error {
 	_, err := p.authorizeToken(token, p.ctl.Audiences.SSHRevoke)
 	// TODO(hs): authorize the principals using SSH name policy allow/deny rules (also for other provisioners with AuthorizeSSHRevoke)
 	return errs.Wrap(http.StatusInternalServerError, err, "jwk.AuthorizeSSHRevoke")

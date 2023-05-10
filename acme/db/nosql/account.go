@@ -26,7 +26,7 @@ func (dba *dbAccount) clone() *dbAccount {
 	return &nu
 }
 
-func (db *DB) getAccountIDByKeyID(ctx context.Context, kid string) (string, error) {
+func (db *DB) getAccountIDByKeyID(_ context.Context, kid string) (string, error) {
 	id, err := db.db.Get(accountByKeyIDTable, []byte(kid))
 	if err != nil {
 		if nosqlDB.IsErrNotFound(err) {
@@ -38,7 +38,7 @@ func (db *DB) getAccountIDByKeyID(ctx context.Context, kid string) (string, erro
 }
 
 // getDBAccount retrieves and unmarshals dbAccount.
-func (db *DB) getDBAccount(ctx context.Context, id string) (*dbAccount, error) {
+func (db *DB) getDBAccount(_ context.Context, id string) (*dbAccount, error) {
 	data, err := db.db.Get(accountTable, []byte(id))
 	if err != nil {
 		if nosqlDB.IsErrNotFound(err) {

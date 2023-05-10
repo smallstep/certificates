@@ -46,7 +46,10 @@ function step_ca_init () {
         --provisioner-password-file "${STEPPATH}/provisioner_password"
         --address "${DOCKER_STEPCA_INIT_ADDRESS}"
     )
-    if [ -n "${DOCKER_STEPCA_INIT_PASSWORD}" ]; then
+    if [ -n "${DOCKER_STEPCA_INIT_PASSWORD_FILE}" ]; then
+        cat < "${DOCKER_STEPCA_INIT_PASSWORD_FILE}" > "${STEPPATH}/password"
+        cat < "${DOCKER_STEPCA_INIT_PASSWORD_FILE}" > "${STEPPATH}/provisioner_password"
+    elif [ -n "${DOCKER_STEPCA_INIT_PASSWORD}" ]; then
         echo "${DOCKER_STEPCA_INIT_PASSWORD}" > "${STEPPATH}/password"
         echo "${DOCKER_STEPCA_INIT_PASSWORD}" > "${STEPPATH}/provisioner_password"
     else

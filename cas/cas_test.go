@@ -18,15 +18,15 @@ import (
 
 type mockCAS struct{}
 
-func (m *mockCAS) CreateCertificate(req *apiv1.CreateCertificateRequest) (*apiv1.CreateCertificateResponse, error) {
+func (m *mockCAS) CreateCertificate(*apiv1.CreateCertificateRequest) (*apiv1.CreateCertificateResponse, error) {
 	panic("not implemented")
 }
 
-func (m *mockCAS) RenewCertificate(req *apiv1.RenewCertificateRequest) (*apiv1.RenewCertificateResponse, error) {
+func (m *mockCAS) RenewCertificate(*apiv1.RenewCertificateRequest) (*apiv1.RenewCertificateResponse, error) {
 	panic("not implemented")
 }
 
-func (m *mockCAS) RevokeCertificate(req *apiv1.RevokeCertificateRequest) (*apiv1.RevokeCertificateResponse, error) {
+func (m *mockCAS) RevokeCertificate(*apiv1.RevokeCertificateRequest) (*apiv1.RevokeCertificateResponse, error) {
 	panic("not implemented")
 }
 

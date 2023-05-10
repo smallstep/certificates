@@ -101,7 +101,7 @@ type mockKeyManager struct {
 	errClose        error
 }
 
-func (m *mockKeyManager) GetPublicKey(req *kmsapi.GetPublicKeyRequest) (crypto.PublicKey, error) {
+func (m *mockKeyManager) GetPublicKey(*kmsapi.GetPublicKeyRequest) (crypto.PublicKey, error) {
 	signer := testSigner
 	if m.signer != nil {
 		signer = m.signer
@@ -121,7 +121,7 @@ func (m *mockKeyManager) CreateKey(req *kmsapi.CreateKeyRequest) (*kmsapi.Create
 	}, m.errCreateKey
 }
 
-func (m *mockKeyManager) CreateSigner(req *kmsapi.CreateSignerRequest) (crypto.Signer, error) {
+func (m *mockKeyManager) CreateSigner(*kmsapi.CreateSignerRequest) (crypto.Signer, error) {
 	signer := testSigner
 	if m.signer != nil {
 		signer = m.signer
@@ -129,7 +129,7 @@ func (m *mockKeyManager) CreateSigner(req *kmsapi.CreateSignerRequest) (crypto.S
 	return signer, m.errCreatesigner
 }
 
-func (m *mockKeyManager) CreateDecrypter(req *kmsapi.CreateDecrypterRequest) (crypto.Decrypter, error) {
+func (m *mockKeyManager) CreateDecrypter(*kmsapi.CreateDecrypterRequest) (crypto.Decrypter, error) {
 	return nil, nil
 }
 
@@ -147,6 +147,7 @@ func (b *badSigner) Sign(_ io.Reader, _ []byte, _ crypto.SignerOpts) ([]byte, er
 	return nil, fmt.Errorf("💥")
 }
 
+//nolint:gocritic // ignore sloppy test func name
 func mockNow(t *testing.T) {
 	tmp := now
 	now = func() time.Time {

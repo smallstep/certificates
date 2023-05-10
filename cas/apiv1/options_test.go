@@ -12,18 +12,19 @@ type testCAS struct {
 	name string
 }
 
-func (t *testCAS) CreateCertificate(req *CreateCertificateRequest) (*CreateCertificateResponse, error) {
+func (t *testCAS) CreateCertificate(*CreateCertificateRequest) (*CreateCertificateResponse, error) {
 	return nil, nil
 }
 
-func (t *testCAS) RenewCertificate(req *RenewCertificateRequest) (*RenewCertificateResponse, error) {
+func (t *testCAS) RenewCertificate(*RenewCertificateRequest) (*RenewCertificateResponse, error) {
 	return nil, nil
 }
 
-func (t *testCAS) RevokeCertificate(req *RevokeCertificateRequest) (*RevokeCertificateResponse, error) {
+func (t *testCAS) RevokeCertificate(*RevokeCertificateRequest) (*RevokeCertificateResponse, error) {
 	return nil, nil
 }
 
+//nolint:gocritic // ignore sloppy test func name
 func mockRegister(t *testing.T) {
 	t.Helper()
 	Register(SoftCAS, func(ctx context.Context, opts Options) (CertificateAuthorityService, error) {

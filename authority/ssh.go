@@ -52,7 +52,7 @@ func (a *Authority) GetSSHFederation(context.Context) (*config.SSHKeys, error) {
 }
 
 // GetSSHConfig returns rendered templates for clients (user) or servers (host).
-func (a *Authority) GetSSHConfig(ctx context.Context, typ string, data map[string]string) ([]templates.Output, error) {
+func (a *Authority) GetSSHConfig(_ context.Context, typ string, data map[string]string) ([]templates.Output, error) {
 	if a.sshCAUserCertSignKey == nil && a.sshCAHostCertSignKey == nil {
 		return nil, errs.NotFound("getSSHConfig: ssh is not configured")
 	}
@@ -146,7 +146,7 @@ func (a *Authority) GetSSHBastion(ctx context.Context, user, hostname string) (*
 }
 
 // SignSSH creates a signed SSH certificate with the given public key and options.
-func (a *Authority) SignSSH(ctx context.Context, key ssh.PublicKey, opts provisioner.SignSSHOptions, signOpts ...provisioner.SignOption) (*ssh.Certificate, error) {
+func (a *Authority) SignSSH(_ context.Context, key ssh.PublicKey, opts provisioner.SignSSHOptions, signOpts ...provisioner.SignOption) (*ssh.Certificate, error) {
 	var (
 		certOptions []sshutil.Option
 		mods        []provisioner.SSHCertModifier
@@ -663,11 +663,7 @@ func callEnrichingWebhooksSSH(webhookCtl webhookController, cr sshutil.Certifica
 	if err != nil {
 		return err
 	}
-	if err := webhookCtl.Enrich(whEnrichReq); err != nil {
-		return err
-	}
-
-	return nil
+	return webhookCtl.Enrich(whEnrichReq)
 }
 
 func callAuthorizingWebhooksSSH(webhookCtl webhookController, cert *sshutil.Certificate, certTpl *ssh.Certificate) error {
@@ -680,9 +676,5 @@ func callAuthorizingWebhooksSSH(webhookCtl webhookController, cert *sshutil.Cert
 	if err != nil {
 		return err
 	}
-	if err := webhookCtl.Authorize(whAuthBody); err != nil {
-		return err
-	}
-
-	return nil
+	return webhookCtl.Authorize(whAuthBody)
 }

@@ -39,7 +39,7 @@ func (db *DB) CreateNonce(ctx context.Context) (acme.Nonce, error) {
 
 // DeleteNonce verifies that the nonce is valid (by checking if it exists),
 // and if so, consumes the nonce resource by deleting it from the database.
-func (db *DB) DeleteNonce(ctx context.Context, nonce acme.Nonce) error {
+func (db *DB) DeleteNonce(_ context.Context, nonce acme.Nonce) error {
 	err := db.db.Update(&database.Tx{
 		Operations: []*database.TxEntry{
 			{

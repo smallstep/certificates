@@ -169,6 +169,8 @@ func (p *GCP) GetIdentityURL(audience string) string {
 
 // GetIdentityToken does an HTTP request to the identity url.
 func (p *GCP) GetIdentityToken(subject, caURL string) (string, error) {
+	_ = subject // unused input
+
 	audience, err := generateSignAudience(caURL, p.GetIDForToken())
 	if err != nil {
 		return "", err
@@ -220,7 +222,7 @@ func (p *GCP) Init(config Config) (err error) {
 
 // AuthorizeSign validates the given token and returns the sign options that
 // will be used on certificate creation.
-func (p *GCP) AuthorizeSign(ctx context.Context, token string) ([]SignOption, error) {
+func (p *GCP) AuthorizeSign(_ context.Context, token string) ([]SignOption, error) {
 	claims, err := p.authorizeToken(token)
 	if err != nil {
 		return nil, errs.Wrap(http.StatusInternalServerError, err, "gcp.AuthorizeSign")
@@ -380,7 +382,7 @@ func (p *GCP) authorizeToken(token string) (*gcpPayload, error) {
 }
 
 // AuthorizeSSHSign returns the list of SignOption for a SignSSH request.
-func (p *GCP) AuthorizeSSHSign(ctx context.Context, token string) ([]SignOption, error) {
+func (p *GCP) AuthorizeSSHSign(_ context.Context, token string) ([]SignOption, error) {
 	if !p.ctl.Claimer.IsSSHCAEnabled() {
 		return nil, errs.Unauthorized("gcp.AuthorizeSSHSign; sshCA is disabled for gcp provisioner '%s'", p.GetName())
 	}

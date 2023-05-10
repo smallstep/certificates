@@ -46,7 +46,7 @@ type PrerequisitesChecker func(ctx context.Context) (bool, error)
 
 // DefaultPrerequisitesChecker is the default PrerequisiteChecker and returns
 // always true.
-func DefaultPrerequisitesChecker(ctx context.Context) (bool, error) {
+func DefaultPrerequisitesChecker(context.Context) (bool, error) {
 	return true, nil
 }
 

@@ -127,7 +127,7 @@ func (v *VaultCAS) CreateCertificate(req *apiv1.CreateCertificateRequest) (*apiv
 
 // GetCertificateAuthority returns the root certificate of the certificate
 // authority using the configured fingerprint.
-func (v *VaultCAS) GetCertificateAuthority(req *apiv1.GetCertificateAuthorityRequest) (*apiv1.GetCertificateAuthorityResponse, error) {
+func (v *VaultCAS) GetCertificateAuthority(*apiv1.GetCertificateAuthorityRequest) (*apiv1.GetCertificateAuthorityResponse, error) {
 	secret, err := v.client.Logical().Read(v.config.PKIMountPath + "/cert/ca_chain")
 	if err != nil {
 		return nil, fmt.Errorf("error reading ca chain: %w", err)
@@ -161,7 +161,7 @@ func (v *VaultCAS) GetCertificateAuthority(req *apiv1.GetCertificateAuthorityReq
 
 // RenewCertificate will always return a non-implemented error as renewals
 // are not supported yet.
-func (v *VaultCAS) RenewCertificate(req *apiv1.RenewCertificateRequest) (*apiv1.RenewCertificateResponse, error) {
+func (v *VaultCAS) RenewCertificate(*apiv1.RenewCertificateRequest) (*apiv1.RenewCertificateResponse, error) {
 	return nil, apiv1.NotImplementedError{Message: "vaultCAS does not support renewals"}
 }
 

@@ -311,7 +311,7 @@ type sshCertDefaultValidator struct{}
 // Valid returns an error if the given certificate does not contain the
 // necessary fields. We skip ValidPrincipals and Extensions as with custom
 // templates you can set them empty.
-func (v *sshCertDefaultValidator) Valid(cert *ssh.Certificate, o SignSSHOptions) error {
+func (v *sshCertDefaultValidator) Valid(cert *ssh.Certificate, _ SignSSHOptions) error {
 	switch {
 	case len(cert.Nonce) == 0:
 		return errs.Forbidden("ssh certificate nonce cannot be empty")
@@ -346,7 +346,7 @@ type sshDefaultPublicKeyValidator struct{}
 // TODO: this is the only validator that checks the key type. We should execute
 // this before the signing. We should add a new validations interface or extend
 // SSHCertOptionsValidator with the key.
-func (v sshDefaultPublicKeyValidator) Valid(cert *ssh.Certificate, o SignSSHOptions) error {
+func (v sshDefaultPublicKeyValidator) Valid(cert *ssh.Certificate, _ SignSSHOptions) error {
 	if cert.Key == nil {
 		return errs.BadRequest("ssh certificate key cannot be nil")
 	}
