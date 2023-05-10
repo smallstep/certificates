@@ -291,7 +291,7 @@ func (h *caHandler) Route(r Router) {
 // New creates a new RouterHandler with the CA endpoints.
 //
 // Deprecated: Use api.Route(r Router)
-func New(auth Authority) RouterHandler {
+func New(Authority) RouterHandler {
 	return &caHandler{}
 }
 
@@ -338,7 +338,7 @@ func Version(w http.ResponseWriter, r *http.Request) {
 }
 
 // Health is an HTTP handler that returns the status of the server.
-func Health(w http.ResponseWriter, r *http.Request) {
+func Health(w http.ResponseWriter, _ *http.Request) {
 	render.JSON(w, HealthResponse{Status: "ok"})
 }
 

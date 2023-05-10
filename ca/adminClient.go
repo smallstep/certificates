@@ -269,7 +269,7 @@ retry:
 }
 
 // GetAdmins returns all admins from the GET /admin/admins request to the CA.
-func (c *AdminClient) GetAdmins(opts ...AdminOption) ([]*linkedca.Admin, error) {
+func (c *AdminClient) GetAdmins(...AdminOption) ([]*linkedca.Admin, error) {
 	var (
 		cursor = ""
 		admins = []*linkedca.Admin{}
@@ -474,7 +474,7 @@ retry:
 }
 
 // GetProvisioners returns all admins from the GET /admin/admins request to the CA.
-func (c *AdminClient) GetProvisioners(opts ...AdminOption) (provisioner.List, error) {
+func (c *AdminClient) GetProvisioners(...AdminOption) (provisioner.List, error) {
 	var (
 		cursor = ""
 		provs  = provisioner.List{}

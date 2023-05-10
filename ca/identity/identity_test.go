@@ -367,7 +367,7 @@ func (r *renewer) GetRootCAs() *x509.CertPool {
 	return r.pool
 }
 
-func (r *renewer) Renew(tr http.RoundTripper) (*api.SignResponse, error) {
+func (r *renewer) Renew(http.RoundTripper) (*api.SignResponse, error) {
 	return r.sign, r.err
 }
 

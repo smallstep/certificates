@@ -109,7 +109,7 @@ func (r *TLSRenewer) Stop() bool {
 // GetCertificate returns the current server certificate.
 //
 // This method is set in the tls.Config GetCertificate property.
-func (r *TLSRenewer) GetCertificate(clientHello *tls.ClientHelloInfo) (*tls.Certificate, error) {
+func (r *TLSRenewer) GetCertificate(*tls.ClientHelloInfo) (*tls.Certificate, error) {
 	return r.getCertificate(), nil
 }
 
@@ -118,7 +118,7 @@ func (r *TLSRenewer) GetCertificate(clientHello *tls.ClientHelloInfo) (*tls.Cert
 // request. It's intended to be use by the certificate authority server.
 //
 // This method is set in the tls.Config GetCertificate property.
-func (r *TLSRenewer) GetCertificateForCA(clientHello *tls.ClientHelloInfo) (*tls.Certificate, error) {
+func (r *TLSRenewer) GetCertificateForCA(*tls.ClientHelloInfo) (*tls.Certificate, error) {
 	return r.getCertificateForCA(), nil
 }
 

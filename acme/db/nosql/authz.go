@@ -32,7 +32,7 @@ func (ba *dbAuthz) clone() *dbAuthz {
 
 // getDBAuthz retrieves and unmarshals a database representation of the
 // ACME Authorization type.
-func (db *DB) getDBAuthz(ctx context.Context, id string) (*dbAuthz, error) {
+func (db *DB) getDBAuthz(_ context.Context, id string) (*dbAuthz, error) {
 	data, err := db.db.Get(authzTable, []byte(id))
 	if nosql.IsErrNotFound(err) {
 		return nil, acme.NewError(acme.ErrorMalformedType, "authz %s not found", id)
@@ -121,7 +121,7 @@ func (db *DB) UpdateAuthorization(ctx context.Context, az *acme.Authorization) e
 }
 
 // GetAuthorizationsByAccountID retrieves and unmarshals ACME authz types from the database.
-func (db *DB) GetAuthorizationsByAccountID(ctx context.Context, accountID string) ([]*acme.Authorization, error) {
+func (db *DB) GetAuthorizationsByAccountID(_ context.Context, accountID string) ([]*acme.Authorization, error) {
 	entries, err := db.db.List(authzTable)
 	if err != nil {
 		return nil, errors.Wrapf(err, "error listing authz")

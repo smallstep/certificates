@@ -435,7 +435,7 @@ func (p *AWS) Init(config Config) (err error) {
 
 // AuthorizeSign validates the given token and returns the sign options that
 // will be used on certificate creation.
-func (p *AWS) AuthorizeSign(ctx context.Context, token string) ([]SignOption, error) {
+func (p *AWS) AuthorizeSign(_ context.Context, token string) ([]SignOption, error) {
 	payload, err := p.authorizeToken(token)
 	if err != nil {
 		return nil, errs.Wrap(http.StatusInternalServerError, err, "aws.AuthorizeSign")
@@ -708,7 +708,7 @@ func (p *AWS) authorizeToken(token string) (*awsPayload, error) {
 }
 
 // AuthorizeSSHSign returns the list of SignOption for a SignSSH request.
-func (p *AWS) AuthorizeSSHSign(ctx context.Context, token string) ([]SignOption, error) {
+func (p *AWS) AuthorizeSSHSign(_ context.Context, token string) ([]SignOption, error) {
 	if !p.ctl.Claimer.IsSSHCAEnabled() {
 		return nil, errs.Unauthorized("aws.AuthorizeSSHSign; ssh ca is disabled for aws provisioner '%s'", p.GetName())
 	}

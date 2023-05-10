@@ -111,7 +111,7 @@ type AuthorizeSSHRenewFunc func(ctx context.Context, p *Controller, cert *ssh.Ce
 // DefaultIdentityFunc return a default identity depending on the provisioner
 // type. For OIDC email is always present and the usernames might
 // contain empty strings.
-func DefaultIdentityFunc(ctx context.Context, p Interface, email string) (*Identity, error) {
+func DefaultIdentityFunc(_ context.Context, p Interface, email string) (*Identity, error) {
 	switch k := p.(type) {
 	case *OIDC:
 		// OIDC principals would be:
@@ -140,7 +140,7 @@ func DefaultIdentityFunc(ctx context.Context, p Interface, email string) (*Ident
 // will return an error if the provisioner has the renewal disabled, if the
 // certificate is not yet valid or if the certificate is expired and renew after
 // expiry is disabled.
-func DefaultAuthorizeRenew(ctx context.Context, p *Controller, cert *x509.Certificate) error {
+func DefaultAuthorizeRenew(_ context.Context, p *Controller, cert *x509.Certificate) error {
 	if p.Claimer.IsDisableRenewal() {
 		return errs.Unauthorized("renew is disabled for provisioner '%s'", p.GetName())
 	}
@@ -162,7 +162,7 @@ func DefaultAuthorizeRenew(ctx context.Context, p *Controller, cert *x509.Certif
 // will return an error if the provisioner has the renewal disabled, if the
 // certificate is not yet valid or if the certificate is expired and renew after
 // expiry is disabled.
-func DefaultAuthorizeSSHRenew(ctx context.Context, p *Controller, cert *ssh.Certificate) error {
+func DefaultAuthorizeSSHRenew(_ context.Context, p *Controller, cert *ssh.Certificate) error {
 	if p.Claimer.IsDisableRenewal() {
 		return errs.Unauthorized("renew is disabled for provisioner '%s'", p.GetName())
 	}

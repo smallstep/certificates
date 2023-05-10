@@ -273,7 +273,7 @@ func shouldAddMetaObject(p *provisioner.ACME) bool {
 
 // NotImplemented returns a 501 and is generally a placeholder for functionality which
 // MAY be added at some point in the future but is not in any way a guarantee of such.
-func NotImplemented(w http.ResponseWriter, r *http.Request) {
+func NotImplemented(w http.ResponseWriter, _ *http.Request) {
 	render.Error(w, acme.NewError(acme.ErrorNotImplementedType, "this API is not implemented"))
 }
 

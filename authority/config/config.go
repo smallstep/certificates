@@ -182,7 +182,7 @@ func (c *AuthConfig) init() {
 }
 
 // Validate validates the authority configuration.
-func (c *AuthConfig) Validate(audiences provisioner.Audiences) error {
+func (c *AuthConfig) Validate(provisioner.Audiences) error {
 	if c == nil {
 		return errors.New("authority cannot be undefined")
 	}

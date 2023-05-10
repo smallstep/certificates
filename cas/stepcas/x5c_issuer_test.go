@@ -22,10 +22,11 @@ func (b noneSigner) Public() crypto.PublicKey {
 	return []byte(b)
 }
 
-func (b noneSigner) Sign(rnd io.Reader, digest []byte, opts crypto.SignerOpts) (signature []byte, err error) {
+func (b noneSigner) Sign(_ io.Reader, digest []byte, _ crypto.SignerOpts) (signature []byte, err error) {
 	return digest, nil
 }
 
+//nolint:gocritic // ignore sloppy test func name
 func fakeTime(t *testing.T) {
 	t.Helper()
 	tmp := timeNow

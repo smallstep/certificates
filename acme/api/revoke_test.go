@@ -258,7 +258,7 @@ func jwkEncode(pub crypto.PublicKey) (string, error) {
 // jwsFinal constructs the final JWS object.
 // Implementation taken from github.com/mholt/acmez, which seems to be based on
 // https://github.com/golang/crypto/blob/master/acme/jws.go.
-func jwsFinal(sha crypto.Hash, sig []byte, phead, payload string) ([]byte, error) {
+func jwsFinal(_ crypto.Hash, sig []byte, phead, payload string) ([]byte, error) {
 	enc := struct {
 		Protected string `json:"protected"`
 		Payload   string `json:"payload"`
@@ -281,7 +281,7 @@ type mockCA struct {
 	MockAreSANsallowed func(ctx context.Context, sans []string) error
 }
 
-func (m *mockCA) Sign(cr *x509.CertificateRequest, opts provisioner.SignOptions, signOpts ...provisioner.SignOption) ([]*x509.Certificate, error) {
+func (m *mockCA) Sign(*x509.CertificateRequest, provisioner.SignOptions, ...provisioner.SignOption) ([]*x509.Certificate, error) {
 	return nil, nil
 }
 

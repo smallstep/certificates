@@ -73,7 +73,7 @@ func (s *SCEP) GetEncryptedKey() (string, string, bool) {
 }
 
 // GetTokenID returns the identifier of the token.
-func (s *SCEP) GetTokenID(ott string) (string, error) {
+func (s *SCEP) GetTokenID(string) (string, error) {
 	return "", errors.New("scep provisioner does not implement GetTokenID")
 }
 
@@ -186,7 +186,7 @@ func (s *SCEP) Init(config Config) (err error) {
 // AuthorizeSign does not do any verification, because all verification is handled
 // in the SCEP protocol. This method returns a list of modifiers / constraints
 // on the resulting certificate.
-func (s *SCEP) AuthorizeSign(ctx context.Context, token string) ([]SignOption, error) {
+func (s *SCEP) AuthorizeSign(context.Context, string) ([]SignOption, error) {
 	return []SignOption{
 		s,
 		// modifiers / withOptions
