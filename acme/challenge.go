@@ -26,10 +26,10 @@ import (
 	"time"
 
 	"github.com/fxamacker/cbor/v2"
-	"github.com/google/go-attestation/attest"
 	"github.com/google/go-tpm/tpm2"
 	"golang.org/x/exp/slices"
 
+	"github.com/smallstep/go-attestation/attest"
 	"go.step.sm/crypto/jose"
 	"go.step.sm/crypto/keyutil"
 	"go.step.sm/crypto/pemutil"

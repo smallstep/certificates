@@ -9,7 +9,6 @@ require (
 	github.com/fxamacker/cbor/v2 v2.4.0
 	github.com/go-chi/chi v4.1.2+incompatible
 	github.com/golang/mock v1.6.0
-	github.com/google/go-attestation v0.4.4-0.20220404204839-8820d49b18d9
 	github.com/google/go-cmp v0.5.9
 	github.com/google/go-tpm v0.3.3
 	github.com/google/uuid v1.3.0
@@ -24,6 +23,7 @@ require (
 	github.com/sirupsen/logrus v1.9.0
 	github.com/slackhq/nebula v1.6.1
 	github.com/smallstep/assert v0.0.0-20200723003110-82e2b9b3b262
+	github.com/smallstep/go-attestation v0.4.4-0.20230509120429-e17291421738
 	github.com/smallstep/nosql v0.6.0
 	github.com/stretchr/testify v1.8.2
 	github.com/urfave/cli v1.22.13
@@ -123,7 +123,6 @@ require (
 	github.com/schollz/jsonstore v1.1.0 // indirect
 	github.com/shopspring/decimal v1.2.0 // indirect
 	github.com/shurcooL/sanitized_anchor_name v1.0.0 // indirect
-	github.com/smallstep/go-attestation v0.4.4-0.20230509120429-e17291421738 // indirect
 	github.com/spf13/cast v1.4.1 // indirect
 	github.com/thales-e-security/pool v0.0.2 // indirect
 	github.com/x448/float16 v0.8.4 // indirect
@@ -146,6 +145,3 @@ require (
 
 // use github.com/smallstep/pkcs7 fork with patches applied
 replace go.mozilla.org/pkcs7 => github.com/smallstep/pkcs7 v0.0.0-20230302202335-4c094085c948
-
-// use github.com/smallstep/go-attestation fork with patches for Windows AK support applied
-replace github.com/google/go-attestation v0.4.4-0.20220404204839-8820d49b18d9 => github.com/smallstep/go-attestation v0.4.4-0.20230224121042-1bcb20a75add
