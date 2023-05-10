@@ -19,6 +19,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"log"
 	"net"
 	"net/url"
 	"os"
@@ -75,6 +76,7 @@ type Challenge struct {
 	Token           string        `json:"token"`
 	ValidatedAt     string        `json:"validated,omitempty"`
 	URL             string        `json:"url"`
+	Target          string        `json:"target"`
 	Error           *Error        `json:"error,omitempty"`
 }
 
@@ -434,7 +436,8 @@ func wireDPOP01Validate(ctx context.Context, ch *Challenge, db DB, jwk *jose.JSO
 		return NewErrorISE("missing provisioner")
 	}
 
-	key := provisioner.GetOptions().GetDPOPOptions().GetSigningKey()
+	dpopOptions := provisioner.GetOptions().GetDPOPOptions()
+	key := dpopOptions.GetSigningKey()
 
 	var wireChallengePayload WireChallengePayload
 	err := json.Unmarshal(payload, &wireChallengePayload)
@@ -466,10 +469,21 @@ func wireDPOP01Validate(ctx context.Context, ch *Challenge, db DB, jwk *jose.JSO
 		return WrapErrorISE(err, "error unmarshalling challenge data")
 	}
 
+	clientID, err := wire.ParseClientID(challengeValues.ClientID)
+	if err != nil {
+		return WrapErrorISE(err, "error parsing device id")
+	}
+
+	issuer, err := dpopOptions.GetTarget(clientID.DeviceID)
+	if err != nil {
+		return WrapErrorISE(err, "Invalid Go template registered for 'target'")
+	}
+	log.Printf(">> issuer: '%s'", issuer)
+
 	expiry := strconv.FormatInt(time.Now().Add(time.Hour*24*365).Unix(), 10)
 	cmd := exec.CommandContext(
 		ctx,
-		provisioner.GetOptions().GetDPOPOptions().GetValidationExecPath(),
+		dpopOptions.GetValidationExecPath(),
 		"verify-access",
 		"--client-id",
 		challengeValues.ClientID,
@@ -479,6 +493,8 @@ func wireDPOP01Validate(ctx context.Context, ch *Challenge, db DB, jwk *jose.JSO
 		"360",
 		"--max-expiry",
 		expiry,
+		"--issuer",
+		issuer,
 		"--hash-algorithm",
 		`SHA-256`,
 		"--key",

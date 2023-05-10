@@ -272,12 +272,43 @@ func newAuthorization(ctx context.Context, az *acme.Authorization) error {
 			continue
 		}
 
+		var target string
+		switch az.Identifier.Type {
+		case acme.WireID:
+			wireId, err := wire.ParseID([]byte(az.Identifier.Value))
+			if err != nil {
+				if err != nil {
+					return acme.NewError(acme.ErrorMalformedType, "WireID cannot be parsed")
+				}
+			}
+			clientID, err := wire.ParseClientID(wireId.ClientID)
+			if err != nil {
+				return acme.NewError(acme.ErrorMalformedType, "DeviceID cannot be parsed")
+			}
+
+			var targetProvider interface{ GetTarget(string) (string, error) }
+			switch typ {
+			case acme.WIREOIDC01:
+				targetProvider = prov.GetOptions().GetOIDCOptions()
+			case acme.WIREDPOP01:
+				targetProvider = prov.GetOptions().GetDPOPOptions()
+			default:
+			}
+
+			target, err = targetProvider.GetTarget(clientID.DeviceID)
+			if err != nil {
+				return acme.NewError(acme.ErrorMalformedType, "Invalid Go template registered for 'target'")
+			}
+		default:
+		}
+
 		ch := &acme.Challenge{
 			AccountID: az.AccountID,
 			Value:     az.Identifier.Value,
 			Type:      typ,
 			Token:     az.Token,
 			Status:    acme.StatusPending,
+			Target:    target,
 		}
 		if err := db.CreateChallenge(ctx, ch); err != nil {
 			return acme.WrapErrorISE(err, "error creating challenge")
