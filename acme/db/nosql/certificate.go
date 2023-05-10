@@ -69,7 +69,7 @@ func (db *DB) CreateCertificate(ctx context.Context, cert *acme.Certificate) err
 
 // GetCertificate retrieves and unmarshals an ACME certificate type from the
 // datastore.
-func (db *DB) GetCertificate(ctx context.Context, id string) (*acme.Certificate, error) {
+func (db *DB) GetCertificate(_ context.Context, id string) (*acme.Certificate, error) {
 	b, err := db.db.Get(certTable, []byte(id))
 	if nosql.IsErrNotFound(err) {
 		return nil, acme.NewError(acme.ErrorMalformedType, "certificate %s not found", id)

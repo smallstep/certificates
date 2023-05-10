@@ -13,7 +13,8 @@ type Service struct {
 	decrypter        crypto.Decrypter
 }
 
-func NewService(ctx context.Context, opts Options) (*Service, error) {
+// NewService returns a new Service type.
+func NewService(_ context.Context, opts Options) (*Service, error) {
 	if err := opts.Validate(); err != nil {
 		return nil, err
 	}

@@ -35,7 +35,7 @@ func newLocalListener() net.Listener {
 	return l
 }
 
-func setMinCertDuration(d time.Duration) func() {
+func setMinCertDuration(time.Duration) func() {
 	tmp := minCertDuration
 	minCertDuration = 1 * time.Second
 	return func() {

@@ -35,7 +35,7 @@ type dbExternalAccountKeyReference struct {
 }
 
 // getDBExternalAccountKey retrieves and unmarshals dbExternalAccountKey.
-func (db *DB) getDBExternalAccountKey(ctx context.Context, id string) (*dbExternalAccountKey, error) {
+func (db *DB) getDBExternalAccountKey(_ context.Context, id string) (*dbExternalAccountKey, error) {
 	data, err := db.db.Get(externalAccountKeyTable, []byte(id))
 	if err != nil {
 		if nosqlDB.IsErrNotFound(err) {
@@ -160,6 +160,8 @@ func (db *DB) DeleteExternalAccountKey(ctx context.Context, provisionerID, keyID
 
 // GetExternalAccountKeys retrieves all External Account Binding keys for a provisioner
 func (db *DB) GetExternalAccountKeys(ctx context.Context, provisionerID, cursor string, limit int) ([]*acme.ExternalAccountKey, string, error) {
+	_, _ = cursor, limit // unused input
+
 	externalAccountKeyMutex.RLock()
 	defer externalAccountKeyMutex.RUnlock()
 
@@ -227,7 +229,7 @@ func (db *DB) GetExternalAccountKeyByReference(ctx context.Context, provisionerI
 	return db.GetExternalAccountKey(ctx, provisionerID, dbExternalAccountKeyReference.ExternalAccountKeyID)
 }
 
-func (db *DB) GetExternalAccountKeyByAccountID(ctx context.Context, provisionerID, accountID string) (*acme.ExternalAccountKey, error) {
+func (db *DB) GetExternalAccountKeyByAccountID(context.Context, string, string) (*acme.ExternalAccountKey, error) {
 	//nolint:nilnil // legacy
 	return nil, nil
 }

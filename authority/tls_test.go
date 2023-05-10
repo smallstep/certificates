@@ -1146,17 +1146,16 @@ func TestAuthority_Renew(t *testing.T) {
 									assert.False(t, reflect.DeepEqual(ext1, ext2))
 								}
 								continue
-							} else {
-								found := false
-								for _, ext2 := range leaf.Extensions {
-									if reflect.DeepEqual(ext1, ext2) {
-										found = true
-										break
-									}
+							}
+							found := false
+							for _, ext2 := range leaf.Extensions {
+								if reflect.DeepEqual(ext1, ext2) {
+									found = true
+									break
 								}
-								if !found {
-									t.Errorf("x509 extension %s not found in renewed certificate", ext1.Id.String())
-								}
+							}
+							if !found {
+								t.Errorf("x509 extension %s not found in renewed certificate", ext1.Id.String())
 							}
 						}
 					}
@@ -1363,17 +1362,16 @@ func TestAuthority_Rekey(t *testing.T) {
 									assert.False(t, reflect.DeepEqual(ext1, ext2))
 								}
 								continue
-							} else {
-								found := false
-								for _, ext2 := range leaf.Extensions {
-									if reflect.DeepEqual(ext1, ext2) {
-										found = true
-										break
-									}
+							}
+							found := false
+							for _, ext2 := range leaf.Extensions {
+								if reflect.DeepEqual(ext1, ext2) {
+									found = true
+									break
 								}
-								if !found {
-									t.Errorf("x509 extension %s not found in renewed certificate", ext1.Id.String())
-								}
+							}
+							if !found {
+								t.Errorf("x509 extension %s not found in renewed certificate", ext1.Id.String())
 							}
 						}
 					}
@@ -1936,14 +1934,14 @@ func TestAuthority_CRL(t *testing.T) {
 		tc := f()
 		t.Run(name, func(t *testing.T) {
 			if crlBytes, err := tc.auth.GetCertificateRevocationList(); err == nil {
-				crl, parseErr := x509.ParseCRL(crlBytes)
+				crl, parseErr := x509.ParseRevocationList(crlBytes)
 				if parseErr != nil {
 					t.Errorf("x509.ParseCertificateRequest() error = %v, wantErr %v", parseErr, nil)
 					return
 				}
 
 				var cmpList []string
-				for _, c := range crl.TBSCertList.RevokedCertificates {
+				for _, c := range crl.RevokedCertificates {
 					cmpList = append(cmpList, c.SerialNumber.String())
 				}
 

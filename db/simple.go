@@ -20,24 +20,24 @@ type SimpleDB struct {
 	usedTokens *sync.Map
 }
 
-func newSimpleDB(c *Config) (*SimpleDB, error) {
+func newSimpleDB(*Config) (*SimpleDB, error) {
 	db := &SimpleDB{}
 	db.usedTokens = new(sync.Map)
 	return db, nil
 }
 
 // IsRevoked noop
-func (s *SimpleDB) IsRevoked(sn string) (bool, error) {
+func (s *SimpleDB) IsRevoked(string) (bool, error) {
 	return false, nil
 }
 
 // IsSSHRevoked noop
-func (s *SimpleDB) IsSSHRevoked(sn string) (bool, error) {
+func (s *SimpleDB) IsSSHRevoked(string) (bool, error) {
 	return false, nil
 }
 
 // Revoke returns a "NotImplemented" error.
-func (s *SimpleDB) Revoke(rci *RevokedCertificateInfo) error {
+func (s *SimpleDB) Revoke(*RevokedCertificateInfo) error {
 	return ErrNotImplemented
 }
 
@@ -52,22 +52,22 @@ func (s *SimpleDB) GetCRL() (*CertificateRevocationListInfo, error) {
 }
 
 // StoreCRL returns a "NotImplemented" error.
-func (s *SimpleDB) StoreCRL(crlInfo *CertificateRevocationListInfo) error {
+func (s *SimpleDB) StoreCRL(*CertificateRevocationListInfo) error {
 	return ErrNotImplemented
 }
 
 // RevokeSSH returns a "NotImplemented" error.
-func (s *SimpleDB) RevokeSSH(rci *RevokedCertificateInfo) error {
+func (s *SimpleDB) RevokeSSH(*RevokedCertificateInfo) error {
 	return ErrNotImplemented
 }
 
 // GetCertificate returns a "NotImplemented" error.
-func (s *SimpleDB) GetCertificate(serialNumber string) (*x509.Certificate, error) {
+func (s *SimpleDB) GetCertificate(string) (*x509.Certificate, error) {
 	return nil, ErrNotImplemented
 }
 
 // StoreCertificate returns a "NotImplemented" error.
-func (s *SimpleDB) StoreCertificate(crt *x509.Certificate) error {
+func (s *SimpleDB) StoreCertificate(*x509.Certificate) error {
 	return ErrNotImplemented
 }
 
@@ -90,12 +90,12 @@ func (s *SimpleDB) UseToken(id, tok string) (bool, error) {
 }
 
 // IsSSHHost returns a "NotImplemented" error.
-func (s *SimpleDB) IsSSHHost(principal string) (bool, error) {
+func (s *SimpleDB) IsSSHHost(string) (bool, error) {
 	return false, ErrNotImplemented
 }
 
 // StoreSSHCertificate returns a "NotImplemented" error.
-func (s *SimpleDB) StoreSSHCertificate(crt *ssh.Certificate) error {
+func (s *SimpleDB) StoreSSHCertificate(*ssh.Certificate) error {
 	return ErrNotImplemented
 }
 
@@ -112,7 +112,7 @@ func (s *SimpleDB) Shutdown() error {
 // nosql.DB interface implementation //
 
 // Open opens the database available with the given options.
-func (s *SimpleDB) Open(dataSourceName string, opt ...database.Option) error {
+func (s *SimpleDB) Open(string, ...database.Option) error {
 	return ErrNotImplemented
 }
 
@@ -122,43 +122,43 @@ func (s *SimpleDB) Close() error {
 }
 
 // Get returns the value stored in the given table/bucket and key.
-func (s *SimpleDB) Get(bucket, key []byte) ([]byte, error) {
+func (s *SimpleDB) Get([]byte, []byte) ([]byte, error) {
 	return nil, ErrNotImplemented
 }
 
 // Set sets the given value in the given table/bucket and key.
-func (s *SimpleDB) Set(bucket, key, value []byte) error {
+func (s *SimpleDB) Set([]byte, []byte, []byte) error {
 	return ErrNotImplemented
 }
 
 // CmpAndSwap swaps the value at the given bucket and key if the current
 // value is equivalent to the oldValue input. Returns 'true' if the
 // swap was successful and 'false' otherwise.
-func (s *SimpleDB) CmpAndSwap(bucket, key, oldValue, newValue []byte) ([]byte, bool, error) {
+func (s *SimpleDB) CmpAndSwap([]byte, []byte, []byte, []byte) ([]byte, bool, error) {
 	return nil, false, ErrNotImplemented
 }
 
 // Del deletes the data in the given table/bucket and key.
-func (s *SimpleDB) Del(bucket, key []byte) error {
+func (s *SimpleDB) Del([]byte, []byte) error {
 	return ErrNotImplemented
 }
 
 // List returns a list of all the entries in a given table/bucket.
-func (s *SimpleDB) List(bucket []byte) ([]*database.Entry, error) {
+func (s *SimpleDB) List([]byte) ([]*database.Entry, error) {
 	return nil, ErrNotImplemented
 }
 
 // Update performs a transaction with multiple read-write commands.
-func (s *SimpleDB) Update(tx *database.Tx) error {
+func (s *SimpleDB) Update(*database.Tx) error {
 	return ErrNotImplemented
 }
 
 // CreateTable creates a table or a bucket in the database.
-func (s *SimpleDB) CreateTable(bucket []byte) error {
+func (s *SimpleDB) CreateTable([]byte) error {
 	return ErrNotImplemented
 }
 
 // DeleteTable deletes a table or a bucket in the database.
-func (s *SimpleDB) DeleteTable(bucket []byte) error {
+func (s *SimpleDB) DeleteTable([]byte) error {
 	return ErrNotImplemented
 }

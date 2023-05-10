@@ -14,7 +14,7 @@ type mockWebhookController struct {
 
 var _ webhookController = &mockWebhookController{}
 
-func (wc *mockWebhookController) Enrich(req *webhook.RequestBody) error {
+func (wc *mockWebhookController) Enrich(*webhook.RequestBody) error {
 	for key, data := range wc.respData {
 		wc.templateData.SetWebhook(key, data)
 	}
@@ -22,6 +22,6 @@ func (wc *mockWebhookController) Enrich(req *webhook.RequestBody) error {
 	return wc.enrichErr
 }
 
-func (wc *mockWebhookController) Authorize(req *webhook.RequestBody) error {
+func (wc *mockWebhookController) Authorize(*webhook.RequestBody) error {
 	return wc.authorizeErr
 }

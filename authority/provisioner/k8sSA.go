@@ -72,7 +72,7 @@ func (p *K8sSA) GetIDForToken() string {
 }
 
 // GetTokenID returns an unimplemented error and does not use the input ott.
-func (p *K8sSA) GetTokenID(ott string) (string, error) {
+func (p *K8sSA) GetTokenID(string) (string, error) {
 	return "", errors.New("not implemented")
 }
 
@@ -148,6 +148,7 @@ func (p *K8sSA) Init(config Config) (err error) {
 // claims for case specific downstream parsing.
 // e.g. a Sign request will auth/validate different fields than a Revoke request.
 func (p *K8sSA) authorizeToken(token string, audiences []string) (*k8sSAPayload, error) {
+	_ = audiences // unused input
 	jwt, err := jose.ParseSigned(token)
 	if err != nil {
 		return nil, errs.Wrap(http.StatusUnauthorized, err,
@@ -207,13 +208,13 @@ func (p *K8sSA) authorizeToken(token string, audiences []string) (*k8sSAPayload,
 
 // AuthorizeRevoke returns an error if the provisioner does not have rights to
 // revoke the certificate with serial number in the `sub` property.
-func (p *K8sSA) AuthorizeRevoke(ctx context.Context, token string) error {
+func (p *K8sSA) AuthorizeRevoke(_ context.Context, token string) error {
 	_, err := p.authorizeToken(token, p.ctl.Audiences.Revoke)
 	return errs.Wrap(http.StatusInternalServerError, err, "k8ssa.AuthorizeRevoke")
 }
 
 // AuthorizeSign validates the given token.
-func (p *K8sSA) AuthorizeSign(ctx context.Context, token string) ([]SignOption, error) {
+func (p *K8sSA) AuthorizeSign(_ context.Context, token string) ([]SignOption, error) {
 	claims, err := p.authorizeToken(token, p.ctl.Audiences.Sign)
 	if err != nil {
 		return nil, errs.Wrap(http.StatusInternalServerError, err, "k8ssa.AuthorizeSign")
@@ -253,7 +254,7 @@ func (p *K8sSA) AuthorizeRenew(ctx context.Context, cert *x509.Certificate) erro
 }
 
 // AuthorizeSSHSign validates an request for an SSH certificate.
-func (p *K8sSA) AuthorizeSSHSign(ctx context.Context, token string) ([]SignOption, error) {
+func (p *K8sSA) AuthorizeSSHSign(_ context.Context, token string) ([]SignOption, error) {
 	if !p.ctl.Claimer.IsSSHCAEnabled() {
 		return nil, errs.Unauthorized("k8ssa.AuthorizeSSHSign; sshCA is disabled for k8sSA provisioner '%s'", p.GetName())
 	}

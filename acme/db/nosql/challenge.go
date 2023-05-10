@@ -29,7 +29,7 @@ func (dbc *dbChallenge) clone() *dbChallenge {
 	return &u
 }
 
-func (db *DB) getDBChallenge(ctx context.Context, id string) (*dbChallenge, error) {
+func (db *DB) getDBChallenge(_ context.Context, id string) (*dbChallenge, error) {
 	data, err := db.db.Get(challengeTable, []byte(id))
 	if nosql.IsErrNotFound(err) {
 		return nil, acme.NewError(acme.ErrorMalformedType, "challenge %s not found", id)
@@ -69,6 +69,7 @@ func (db *DB) CreateChallenge(ctx context.Context, ch *acme.Challenge) error {
 // GetChallenge retrieves and unmarshals an ACME challenge type from the database.
 // Implements the acme.DB GetChallenge interface.
 func (db *DB) GetChallenge(ctx context.Context, id, authzID string) (*acme.Challenge, error) {
+	_ = authzID // unused input
 	dbch, err := db.getDBChallenge(ctx, id)
 	if err != nil {
 		return nil, err

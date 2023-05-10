@@ -520,7 +520,7 @@ const (
 	coseAlgRS256 coseAlgorithmIdentifier = -257
 )
 
-func doTPMAttestationFormat(ctx context.Context, prov Provisioner, ch *Challenge, jwk *jose.JSONWebKey, att *attestationObject) (*tpmAttestationData, error) {
+func doTPMAttestationFormat(_ context.Context, prov Provisioner, ch *Challenge, jwk *jose.JSONWebKey, att *attestationObject) (*tpmAttestationData, error) {
 	ver, ok := att.AttStatement["ver"].(string)
 	if !ok {
 		return nil, NewError(ErrorBadAttestationStatementType, "ver not present")
@@ -742,11 +742,7 @@ func validateAKCertificate(c *x509.Certificate) error {
 	if err := validateAKCertificateExtendedKeyUsage(c); err != nil {
 		return err
 	}
-	if err := validateAKCertificateSubjectAlternativeNames(c); err != nil {
-		return err
-	}
-
-	return nil
+	return validateAKCertificateSubjectAlternativeNames(c)
 }
 
 // validateAKCertificateSubjectAlternativeNames checks if the AK certificate
@@ -828,7 +824,7 @@ type appleAttestationData struct {
 	Fingerprint  string
 }
 
-func doAppleAttestationFormat(ctx context.Context, prov Provisioner, ch *Challenge, att *attestationObject) (*appleAttestationData, error) {
+func doAppleAttestationFormat(_ context.Context, prov Provisioner, _ *Challenge, att *attestationObject) (*appleAttestationData, error) {
 	// Use configured or default attestation roots if none is configured.
 	roots, ok := prov.GetAttestationRoots()
 	if !ok {
@@ -933,7 +929,7 @@ type stepAttestationData struct {
 	Fingerprint  string
 }
 
-func doStepAttestationFormat(ctx context.Context, prov Provisioner, ch *Challenge, jwk *jose.JSONWebKey, att *attestationObject) (*stepAttestationData, error) {
+func doStepAttestationFormat(_ context.Context, prov Provisioner, ch *Challenge, jwk *jose.JSONWebKey, att *attestationObject) (*stepAttestationData, error) {
 	// Use configured or default attestation roots if none is configured.
 	roots, ok := prov.GetAttestationRoots()
 	if !ok {

@@ -381,19 +381,19 @@ func (c *linkedCaClient) IsSSHRevoked(serial string) (bool, error) {
 	return resp.Status != linkedca.RevocationStatus_ACTIVE, nil
 }
 
-func (c *linkedCaClient) CreateAuthorityPolicy(ctx context.Context, policy *linkedca.Policy) error {
+func (c *linkedCaClient) CreateAuthorityPolicy(_ context.Context, _ *linkedca.Policy) error {
 	return errors.New("not implemented yet")
 }
 
-func (c *linkedCaClient) GetAuthorityPolicy(ctx context.Context) (*linkedca.Policy, error) {
+func (c *linkedCaClient) GetAuthorityPolicy(context.Context) (*linkedca.Policy, error) {
 	return nil, errors.New("not implemented yet")
 }
 
-func (c *linkedCaClient) UpdateAuthorityPolicy(ctx context.Context, policy *linkedca.Policy) error {
+func (c *linkedCaClient) UpdateAuthorityPolicy(_ context.Context, _ *linkedca.Policy) error {
 	return errors.New("not implemented yet")
 }
 
-func (c *linkedCaClient) DeleteAuthorityPolicy(ctx context.Context) error {
+func (c *linkedCaClient) DeleteAuthorityPolicy(context.Context) error {
 	return errors.New("not implemented yet")
 }
 

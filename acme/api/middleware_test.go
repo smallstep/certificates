@@ -24,7 +24,7 @@ import (
 
 var testBody = []byte("foo")
 
-func testNext(w http.ResponseWriter, r *http.Request) {
+func testNext(w http.ResponseWriter, _ *http.Request) {
 	w.Write(testBody)
 }
 
@@ -328,7 +328,7 @@ func TestHandler_isPostAsGet(t *testing.T) {
 
 type errReader int
 
-func (errReader) Read(p []byte) (n int, err error) {
+func (errReader) Read([]byte) (int, error) {
 	return 0, errors.New("force")
 }
 func (errReader) Close() error {

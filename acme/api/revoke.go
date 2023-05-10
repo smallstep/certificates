@@ -151,7 +151,7 @@ func RevokeCert(w http.ResponseWriter, r *http.Request) {
 // the identifiers in the certificate are extracted and compared against the (valid) Authorizations
 // that are stored for the ACME Account. If these sets match, the Account is considered authorized
 // to revoke the certificate. If this check fails, the client will receive an unauthorized error.
-func isAccountAuthorized(ctx context.Context, dbCert *acme.Certificate, certToBeRevoked *x509.Certificate, account *acme.Account) *acme.Error {
+func isAccountAuthorized(_ context.Context, dbCert *acme.Certificate, certToBeRevoked *x509.Certificate, account *acme.Account) *acme.Error {
 	if !account.IsValid() {
 		return wrapUnauthorizedError(certToBeRevoked, nil, fmt.Sprintf("account '%s' has status '%s'", account.ID, account.Status), nil)
 	}

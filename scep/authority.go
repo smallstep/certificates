@@ -115,7 +115,7 @@ func (a *Authority) GetLinkExplicit(provName string, abs bool, baseURL *url.URL,
 
 // getLinkExplicit returns an absolute or partial path to the given resource and a base
 // URL dynamically obtained from the request for which the link is being calculated.
-func (a *Authority) getLinkExplicit(provisionerName string, abs bool, baseURL *url.URL, inputs ...string) string {
+func (a *Authority) getLinkExplicit(provisionerName string, abs bool, baseURL *url.URL, _ ...string) string {
 	link := "/" + provisionerName
 	if abs {
 		// Copy the baseURL value from the pointer. https://github.com/golang/go/issues/38351
@@ -182,7 +182,7 @@ func (a *Authority) GetCACertificates(ctx context.Context) ([]*x509.Certificate,
 }
 
 // DecryptPKIEnvelope decrypts an enveloped message
-func (a *Authority) DecryptPKIEnvelope(ctx context.Context, msg *PKIMessage) error {
+func (a *Authority) DecryptPKIEnvelope(_ context.Context, msg *PKIMessage) error {
 	p7c, err := pkcs7.Parse(msg.P7.Content)
 	if err != nil {
 		return fmt.Errorf("error parsing pkcs7 content: %w", err)
@@ -389,7 +389,7 @@ func (a *Authority) SignCSR(ctx context.Context, csr *x509.CertificateRequest, m
 }
 
 // CreateFailureResponse creates an appropriately signed reply for PKI operations
-func (a *Authority) CreateFailureResponse(ctx context.Context, csr *x509.CertificateRequest, msg *PKIMessage, info FailInfoName, infoText string) (*PKIMessage, error) {
+func (a *Authority) CreateFailureResponse(_ context.Context, _ *x509.CertificateRequest, msg *PKIMessage, info FailInfoName, infoText string) (*PKIMessage, error) {
 	config := pkcs7.SignerInfoConfig{
 		ExtraSignedAttributes: []pkcs7.Attribute{
 			{

@@ -187,13 +187,13 @@ func (p *X5C) authorizeToken(token string, audiences []string) (*x5cPayload, err
 
 // AuthorizeRevoke returns an error if the provisioner does not have rights to
 // revoke the certificate with serial number in the `sub` property.
-func (p *X5C) AuthorizeRevoke(ctx context.Context, token string) error {
+func (p *X5C) AuthorizeRevoke(_ context.Context, token string) error {
 	_, err := p.authorizeToken(token, p.ctl.Audiences.Revoke)
 	return errs.Wrap(http.StatusInternalServerError, err, "x5c.AuthorizeRevoke")
 }
 
 // AuthorizeSign validates the given token.
-func (p *X5C) AuthorizeSign(ctx context.Context, token string) ([]SignOption, error) {
+func (p *X5C) AuthorizeSign(_ context.Context, token string) ([]SignOption, error) {
 	claims, err := p.authorizeToken(token, p.ctl.Audiences.Sign)
 	if err != nil {
 		return nil, errs.Wrap(http.StatusInternalServerError, err, "x5c.AuthorizeSign")
@@ -256,7 +256,7 @@ func (p *X5C) AuthorizeRenew(ctx context.Context, cert *x509.Certificate) error 
 }
 
 // AuthorizeSSHSign returns the list of SignOption for a SignSSH request.
-func (p *X5C) AuthorizeSSHSign(ctx context.Context, token string) ([]SignOption, error) {
+func (p *X5C) AuthorizeSSHSign(_ context.Context, token string) ([]SignOption, error) {
 	if !p.ctl.Claimer.IsSSHCAEnabled() {
 		return nil, errs.Unauthorized("x5c.AuthorizeSSHSign; sshCA is disabled for x5c provisioner '%s'", p.GetName())
 	}
