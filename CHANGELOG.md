@@ -27,13 +27,14 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
 
 ## [Unreleased]
 
-## [v0.24.2] - 2023-05-XX
+## [v0.24.2] - 2023-05-11
 
 ### Added
 
 - Log SSH certificates (smallstep/certificates#1374)
 - CRL endpoints on the HTTP server (smallstep/certificates#1372)
 - Dynamic SCEP challenge validation using webhooks (smallstep/certificates#1366)
+- For Docker deployments, added DOCKER_STEPCA_INIT_PASSWORD_FILE. Useful for pointing to a Docker Secret in the container (smallstep/certificates#1384)
 
 ### Changed
 
