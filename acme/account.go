@@ -25,6 +25,9 @@ type Account struct {
 
 // GetLocation returns the URL location of the given account.
 func (a *Account) GetLocation() string {
+	if a.LocationPrefix == "" {
+		return ""
+	}
 	return a.LocationPrefix + a.ID
 }
 
