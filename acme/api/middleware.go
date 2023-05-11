@@ -318,7 +318,17 @@ func lookupJWK(next nextHTTP) nextHTTP {
 				return
 			}
 
-			if storedLocation := acc.GetLocation(); kid != storedLocation {
+			if storedLocation := acc.GetLocation(); storedLocation == "" {
+				// Old ACME accounts may not have a stored location.
+				if !strings.HasPrefix(kid, kidPrefix) {
+					render.Error(w, acme.NewError(acme.ErrorMalformedType,
+						"kid does not have required prefix; expected %s, but got %s",
+						kidPrefix, kid))
+					return
+				}
+			} else if kid != storedLocation {
+				// ACME accounts should have a stored location equivalent to the kid
+				// in the ACME request.
 				render.Error(w, acme.NewError(acme.ErrorMalformedType,
 					"kid does not match stored account location; expected %q, but got %q",
 					storedLocation, kid))
