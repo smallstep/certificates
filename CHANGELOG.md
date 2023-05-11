@@ -25,6 +25,33 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
 
 ---
 
+## [Unreleased]
+
+## [v0.24.2] - 2023-05-11
+
+### Added
+
+- Log SSH certificates (smallstep/certificates#1374)
+- CRL endpoints on the HTTP server (smallstep/certificates#1372)
+- Dynamic SCEP challenge validation using webhooks (smallstep/certificates#1366)
+- For Docker deployments, added DOCKER_STEPCA_INIT_PASSWORD_FILE. Useful for pointing to a Docker Secret in the container (smallstep/certificates#1384)
+
+### Changed
+
+- Depend on [smallstep/go-attestation](https://github.com/smallstep/go-attestation) instead of [google/go-attestation](https://github.com/google/go-attestation)
+- Render CRLs into http.ResponseWriter instead of memory (smallstep/certificates#1373)
+- Redaction of SCEP static challenge when listing provisioners (smallstep/certificates#1204)
+
+### Fixed
+
+- VaultCAS certificate lifetime (smallstep/certificates#1376)
+
+## [v0.24.1] - 2023-04-14
+
+### Fixed
+
+- Docker image name for HSM support (smallstep/certificates#1348)
+
 ## [v0.24.0] - 2023-04-12
 
 ### Added
