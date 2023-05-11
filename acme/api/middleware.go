@@ -302,6 +302,11 @@ func lookupJWK(next nextHTTP) nextHTTP {
 		}
 
 		kid := jws.Signatures[0].Protected.KeyID
+		if kid == "" {
+			render.Error(w, acme.NewError(acme.ErrorMalformedType, "signature missing 'kid'"))
+			return
+		}
+
 		kidPrefix := linker.GetLink(ctx, acme.AccountLinkType, "")
 		accID := strings.TrimPrefix(kid, kidPrefix)
 		acc, err := db.GetAccount(ctx, accID)
@@ -318,18 +323,11 @@ func lookupJWK(next nextHTTP) nextHTTP {
 				return
 			}
 
-			if storedLocation := acc.GetLocation(); storedLocation == "" {
-				// Old ACME accounts may not have a stored location.
-				if !strings.HasPrefix(kid, kidPrefix) {
-					render.Error(w, acme.NewError(acme.ErrorMalformedType,
-						"kid does not have required prefix; expected %s, but got %s",
-						kidPrefix, kid))
-					return
-				}
-			} else if kid != storedLocation {
-				// ACME accounts should have a stored location equivalent to the kid
-				// in the ACME request.
-				render.Error(w, acme.NewError(acme.ErrorMalformedType,
+			if storedLocation := acc.GetLocation(); storedLocation != "" && kid != storedLocation {
+				// ACME accounts should have a stored location equivalent to the
+				// kid in the ACME request. If the location cached on the account
+				// is empty, this is an old account and we can ignore this check.
+				render.Error(w, acme.NewError(acme.ErrorUnauthorizedType,
 					"kid does not match stored account location; expected %q, but got %q",
 					storedLocation, kid))
 				return
