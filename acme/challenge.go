@@ -18,6 +18,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"gopkg.in/square/go-jose.v2/jwt"
 	"io"
 	"net"
 	"net/url"
@@ -535,6 +536,19 @@ func wireDPOP01Validate(ctx context.Context, ch *Challenge, db DB, jwk *jose.JSO
 	if err = db.UpdateChallenge(ctx, ch); err != nil {
 		return WrapErrorISE(err, "error updating challenge")
 	}
+
+	//var access := wireChallengePayload.AccessToken
+	parsedAccessToken, err := jwt.ParseSigned(wireChallengePayload.AccessToken)
+	if err != nil {
+		return WrapErrorISE(err, "Invalid access token")
+	}
+	access := make(map[string]interface{})
+	if err := parsedAccessToken.UnsafeClaimsWithoutVerification(&access); err != nil {
+		return WrapErrorISE(err, "Failed parsing access token")
+	}
+
+	ctx = context.WithValue(ctx, "access", access)
+
 	return nil
 }
 
