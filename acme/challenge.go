@@ -18,8 +18,8 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"gopkg.in/square/go-jose.v2/jwt"
 	"io"
-	"log"
 	"net"
 	"net/url"
 	"os"
@@ -478,7 +478,6 @@ func wireDPOP01Validate(ctx context.Context, ch *Challenge, db DB, jwk *jose.JSO
 	if err != nil {
 		return WrapErrorISE(err, "Invalid Go template registered for 'target'")
 	}
-	log.Printf(">> issuer: '%s'", issuer)
 
 	expiry := strconv.FormatInt(time.Now().Add(time.Hour*24*365).Unix(), 10)
 	cmd := exec.CommandContext(
@@ -534,6 +533,19 @@ func wireDPOP01Validate(ctx context.Context, ch *Challenge, db DB, jwk *jose.JSO
 	if err = db.UpdateChallenge(ctx, ch); err != nil {
 		return WrapErrorISE(err, "error updating challenge")
 	}
+
+	//var access := wireChallengePayload.AccessToken
+	parsedAccessToken, err := jwt.ParseSigned(wireChallengePayload.AccessToken)
+	if err != nil {
+		return WrapErrorISE(err, "Invalid access token")
+	}
+	access := make(map[string]interface{})
+	if err := parsedAccessToken.UnsafeClaimsWithoutVerification(&access); err != nil {
+		return WrapErrorISE(err, "Failed parsing access token")
+	}
+
+	ctx = context.WithValue(ctx, "access", access)
+
 	return nil
 }
 

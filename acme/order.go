@@ -166,6 +166,27 @@ func (o *Order) Finalize(ctx context.Context, db DB, csr *x509.CertificateReques
 	}
 	data.SetSubject(subject)
 
+	/*// inject the raw dpop token as template variable
+	dpop, ok := ctx.Value("dpop").(map[string]interface{})
+	if !ok {
+		return WrapErrorISE(err, "Invalid or absent dpop in context")
+	}
+	data.Set("dpop", dpop)*/
+
+	// inject the raw access token as template variable
+	access, ok := ctx.Value("access").(map[string]interface{})
+	if !ok {
+		return WrapErrorISE(err, "Invalid or absent access in context")
+	}
+	data.Set("access", access)
+
+	/*// inject the raw OIDC id token as template variable
+	oidc, ok := ctx.Value("oidc").(map[string]interface{})
+	if !ok {
+		return WrapErrorISE(err, "Invalid or absent oidc in context")
+	}
+	data.Set("oidc", oidc)*/
+
 	// Custom sign options passed to authority.Sign
 	var extraOptions []provisioner.SignOption
 
