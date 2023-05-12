@@ -117,7 +117,7 @@ func (o *OIDC) GetID() string {
 // GetIDForToken returns an identifier that will be used to load the provisioner
 // from a token.
 func (o *OIDC) GetIDForToken() string {
-	return o.ClientID
+	return o.Name + ":" + o.ClientID
 }
 
 // GetTokenID returns the provisioner unique identifier, the OIDC provisioner the
