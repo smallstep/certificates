@@ -744,7 +744,7 @@ func TestHandler_lookupJWK(t *testing.T) {
 				},
 				ctx:        ctx,
 				statusCode: 401,
-				err:        acme.NewError(acme.ErrorUnauthorizedType, "kid does not matc hstored account location; expected foobar, but %q", prefix+accID),
+				err:        acme.NewError(acme.ErrorUnauthorizedType, "kid does not match stored account location; expected foobar, but %q", prefix+accID),
 			}
 		},
 		"ok/account-with-location-prefix": func(t *testing.T) test {
