@@ -42,3 +42,4 @@ func ParseClientID(clientID string) (ClientID, error) {
 }
 
 type AccessTokenKey struct{}
+type AccessTokenDemoKey struct{}

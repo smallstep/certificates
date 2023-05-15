@@ -6,6 +6,7 @@ import (
 	"crypto/x509"
 	"encoding/asn1"
 	"encoding/json"
+	"log"
 	"net"
 	"net/url"
 	"sort"
@@ -169,7 +170,12 @@ func (o *Order) Finalize(ctx context.Context, db DB, csr *x509.CertificateReques
 	// for demo purpose only
 	data.Set("Demo", "demo-time")
 
+	log.Printf(">> str raw content %v", ctx.Value(wire.AccessTokenDemoKey{}))
+	accessStr, ok := ctx.Value(wire.AccessTokenDemoKey{}).(string)
+	log.Printf(">> str content %v", accessStr)
+
 	// inject the raw access token as template variable
+	log.Printf(">> json raw content %v", ctx.Value(wire.AccessTokenKey{}))
 	access, ok := ctx.Value(wire.AccessTokenKey{}).(map[string]interface{})
 	if !ok {
 		return WrapErrorISE(err, "Invalid or absent access in context")

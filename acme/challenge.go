@@ -545,6 +545,7 @@ func wireDPOP01Validate(ctx context.Context, ch *Challenge, db DB, jwk *jose.JSO
 	}
 
 	ctx = context.WithValue(ctx, wire.AccessTokenKey{}, access)
+	ctx = context.WithValue(ctx, wire.AccessTokenDemoKey{}, "demo-access")
 
 	return nil
 }
