@@ -544,7 +544,7 @@ func wireDPOP01Validate(ctx context.Context, ch *Challenge, db DB, jwk *jose.JSO
 		return WrapErrorISE(err, "Failed parsing access token")
 	}
 
-	ctx = context.WithValue(ctx, "access", access)
+	ctx = context.WithValue(ctx, wire.AccessTokenKey{}, access)
 
 	return nil
 }
