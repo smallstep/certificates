@@ -4,7 +4,7 @@ go 1.19
 
 require (
 	cloud.google.com/go/longrunning v0.4.1
-	cloud.google.com/go/security v1.14.0
+	cloud.google.com/go/security v1.14.1
 	github.com/Masterminds/sprig/v3 v3.2.3
 	github.com/fxamacker/cbor/v2 v2.4.0
 	github.com/go-chi/chi v4.1.2+incompatible
