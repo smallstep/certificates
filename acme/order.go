@@ -167,24 +167,20 @@ func (o *Order) Finalize(ctx context.Context, db DB, csr *x509.CertificateReques
 	}
 	data.SetSubject(subject)
 
-	// for demo purpose only
-	data.Set("Demo", "demo-time")
-
-	log.Printf(">> str raw content %v", ctx.Value(wire.AccessTokenDemoKey{}))
-	accessStr, ok := ctx.Value(wire.AccessTokenDemoKey{}).(string)
-	log.Printf(">> str content %v", accessStr)
+	dpop, err := db.GetDpop(ctx, o.ID)
+	log.Printf(">> dpop from db: %v", dpop)
+	data.Set("Dpop", dpop)
 
 	// inject the raw access token as template variable
-	log.Printf(">> json raw content %v", ctx.Value(wire.AccessTokenKey{}))
-	access, ok := ctx.Value(wire.AccessTokenKey{}).(map[string]interface{})
-	if !ok {
-		return WrapErrorISE(err, "Invalid or absent access in context")
-	}
-	if access == nil {
-		return WrapErrorISE(err, "Access was nil in context")
-	}
-	_ = access
-	//data.Set("Access", access)
+	/*
+		log.Printf(">> json raw content %v", ctx.Value(wire.AccessTokenKey{}))
+		access, ok := ctx.Value(wire.AccessTokenKey{}).(map[string]interface{})
+		if !ok {
+			return WrapErrorISE(err, "Invalid or absent access in context")
+		}
+		if access == nil {
+			return WrapErrorISE(err, "Access was nil in context")
+		}*/
 
 	/*// inject the raw dpop token as template variable
 	dpop, ok := ctx.Value("dpop").(map[string]interface{})

@@ -40,6 +40,3 @@ func ParseClientID(clientID string) (ClientID, error) {
 		Domain:   at[1],
 	}, nil
 }
-
-type AccessTokenKey struct{}
-type AccessTokenDemoKey struct{}

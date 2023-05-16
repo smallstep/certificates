@@ -534,7 +534,6 @@ func wireDPOP01Validate(ctx context.Context, ch *Challenge, db DB, jwk *jose.JSO
 		return WrapErrorISE(err, "error updating challenge")
 	}
 
-	//var access := wireChallengePayload.AccessToken
 	parsedAccessToken, err := jwt.ParseSigned(wireChallengePayload.AccessToken)
 	if err != nil {
 		return WrapErrorISE(err, "Invalid access token")
@@ -544,8 +543,28 @@ func wireDPOP01Validate(ctx context.Context, ch *Challenge, db DB, jwk *jose.JSO
 		return WrapErrorISE(err, "Failed parsing access token")
 	}
 
-	ctx = context.WithValue(ctx, wire.AccessTokenKey{}, access)
-	ctx = context.WithValue(ctx, wire.AccessTokenDemoKey{}, "demo-access")
+	rawDpop, ok := access["proof"].(string)
+	if !ok {
+		return WrapErrorISE(err, "Invalid dpop proof format in access token")
+	}
+
+	parsedDpopToken, err := jwt.ParseSigned(rawDpop)
+	if err != nil {
+		return WrapErrorISE(err, "Invalid DPoP token")
+	}
+	dpop := make(map[string]interface{})
+	if err := parsedAccessToken.UnsafeClaimsWithoutVerification(&parsedDpopToken); err != nil {
+		return WrapErrorISE(err, "Failed parsing dpop token")
+	}
+
+	order, err := db.GetOrdersByAccountID(ctx, ch.AccountID)
+	if err != nil {
+		return WrapErrorISE(err, "Could not find current order by account id")
+	}
+
+	if err := db.CreateDpop(ctx, order[0], dpop); err != nil {
+		return WrapErrorISE(err, "Failed storing DPoP token")
+	}
 
 	return nil
 }
