@@ -20,6 +20,7 @@ import (
 	"fmt"
 	"gopkg.in/square/go-jose.v2/jwt"
 	"io"
+	"log"
 	"net"
 	"net/url"
 	"os"
@@ -427,6 +428,14 @@ func wireOIDC01Validate(ctx context.Context, ch *Challenge, db DB, jwk *jose.JSO
 	if err = db.UpdateChallenge(ctx, ch); err != nil {
 		return WrapErrorISE(err, "error updating challenge")
 	}
+
+	// TODO: remove
+	orders, err := db.GetOrdersByAccountID(ctx, ch.AccountID)
+	if err != nil {
+		return WrapErrorISE(err, "Could not find current order by account id")
+	}
+	log.Printf(">>> oidc challenge: Orders: %v", orders)
+
 	return nil
 }
 
@@ -557,12 +566,13 @@ func wireDPOP01Validate(ctx context.Context, ch *Challenge, db DB, jwk *jose.JSO
 		return WrapErrorISE(err, "Failed parsing dpop token")
 	}
 
-	order, err := db.GetOrdersByAccountID(ctx, ch.AccountID)
+	orders, err := db.GetOrdersByAccountID(ctx, ch.AccountID)
 	if err != nil {
 		return WrapErrorISE(err, "Could not find current order by account id")
 	}
+	log.Printf(">>> dpop challenge: Orders: %v", orders)
 
-	if err := db.CreateDpop(ctx, order[0], dpop); err != nil {
+	if err := db.CreateDpop(ctx, orders[0], dpop); err != nil {
 		return WrapErrorISE(err, "Failed storing DPoP token")
 	}
 

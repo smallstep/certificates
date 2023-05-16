@@ -5,6 +5,7 @@ import (
 	"crypto/x509"
 	"encoding/base64"
 	"encoding/json"
+	"log"
 	"net"
 	"net/http"
 	"strings"
@@ -222,6 +223,14 @@ func NewOrder(w http.ResponseWriter, r *http.Request) {
 	}
 
 	linker.LinkOrder(ctx, o)
+
+	// TODO: remove
+	orders, err := db.GetOrdersByAccountID(ctx, acc.ID)
+	if err != nil {
+		render.Error(w, acme.WrapErrorISE(err, "Could not find current order by account id"))
+		return
+	}
+	log.Printf(">>> new order: Orders: %v", orders)
 
 	w.Header().Set("Location", linker.GetLink(ctx, acme.OrderLinkType, o.ID))
 	render.JSONStatus(w, o, http.StatusCreated)

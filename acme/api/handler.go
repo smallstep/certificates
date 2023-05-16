@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"encoding/pem"
 	"fmt"
+	"log"
 	"net/http"
 	"time"
 
@@ -304,6 +305,14 @@ func GetAuthorization(w http.ResponseWriter, r *http.Request) {
 	}
 
 	linker.LinkAuthorization(ctx, az)
+
+	// TODO: remove
+	orders, err := db.GetOrdersByAccountID(ctx, acc.ID)
+	if err != nil {
+		render.Error(w, acme.WrapErrorISE(err, "Could not find current order by account id"))
+		return
+	}
+	log.Printf(">>> authz: Orders: %v", orders)
 
 	w.Header().Set("Location", linker.GetLink(ctx, acme.AuthzLinkType, az.ID))
 	render.JSON(w, az)
