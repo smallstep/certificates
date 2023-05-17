@@ -434,7 +434,7 @@ func wireOIDC01Validate(ctx context.Context, ch *Challenge, db DB, jwk *jose.JSO
 	if err != nil {
 		return WrapErrorISE(err, "Could not find current order by account id")
 	}
-	log.Printf(">>> oidc challenge: Orders: %v", orders)
+	log.Printf(">>> oidc challenge: Orders: %v, AccountId: %s", orders, ch.AccountID)
 
 	return nil
 }
@@ -570,7 +570,7 @@ func wireDPOP01Validate(ctx context.Context, ch *Challenge, db DB, jwk *jose.JSO
 	if err != nil {
 		return WrapErrorISE(err, "Could not find current order by account id")
 	}
-	log.Printf(">>> dpop challenge: Orders: %v", orders)
+	log.Printf(">>> dpop challenge: Orders: %v, AccountId: %s", orders, ch.AccountID)
 
 	if err := db.CreateDpop(ctx, orders[0], dpop); err != nil {
 		return WrapErrorISE(err, "Failed storing DPoP token")

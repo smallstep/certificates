@@ -3,6 +3,7 @@ package nosql
 import (
 	"context"
 	"encoding/json"
+	"log"
 	"sync"
 	"time"
 
@@ -107,6 +108,8 @@ func (db *DB) CreateOrder(ctx context.Context, o *acme.Order) error {
 
 // UpdateOrder saves an updated ACME Order to the database.
 func (db *DB) UpdateOrder(ctx context.Context, o *acme.Order) error {
+	log.Printf(">>> updating order %s", o.ID)
+
 	old, err := db.getDBOrder(ctx, o.ID)
 	if err != nil {
 		return err

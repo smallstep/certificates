@@ -230,7 +230,7 @@ func NewOrder(w http.ResponseWriter, r *http.Request) {
 		render.Error(w, acme.WrapErrorISE(err, "Could not find current order by account id"))
 		return
 	}
-	log.Printf(">>> new order: Orders: %v", orders)
+	log.Printf(">>> new order: Orders: %v, AccountId: %s", orders, acc.ID)
 
 	w.Header().Set("Location", linker.GetLink(ctx, acme.OrderLinkType, o.ID))
 	render.JSONStatus(w, o, http.StatusCreated)

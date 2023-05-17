@@ -312,7 +312,7 @@ func GetAuthorization(w http.ResponseWriter, r *http.Request) {
 		render.Error(w, acme.WrapErrorISE(err, "Could not find current order by account id"))
 		return
 	}
-	log.Printf(">>> authz: Orders: %v", orders)
+	log.Printf(">>> authz: Orders: %v, AccountId: %s", orders, acc.ID)
 
 	w.Header().Set("Location", linker.GetLink(ctx, acme.AuthzLinkType, az.ID))
 	render.JSON(w, az)
