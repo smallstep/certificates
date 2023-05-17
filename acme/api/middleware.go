@@ -7,6 +7,7 @@ import (
 	"io"
 	"net/http"
 	"net/url"
+	"path"
 	"strings"
 
 	"go.step.sm/crypto/jose"
@@ -16,7 +17,6 @@ import (
 	"github.com/smallstep/certificates/api/render"
 	"github.com/smallstep/certificates/authority/provisioner"
 	"github.com/smallstep/certificates/logging"
-	"github.com/smallstep/nosql"
 )
 
 type nextHTTP = func(http.ResponseWriter, *http.Request)
@@ -293,7 +293,6 @@ func lookupJWK(next nextHTTP) nextHTTP {
 	return func(w http.ResponseWriter, r *http.Request) {
 		ctx := r.Context()
 		db := acme.MustDatabaseFromContext(ctx)
-		linker := acme.MustLinkerFromContext(ctx)
 
 		jws, err := jwsFromContext(ctx)
 		if err != nil {
@@ -307,11 +306,10 @@ func lookupJWK(next nextHTTP) nextHTTP {
 			return
 		}
 
-		kidPrefix := linker.GetLink(ctx, acme.AccountLinkType, "")
-		accID := strings.TrimPrefix(kid, kidPrefix)
+		accID := path.Base(kid)
 		acc, err := db.GetAccount(ctx, accID)
 		switch {
-		case nosql.IsErrNotFound(err):
+		case acme.IsErrNotFound(err):
 			render.Error(w, acme.NewError(acme.ErrorAccountDoesNotExistType, "account with ID '%s' not found", accID))
 			return
 		case err != nil:
@@ -325,12 +323,25 @@ func lookupJWK(next nextHTTP) nextHTTP {
 
 			if storedLocation := acc.GetLocation(); storedLocation != "" && kid != storedLocation {
 				// ACME accounts should have a stored location equivalent to the
-				// kid in the ACME request. If the location cached on the account
-				// is empty, this is an old account and we can ignore this check.
+				// kid in the ACME request.
 				render.Error(w, acme.NewError(acme.ErrorUnauthorizedType,
 					"kid does not match stored account location; expected %q, but got %q",
 					storedLocation, kid))
 				return
+			} else if storedLocation == "" {
+				// This code will only execute for old ACME accounts that do
+				// not have a cached location. The following validation was
+				// the original implementation of the `kid` check which has
+				// since been deprecated. However, the code will remain to
+				// ensure consistent behavior for old ACME accounts.
+				linker := acme.MustLinkerFromContext(ctx)
+				kidPrefix := linker.GetLink(ctx, acme.AccountLinkType, "")
+				if !strings.HasPrefix(kid, kidPrefix) {
+					render.Error(w, acme.NewError(acme.ErrorMalformedType,
+						"kid does not have required prefix; expected %s, but got %s",
+						kidPrefix, kid))
+					return
+				}
 			}
 			ctx = context.WithValue(ctx, accContextKey, acc)
 			ctx = context.WithValue(ctx, jwkContextKey, acc.Key)

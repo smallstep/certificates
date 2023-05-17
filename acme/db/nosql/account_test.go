@@ -549,12 +549,13 @@ func TestDB_UpdateAccount(t *testing.T) {
 	jwk, err := jose.GenerateJWK("EC", "P-256", "ES256", "sig", "", 0)
 	assert.FatalError(t, err)
 	dbacc := &dbAccount{
-		ID:            accID,
-		Status:        acme.StatusDeactivated,
-		CreatedAt:     now,
-		DeactivatedAt: now,
-		Contact:       []string{"foo", "bar"},
-		Key:           jwk,
+		ID:             accID,
+		Status:         acme.StatusDeactivated,
+		CreatedAt:      now,
+		DeactivatedAt:  now,
+		Contact:        []string{"foo", "bar"},
+		LocationPrefix: "foo",
+		Key:            jwk,
 	}
 	b, err := json.Marshal(dbacc)
 	assert.FatalError(t, err)
@@ -654,10 +655,11 @@ func TestDB_UpdateAccount(t *testing.T) {
 		},
 		"ok": func(t *testing.T) test {
 			acc := &acme.Account{
-				ID:      accID,
-				Status:  acme.StatusDeactivated,
-				Contact: []string{"foo", "bar"},
-				Key:     jwk,
+				ID:             accID,
+				Status:         acme.StatusDeactivated,
+				Contact:        []string{"baz", "zap"},
+				LocationPrefix: "bar",
+				Key:            jwk,
 			}
 			return test{
 				acc: acc,
@@ -676,7 +678,9 @@ func TestDB_UpdateAccount(t *testing.T) {
 						assert.FatalError(t, json.Unmarshal(nu, dbNew))
 						assert.Equals(t, dbNew.ID, dbacc.ID)
 						assert.Equals(t, dbNew.Status, acc.Status)
-						assert.Equals(t, dbNew.Contact, dbacc.Contact)
+						assert.Equals(t, dbNew.Contact, acc.Contact)
+						// LocationPrefix should not change.
+						assert.Equals(t, dbNew.LocationPrefix, dbacc.LocationPrefix)
 						assert.Equals(t, dbNew.Key.KeyID, dbacc.Key.KeyID)
 						assert.Equals(t, dbNew.CreatedAt, dbacc.CreatedAt)
 						assert.True(t, dbNew.DeactivatedAt.Add(-time.Minute).Before(now))
@@ -696,12 +700,7 @@ func TestDB_UpdateAccount(t *testing.T) {
 					assert.HasPrefix(t, err.Error(), tc.err.Error())
 				}
 			} else {
-				if assert.Nil(t, tc.err) {
-					assert.Equals(t, tc.acc.ID, dbacc.ID)
-					assert.Equals(t, tc.acc.Status, dbacc.Status)
-					assert.Equals(t, tc.acc.Contact, dbacc.Contact)
-					assert.Equals(t, tc.acc.Key.KeyID, dbacc.Key.KeyID)
-				}
+				assert.Nil(t, tc.err)
 			}
 		})
 	}
