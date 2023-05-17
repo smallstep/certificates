@@ -132,17 +132,17 @@ release:
 
     #### Linux
 
-    - 📦 [step-ca_linux_{{ .Version }}_amd64.tar.gz](https://dl.step.sm/gh-release/certificates/gh-release-header/{{ .Tag }}/step-ca_linux_{{ .Version }}_amd64.tar.gz)
-    - 📦 [step-ca_{{ .Version }}_amd64.deb](https://dl.step.sm/gh-release/certificates/gh-release-header/{{ .Tag }}/step-ca_{{ .Version }}_amd64.deb)
+    - 📦 [step-ca_linux_{{ .Version }}_amd64.tar.gz](https://dl.smallstep.com/gh-release/certificates/gh-release-header/{{ .Tag }}/step-ca_linux_{{ .Version }}_amd64.tar.gz)
+    - 📦 [step-ca_{{ .Version }}_amd64.deb](https://dl.smallstep.com/gh-release/certificates/gh-release-header/{{ .Tag }}/step-ca_{{ .Version }}_amd64.deb)
 
     #### OSX Darwin
 
-    - 📦 [step-ca_darwin_{{ .Version }}_amd64.tar.gz](https://dl.step.sm/gh-release/certificates/gh-release-header/{{ .Tag }}/step-ca_darwin_{{ .Version }}_amd64.tar.gz)
-    - 📦 [step-ca_darwin_{{ .Version }}_arm64.tar.gz](https://dl.step.sm/gh-release/certificates/gh-release-header/{{ .Tag }}/step-ca_darwin_{{ .Version }}_arm64.tar.gz)
+    - 📦 [step-ca_darwin_{{ .Version }}_amd64.tar.gz](https://dl.smallstep.com/gh-release/certificates/gh-release-header/{{ .Tag }}/step-ca_darwin_{{ .Version }}_amd64.tar.gz)
+    - 📦 [step-ca_darwin_{{ .Version }}_arm64.tar.gz](https://dl.smallstep.com/gh-release/certificates/gh-release-header/{{ .Tag }}/step-ca_darwin_{{ .Version }}_arm64.tar.gz)
 
     #### Windows
 
-    - 📦 [step-ca_windows_{{ .Version }}_amd64.zip](https://dl.step.sm/gh-release/certificates/gh-release-header/{{ .Tag }}/step-ca_windows_{{ .Version }}_amd64.zip)
+    - 📦 [step-ca_windows_{{ .Version }}_amd64.zip](https://dl.smallstep.com/gh-release/certificates/gh-release-header/{{ .Tag }}/step-ca_windows_{{ .Version }}_amd64.zip)
 
     For more builds across platforms and architectures, see the `Assets` section below.
     And for packaged versions (Docker, k8s, Homebrew), see our [installation docs](https://smallstep.com/docs/step-ca/installation).
