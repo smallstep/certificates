@@ -4,6 +4,7 @@ import (
 	"crypto"
 	"encoding/base64"
 	"encoding/json"
+	"regexp"
 	"time"
 
 	"go.step.sm/crypto/jose"
@@ -29,6 +30,26 @@ func (a *Account) GetLocation() string {
 		return ""
 	}
 	return a.LocationPrefix + a.ID
+}
+
+// GetProvisionerName returns the provisioner name extracted from the stored
+// location.
+func (a *Account) GetProvisionerName() (string, error) {
+	if a.LocationPrefix == "" {
+		return "", NewError(ErrorServerInternalType, "cannot parse provisioner "+
+			"from account missing locationPrefix; accID = %q", a.ID)
+
+	}
+
+	re := regexp.MustCompile(`.*\/acme\/(.+?)\/.*`)
+	match := re.FindStringSubmatch(a.LocationPrefix)
+	if match == nil || len(match) < 2 {
+		// ACME provisioner not found in stored kid.
+		return "", NewError(ErrorServerInternalType,
+			"provisioner could not be parsed from stored locationPrefix; locationPrefix = %q", a.LocationPrefix)
+	}
+
+	return match[1], nil
 }
 
 // ToLog enables response logging.

@@ -321,14 +321,31 @@ func lookupJWK(next nextHTTP) nextHTTP {
 				return
 			}
 
-			if storedLocation := acc.GetLocation(); storedLocation != "" && kid != storedLocation {
-				// ACME accounts should have a stored location equivalent to the
-				// kid in the ACME request.
-				render.Error(w, acme.NewError(acme.ErrorUnauthorizedType,
-					"kid does not match stored account location; expected %q, but got %q",
-					storedLocation, kid))
-				return
-			} else if storedLocation == "" {
+			if storedLocation := acc.GetLocation(); storedLocation != "" {
+				if kid != storedLocation {
+					// ACME accounts should have a stored location equivalent to the
+					// kid in the ACME request.
+					render.Error(w, acme.NewError(acme.ErrorUnauthorizedType,
+						"kid does not match stored account location; expected %s, but got %s",
+						storedLocation, kid))
+					return
+				}
+
+				// Verify that the provisioner with which the account was created
+				// matches the provisioner in the request URL.
+				reqProv := acme.MustProvisionerFromContext(ctx)
+				if accProvName, err := acc.GetProvisionerName(); err != nil {
+					render.Error(w, err)
+					return
+				} else if reqProv.GetName() != accProvName {
+					// Provisioner in the URL must match the provisioner with
+					// which the account was created.
+					render.Error(w, acme.NewError(acme.ErrorUnauthorizedType,
+						"account provisioner does not match requested provisioner; account provisioner = %s, reqested provisioner = %s",
+						accProvName, reqProv.GetName()))
+					return
+				}
+			} else {
 				// This code will only execute for old ACME accounts that do
 				// not have a cached location. The following validation was
 				// the original implementation of the `kid` check which has
