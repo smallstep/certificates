@@ -563,12 +563,12 @@ func wireDPOP01Validate(ctx context.Context, ch *Challenge, db DB, jwk *jose.JSO
 		return WrapErrorISE(err, "Failed parsing dpop token")
 	}
 
-	order, err := db.GetOrdersByAccountID(ctx, ch.AccountID)
+	orders, err := db.GetAllOrdersByAccountID(ctx, ch.AccountID)
 	if err != nil {
 		return WrapErrorISE(err, "Could not find current order by account id")
 	}
 
-	if err := db.CreateDpop(ctx, order[0], dpop); err != nil {
+	if err := db.CreateDpop(ctx, orders[0], dpop); err != nil {
 		return WrapErrorISE(err, "Failed storing DPoP token")
 	}
 
