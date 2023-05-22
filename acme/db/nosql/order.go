@@ -98,7 +98,7 @@ func (db *DB) CreateOrder(ctx context.Context, o *acme.Order) error {
 		return err
 	}
 
-	_, err = db.updateAddOrderIDs(ctx, o.AccountID, o.ID)
+	_, err = db.updateAddOrderIDs(ctx, o.AccountID, false, o.ID)
 	if err != nil {
 		return err
 	}
@@ -121,7 +121,7 @@ func (db *DB) UpdateOrder(ctx context.Context, o *acme.Order) error {
 	return db.save(ctx, old.ID, nu, old, "order", orderTable)
 }
 
-func (db *DB) updateAddOrderIDs(ctx context.Context, accID string, addOids ...string) ([]string, error) {
+func (db *DB) updateAddOrderIDs(ctx context.Context, accID string, anyOrder bool, addOids ...string) ([]string, error) {
 	ordersByAccountMux.Lock()
 	defer ordersByAccountMux.Unlock()
 
@@ -152,7 +152,8 @@ func (db *DB) updateAddOrderIDs(ctx context.Context, accID string, addOids ...st
 		if err = o.UpdateStatus(ctx, db); err != nil {
 			return nil, acme.WrapErrorISE(err, "error updating order %s for account %s", oid, accID)
 		}
-		if o.Status == acme.StatusPending {
+
+		if o.Status == acme.StatusPending || o.Status == acme.StatusReady {
 			pendOids = append(pendOids, oid)
 		}
 	}
@@ -184,5 +185,10 @@ func (db *DB) updateAddOrderIDs(ctx context.Context, accID string, addOids ...st
 
 // GetOrdersByAccountID returns a list of order IDs owned by the account.
 func (db *DB) GetOrdersByAccountID(ctx context.Context, accID string) ([]string, error) {
-	return db.updateAddOrderIDs(ctx, accID)
+	return db.updateAddOrderIDs(ctx, accID, false)
+}
+
+// GetAllOrdersByAccountID returns a list of any order IDs owned by the account.
+func (db *DB) GetAllOrdersByAccountID(ctx context.Context, accID string) ([]string, error) {
+	return db.updateAddOrderIDs(ctx, accID, true)
 }

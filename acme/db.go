@@ -52,6 +52,7 @@ type DB interface {
 	CreateOrder(ctx context.Context, o *Order) error
 	GetOrder(ctx context.Context, id string) (*Order, error)
 	GetOrdersByAccountID(ctx context.Context, accountID string) ([]string, error)
+	GetAllOrdersByAccountID(ctx context.Context, accountID string) ([]string, error)
 	UpdateOrder(ctx context.Context, o *Order) error
 
 	CreateDpop(ctx context.Context, orderId string, dpop map[string]interface{}) error
