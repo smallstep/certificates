@@ -49,8 +49,10 @@ type DB interface {
 	GetAllOrdersByAccountID(ctx context.Context, accountID string) ([]string, error)
 	UpdateOrder(ctx context.Context, o *Order) error
 
-	CreateDpop(ctx context.Context, orderId string, dpop map[string]interface{}) error
-	GetDpop(ctx context.Context, orderId string) (map[string]interface{}, error)
+	CreateDpopToken(ctx context.Context, orderId string, dpop map[string]interface{}) error
+	GetDpopToken(ctx context.Context, orderId string) (map[string]interface{}, error)
+	CreateOidcToken(ctx context.Context, orderId string, idToken map[string]interface{}) error
+	GetOidcToken(ctx context.Context, orderId string) (map[string]interface{}, error)
 }
 
 type dbKey struct{}

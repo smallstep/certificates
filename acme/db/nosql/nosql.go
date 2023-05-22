@@ -23,7 +23,8 @@ var (
 	externalAccountKeyTable                   = []byte("acme_external_account_keys")
 	externalAccountKeyIDsByReferenceTable     = []byte("acme_external_account_keyID_reference_index")
 	externalAccountKeyIDsByProvisionerIDTable = []byte("acme_external_account_keyID_provisionerID_index")
-	dpopTable                                 = []byte("acme_dpop")
+	dpopTokenTable                            = []byte("acme_dpop_token")
+	oidcTokenTable                            = []byte("oidc_token")
 )
 
 // DB is a struct that implements the AcmeDB interface.
