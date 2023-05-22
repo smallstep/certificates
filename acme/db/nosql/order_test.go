@@ -997,9 +997,9 @@ func TestDB_updateAddOrderIDs(t *testing.T) {
 				err error
 			)
 			if tc.addOids == nil {
-				res, err = d.updateAddOrderIDs(context.Background(), accID)
+				res, err = d.updateAddOrderIDs(context.Background(), accID, false)
 			} else {
-				res, err = d.updateAddOrderIDs(context.Background(), accID, tc.addOids...)
+				res, err = d.updateAddOrderIDs(context.Background(), accID, false, tc.addOids...)
 			}
 
 			if err != nil {
