@@ -3,7 +3,6 @@ package nosql
 import (
 	"context"
 	"encoding/json"
-	"log"
 	"sync"
 	"time"
 
@@ -71,14 +70,11 @@ func (db *DB) GetOrder(ctx context.Context, id string) (*acme.Order, error) {
 		Error:            dbo.Error,
 	}
 
-	log.Printf(">>> get order %v", o)
-
 	return o, nil
 }
 
 // CreateOrder creates ACME Order resources and saves them to the DB.
 func (db *DB) CreateOrder(ctx context.Context, o *acme.Order) error {
-	log.Printf(">>> create order %v", o)
 	var err error
 	o.ID, err = randID()
 	if err != nil {
@@ -111,7 +107,6 @@ func (db *DB) CreateOrder(ctx context.Context, o *acme.Order) error {
 
 // UpdateOrder saves an updated ACME Order to the database.
 func (db *DB) UpdateOrder(ctx context.Context, o *acme.Order) error {
-	log.Printf(">>> updating order %v", o)
 
 	old, err := db.getDBOrder(ctx, o.ID)
 	if err != nil {
@@ -158,9 +153,7 @@ func (db *DB) updateAddOrderIDs(ctx context.Context, accID string, anyOrder bool
 		if err = o.UpdateStatus(ctx, db); err != nil {
 			return nil, acme.WrapErrorISE(err, "error updating order %s for account %s", oid, accID)
 		}
-		log.Printf(">>> found order %s", oid)
 		if o.Status == acme.StatusPending || o.Status == acme.StatusReady {
-			log.Printf(">>> found order %s which is pending", oid)
 			pendOids = append(pendOids, oid)
 		}
 	}

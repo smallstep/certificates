@@ -20,7 +20,6 @@ import (
 	"fmt"
 	"gopkg.in/square/go-jose.v2/jwt"
 	"io"
-	"log"
 	"net"
 	"net/url"
 	"os"
@@ -429,13 +428,6 @@ func wireOIDC01Validate(ctx context.Context, ch *Challenge, db DB, jwk *jose.JSO
 		return WrapErrorISE(err, "error updating challenge")
 	}
 
-	// TODO: remove
-	orders, err := db.GetOrdersByAccountID(ctx, ch.AccountID)
-	if err != nil {
-		return WrapErrorISE(err, "Could not find current order by account id")
-	}
-	log.Printf(">>> oidc challenge: Orders: %v, AccountId: %s", orders, ch.AccountID)
-
 	return nil
 }
 
@@ -551,13 +543,11 @@ func wireDPOP01Validate(ctx context.Context, ch *Challenge, db DB, jwk *jose.JSO
 	if err := parsedAccessToken.UnsafeClaimsWithoutVerification(&access); err != nil {
 		return WrapErrorISE(err, "Failed parsing access token")
 	}
-	log.Printf(">>> dpop challenge: access token: %v", access)
 
 	rawDpop, ok := access["proof"].(string)
 	if !ok {
 		return WrapErrorISE(err, "Invalid dpop proof format in access token")
 	}
-	log.Printf(">>> dpop challenge: raw dpop: %s", rawDpop)
 
 	parsedDpopToken, err := jwt.ParseSigned(rawDpop)
 	if err != nil {
@@ -567,13 +557,11 @@ func wireDPOP01Validate(ctx context.Context, ch *Challenge, db DB, jwk *jose.JSO
 	if err := parsedDpopToken.UnsafeClaimsWithoutVerification(&dpop); err != nil {
 		return WrapErrorISE(err, "Failed parsing dpop token")
 	}
-	log.Printf(">>> dpop challenge: Save DPoP: %v", dpop)
 
 	orders, err := db.GetAllOrdersByAccountID(ctx, ch.AccountID)
 	if err != nil {
 		return WrapErrorISE(err, "Could not find current order by account id")
 	}
-	log.Printf(">>> dpop challenge: Orders: %v, AccountId: %s", orders, ch.AccountID)
 
 	if err := db.CreateDpop(ctx, orders[0], dpop); err != nil {
 		return WrapErrorISE(err, "Failed storing DPoP token")
