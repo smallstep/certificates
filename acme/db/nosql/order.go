@@ -124,11 +124,6 @@ func (db *DB) UpdateOrder(ctx context.Context, o *acme.Order) error {
 	nu.Error = o.Error
 	nu.CertificateID = o.CertificateID
 
-	_, err = db.updateAddOrderIDs(ctx, o.AccountID, o.ID)
-	if err != nil {
-		return err
-	}
-
 	return db.save(ctx, old.ID, nu, old, "order", orderTable)
 }
 
