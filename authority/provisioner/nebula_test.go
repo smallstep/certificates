@@ -55,7 +55,7 @@ func mustNebulaCA(t *testing.T) (*cert.NebulaCertificate, ed25519.PrivateKey) {
 			IsCA:      true,
 		},
 	}
-	if err := nc.Sign(priv); err != nil {
+	if err := nc.Sign(cert.Curve_CURVE25519, priv); err != nil {
 		t.Fatal(err)
 	}
 	return nc, priv
@@ -95,7 +95,7 @@ func mustNebulaCert(t *testing.T, name string, ipNet *net.IPNet, groups []string
 		},
 	}
 
-	if err := nc.Sign(signer); err != nil {
+	if err := nc.Sign(cert.Curve_CURVE25519, signer); err != nil {
 		t.Fatal(err)
 	}
 
