@@ -564,7 +564,7 @@ func wireDPOP01Validate(ctx context.Context, ch *Challenge, db DB, jwk *jose.JSO
 		return WrapErrorISE(err, "Invalid DPoP token")
 	}
 	dpop := make(map[string]interface{})
-	if err := parsedAccessToken.UnsafeClaimsWithoutVerification(&parsedDpopToken); err != nil {
+	if err := parsedDpopToken.UnsafeClaimsWithoutVerification(&dpop); err != nil {
 		return WrapErrorISE(err, "Failed parsing dpop token")
 	}
 	log.Printf(">>> dpop challenge: Save DPoP: %v", dpop)
