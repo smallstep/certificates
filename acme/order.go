@@ -210,43 +210,11 @@ func (o *Order) Finalize(ctx context.Context, db DB, csr *x509.CertificateReques
 	}
 	data.SetSubject(subject)
 
-	dpop, err := db.GetDpop(ctx, o.ID)
-	if err != nil {
-		return err
-	}
+	// Inject Wire's custom challenges into the template once they have been validated
+	dpop, err := db.GetDpopToken(ctx, o.ID)
 	data.Set("Dpop", dpop)
-
-	// inject the raw access token as template variable
-	/*
-		log.Printf(">> json raw content %v", ctx.Value(wire.AccessTokenKey{}))
-		access, ok := ctx.Value(wire.AccessTokenKey{}).(map[string]interface{})
-		if !ok {
-			return WrapErrorISE(err, "Invalid or absent access in context")
-		}
-		if access == nil {
-			return WrapErrorISE(err, "Access was nil in context")
-		}*/
-
-	/*// inject the raw dpop token as template variable
-	dpop, ok := ctx.Value("dpop").(map[string]interface{})
-	if !ok {
-		return WrapErrorISE(err, "Invalid or absent dpop in context")
-	}
-	data.Set("dpop", dpop)*/
-
-	// inject the raw access token as template variable
-	/*access, ok := ctx.Value("access").(map[string]interface{})
-	if !ok {
-		return WrapErrorISE(err, "Invalid or absent access in context")
-	}
-	data.Set("access", access)*/
-
-	/*// inject the raw OIDC id token as template variable
-	oidc, ok := ctx.Value("oidc").(map[string]interface{})
-	if !ok {
-		return WrapErrorISE(err, "Invalid or absent oidc in context")
-	}
-	data.Set("oidc", oidc)*/
+	oidc, err := db.GetOidcToken(ctx, o.ID)
+	data.Set("Oidc", oidc)
 
 	// Custom sign options passed to authority.Sign
 	var extraOptions []provisioner.SignOption

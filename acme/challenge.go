@@ -431,6 +431,25 @@ func wireOIDC01Validate(ctx context.Context, ch *Challenge, db DB, jwk *jose.JSO
 	if err = db.UpdateChallenge(ctx, ch); err != nil {
 		return WrapErrorISE(err, "error updating challenge")
 	}
+
+	parsedIdToken, err := jwt.ParseSigned(wireChallengePayload.IdToken)
+	if err != nil {
+		return WrapErrorISE(err, "Invalid OIDC id token")
+	}
+	oidcToken := make(map[string]interface{})
+	if err := parsedIdToken.UnsafeClaimsWithoutVerification(&oidcToken); err != nil {
+		return WrapErrorISE(err, "Failed parsing OIDC id token")
+	}
+
+	orders, err := db.GetAllOrdersByAccountID(ctx, ch.AccountID)
+	if err != nil {
+		return WrapErrorISE(err, "Could not find current order by account id")
+	}
+
+	if err := db.CreateOidcToken(ctx, orders[0], oidcToken); err != nil {
+		return WrapErrorISE(err, "Failed storing OIDC id token")
+	}
+
 	return nil
 }
 
@@ -568,7 +587,7 @@ func wireDPOP01Validate(ctx context.Context, ch *Challenge, db DB, jwk *jose.JSO
 		return WrapErrorISE(err, "Could not find current order by account id")
 	}
 
-	if err := db.CreateDpop(ctx, orders[0], dpop); err != nil {
+	if err := db.CreateDpopToken(ctx, orders[0], dpop); err != nil {
 		return WrapErrorISE(err, "Failed storing DPoP token")
 	}
 
