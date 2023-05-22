@@ -127,6 +127,7 @@ func (o *Order) UpdateStatus(ctx context.Context, db DB) error {
 	default:
 		return NewErrorISE("unrecognized order status: %s", o.Status)
 	}
+	log.Printf(">>> Update order %s status", o.ID)
 	if err := db.UpdateOrder(ctx, o); err != nil {
 		return WrapErrorISE(err, "error updating order")
 	}
@@ -331,6 +332,7 @@ func (o *Order) Finalize(ctx context.Context, db DB, csr *x509.CertificateReques
 
 	o.CertificateID = cert.ID
 	o.Status = StatusValid
+	log.Printf(">>> Update order %s from finalize", o.ID)
 	if err = db.UpdateOrder(ctx, o); err != nil {
 		return WrapErrorISE(err, "error updating order %s", o.ID)
 	}
