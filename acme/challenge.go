@@ -551,11 +551,13 @@ func wireDPOP01Validate(ctx context.Context, ch *Challenge, db DB, jwk *jose.JSO
 	if err := parsedAccessToken.UnsafeClaimsWithoutVerification(&access); err != nil {
 		return WrapErrorISE(err, "Failed parsing access token")
 	}
+	log.Printf(">>> dpop challenge: access token: %v", access)
 
 	rawDpop, ok := access["proof"].(string)
 	if !ok {
 		return WrapErrorISE(err, "Invalid dpop proof format in access token")
 	}
+	log.Printf(">>> dpop challenge: raw dpop: %s", rawDpop)
 
 	parsedDpopToken, err := jwt.ParseSigned(rawDpop)
 	if err != nil {
@@ -565,6 +567,7 @@ func wireDPOP01Validate(ctx context.Context, ch *Challenge, db DB, jwk *jose.JSO
 	if err := parsedAccessToken.UnsafeClaimsWithoutVerification(&parsedDpopToken); err != nil {
 		return WrapErrorISE(err, "Failed parsing dpop token")
 	}
+	log.Printf(">>> dpop challenge: Save DPoP: %v", dpop)
 
 	orders, err := db.GetAllOrdersByAccountID(ctx, ch.AccountID)
 	if err != nil {
