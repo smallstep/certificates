@@ -12,9 +12,9 @@ import (
 )
 
 type dbDpop struct {
-	ID        string                 `json:"id"`
-	Content   map[string]interface{} `json:"content"`
-	CreatedAt time.Time              `json:"createdAt"`
+	ID        string    `json:"id"`
+	Content   []byte    `json:"content"`
+	CreatedAt time.Time `json:"createdAt"`
 }
 
 // getDBDpop retrieves and unmarshals an DPoP type from the database.
@@ -41,24 +41,26 @@ func (db *DB) GetDpop(ctx context.Context, orderId string) (map[string]interface
 		return nil, err
 	}
 
-	dpop := dbDpop.Content
+	dpop := make(map[string]interface{})
+	err = json.Unmarshal(dbDpop.Content, &dpop)
 
-	return dpop, nil
+	return dpop, err
 }
 
 // CreateDpop creates DPoP resources and saves them to the DB.
 func (db *DB) CreateDpop(ctx context.Context, orderId string, dpop map[string]interface{}) error {
 	log.Printf(">>> Create dpop: %s", orderId)
-	marshal, err := json.Marshal(dpop)
+	content, err := json.Marshal(dpop)
 	if err != nil {
+		log.Printf(">>> Failed marshalling dpop")
 		return err
 	}
-	log.Printf(">>> Create dpop will insert: %v", marshal)
+	log.Printf(">>> Create dpop will insert: %s", string(content))
 
 	now := clock.Now()
 	dbDpop := &dbDpop{
 		ID:        orderId,
-		Content:   dpop,
+		Content:   content,
 		CreatedAt: now,
 	}
 	if err := db.save(ctx, orderId, dbDpop, nil, "dpop", dpopTable); err != nil {
