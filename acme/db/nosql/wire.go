@@ -3,6 +3,7 @@ package nosql
 import (
 	"context"
 	"encoding/json"
+	"log"
 	"time"
 
 	"github.com/pkg/errors"
@@ -24,15 +25,17 @@ func (db *DB) getDBDpop(ctx context.Context, orderId string) (*dbDpop, error) {
 	} else if err != nil {
 		return nil, errors.Wrapf(err, "error loading dpop %s", orderId)
 	}
-	o := new(dbDpop)
-	if err := json.Unmarshal(b, &o); err != nil {
+	d := new(dbDpop)
+	if err := json.Unmarshal(b, &d); err != nil {
 		return nil, errors.Wrapf(err, "error unmarshaling dpop %s into dbDpop", orderId)
 	}
-	return o, nil
+	log.Printf(">>> Found dpop %s, %v", d.ID, d.Content)
+	return d, nil
 }
 
 // GetDpop retrieves an DPoP from the database.
 func (db *DB) GetDpop(ctx context.Context, orderId string) (map[string]interface{}, error) {
+	log.Printf(">>> Get dpop: %s", orderId)
 	dbDpop, err := db.getDBDpop(ctx, orderId)
 	if err != nil {
 		return nil, err
@@ -45,6 +48,13 @@ func (db *DB) GetDpop(ctx context.Context, orderId string) (map[string]interface
 
 // CreateDpop creates DPoP resources and saves them to the DB.
 func (db *DB) CreateDpop(ctx context.Context, orderId string, dpop map[string]interface{}) error {
+	log.Printf(">>> Create dpop: %s", orderId)
+	marshal, err := json.Marshal(dpop)
+	if err != nil {
+		return err
+	}
+	log.Printf(">>> Create dpop will insert: %v", marshal)
+
 	now := clock.Now()
 	dbDpop := &dbDpop{
 		ID:        orderId,

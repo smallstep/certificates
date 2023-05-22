@@ -169,7 +169,7 @@ func (o *Order) Finalize(ctx context.Context, db DB, csr *x509.CertificateReques
 	data.SetSubject(subject)
 
 	dpop, err := db.GetDpop(ctx, o.ID)
-	log.Printf(">> dpop from db: %v", dpop)
+	log.Printf(">> dpop from db for order %s: %v", o.ID, dpop)
 	data.Set("Dpop", dpop)
 
 	// inject the raw access token as template variable
