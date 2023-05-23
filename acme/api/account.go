@@ -132,10 +132,11 @@ func NewAccount(w http.ResponseWriter, r *http.Request) {
 		}
 
 		acc = &acme.Account{
-			Key:            jwk,
-			Contact:        nar.Contact,
-			Status:         acme.StatusValid,
-			LocationPrefix: getAccountLocationPath(ctx, linker, ""),
+			Key:             jwk,
+			Contact:         nar.Contact,
+			Status:          acme.StatusValid,
+			LocationPrefix:  getAccountLocationPath(ctx, linker, ""),
+			ProvisionerName: prov.GetName(),
 		}
 		if err := db.CreateAccount(ctx, acc); err != nil {
 			render.Error(w, acme.WrapErrorISE(err, "error creating account"))

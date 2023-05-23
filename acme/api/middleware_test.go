@@ -17,7 +17,6 @@ import (
 	"github.com/pkg/errors"
 	"github.com/smallstep/assert"
 	"github.com/smallstep/certificates/acme"
-	"github.com/smallstep/nosql/database"
 	"go.step.sm/crypto/jose"
 	"go.step.sm/crypto/keyutil"
 )
@@ -689,7 +688,7 @@ func TestHandler_lookupJWK(t *testing.T) {
 				db: &acme.MockDB{
 					MockGetAccount: func(ctx context.Context, accID string) (*acme.Account, error) {
 						assert.Equals(t, accID, accID)
-						return nil, database.ErrNotFound
+						return nil, acme.ErrNotFound
 					},
 				},
 				ctx:        ctx,
@@ -743,12 +742,12 @@ func TestHandler_lookupJWK(t *testing.T) {
 					},
 				},
 				ctx:        ctx,
-				statusCode: 401,
+				statusCode: http.StatusUnauthorized,
 				err:        acme.NewError(acme.ErrorUnauthorizedType, "kid does not match stored account location; expected foobar, but %q", prefix+accID),
 			}
 		},
-		"ok/account-with-location-prefix": func(t *testing.T) test {
-			acc := &acme.Account{LocationPrefix: prefix + accID, Status: "valid", Key: jwk}
+		"fail/account-with-location-prefix/bad-provisioner": func(t *testing.T) test {
+			acc := &acme.Account{LocationPrefix: prefix + accID, Status: "valid", Key: jwk, ProvisionerName: "other"}
 			ctx := acme.NewProvisionerContext(context.Background(), prov)
 			ctx = context.WithValue(ctx, jwsContextKey, parsedJWS)
 			return test{
@@ -769,7 +768,35 @@ func TestHandler_lookupJWK(t *testing.T) {
 					assert.Equals(t, _jwk, jwk)
 					w.Write(testBody)
 				},
-				statusCode: 200,
+				statusCode: http.StatusUnauthorized,
+				err: acme.NewError(acme.ErrorUnauthorizedType,
+					"account provisioner does not match requested provisioner; account provisioner = %s, reqested provisioner = %s",
+					prov.GetName(), "other"),
+			}
+		},
+		"ok/account-with-location-prefix": func(t *testing.T) test {
+			acc := &acme.Account{LocationPrefix: prefix + accID, Status: "valid", Key: jwk, ProvisionerName: prov.GetName()}
+			ctx := acme.NewProvisionerContext(context.Background(), prov)
+			ctx = context.WithValue(ctx, jwsContextKey, parsedJWS)
+			return test{
+				linker: acme.NewLinker("test.ca.smallstep.com", "acme"),
+				db: &acme.MockDB{
+					MockGetAccount: func(ctx context.Context, id string) (*acme.Account, error) {
+						assert.Equals(t, id, accID)
+						return acc, nil
+					},
+				},
+				ctx: ctx,
+				next: func(w http.ResponseWriter, r *http.Request) {
+					_acc, err := accountFromContext(r.Context())
+					assert.FatalError(t, err)
+					assert.Equals(t, _acc, acc)
+					_jwk, err := jwkFromContext(r.Context())
+					assert.FatalError(t, err)
+					assert.Equals(t, _jwk, jwk)
+					w.Write(testBody)
+				},
+				statusCode: http.StatusOK,
 			}
 		},
 		"ok/account-without-location-prefix": func(t *testing.T) test {

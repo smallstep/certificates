@@ -198,6 +198,7 @@ func TestDB_getAccountIDByKeyID(t *testing.T) {
 func TestDB_GetAccount(t *testing.T) {
 	accID := "accID"
 	locationPrefix := "https://test.ca.smallstep.com/acme/foo/account/"
+	provisionerName := "foo"
 	type test struct {
 		db      nosql.DB
 		err     error
@@ -223,13 +224,14 @@ func TestDB_GetAccount(t *testing.T) {
 			jwk, err := jose.GenerateJWK("EC", "P-256", "ES256", "sig", "", 0)
 			assert.FatalError(t, err)
 			dbacc := &dbAccount{
-				ID:             accID,
-				Status:         acme.StatusDeactivated,
-				CreatedAt:      now,
-				DeactivatedAt:  now,
-				Contact:        []string{"foo", "bar"},
-				Key:            jwk,
-				LocationPrefix: locationPrefix,
+				ID:              accID,
+				Status:          acme.StatusDeactivated,
+				CreatedAt:       now,
+				DeactivatedAt:   now,
+				Contact:         []string{"foo", "bar"},
+				Key:             jwk,
+				LocationPrefix:  locationPrefix,
+				ProvisionerName: provisionerName,
 			}
 			b, err := json.Marshal(dbacc)
 			assert.FatalError(t, err)
@@ -269,6 +271,7 @@ func TestDB_GetAccount(t *testing.T) {
 				assert.Equals(t, acc.Status, tc.dbacc.Status)
 				assert.Equals(t, acc.Contact, tc.dbacc.Contact)
 				assert.Equals(t, acc.LocationPrefix, tc.dbacc.LocationPrefix)
+				assert.Equals(t, acc.ProvisionerName, tc.dbacc.ProvisionerName)
 				assert.Equals(t, acc.Key.KeyID, tc.dbacc.Key.KeyID)
 			}
 		})
@@ -464,6 +467,7 @@ func TestDB_CreateAccount(t *testing.T) {
 							assert.Equals(t, dbacc.ID, string(key))
 							assert.Equals(t, dbacc.Contact, acc.Contact)
 							assert.Equals(t, dbacc.LocationPrefix, acc.LocationPrefix)
+							assert.Equals(t, dbacc.ProvisionerName, acc.ProvisionerName)
 							assert.Equals(t, dbacc.Key.KeyID, acc.Key.KeyID)
 							assert.True(t, clock.Now().Add(-time.Minute).Before(dbacc.CreatedAt))
 							assert.True(t, clock.Now().Add(time.Minute).After(dbacc.CreatedAt))
@@ -510,6 +514,7 @@ func TestDB_CreateAccount(t *testing.T) {
 							assert.Equals(t, dbacc.ID, string(key))
 							assert.Equals(t, dbacc.Contact, acc.Contact)
 							assert.Equals(t, dbacc.LocationPrefix, acc.LocationPrefix)
+							assert.Equals(t, dbacc.ProvisionerName, acc.ProvisionerName)
 							assert.Equals(t, dbacc.Key.KeyID, acc.Key.KeyID)
 							assert.True(t, clock.Now().Add(-time.Minute).Before(dbacc.CreatedAt))
 							assert.True(t, clock.Now().Add(time.Minute).After(dbacc.CreatedAt))
@@ -549,13 +554,14 @@ func TestDB_UpdateAccount(t *testing.T) {
 	jwk, err := jose.GenerateJWK("EC", "P-256", "ES256", "sig", "", 0)
 	assert.FatalError(t, err)
 	dbacc := &dbAccount{
-		ID:             accID,
-		Status:         acme.StatusDeactivated,
-		CreatedAt:      now,
-		DeactivatedAt:  now,
-		Contact:        []string{"foo", "bar"},
-		LocationPrefix: "foo",
-		Key:            jwk,
+		ID:              accID,
+		Status:          acme.StatusDeactivated,
+		CreatedAt:       now,
+		DeactivatedAt:   now,
+		Contact:         []string{"foo", "bar"},
+		LocationPrefix:  "foo",
+		ProvisionerName: "alpha",
+		Key:             jwk,
 	}
 	b, err := json.Marshal(dbacc)
 	assert.FatalError(t, err)
@@ -655,11 +661,12 @@ func TestDB_UpdateAccount(t *testing.T) {
 		},
 		"ok": func(t *testing.T) test {
 			acc := &acme.Account{
-				ID:             accID,
-				Status:         acme.StatusDeactivated,
-				Contact:        []string{"baz", "zap"},
-				LocationPrefix: "bar",
-				Key:            jwk,
+				ID:              accID,
+				Status:          acme.StatusDeactivated,
+				Contact:         []string{"baz", "zap"},
+				LocationPrefix:  "bar",
+				ProvisionerName: "beta",
+				Key:             jwk,
 			}
 			return test{
 				acc: acc,
@@ -681,6 +688,7 @@ func TestDB_UpdateAccount(t *testing.T) {
 						assert.Equals(t, dbNew.Contact, acc.Contact)
 						// LocationPrefix should not change.
 						assert.Equals(t, dbNew.LocationPrefix, dbacc.LocationPrefix)
+						assert.Equals(t, dbNew.ProvisionerName, dbacc.ProvisionerName)
 						assert.Equals(t, dbNew.Key.KeyID, dbacc.Key.KeyID)
 						assert.Equals(t, dbNew.CreatedAt, dbacc.CreatedAt)
 						assert.True(t, dbNew.DeactivatedAt.Add(-time.Minute).Before(now))

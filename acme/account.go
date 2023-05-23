@@ -4,7 +4,6 @@ import (
 	"crypto"
 	"encoding/base64"
 	"encoding/json"
-	"regexp"
 	"time"
 
 	"go.step.sm/crypto/jose"
@@ -22,6 +21,7 @@ type Account struct {
 	OrdersURL              string           `json:"orders"`
 	ExternalAccountBinding interface{}      `json:"externalAccountBinding,omitempty"`
 	LocationPrefix         string           `json:"-"`
+	ProvisionerName        string           `json:"-"`
 }
 
 // GetLocation returns the URL location of the given account.
@@ -34,22 +34,8 @@ func (a *Account) GetLocation() string {
 
 // GetProvisionerName returns the provisioner name extracted from the stored
 // location.
-func (a *Account) GetProvisionerName() (string, error) {
-	if a.LocationPrefix == "" {
-		return "", NewError(ErrorServerInternalType, "cannot parse provisioner "+
-			"from account missing locationPrefix; accID = %q", a.ID)
-
-	}
-
-	re := regexp.MustCompile(`.*\/acme\/(.+?)\/.*`)
-	match := re.FindStringSubmatch(a.LocationPrefix)
-	if match == nil || len(match) < 2 {
-		// ACME provisioner not found in stored kid.
-		return "", NewError(ErrorServerInternalType,
-			"provisioner could not be parsed from stored locationPrefix; locationPrefix = %q", a.LocationPrefix)
-	}
-
-	return match[1], nil
+func (a *Account) GetProvisionerName() string {
+	return a.ProvisionerName
 }
 
 // ToLog enables response logging.
