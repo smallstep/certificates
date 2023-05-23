@@ -89,7 +89,6 @@ func TestAccount_GetProvisionerName(t *testing.T) {
 	type test struct {
 		acc  *Account
 		want string
-		err  *Error
 	}
 	tests := map[string]test{
 		"ok": {
