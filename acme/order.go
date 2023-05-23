@@ -267,13 +267,18 @@ func (o *Order) subject(csr *x509.CertificateRequest) (subject x509util.Subject,
 			// TODO: temporarily using a custom OIDC for carrying the display name without having it listed as a DNS SAN.
 			// reusing LDAP's OID for diplay name see http://oid-info.com/get/2.16.840.1.113730.3.1.241
 			displayNameOid := asn1.ObjectIdentifier{1, 2, 840, 113549, 1, 9, 1}
+			var foundDisplayName = false
 			for _, entry := range csr.Subject.Names {
 				if entry.Type.Equal(displayNameOid) {
+					foundDisplayName = true
 					displayName := entry.Value.(string)
 					if displayName != wireID.Name {
 						return subject, NewErrorISE("expected displayName %v, found %v", wireID.Name, displayName)
 					}
 				}
+			}
+			if !foundDisplayName {
+				return subject, NewErrorISE("CSR must contain the display name in 2.16.840.1.113730.3.1.241 OID")
 			}
 			/*if csr.Subject.CommonName != wireID.Name {
 				return subject, NewErrorISE("expected CN %v, found %v", wireID.Name, csr.Subject.CommonName)
