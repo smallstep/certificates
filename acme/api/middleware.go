@@ -4,6 +4,7 @@ import (
 	"context"
 	"crypto/rsa"
 	"errors"
+	"fmt"
 	"io"
 	"net/http"
 	"net/url"
@@ -322,6 +323,7 @@ func lookupJWK(next nextHTTP) nextHTTP {
 			}
 
 			if storedLocation := acc.GetLocation(); storedLocation != "" {
+				fmt.Println("NEW CODE PATHWAY")
 				if kid != storedLocation {
 					// ACME accounts should have a stored location equivalent to the
 					// kid in the ACME request.
@@ -345,6 +347,7 @@ func lookupJWK(next nextHTTP) nextHTTP {
 					return
 				}
 			} else {
+				fmt.Println("OLD CODE PATHWAY")
 				// This code will only execute for old ACME accounts that do
 				// not have a cached location. The following validation was
 				// the original implementation of the `kid` check which has
