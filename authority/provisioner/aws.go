@@ -73,9 +73,11 @@ const awsMetadataTokenTTLHeader = "X-aws-ec2-metadata-token-ttl-seconds" //nolin
 // The fifth certificate is used in:
 //
 //	me-south-1
+//
 // The sixth certificate is used in:
 //
 //	me-central-1
+//
 // The seventh certificate is used in:
 //
 //	ap-southeast-3
