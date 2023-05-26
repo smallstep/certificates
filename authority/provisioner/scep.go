@@ -2,13 +2,19 @@ package provisioner
 
 import (
 	"context"
+	"crypto"
+	"crypto/rsa"
 	"crypto/subtle"
+	"crypto/x509"
 	"fmt"
 	"net/http"
 	"time"
 
 	"github.com/pkg/errors"
 
+	"go.step.sm/crypto/kms"
+	kmsapi "go.step.sm/crypto/kms/apiv1"
+	"go.step.sm/crypto/pemutil"
 	"go.step.sm/linkedca"
 
 	"github.com/smallstep/certificates/webhook"
@@ -32,6 +38,12 @@ type SCEP struct {
 	// MinimumPublicKeyLength is the minimum length for public keys in CSRs
 	MinimumPublicKeyLength int `json:"minimumPublicKeyLength,omitempty"`
 
+	// TODO
+	KMS                  *kms.Options `json:"kms,omitempty"`
+	DecrypterCert        string       `json:"decrypterCert"`
+	DecrypterKey         string       `json:"decrypterKey"`
+	DecrypterKeyPassword string       `json:"decrypterKeyPassword"`
+
 	// Numerical identifier for the ContentEncryptionAlgorithm as defined in github.com/mozilla-services/pkcs7
 	// at https://github.com/mozilla-services/pkcs7/blob/33d05740a3526e382af6395d3513e73d4e66d1cb/encrypt.go#L63
 	// Defaults to 0, being DES-CBC
@@ -41,6 +53,9 @@ type SCEP struct {
 	ctl                           *Controller
 	encryptionAlgorithm           int
 	challengeValidationController *challengeValidationController
+	keyManager                    kmsapi.KeyManager
+	decrypter                     crypto.Decrypter
+	decrypterCertificate          *x509.Certificate
 }
 
 // GetID returns the provisioner unique identifier.
@@ -177,6 +192,34 @@ func (s *SCEP) Init(config Config) (err error) {
 		s.GetOptions().GetWebhooks(),
 	)
 
+	if s.KMS != nil {
+		if s.keyManager, err = kms.New(context.Background(), *s.KMS); err != nil {
+			return fmt.Errorf("failed initializing kms: %w", err)
+		}
+		km, ok := s.keyManager.(kmsapi.Decrypter)
+		if !ok {
+			return fmt.Errorf(`%q is not a kmsapi.Decrypter`, s.KMS.Type)
+		}
+		if s.DecrypterKey != "" || s.DecrypterCert != "" {
+			if s.decrypter, err = km.CreateDecrypter(&kmsapi.CreateDecrypterRequest{
+				DecryptionKey: s.DecrypterKey,
+				Password:      []byte(s.DecrypterKeyPassword),
+			}); err != nil {
+				return fmt.Errorf("failed creating decrypter: %w", err)
+			}
+			if s.decrypterCertificate, err = pemutil.ReadCertificate(s.DecrypterCert); err != nil {
+				return fmt.Errorf("failed reading certificate: %w", err)
+			}
+			decrypterPublicKey, ok := s.decrypter.Public().(*rsa.PublicKey)
+			if !ok {
+				return fmt.Errorf("only RSA keys are supported")
+			}
+			if !decrypterPublicKey.Equal(s.decrypterCertificate.PublicKey) {
+				return errors.New("mismatch between decryption certificate and decrypter public keys")
+			}
+		}
+	}
+
 	// TODO: add other, SCEP specific, options?
 
 	s.ctl, err = NewController(s, s.Claims, config, s.Options)
@@ -258,4 +301,8 @@ func (s *SCEP) selectValidationMethod() validationMethod {
 		return validationMethodStatic
 	}
 	return validationMethodNone
+}
+
+func (s *SCEP) GetDecrypter() (*x509.Certificate, crypto.Decrypter) {
+	return s.decrypterCertificate, s.decrypter
 }

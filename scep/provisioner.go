@@ -2,6 +2,8 @@ package scep
 
 import (
 	"context"
+	"crypto"
+	"crypto/x509"
 	"time"
 
 	"github.com/smallstep/certificates/authority/provisioner"
@@ -16,6 +18,7 @@ type Provisioner interface {
 	GetOptions() *provisioner.Options
 	GetCapabilities() []string
 	ShouldIncludeRootInChain() bool
+	GetDecrypter() (*x509.Certificate, crypto.Decrypter)
 	GetContentEncryptionAlgorithm() int
 	ValidateChallenge(ctx context.Context, challenge, transactionID string) error
 }

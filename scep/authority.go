@@ -2,6 +2,7 @@ package scep
 
 import (
 	"context"
+	"crypto"
 	"crypto/x509"
 	"errors"
 	"fmt"
@@ -18,12 +19,10 @@ import (
 
 // Authority is the layer that handles all SCEP interactions.
 type Authority struct {
-	prefix                  string
-	dns                     string
-	intermediateCertificate *x509.Certificate
-	caCerts                 []*x509.Certificate // TODO(hs): change to use these instead of root and intermediate
-	service                 *Service
-	signAuth                SignAuthority
+	prefix   string
+	dns      string
+	service  *Service
+	signAuth SignAuthority
 }
 
 type authorityKey struct{}
@@ -74,18 +73,8 @@ func New(signAuth SignAuthority, ops AuthorityOptions) (*Authority, error) {
 		prefix:   ops.Prefix,
 		dns:      ops.DNS,
 		signAuth: signAuth,
+		service:  ops.Service,
 	}
-
-	// TODO: this is not really nice to do; the Service should be removed
-	// in its entirety to make this more interoperable with the rest of
-	// step-ca, I think.
-	if ops.Service != nil {
-		authority.caCerts = ops.Service.certificateChain
-		// TODO(hs): look into refactoring SCEP into using just caCerts everywhere, if it makes sense for more elaborate SCEP configuration. Keeping it like this for clarity (for now).
-		authority.intermediateCertificate = ops.Service.certificateChain[0]
-		authority.service = ops.Service
-	}
-
 	return authority, nil
 }
 
@@ -165,30 +154,46 @@ func (a *Authority) GetCACertificates(ctx context.Context) ([]*x509.Certificate,
 		return nil, err
 	}
 
-	if len(a.caCerts) == 0 {
+	if len(a.service.certificateChain) == 0 {
 		return nil, errors.New("no intermediate certificate available in SCEP authority")
 	}
 
 	certs := []*x509.Certificate{}
-	certs = append(certs, a.caCerts[0])
+	if decrypterCertificate, _ := p.GetDecrypter(); decrypterCertificate != nil {
+		certs = append(certs, decrypterCertificate)
+		certs = append(certs, a.service.signerCertificate)
+	} else {
+		certs = append(certs, a.service.defaultDecrypterCertificate)
+	}
 
 	// NOTE: we're adding the CA roots here, but they are (highly likely) different than what the RFC means.
 	// Clients are responsible to select the right cert(s) to use, though.
-	if p.ShouldIncludeRootInChain() && len(a.caCerts) > 1 {
-		certs = append(certs, a.caCerts[1])
+	if p.ShouldIncludeRootInChain() && len(a.service.certificateChain) > 1 {
+		certs = append(certs, a.service.certificateChain[1])
 	}
 
 	return certs, nil
 }
 
 // DecryptPKIEnvelope decrypts an enveloped message
-func (a *Authority) DecryptPKIEnvelope(_ context.Context, msg *PKIMessage) error {
+func (a *Authority) DecryptPKIEnvelope(ctx context.Context, msg *PKIMessage) error {
 	p7c, err := pkcs7.Parse(msg.P7.Content)
 	if err != nil {
 		return fmt.Errorf("error parsing pkcs7 content: %w", err)
 	}
 
-	envelope, err := p7c.Decrypt(a.intermediateCertificate, a.service.decrypter)
+	fmt.Println(fmt.Sprintf("%#+v", a.service.defaultDecrypterCertificate))
+	fmt.Println(fmt.Sprintf("%#+v", a.service.defaultDecrypter))
+
+	cert, pkey, err := a.selectDecrypter(ctx)
+	if err != nil {
+		return fmt.Errorf("failed selecting decrypter: %w", err)
+	}
+
+	fmt.Println(fmt.Sprintf("%#+v", cert))
+	fmt.Println(fmt.Sprintf("%#+v", pkey))
+
+	envelope, err := p7c.Decrypt(cert, pkey)
 	if err != nil {
 		return fmt.Errorf("error decrypting encrypted pkcs7 content: %w", err)
 	}
@@ -208,6 +213,9 @@ func (a *Authority) DecryptPKIEnvelope(_ context.Context, msg *PKIMessage) error
 		if err != nil {
 			return fmt.Errorf("parse CSR from pkiEnvelope: %w", err)
 		}
+		if err := csr.CheckSignature(); err != nil {
+			return fmt.Errorf("invalid CSR signature; %w", err)
+		}
 		// check for challengePassword
 		cp, err := microx509util.ParseChallengePassword(msg.pkiEnvelope)
 		if err != nil {
@@ -224,6 +232,24 @@ func (a *Authority) DecryptPKIEnvelope(_ context.Context, msg *PKIMessage) error
 	}
 
 	return nil
+}
+
+func (a *Authority) selectDecrypter(ctx context.Context) (cert *x509.Certificate, pkey crypto.PrivateKey, err error) {
+	p, err := provisionerFromContext(ctx)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	// return provisioner specific decrypter, if available
+	if cert, pkey = p.GetDecrypter(); cert != nil && pkey != nil {
+		return
+	}
+
+	// fallback to the CA wide decrypter
+	cert = a.service.defaultDecrypterCertificate
+	pkey = a.service.defaultDecrypter
+
+	return
 }
 
 // SignCSR creates an x509.Certificate based on a CSR template and Cert Authority credentials
@@ -358,10 +384,11 @@ func (a *Authority) SignCSR(ctx context.Context, csr *x509.CertificateRequest, m
 	// as the first certificate in the array
 	signedData.AddCertificate(cert)
 
-	authCert := a.intermediateCertificate
+	authCert := a.service.signerCertificate
+	signer := a.service.signer
 
 	// sign the attributes
-	if err := signedData.AddSigner(authCert, a.service.signer, config); err != nil {
+	if err := signedData.AddSigner(authCert, signer, config); err != nil {
 		return nil, err
 	}
 
@@ -429,7 +456,7 @@ func (a *Authority) CreateFailureResponse(_ context.Context, _ *x509.Certificate
 	}
 
 	// sign the attributes
-	if err := signedData.AddSigner(a.intermediateCertificate, a.service.signer, config); err != nil {
+	if err := signedData.AddSigner(a.service.signerCertificate, a.service.signer, config); err != nil {
 		return nil, err
 	}
 

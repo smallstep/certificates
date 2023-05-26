@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"crypto"
+	"crypto/rsa"
 	"crypto/sha256"
 	"crypto/x509"
 	"encoding/hex"
@@ -666,13 +667,30 @@ func (a *Authority) init() error {
 			return err
 		}
 
+		options.SignerCert = options.CertificateChain[0]
+		options.DecrypterCert = options.CertificateChain[0]
+
+		// TODO: instead of creating the decrypter here, pass the
+		// intermediate key + chain down to the SCEP service / authority,
+		// and only instantiate it when required there.
+		// TODO: if moving the logic, try improving the logic for the
+		// decrypter password too?
 		if km, ok := a.keyManager.(kmsapi.Decrypter); ok {
 			options.Decrypter, err = km.CreateDecrypter(&kmsapi.CreateDecrypterRequest{
 				DecryptionKey: a.config.IntermediateKey,
 				Password:      a.password,
 			})
-			if err != nil {
-				return err
+			if err == nil {
+				// when creating the decrypter fails, ignore the error
+				// TODO(hs): decide if this is OK. It could fail at startup, but it
+				// could be up later. Right now decryption would always fail.
+				key, ok := options.Decrypter.Public().(*rsa.PublicKey)
+				if !ok {
+					return errors.New("only RSA keys are currently supported as decrypters")
+				}
+				if !key.Equal(options.DecrypterCert.PublicKey) {
+					return errors.New("mismatch between decryption certificate and decrypter public keys")
+				}
 			}
 		}
 
