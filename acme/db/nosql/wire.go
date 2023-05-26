@@ -25,7 +25,7 @@ func (db *DB) getDBDpopToken(ctx context.Context, orderId string) (*dbDpopToken,
 		return nil, errors.Wrapf(err, "error loading dpop %s", orderId)
 	}
 	d := new(dbDpopToken)
-	if err := json.Unmarshal(b, &d); err != nil {
+	if err := json.Unmarshal(b, d); err != nil {
 		return nil, errors.Wrapf(err, "error unmarshaling dpop %s into dbDpopToken", orderId)
 	}
 	return d, nil
@@ -78,7 +78,7 @@ func (db *DB) getDBOidcToken(ctx context.Context, orderId string) (*dbOidcToken,
 		return nil, errors.Wrapf(err, "error loading oidc token %s", orderId)
 	}
 	o := new(dbOidcToken)
-	if err := json.Unmarshal(b, &o); err != nil {
+	if err := json.Unmarshal(b, o); err != nil {
 		return nil, errors.Wrapf(err, "error unmarshaling oidc token %s into dbOidcToken", orderId)
 	}
 	return o, nil
