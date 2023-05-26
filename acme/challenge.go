@@ -446,6 +446,10 @@ func wireOIDC01Validate(ctx context.Context, ch *Challenge, db DB, jwk *jose.JSO
 		return WrapErrorISE(err, "Could not find current order by account id")
 	}
 
+	if len(orders) != 1 {
+		return WrapErrorISE(err, "There are too many orders for this account for this custom OIDC challenge")
+	}
+
 	if err := db.CreateOidcToken(ctx, orders[0], oidcToken); err != nil {
 		return WrapErrorISE(err, "Failed storing OIDC id token")
 	}
@@ -585,6 +589,10 @@ func wireDPOP01Validate(ctx context.Context, ch *Challenge, db DB, jwk *jose.JSO
 	orders, err := db.GetAllOrdersByAccountID(ctx, ch.AccountID)
 	if err != nil {
 		return WrapErrorISE(err, "Could not find current order by account id")
+	}
+
+	if len(orders) != 1 {
+		return WrapErrorISE(err, "There are too many orders for this account for this custom DPoP challenge")
 	}
 
 	if err := db.CreateDpopToken(ctx, orders[0], dpop); err != nil {
