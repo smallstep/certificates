@@ -493,8 +493,8 @@ github.com/googleapis/enterprise-certificate-proxy v0.2.3/go.mod h1:AwSRAtLfXpU5
 github.com/googleapis/gax-go v2.0.2+incompatible/go.mod h1:SFVmujtThgffbyetf+mdk2eWhX2bMyUtNHzFKcPA9HY=
 github.com/googleapis/gax-go/v2 v2.0.4/go.mod h1:0Wqv26UfaUD9n4G6kQubkQ+KchISgw+vpHVxEJEs9eg=
 github.com/googleapis/gax-go/v2 v2.0.5/go.mod h1:DWXyrwAJ9X0FpwwEdw+IPEYBICEFu5mhpdKc/us6bOk=
-github.com/googleapis/gax-go/v2 v2.9.0 h1:ie5/2yPjucjZW6fEGjLhS5+PhEg6owWMrFB5d7TFFhw=
-github.com/googleapis/gax-go/v2 v2.9.0/go.mod h1:qf/E3rjAvrwLsAnQW+IClIu+z03yUf4KOoO82NfZ+QY=
+github.com/googleapis/gax-go/v2 v2.9.1 h1:DpTpJqzZ3NvX9zqjhIuI1oVzYZMvboZe+3LoeEIJjHM=
+github.com/googleapis/gax-go/v2 v2.9.1/go.mod h1:4FG3gMrVZlyMp5itSYKMU9z/lBE7+SbnUOvzH2HqbEY=
 github.com/gopherjs/gopherjs v0.0.0-20181017120253-0766667cb4d1/go.mod h1:wJfORRmW1u3UXTncJ5qlYoELFm8eSnnEO6hX4iZ3EWY=
 github.com/gordonklaus/ineffassign v0.0.0-20200309095847-7953dde2c7bf/go.mod h1:cuNKsD1zp2v6XfE/orVX2QE1LC+i254ceGcVeDT3pTU=
 github.com/goreleaser/goreleaser v0.134.0/go.mod h1:ZT6Y2rSYa6NxQzIsdfWWNWAlYGXGbreo66NmE+3X3WQ=
