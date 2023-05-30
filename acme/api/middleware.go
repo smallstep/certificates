@@ -340,7 +340,7 @@ func lookupJWK(next nextHTTP) nextHTTP {
 					// Provisioner in the URL must match the provisioner with
 					// which the account was created.
 					render.Error(w, acme.NewError(acme.ErrorUnauthorizedType,
-						"account provisioner does not match requested provisioner; account provisioner = %s, reqested provisioner = %s",
+						"account provisioner does not match requested provisioner; account provisioner = %s, requested provisioner = %s",
 						accProvName, reqProvName))
 					return
 				}
