@@ -3,7 +3,7 @@ module github.com/smallstep/certificates
 go 1.19
 
 require (
-	cloud.google.com/go/longrunning v0.4.1
+	cloud.google.com/go/longrunning v0.4.2
 	cloud.google.com/go/security v1.14.1
 	github.com/Masterminds/sprig/v3 v3.2.3
 	github.com/fxamacker/cbor/v2 v2.4.0
@@ -12,15 +12,15 @@ require (
 	github.com/google/go-cmp v0.5.9
 	github.com/google/go-tpm v0.3.3
 	github.com/google/uuid v1.3.0
-	github.com/googleapis/gax-go/v2 v2.9.0
-	github.com/hashicorp/vault/api v1.9.1
-	github.com/hashicorp/vault/api/auth/approle v0.4.0
-	github.com/hashicorp/vault/api/auth/kubernetes v0.4.0
+	github.com/googleapis/gax-go/v2 v2.9.1
+	github.com/hashicorp/vault/api v1.9.2
+	github.com/hashicorp/vault/api/auth/approle v0.4.1
+	github.com/hashicorp/vault/api/auth/kubernetes v0.4.1
 	github.com/micromdm/scep/v2 v2.1.0
 	github.com/newrelic/go-agent/v3 v3.21.1
 	github.com/pkg/errors v0.9.1
 	github.com/rs/xid v1.5.0
-	github.com/sirupsen/logrus v1.9.0
+	github.com/sirupsen/logrus v1.9.2
 	github.com/slackhq/nebula v1.6.1
 	github.com/smallstep/assert v0.0.0-20200723003110-82e2b9b3b262
 	github.com/smallstep/go-attestation v0.4.4-0.20230509120429-e17291421738
@@ -69,6 +69,7 @@ require (
 	github.com/dgraph-io/ristretto v0.1.0 // indirect
 	github.com/dgryski/go-farm v0.0.0-20200201041132-a6ae2369ad13 // indirect
 	github.com/dustin/go-humanize v1.0.0 // indirect
+	github.com/go-jose/go-jose/v3 v3.0.0 // indirect
 	github.com/go-kit/kit v0.10.0 // indirect
 	github.com/go-logfmt/logfmt v0.5.1 // indirect
 	github.com/go-piv/piv-go v1.11.0 // indirect
