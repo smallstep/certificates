@@ -208,10 +208,9 @@ func (s *SCEP) Init(config Config) (err error) {
 				return fmt.Errorf("failed creating decrypter: %w", err)
 			}
 
-			// Parse decrypter certificate
+			// parse the decrypter certificate
 			block, rest := pem.Decode(s.DecrypterCertificate)
 			if len(rest) > 0 {
-				fmt.Println(string(rest))
 				return errors.New("failed parsing decrypter certificate: trailing data")
 			}
 			if block == nil {
@@ -221,9 +220,7 @@ func (s *SCEP) Init(config Config) (err error) {
 				return fmt.Errorf("failed parsing decrypter certificate: %w", err)
 			}
 
-			// if s.decrypterCertificate, err = pemutil.ReadCertificate(s.DecrypterCertFile); err != nil {
-			// 	return fmt.Errorf("failed reading certificate: %w", err)
-			// }
+			// validate the decrypter key
 			decrypterPublicKey, ok := s.decrypter.Public().(*rsa.PublicKey)
 			if !ok {
 				return fmt.Errorf("only RSA keys are supported")

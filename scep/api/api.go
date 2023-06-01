@@ -308,8 +308,6 @@ func PKIOperation(ctx context.Context, req request) (Response, error) {
 	transactionID := string(msg.TransactionID)
 	challengePassword := msg.CSRReqMessage.ChallengePassword
 
-	fmt.Println("challenge password: ", challengePassword)
-
 	// NOTE: we're blocking the RenewalReq if the challenge does not match, because otherwise we don't have any authentication.
 	// The macOS SCEP client performs renewals using PKCSreq. The CertNanny SCEP client will use PKCSreq with challenge too, it seems,
 	// even if using the renewal flow as described in the README.md. MicroMDM SCEP client also only does PKCSreq by default, unless
@@ -317,7 +315,6 @@ func PKIOperation(ctx context.Context, req request) (Response, error) {
 	// We'll have to see how it works out.
 	if msg.MessageType == microscep.PKCSReq || msg.MessageType == microscep.RenewalReq {
 		if err := auth.ValidateChallenge(ctx, challengePassword, transactionID); err != nil {
-			fmt.Println(err)
 			if errors.Is(err, provisioner.ErrSCEPChallengeInvalid) {
 				return createFailureResponse(ctx, csr, msg, microscep.BadRequest, err)
 			}

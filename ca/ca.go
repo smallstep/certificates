@@ -256,12 +256,17 @@ func (ca *CA) Init(cfg *config.Config) (*CA, error) {
 			return nil, errors.Wrap(err, "failed creating SCEP authority")
 		}
 
-		// TODO: validate that the scepAuthority is fully valid? E.g. initialization
-		// may have configured the default decrypter, but if that's not set or if it's
-		// somehow not usable, all SCEP provisioners should have a valid decrypter
-		// configured by now.
+		// validate the SCEP authority configuration. Currently this
+		// will not result in a failure to start if one or more SCEP
+		// provisioners are not correctly configured. Only a log will
+		// be emitted.
+		shouldFail := false
 		if err := scepAuthority.Validate(); err != nil {
-			return nil, errors.Wrap(err, "failed validating SCEP authority")
+			err = errors.Wrap(err, "failed validating SCEP authority")
+			if shouldFail {
+				return nil, err
+			}
+			log.Println(err)
 		}
 
 		// According to the RFC (https://tools.ietf.org/html/rfc8894#section-7.10),

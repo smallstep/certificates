@@ -152,8 +152,6 @@ retry:
 		return nil, err
 	}
 
-	fmt.Println(req)
-
 	secret, err := base64.StdEncoding.DecodeString(w.Secret)
 	if err != nil {
 		return nil, err
@@ -203,7 +201,6 @@ retry:
 		time.Sleep(time.Second)
 		goto retry
 	}
-	fmt.Println(fmt.Sprintf("%#+v", resp))
 	if resp.StatusCode >= 400 {
 		return nil, fmt.Errorf("Webhook server responded with %d", resp.StatusCode)
 	}

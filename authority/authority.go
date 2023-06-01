@@ -262,6 +262,14 @@ func (a *Authority) ReloadAdminResources(ctx context.Context) error {
 	a.config.AuthorityConfig.Admins = adminList
 	a.admins = adminClxn
 
+	// update the SCEP service with the currently active SCEP
+	// provisioner names.
+	// TODO(hs): trigger SCEP authority (re)validation using
+	// the current set of SCEP provisioners.
+	if a.scepService != nil {
+		a.scepService.UpdateProvisioners(a.getSCEPProvisionerNames())
+	}
+
 	return nil
 }
 
@@ -643,7 +651,7 @@ func (a *Authority) init() error {
 
 	// The SCEP functionality is provided through an instance of
 	// scep.Service. It is initialized once when the CA is started.
-	// TODO: should the SCEP service support reloading? For example,
+	// TODO(hs): should the SCEP service support reloading? For example,
 	// when the admin resources are reloaded, specifically the provisioners,
 	// it can happen that the SCEP service is no longer required and can
 	// be destroyed, or that it needs to be instantiated. It may also need
@@ -664,11 +672,11 @@ func (a *Authority) init() error {
 			return err
 		}
 
-		// TODO: instead of creating the decrypter here, pass the
+		// TODO(hs): instead of creating the decrypter here, pass the
 		// intermediate key + chain down to the SCEP service / authority,
 		// and only instantiate it when required there. Is that possible?
 		// Also with entering passwords?
-		// TODO: if moving the logic, try improving the logic for the
+		// TODO(hs): if moving the logic, try improving the logic for the
 		// decrypter password too? Right now it needs to be entered multiple
 		// times; I've observed it to be three times maximum, every time
 		// the intermediate key is read.
@@ -678,10 +686,15 @@ func (a *Authority) init() error {
 				DecryptionKey: a.config.IntermediateKey,
 				Password:      a.password,
 			}); err == nil {
-				// only pass the decrypter down when it was successfully created
+				// only pass the decrypter down when it was successfully created,
+				// meaning it's an RSA key, and `CreateDecrypter` did not fail.
 				options.Decrypter = decrypter
 			}
 		}
+
+		// provide the current SCEP provisioner names, so that the provisioners
+		// can be validated when the CA is started.
+		options.SCEPProvisionerNames = a.getSCEPProvisionerNames()
 
 		a.scepService, err = scep.NewService(ctx, options)
 		if err != nil {
@@ -847,6 +860,15 @@ func (a *Authority) requiresSCEP() bool {
 		}
 	}
 	return false
+}
+
+func (a *Authority) getSCEPProvisionerNames() (names []string) {
+	for _, p := range a.config.AuthorityConfig.Provisioners {
+		if p.GetType() == provisioner.TypeSCEP {
+			names = append(names, p.GetName())
+		}
+	}
+	return
 }
 
 // GetSCEP returns the configured SCEP Service.

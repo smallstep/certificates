@@ -20,6 +20,10 @@ type Options struct {
 	Signer crypto.Signer `json:"-"`
 	// Decrypter decrypts encrypted SCEP messages. Configured in the ca.json key property.
 	Decrypter crypto.Decrypter `json:"-"`
+	// SCEPProvisionerNames contains the currently configured SCEP provioner names. These
+	// are used to be able to load the provisioners when the SCEP authority is being
+	// validated.
+	SCEPProvisionerNames []string
 }
 
 type comparablePublicKey interface {

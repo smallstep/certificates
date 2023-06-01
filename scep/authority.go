@@ -67,22 +67,24 @@ func New(signAuth SignAuthority, ops AuthorityOptions) (*Authority, error) {
 	return authority, nil
 }
 
+// Validate validates if the SCEP Authority has a valid configuration.
+// The validation includes a check if a decrypter is available, either
+// an authority wide decrypter, or a provisioner specific decrypter.
 func (a *Authority) Validate() error {
-	// if a default decrypter is set, the Authority is able
-	// to decrypt SCEP requests. No need to verify the provisioners.
-	if a.service.defaultDecrypter != nil {
-		return nil
-	}
-
-	for _, name := range []string{"scepca"} { // TODO: correct names; provided through options
+	noDefaultDecrypterAvailable := a.service.defaultDecrypter == nil
+	for _, name := range a.service.scepProvisionerNames {
 		p, err := a.LoadProvisionerByName(name)
 		if err != nil {
-			fmt.Println("prov load fail: %w", err)
+			return fmt.Errorf("failed loading provisioner %q: %w", name, err)
 		}
 		if scepProv, ok := p.(*provisioner.SCEP); ok {
-			if cert, decrypter := scepProv.GetDecrypter(); cert == nil || decrypter == nil {
-				fmt.Println(fmt.Sprintf("SCEP provisioner %q doesn't have valid decrypter", scepProv.GetName()))
-				// TODO: return error
+			cert, decrypter := scepProv.GetDecrypter()
+			// TODO: return sentinel/typed error, to be able to ignore/log these cases during init?
+			if cert == nil && noDefaultDecrypterAvailable {
+				return fmt.Errorf("SCEP provisioner %q does not have a decrypter certificate", name)
+			}
+			if decrypter == nil && noDefaultDecrypterAvailable {
+				return fmt.Errorf("SCEP provisioner %q does not have decrypter", name)
 			}
 		}
 	}
@@ -153,16 +155,10 @@ func (a *Authority) DecryptPKIEnvelope(ctx context.Context, msg *PKIMessage) err
 		return fmt.Errorf("error parsing pkcs7 content: %w", err)
 	}
 
-	fmt.Println(fmt.Sprintf("%#+v", a.service.signerCertificate))
-	fmt.Println(fmt.Sprintf("%#+v", a.service.defaultDecrypter))
-
 	cert, pkey, err := a.selectDecrypter(ctx)
 	if err != nil {
 		return fmt.Errorf("failed selecting decrypter: %w", err)
 	}
-
-	fmt.Println(fmt.Sprintf("%#+v", cert))
-	fmt.Println(fmt.Sprintf("%#+v", pkey))
 
 	envelope, err := p7c.Decrypt(cert, pkey)
 	if err != nil {
