@@ -4,7 +4,6 @@ import (
 	"context"
 	"crypto"
 	"crypto/x509"
-	"errors"
 	"time"
 
 	"github.com/smallstep/certificates/authority/provisioner"
@@ -24,25 +23,20 @@ type Provisioner interface {
 	ValidateChallenge(ctx context.Context, challenge, transactionID string) error
 }
 
-// ContextKey is the key type for storing and searching for SCEP request
-// essentials in the context of a request.
-type ContextKey string
-
-const (
-	// ProvisionerContextKey provisioner key
-	ProvisionerContextKey = ContextKey("provisioner")
-)
+// provisionerKey is the key type for storing and searching a
+// SCEP provisioner in the context.
+type provisionerKey struct{}
 
 // provisionerFromContext searches the context for a SCEP provisioner.
-// Returns the provisioner or an error.
-func provisionerFromContext(ctx context.Context) (Provisioner, error) {
-	val := ctx.Value(ProvisionerContextKey)
-	if val == nil {
-		return nil, errors.New("provisioner expected in request context")
+// Returns the provisioner or panics if no SCEP provisioner is found.
+func provisionerFromContext(ctx context.Context) Provisioner {
+	p, ok := ctx.Value(provisionerKey{}).(Provisioner)
+	if !ok {
+		panic("SCEP provisioner expected in request context")
 	}
-	p, ok := val.(Provisioner)
-	if !ok || p == nil {
-		return nil, errors.New("provisioner in context is not a SCEP provisioner")
-	}
-	return p, nil
+	return p
+}
+
+func NewProvisionerContext(ctx context.Context, p Provisioner) context.Context {
+	return context.WithValue(ctx, provisionerKey{}, p)
 }

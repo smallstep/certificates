@@ -221,7 +221,7 @@ func lookupProvisioner(next http.HandlerFunc) http.HandlerFunc {
 			return
 		}
 
-		ctx = context.WithValue(ctx, scep.ProvisionerContextKey, scep.Provisioner(prov))
+		ctx = scep.NewProvisionerContext(ctx, scep.Provisioner(prov))
 		next(w, r.WithContext(ctx))
 	}
 }

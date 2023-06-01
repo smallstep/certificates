@@ -136,10 +136,7 @@ func (a *Authority) LoadProvisionerByName(name string) (provisioner.Interface, e
 // Using an RA does not seem to exist in https://tools.ietf.org/html/rfc8894, but is mentioned in
 // https://tools.ietf.org/id/draft-nourse-scep-21.html.
 func (a *Authority) GetCACertificates(ctx context.Context) (certs []*x509.Certificate, err error) {
-	p, err := provisionerFromContext(ctx)
-	if err != nil {
-		return
-	}
+	p := provisionerFromContext(ctx)
 
 	// if a provisioner specific RSA decrypter is available, it is returned as
 	// the first certificate.
@@ -214,10 +211,7 @@ func (a *Authority) DecryptPKIEnvelope(ctx context.Context, msg *PKIMessage) err
 }
 
 func (a *Authority) selectDecrypter(ctx context.Context) (cert *x509.Certificate, pkey crypto.PrivateKey, err error) {
-	p, err := provisionerFromContext(ctx)
-	if err != nil {
-		return nil, nil, err
-	}
+	p := provisionerFromContext(ctx)
 
 	// return provisioner specific decrypter, if available
 	if cert, pkey = p.GetDecrypter(); cert != nil && pkey != nil {
@@ -239,10 +233,7 @@ func (a *Authority) SignCSR(ctx context.Context, csr *x509.CertificateRequest, m
 	// poll for the status. It seems to be similar as what can happen in ACME, so might want to model
 	// the implementation after the one in the ACME authority. Requires storage, etc.
 
-	p, err := provisionerFromContext(ctx)
-	if err != nil {
-		return nil, err
-	}
+	p := provisionerFromContext(ctx)
 
 	// check if CSRReqMessage has already been decrypted
 	if msg.CSRReqMessage.CSR == nil {
@@ -463,10 +454,7 @@ func (a *Authority) CreateFailureResponse(_ context.Context, _ *x509.Certificate
 
 // GetCACaps returns the CA capabilities
 func (a *Authority) GetCACaps(ctx context.Context) []string {
-	p, err := provisionerFromContext(ctx)
-	if err != nil {
-		return defaultCapabilities
-	}
+	p := provisionerFromContext(ctx)
 
 	caps := p.GetCapabilities()
 	if len(caps) == 0 {
@@ -483,9 +471,6 @@ func (a *Authority) GetCACaps(ctx context.Context) []string {
 }
 
 func (a *Authority) ValidateChallenge(ctx context.Context, challenge, transactionID string) error {
-	p, err := provisionerFromContext(ctx)
-	if err != nil {
-		return err
-	}
+	p := provisionerFromContext(ctx)
 	return p.ValidateChallenge(ctx, challenge, transactionID)
 }
