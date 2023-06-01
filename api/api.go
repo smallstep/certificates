@@ -244,13 +244,16 @@ func (p ProvisionersResponse) MarshalJSON() ([]byte, error) {
 			continue
 		}
 
+		fmt.Println(scepProv.KMS)
+		fmt.Println(fmt.Sprintf("%#+v", scepProv))
+
 		type old struct {
 			challengePassword    string
-			decrypterCertificate string
+			decrypterCertificate []byte
 			decrypterKey         string
 			decrypterKeyPassword string
 		}
-		o := old{scepProv.ChallengePassword, scepProv.DecrypterCert, scepProv.DecrypterKey, scepProv.DecrypterKeyPassword}
+		o := old{scepProv.ChallengePassword, scepProv.DecrypterCertificate, scepProv.DecrypterKey, scepProv.DecrypterKeyPassword}
 		scepProv.ChallengePassword = "*** REDACTED ***"
 		// TODO: remove the details in the API response
 		// scepProv.DecrypterCert = ""
@@ -259,7 +262,7 @@ func (p ProvisionersResponse) MarshalJSON() ([]byte, error) {
 
 		defer func(o old) { //nolint:gocritic // defer in loop required to restore initial state of provisioners
 			scepProv.ChallengePassword = o.challengePassword
-			scepProv.DecrypterCert = o.decrypterCertificate
+			scepProv.DecrypterCertificate = o.decrypterCertificate
 			scepProv.DecrypterKey = o.decrypterKey
 			scepProv.DecrypterKeyPassword = o.decrypterKeyPassword
 		}(o)

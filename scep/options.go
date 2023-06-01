@@ -2,77 +2,76 @@ package scep
 
 import (
 	"crypto"
+	"crypto/rsa"
 	"crypto/x509"
-
-	"github.com/pkg/errors"
+	"errors"
 )
 
 type Options struct {
-	// CertificateChain is the issuer certificate, along with any other bundled certificates
-	// to be returned in the chain for consumers. Configured in the ca.json crt property.
-	CertificateChain []*x509.Certificate
-	SignerCert       *x509.Certificate
-	DecrypterCert    *x509.Certificate
+	// Roots contains the (federated) CA roots certificate(s)
+	Roots []*x509.Certificate `json:"-"`
+	// Intermediates points issuer certificate, along with any other bundled certificates
+	// to be returned in the chain for consumers.
+	Intermediates []*x509.Certificate `json:"-"`
+	// SignerCert points to the certificate of the CA signer. It usually is the same as the
+	// first certificate in the CertificateChain.
+	SignerCert *x509.Certificate `json:"-"`
 	// Signer signs CSRs in SCEP. Configured in the ca.json key property.
 	Signer crypto.Signer `json:"-"`
 	// Decrypter decrypts encrypted SCEP messages. Configured in the ca.json key property.
 	Decrypter crypto.Decrypter `json:"-"`
 }
 
+type comparablePublicKey interface {
+	Equal(crypto.PublicKey) bool
+}
+
 // Validate checks the fields in Options.
 func (o *Options) Validate() error {
-	if o.CertificateChain == nil {
-		return errors.New("certificate chain not configured correctly")
+	switch {
+	case len(o.Intermediates) == 0:
+		return errors.New("no intermediate certificate available for SCEP authority")
+	case o.Signer == nil:
+		return errors.New("no signer available for SCEP authority")
+	case o.SignerCert == nil:
+		return errors.New("no signer certificate available for SCEP authority")
 	}
 
-	if len(o.CertificateChain) < 1 {
-		return errors.New("certificate chain should at least have one certificate")
+	// check if the signer (intermediate CA) certificate has the same public key as
+	// the signer. According to the RFC it seems valid to have different keys for
+	// the intermediate and the CA signing new certificates, so this might change
+	// in the future.
+	signerPublicKey := o.Signer.Public().(comparablePublicKey)
+	if !signerPublicKey.Equal(o.SignerCert.PublicKey) {
+		return errors.New("mismatch between signer certificate and public key")
 	}
 
-	// According to the RFC: https://tools.ietf.org/html/rfc8894#section-3.1, SCEP
-	// can be used with something different than RSA, but requires the encryption
-	// to be performed using the challenge password. An older version of specification
-	// states that only RSA is supported: https://tools.ietf.org/html/draft-nourse-scep-23#section-2.1.1
-	// Other algorithms than RSA do not seem to be supported in certnanny/sscep, but it might work
+	// decrypter can be nil in case a signing only key is used; validation complete.
+	if o.Decrypter == nil {
+		return nil
+	}
+
+	// If a decrypter is available, check that it's backed by an RSA key. According to the
+	// RFC: https://tools.ietf.org/html/rfc8894#section-3.1, SCEP can be used with something
+	// different than RSA, but requires the encryption to be performed using the challenge
+	// password in that case. An older version of specification states that only RSA is
+	// supported: https://tools.ietf.org/html/draft-nourse-scep-23#section-2.1.1. Other
+	// algorithms do not seem to be supported in certnanny/sscep, but it might work
 	// in micromdm/scep. Currently only RSA is allowed, but it might be an option
 	// to try other algorithms in the future.
-	//intermediate := o.CertificateChain[0]
-	//intermediate := o.SignerCert
-	// if intermediate.PublicKeyAlgorithm != x509.RSA {
-	// 	return errors.New("only the RSA algorithm is (currently) supported")
-	// }
-
-	// TODO: add checks for key usage?
-
-	//signerPublicKey, ok := o.Signer.Public().(*rsa.PublicKey)
-	// if !ok {
-	// 	return errors.New("only RSA public keys are (currently) supported as signers")
-	// }
-
-	// check if the intermediate ca certificate has the same public key as the signer.
-	// According to the RFC it seems valid to have different keys for the intermediate
-	// and the CA signing new certificates, so this might change in the future.
-	// if !signerPublicKey.Equal(intermediate.PublicKey) {
-	// 	return errors.New("mismatch between certificate chain and signer public keys")
-	// }
-
-	// TODO: this could be a different decrypter, based on the value
-	// in the provisioner.
-	// decrypterPublicKey, ok := o.Decrypter.Public().(*rsa.PublicKey)
-	// if !ok {
-	// 	return errors.New("only RSA public keys are (currently) supported as decrypters")
-	// }
+	decrypterPublicKey, ok := o.Decrypter.Public().(*rsa.PublicKey)
+	if !ok {
+		return errors.New("only RSA keys are (currently) supported as decrypters")
+	}
 
 	// check if intermediate public key is the same as the decrypter public key.
 	// In certnanny/sscep it's mentioned that the signing key can be different
-	// from the decrypting (and encrypting) key. Currently that's not supported.
-	// if !decrypterPublicKey.Equal(intermediate.PublicKey) {
-	// 	return errors.New("mismatch between certificate chain and decrypter public keys")
-	// }
-
-	// if !decrypterPublicKey.Equal(o.DecrypterCert.PublicKey) {
-	// 	return errors.New("mismatch between certificate chain and decrypter public keys")
-	// }
+	// from the decrypting (and encrypting) key. These options are only used and
+	// validated when the intermediate CA is also used as the decrypter, though,
+	// so they should match.
+	if !decrypterPublicKey.Equal(o.SignerCert.PublicKey) {
+		return errors.New("mismatch between certificate chain and decrypter public keys")
+	}
 
 	return nil
 }

@@ -6,13 +6,15 @@ import (
 	"crypto/x509"
 )
 
-// Service is a wrapper for crypto.Signer and crypto.Decrypter
+// Service is a wrapper for a crypto.Decrypter and crypto.Signer for
+// decrypting SCEP requests and signing certificates in response to
+// SCEP certificate requests.
 type Service struct {
-	certificateChain            []*x509.Certificate
-	signerCertificate           *x509.Certificate
-	signer                      crypto.Signer
-	defaultDecrypterCertificate *x509.Certificate
-	defaultDecrypter            crypto.Decrypter
+	roots             []*x509.Certificate
+	intermediates     []*x509.Certificate
+	signerCertificate *x509.Certificate
+	signer            crypto.Signer
+	defaultDecrypter  crypto.Decrypter
 }
 
 // NewService returns a new Service type.
@@ -20,13 +22,11 @@ func NewService(_ context.Context, opts Options) (*Service, error) {
 	if err := opts.Validate(); err != nil {
 		return nil, err
 	}
-
-	// TODO: should this become similar to the New CertificateAuthorityService as in x509CAService?
 	return &Service{
-		certificateChain:            opts.CertificateChain,
-		signerCertificate:           opts.SignerCert,
-		signer:                      opts.Signer,
-		defaultDecrypterCertificate: opts.DecrypterCert,
-		defaultDecrypter:            opts.Decrypter,
+		roots:             opts.Roots,
+		intermediates:     opts.Intermediates,
+		signerCertificate: opts.SignerCert,
+		signer:            opts.Signer,
+		defaultDecrypter:  opts.Decrypter,
 	}, nil
 }

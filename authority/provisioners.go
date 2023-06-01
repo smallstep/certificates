@@ -8,6 +8,7 @@ import (
 	"encoding/pem"
 	"fmt"
 	"os"
+	"strings"
 
 	"github.com/pkg/errors"
 	"gopkg.in/square/go-jose.v2/jwt"
@@ -15,6 +16,7 @@ import (
 	"go.step.sm/cli-utils/step"
 	"go.step.sm/cli-utils/ui"
 	"go.step.sm/crypto/jose"
+	"go.step.sm/crypto/kms"
 	"go.step.sm/linkedca"
 
 	"github.com/smallstep/certificates/authority/admin"
@@ -235,7 +237,7 @@ func (a *Authority) StoreProvisioner(ctx context.Context, prov *linkedca.Provisi
 	}
 
 	if err := certProv.Init(provisionerConfig); err != nil {
-		return admin.WrapError(admin.ErrorBadRequestType, err, "error validating configuration for provisioner %s", prov.Name)
+		return admin.WrapError(admin.ErrorBadRequestType, err, "error validating configuration for provisioner %q", prov.Name)
 	}
 
 	// Store to database -- this will set the ID.
@@ -960,7 +962,7 @@ func ProvisionerToCertificates(p *linkedca.Provisioner) (provisioner.Interface, 
 		}, nil
 	case *linkedca.ProvisionerDetails_SCEP:
 		cfg := d.SCEP
-		return &provisioner.SCEP{
+		s := &provisioner.SCEP{
 			ID:                            p.Id,
 			Type:                          p.Type.String(),
 			Name:                          p.Name,
@@ -972,7 +974,19 @@ func ProvisionerToCertificates(p *linkedca.Provisioner) (provisioner.Interface, 
 			EncryptionAlgorithmIdentifier: int(cfg.EncryptionAlgorithmIdentifier),
 			Claims:                        claims,
 			Options:                       options,
-		}, nil
+		}
+		if decrypter := cfg.GetDecrypter(); decrypter != nil {
+			if dkms := decrypter.GetKms(); dkms != nil {
+				s.KMS = &kms.Options{
+					Type:            kms.Type(strings.ToLower(linkedca.KMS_Type_name[int32(dkms.Type)])),
+					CredentialsFile: dkms.CredentialsFile,
+				}
+			}
+			s.DecrypterCertificate = decrypter.DecrypterCertificate
+			s.DecrypterKey = decrypter.DecrypterKey
+			s.DecrypterKeyPassword = decrypter.DecrypterKeyPassword
+		}
+		return s, nil
 	case *linkedca.ProvisionerDetails_Nebula:
 		var roots []byte
 		for i, root := range d.Nebula.GetRoots() {

@@ -6,7 +6,6 @@ import (
 	"crypto/x509"
 	"errors"
 	"fmt"
-	"net/url"
 
 	microx509util "github.com/micromdm/scep/v2/cryptoutil/x509util"
 	microscep "github.com/micromdm/scep/v2/scep"
@@ -19,9 +18,7 @@ import (
 
 // Authority is the layer that handles all SCEP interactions.
 type Authority struct {
-	prefix   string
-	dns      string
-	service  *Service
+	service  *Service // TODO: refactor, so that this is not required
 	signAuth SignAuthority
 }
 
@@ -50,15 +47,9 @@ func MustFromContext(ctx context.Context) *Authority {
 
 // AuthorityOptions required to create a new SCEP Authority.
 type AuthorityOptions struct {
-	// Service provides the certificate chain, the signer and the decrypter to the Authority
+	// Service provides the roots, intermediates, the signer and the (default)
+	// decrypter to the SCEP Authority.
 	Service *Service
-	// DNS is the host used to generate accurate SCEP links. By default the authority
-	// will use the Host from the request, so this value will only be used if
-	// request.Host is empty.
-	DNS string
-	// Prefix is a URL path prefix under which the SCEP api is served. This
-	// prefix is required to generate accurate SCEP links.
-	Prefix string
 }
 
 // SignAuthority is the interface for a signing authority
@@ -70,12 +61,33 @@ type SignAuthority interface {
 // New returns a new Authority that implements the SCEP interface.
 func New(signAuth SignAuthority, ops AuthorityOptions) (*Authority, error) {
 	authority := &Authority{
-		prefix:   ops.Prefix,
-		dns:      ops.DNS,
 		signAuth: signAuth,
 		service:  ops.Service,
 	}
 	return authority, nil
+}
+
+func (a *Authority) Validate() error {
+	// if a default decrypter is set, the Authority is able
+	// to decrypt SCEP requests. No need to verify the provisioners.
+	if a.service.defaultDecrypter != nil {
+		return nil
+	}
+
+	for _, name := range []string{"scepca"} { // TODO: correct names; provided through options
+		p, err := a.LoadProvisionerByName(name)
+		if err != nil {
+			fmt.Println("prov load fail: %w", err)
+		}
+		if scepProv, ok := p.(*provisioner.SCEP); ok {
+			if cert, decrypter := scepProv.GetDecrypter(); cert == nil || decrypter == nil {
+				fmt.Println(fmt.Sprintf("SCEP provisioner %q doesn't have valid decrypter", scepProv.GetName()))
+				// TODO: return error
+			}
+		}
+	}
+
+	return nil
 }
 
 var (
@@ -97,79 +109,38 @@ func (a *Authority) LoadProvisionerByName(name string) (provisioner.Interface, e
 	return a.signAuth.LoadProvisionerByName(name)
 }
 
-// GetLinkExplicit returns the requested link from the directory.
-func (a *Authority) GetLinkExplicit(provName string, abs bool, baseURL *url.URL, inputs ...string) string {
-	return a.getLinkExplicit(provName, abs, baseURL, inputs...)
-}
-
-// getLinkExplicit returns an absolute or partial path to the given resource and a base
-// URL dynamically obtained from the request for which the link is being calculated.
-func (a *Authority) getLinkExplicit(provisionerName string, abs bool, baseURL *url.URL, _ ...string) string {
-	link := "/" + provisionerName
-	if abs {
-		// Copy the baseURL value from the pointer. https://github.com/golang/go/issues/38351
-		u := url.URL{}
-		if baseURL != nil {
-			u = *baseURL
-		}
-
-		// If no Scheme is set, then default to http (in case of SCEP)
-		if u.Scheme == "" {
-			u.Scheme = "http"
-		}
-
-		// If no Host is set, then use the default (first DNS attr in the ca.json).
-		if u.Host == "" {
-			u.Host = a.dns
-		}
-
-		u.Path = a.prefix + link
-		return u.String()
-	}
-
-	return link
-}
-
-// GetCACertificates returns the certificate (chain) for the CA
-func (a *Authority) GetCACertificates(ctx context.Context) ([]*x509.Certificate, error) {
-	// TODO: this should return: the "SCEP Server (RA)" certificate, the issuing CA up to and excl. the root
-	// Some clients do need the root certificate however; also see: https://github.com/openxpki/openxpki/issues/73
-	//
-	// This means we might need to think about if we should use the current intermediate CA
-	// certificate as the "SCEP Server (RA)" certificate. It might be better to have a distinct
-	// RA certificate, with a corresponding rsa.PrivateKey, just for SCEP usage, which is signed by
-	// the intermediate CA. Will need to look how we can provide this nicely within step-ca.
-	//
-	// This might also mean that we might want to use a distinct instance of KMS for doing the key operations,
-	// so that we can use RSA just for SCEP.
-	//
-	// Using an RA does not seem to exist in https://tools.ietf.org/html/rfc8894, but is mentioned in
-	// https://tools.ietf.org/id/draft-nourse-scep-21.html. Will continue using the CA directly for now.
-	//
-	// The certificate to use should probably depend on the (configured) provisioner and may
-	// use a distinct certificate, apart from the intermediate.
-
+// GetCACertificates returns the certificate (chain) for the CA.
+//
+// This methods returns the "SCEP Server (RA)" certificate, the issuing CA up to and excl. the root.
+// Some clients do need the root certificate however; also see: https://github.com/openxpki/openxpki/issues/73
+//
+// In case a provisioner specific decrypter is available, this is used as the "SCEP Server (RA)" certificate
+// instead of the CA intermediate directly. This uses a distinct instance of a KMS for doing the SCEp key
+// operations, so that RSA can be used for just SCEP.
+//
+// Using an RA does not seem to exist in https://tools.ietf.org/html/rfc8894, but is mentioned in
+// https://tools.ietf.org/id/draft-nourse-scep-21.html.
+func (a *Authority) GetCACertificates(ctx context.Context) (certs []*x509.Certificate, err error) {
 	p, err := provisionerFromContext(ctx)
 	if err != nil {
-		return nil, err
+		return
 	}
 
-	if len(a.service.certificateChain) == 0 {
-		return nil, errors.New("no intermediate certificate available in SCEP authority")
-	}
-
-	certs := []*x509.Certificate{}
+	// if a provisioner specific RSA decrypter is available, it is returned as
+	// the first certificate.
 	if decrypterCertificate, _ := p.GetDecrypter(); decrypterCertificate != nil {
 		certs = append(certs, decrypterCertificate)
-		certs = append(certs, a.service.signerCertificate)
-	} else {
-		certs = append(certs, a.service.defaultDecrypterCertificate)
 	}
 
-	// NOTE: we're adding the CA roots here, but they are (highly likely) different than what the RFC means.
-	// Clients are responsible to select the right cert(s) to use, though.
-	if p.ShouldIncludeRootInChain() && len(a.service.certificateChain) > 1 {
-		certs = append(certs, a.service.certificateChain[1])
+	// TODO: ensure logic, so that signer is first intermediate and that
+	// there are no doubles certificates.
+	//certs = append(certs, a.service.signerCertificate)
+	certs = append(certs, a.service.intermediates...)
+
+	// the CA roots are added for completeness. Clients are responsible
+	// to select the right cert(s) to store and use.
+	if p.ShouldIncludeRootInChain() {
+		certs = append(certs, a.service.roots...)
 	}
 
 	return certs, nil
@@ -182,7 +153,7 @@ func (a *Authority) DecryptPKIEnvelope(ctx context.Context, msg *PKIMessage) err
 		return fmt.Errorf("error parsing pkcs7 content: %w", err)
 	}
 
-	fmt.Println(fmt.Sprintf("%#+v", a.service.defaultDecrypterCertificate))
+	fmt.Println(fmt.Sprintf("%#+v", a.service.signerCertificate))
 	fmt.Println(fmt.Sprintf("%#+v", a.service.defaultDecrypter))
 
 	cert, pkey, err := a.selectDecrypter(ctx)
@@ -246,7 +217,7 @@ func (a *Authority) selectDecrypter(ctx context.Context) (cert *x509.Certificate
 	}
 
 	// fallback to the CA wide decrypter
-	cert = a.service.defaultDecrypterCertificate
+	cert = a.service.signerCertificate
 	pkey = a.service.defaultDecrypter
 
 	return

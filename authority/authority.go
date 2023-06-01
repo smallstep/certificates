@@ -641,56 +641,45 @@ func (a *Authority) init() error {
 		return err
 	}
 
-	// Check if a KMS with decryption capability is required and available
-	if a.requiresDecrypter() {
-		if _, ok := a.keyManager.(kmsapi.Decrypter); !ok {
-			return errors.New("keymanager doesn't provide crypto.Decrypter")
-		}
-	}
-
-	// TODO: decide if this is a good approach for providing the SCEP functionality
-	// It currently mirrors the logic for the x509CAService
-	if a.requiresSCEPService() && a.scepService == nil {
+	// The SCEP functionality is provided through an instance of
+	// scep.Service. It is initialized once when the CA is started.
+	// TODO: should the SCEP service support reloading? For example,
+	// when the admin resources are reloaded, specifically the provisioners,
+	// it can happen that the SCEP service is no longer required and can
+	// be destroyed, or that it needs to be instantiated. It may also need
+	// to be revalidated, because not all SCEP provisioner may have a
+	// valid decrypter available.
+	if a.requiresSCEP() && a.GetSCEP() == nil {
 		var options scep.Options
-
-		// Read intermediate and create X509 signer and decrypter for default CAS.
-		options.CertificateChain, err = pemutil.ReadCertificateBundle(a.config.IntermediateCert)
+		options.Roots = a.rootX509Certs
+		options.Intermediates, err = pemutil.ReadCertificateBundle(a.config.IntermediateCert)
 		if err != nil {
 			return err
 		}
-		options.CertificateChain = append(options.CertificateChain, a.rootX509Certs...)
-		options.Signer, err = a.keyManager.CreateSigner(&kmsapi.CreateSignerRequest{
+		options.SignerCert = options.Intermediates[0]
+		if options.Signer, err = a.keyManager.CreateSigner(&kmsapi.CreateSignerRequest{
 			SigningKey: a.config.IntermediateKey,
 			Password:   a.password,
-		})
-		if err != nil {
+		}); err != nil {
 			return err
 		}
-
-		options.SignerCert = options.CertificateChain[0]
-		options.DecrypterCert = options.CertificateChain[0]
 
 		// TODO: instead of creating the decrypter here, pass the
 		// intermediate key + chain down to the SCEP service / authority,
-		// and only instantiate it when required there.
+		// and only instantiate it when required there. Is that possible?
+		// Also with entering passwords?
 		// TODO: if moving the logic, try improving the logic for the
-		// decrypter password too?
-		if km, ok := a.keyManager.(kmsapi.Decrypter); ok {
-			options.Decrypter, err = km.CreateDecrypter(&kmsapi.CreateDecrypterRequest{
+		// decrypter password too? Right now it needs to be entered multiple
+		// times; I've observed it to be three times maximum, every time
+		// the intermediate key is read.
+		_, isRSA := options.Signer.Public().(*rsa.PublicKey)
+		if km, ok := a.keyManager.(kmsapi.Decrypter); ok && isRSA {
+			if decrypter, err := km.CreateDecrypter(&kmsapi.CreateDecrypterRequest{
 				DecryptionKey: a.config.IntermediateKey,
 				Password:      a.password,
-			})
-			if err == nil {
-				// when creating the decrypter fails, ignore the error
-				// TODO(hs): decide if this is OK. It could fail at startup, but it
-				// could be up later. Right now decryption would always fail.
-				key, ok := options.Decrypter.Public().(*rsa.PublicKey)
-				if !ok {
-					return errors.New("only RSA keys are currently supported as decrypters")
-				}
-				if !key.Equal(options.DecrypterCert.PublicKey) {
-					return errors.New("mismatch between decryption certificate and decrypter public keys")
-				}
+			}); err == nil {
+				// only pass the decrypter down when it was successfully created
+				options.Decrypter = decrypter
 			}
 		}
 
@@ -698,8 +687,6 @@ func (a *Authority) init() error {
 		if err != nil {
 			return err
 		}
-
-		// TODO: mimick the x509CAService GetCertificateAuthority here too?
 	}
 
 	// Load X509 constraints engine.
@@ -851,17 +838,9 @@ func (a *Authority) IsRevoked(sn string) (bool, error) {
 	return a.db.IsRevoked(sn)
 }
 
-// requiresDecrypter returns whether the Authority
-// requires a KMS that provides a crypto.Decrypter
-// Currently this is only required when SCEP is
-// enabled.
-func (a *Authority) requiresDecrypter() bool {
-	return a.requiresSCEPService()
-}
-
 // requiresSCEPService iterates over the configured provisioners
 // and determines if one of them is a SCEP provisioner.
-func (a *Authority) requiresSCEPService() bool {
+func (a *Authority) requiresSCEP() bool {
 	for _, p := range a.config.AuthorityConfig.Provisioners {
 		if p.GetType() == provisioner.TypeSCEP {
 			return true
@@ -870,12 +849,8 @@ func (a *Authority) requiresSCEPService() bool {
 	return false
 }
 
-// GetSCEPService returns the configured SCEP Service.
-//
-// TODO: this function is intended to exist temporarily in order to make SCEP
-// work more easily. It can be made more correct by using the right
-// interfaces/abstractions after it works as expected.
-func (a *Authority) GetSCEPService() *scep.Service {
+// GetSCEP returns the configured SCEP Service.
+func (a *Authority) GetSCEP() *scep.Service {
 	return a.scepService
 }
 

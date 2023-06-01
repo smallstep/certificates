@@ -6,6 +6,7 @@ import (
 	"crypto/rsa"
 	"crypto/subtle"
 	"crypto/x509"
+	"encoding/pem"
 	"fmt"
 	"net/http"
 	"time"
@@ -14,7 +15,6 @@ import (
 
 	"go.step.sm/crypto/kms"
 	kmsapi "go.step.sm/crypto/kms/apiv1"
-	"go.step.sm/crypto/pemutil"
 	"go.step.sm/linkedca"
 
 	"github.com/smallstep/certificates/webhook"
@@ -40,7 +40,7 @@ type SCEP struct {
 
 	// TODO
 	KMS                  *kms.Options `json:"kms,omitempty"`
-	DecrypterCert        string       `json:"decrypterCert"`
+	DecrypterCertificate []byte       `json:"decrypterCertificate"`
 	DecrypterKey         string       `json:"decrypterKey"`
 	DecrypterKeyPassword string       `json:"decrypterKeyPassword"`
 
@@ -198,18 +198,32 @@ func (s *SCEP) Init(config Config) (err error) {
 		}
 		km, ok := s.keyManager.(kmsapi.Decrypter)
 		if !ok {
-			return fmt.Errorf(`%q is not a kmsapi.Decrypter`, s.KMS.Type)
+			return fmt.Errorf("%q is not a kmsapi.Decrypter", s.KMS.Type)
 		}
-		if s.DecrypterKey != "" || s.DecrypterCert != "" {
+		if s.DecrypterKey != "" || len(s.DecrypterCertificate) > 0 {
 			if s.decrypter, err = km.CreateDecrypter(&kmsapi.CreateDecrypterRequest{
 				DecryptionKey: s.DecrypterKey,
 				Password:      []byte(s.DecrypterKeyPassword),
 			}); err != nil {
 				return fmt.Errorf("failed creating decrypter: %w", err)
 			}
-			if s.decrypterCertificate, err = pemutil.ReadCertificate(s.DecrypterCert); err != nil {
-				return fmt.Errorf("failed reading certificate: %w", err)
+
+			// Parse decrypter certificate
+			block, rest := pem.Decode(s.DecrypterCertificate)
+			if len(rest) > 0 {
+				fmt.Println(string(rest))
+				return errors.New("failed parsing decrypter certificate: trailing data")
 			}
+			if block == nil {
+				return errors.New("failed parsing decrypter certificate: no PEM block found")
+			}
+			if s.decrypterCertificate, err = x509.ParseCertificate(block.Bytes); err != nil {
+				return fmt.Errorf("failed parsing decrypter certificate: %w", err)
+			}
+
+			// if s.decrypterCertificate, err = pemutil.ReadCertificate(s.DecrypterCertFile); err != nil {
+			// 	return fmt.Errorf("failed reading certificate: %w", err)
+			// }
 			decrypterPublicKey, ok := s.decrypter.Public().(*rsa.PublicKey)
 			if !ok {
 				return fmt.Errorf("only RSA keys are supported")
