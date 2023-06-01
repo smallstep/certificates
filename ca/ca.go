@@ -250,19 +250,14 @@ func (ca *CA) Init(cfg *config.Config) (*CA, error) {
 
 	var scepAuthority *scep.Authority
 	if ca.shouldServeSCEPEndpoints() {
-		if scepAuthority, err = scep.New(auth, scep.AuthorityOptions{
-			Service: auth.GetSCEP(),
-		}); err != nil {
-			return nil, errors.Wrap(err, "failed creating SCEP authority")
-		}
-
 		// validate the SCEP authority configuration. Currently this
 		// will not result in a failure to start if one or more SCEP
 		// provisioners are not correctly configured. Only a log will
 		// be emitted.
-		shouldFail := false
+		scepAuthority = auth.GetSCEP()
 		if err := scepAuthority.Validate(); err != nil {
 			err = errors.Wrap(err, "failed validating SCEP authority")
+			shouldFail := false
 			if shouldFail {
 				return nil, err
 			}

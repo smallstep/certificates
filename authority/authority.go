@@ -62,7 +62,7 @@ type Authority struct {
 	x509Enforcers         []provisioner.CertificateEnforcer
 
 	// SCEP CA
-	scepService *scep.Service
+	scepAuthority *scep.Authority
 
 	// SSH CA
 	sshHostPassword         []byte
@@ -263,11 +263,12 @@ func (a *Authority) ReloadAdminResources(ctx context.Context) error {
 	a.admins = adminClxn
 
 	// update the SCEP service with the currently active SCEP
-	// provisioner names.
-	// TODO(hs): trigger SCEP authority (re)validation using
-	// the current set of SCEP provisioners.
-	if a.scepService != nil {
-		a.scepService.UpdateProvisioners(a.getSCEPProvisionerNames())
+	// provisioner names and revalidate the configuration.
+	if a.scepAuthority != nil {
+		a.scepAuthority.UpdateProvisioners(a.getSCEPProvisionerNames())
+		if err := a.scepAuthority.Validate(); err != nil {
+			log.Printf("failed validating SCEP authority: %v\n", err)
+		}
 	}
 
 	return nil
@@ -696,9 +697,15 @@ func (a *Authority) init() error {
 		// can be validated when the CA is started.
 		options.SCEPProvisionerNames = a.getSCEPProvisionerNames()
 
-		a.scepService, err = scep.NewService(ctx, options)
+		// create a new SCEP authority
+		a.scepAuthority, err = scep.New(a, options)
 		if err != nil {
 			return err
+		}
+
+		// validate the SCEP authority
+		if err := a.scepAuthority.Validate(); err != nil {
+			a.initLogf("failed validating SCEP authority: %v", err)
 		}
 	}
 
@@ -871,9 +878,9 @@ func (a *Authority) getSCEPProvisionerNames() (names []string) {
 	return
 }
 
-// GetSCEP returns the configured SCEP Service.
-func (a *Authority) GetSCEP() *scep.Service {
-	return a.scepService
+// GetSCEP returns the configured SCEP Authority
+func (a *Authority) GetSCEP() *scep.Authority {
+	return a.scepAuthority
 }
 
 func (a *Authority) startCRLGenerator() error {

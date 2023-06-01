@@ -18,8 +18,13 @@ import (
 
 // Authority is the layer that handles all SCEP interactions.
 type Authority struct {
-	service  *Service // TODO: refactor, so that this is not required
-	signAuth SignAuthority
+	signAuth             SignAuthority
+	roots                []*x509.Certificate
+	intermediates        []*x509.Certificate
+	signerCertificate    *x509.Certificate
+	signer               crypto.Signer
+	defaultDecrypter     crypto.Decrypter
+	scepProvisionerNames []string
 }
 
 type authorityKey struct{}
@@ -45,13 +50,6 @@ func MustFromContext(ctx context.Context) *Authority {
 	}
 }
 
-// AuthorityOptions required to create a new SCEP Authority.
-type AuthorityOptions struct {
-	// Service provides the roots, intermediates, the signer and the (default)
-	// decrypter to the SCEP Authority.
-	Service *Service
-}
-
 // SignAuthority is the interface for a signing authority
 type SignAuthority interface {
 	Sign(cr *x509.CertificateRequest, opts provisioner.SignOptions, signOpts ...provisioner.SignOption) ([]*x509.Certificate, error)
@@ -59,10 +57,18 @@ type SignAuthority interface {
 }
 
 // New returns a new Authority that implements the SCEP interface.
-func New(signAuth SignAuthority, ops AuthorityOptions) (*Authority, error) {
+func New(signAuth SignAuthority, opts Options) (*Authority, error) {
+	if err := opts.Validate(); err != nil {
+		return nil, err
+	}
 	authority := &Authority{
-		signAuth: signAuth,
-		service:  ops.Service,
+		signAuth:             signAuth, // TODO: provide signAuth through context instead?
+		roots:                opts.Roots,
+		intermediates:        opts.Intermediates,
+		signerCertificate:    opts.SignerCert,
+		signer:               opts.Signer,
+		defaultDecrypter:     opts.Decrypter,
+		scepProvisionerNames: opts.SCEPProvisionerNames,
 	}
 	return authority, nil
 }
@@ -71,15 +77,15 @@ func New(signAuth SignAuthority, ops AuthorityOptions) (*Authority, error) {
 // The validation includes a check if a decrypter is available, either
 // an authority wide decrypter, or a provisioner specific decrypter.
 func (a *Authority) Validate() error {
-	noDefaultDecrypterAvailable := a.service.defaultDecrypter == nil
-	for _, name := range a.service.scepProvisionerNames {
+	noDefaultDecrypterAvailable := a.defaultDecrypter == nil
+	for _, name := range a.scepProvisionerNames {
 		p, err := a.LoadProvisionerByName(name)
 		if err != nil {
 			return fmt.Errorf("failed loading provisioner %q: %w", name, err)
 		}
 		if scepProv, ok := p.(*provisioner.SCEP); ok {
 			cert, decrypter := scepProv.GetDecrypter()
-			// TODO: return sentinel/typed error, to be able to ignore/log these cases during init?
+			// TODO(hs): return sentinel/typed error, to be able to ignore/log these cases during init?
 			if cert == nil && noDefaultDecrypterAvailable {
 				return fmt.Errorf("SCEP provisioner %q does not have a decrypter certificate", name)
 			}
@@ -90,6 +96,13 @@ func (a *Authority) Validate() error {
 	}
 
 	return nil
+}
+
+// UpdateProvisioners updates the SCEP Authority with the new, and hopefully
+// current SCEP provisioners configured. This allows the Authority to be
+// validated with the latest data.
+func (a *Authority) UpdateProvisioners(scepProvisionerNames []string) {
+	a.scepProvisionerNames = scepProvisionerNames
 }
 
 var (
@@ -134,15 +147,14 @@ func (a *Authority) GetCACertificates(ctx context.Context) (certs []*x509.Certif
 		certs = append(certs, decrypterCertificate)
 	}
 
-	// TODO: ensure logic, so that signer is first intermediate and that
-	// there are no doubles certificates.
-	//certs = append(certs, a.service.signerCertificate)
-	certs = append(certs, a.service.intermediates...)
+	// TODO(hs): ensure logic is in place that checks the signer is the first
+	// intermediate and that there are no double certificates.
+	certs = append(certs, a.intermediates...)
 
-	// the CA roots are added for completeness. Clients are responsible
-	// to select the right cert(s) to store and use.
+	// the CA roots are added for completeness when configured to do so. Clients
+	// are responsible to select the right cert(s) to store and use.
 	if p.ShouldIncludeRootInChain() {
-		certs = append(certs, a.service.roots...)
+		certs = append(certs, a.roots...)
 	}
 
 	return certs, nil
@@ -213,8 +225,8 @@ func (a *Authority) selectDecrypter(ctx context.Context) (cert *x509.Certificate
 	}
 
 	// fallback to the CA wide decrypter
-	cert = a.service.signerCertificate
-	pkey = a.service.defaultDecrypter
+	cert = a.signerCertificate
+	pkey = a.defaultDecrypter
 
 	return
 }
@@ -351,8 +363,8 @@ func (a *Authority) SignCSR(ctx context.Context, csr *x509.CertificateRequest, m
 	// as the first certificate in the array
 	signedData.AddCertificate(cert)
 
-	authCert := a.service.signerCertificate
-	signer := a.service.signer
+	authCert := a.signerCertificate
+	signer := a.signer
 
 	// sign the attributes
 	if err := signedData.AddSigner(authCert, signer, config); err != nil {
@@ -423,7 +435,7 @@ func (a *Authority) CreateFailureResponse(_ context.Context, _ *x509.Certificate
 	}
 
 	// sign the attributes
-	if err := signedData.AddSigner(a.service.signerCertificate, a.service.signer, config); err != nil {
+	if err := signedData.AddSigner(a.signerCertificate, a.signer, config); err != nil {
 		return nil, err
 	}
 
