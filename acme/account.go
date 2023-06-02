@@ -32,7 +32,7 @@ func (a *Account) GetLocation() string {
 	return a.LocationPrefix + a.ID
 }
 
-// GetProvisionerName returns the provisioner name extracted from the stored
+// GetProvisionerName returns the provisioner name used to generate the account.
 // location.
 func (a *Account) GetProvisionerName() string {
 	return a.ProvisionerName
@@ -88,6 +88,7 @@ func (p *Policy) GetAllowedNameOptions() *policy.X509NameOptions {
 		IPRanges:   p.X509.Allowed.IPRanges,
 	}
 }
+
 func (p *Policy) GetDeniedNameOptions() *policy.X509NameOptions {
 	if p == nil {
 		return nil
