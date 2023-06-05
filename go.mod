@@ -29,7 +29,7 @@ require (
 	github.com/urfave/cli v1.22.13
 	go.mozilla.org/pkcs7 v0.0.0-20210826202110-33d05740a352
 	go.step.sm/cli-utils v0.7.6
-	go.step.sm/crypto v0.31.0
+	go.step.sm/crypto v0.31.2
 	go.step.sm/linkedca v0.19.1
 	golang.org/x/crypto v0.9.0
 	golang.org/x/exp v0.0.0-20230310171629-522b1b587ee0
@@ -57,7 +57,7 @@ require (
 	github.com/Masterminds/goutils v1.1.1 // indirect
 	github.com/Masterminds/semver/v3 v3.2.0 // indirect
 	github.com/ThalesIgnite/crypto11 v1.2.5 // indirect
-	github.com/aws/aws-sdk-go v1.44.267 // indirect
+	github.com/aws/aws-sdk-go v1.44.271 // indirect
 	github.com/cenkalti/backoff/v3 v3.0.0 // indirect
 	github.com/cespare/xxhash v1.1.0 // indirect
 	github.com/cespare/xxhash/v2 v2.2.0 // indirect
