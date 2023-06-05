@@ -335,7 +335,7 @@ func lookupJWK(next nextHTTP) nextHTTP {
 				// matches the provisioner in the request URL.
 				reqProv := acme.MustProvisionerFromContext(ctx)
 				reqProvName := reqProv.GetName()
-				accProvName := acc.GetProvisionerName()
+				accProvName := acc.ProvisionerName
 				if reqProvName != accProvName {
 					// Provisioner in the URL must match the provisioner with
 					// which the account was created.

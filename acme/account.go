@@ -32,12 +32,6 @@ func (a *Account) GetLocation() string {
 	return a.LocationPrefix + a.ID
 }
 
-// GetProvisionerName returns the provisioner name used to generate the account.
-// location.
-func (a *Account) GetProvisionerName() string {
-	return a.ProvisionerName
-}
-
 // ToLog enables response logging.
 func (a *Account) ToLog() (interface{}, error) {
 	b, err := json.Marshal(a)

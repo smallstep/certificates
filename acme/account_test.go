@@ -83,26 +83,6 @@ func TestAccount_GetLocation(t *testing.T) {
 	}
 }
 
-func TestAccount_GetProvisionerName(t *testing.T) {
-	accID := "foo"
-
-	type test struct {
-		acc  *Account
-		want string
-	}
-	tests := map[string]test{
-		"ok": {
-			acc:  &Account{ID: accID, ProvisionerName: "foo"},
-			want: "foo",
-		},
-	}
-	for name, tc := range tests {
-		t.Run(name, func(t *testing.T) {
-			assert.Equals(t, tc.acc.GetProvisionerName(), tc.want)
-		})
-	}
-}
-
 func TestAccount_IsValid(t *testing.T) {
 	type test struct {
 		acc *Account
