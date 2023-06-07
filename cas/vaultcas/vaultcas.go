@@ -37,6 +37,7 @@ type VaultOptions struct {
 	PKIRoleEd25519 string          `json:"pkiRoleEd25519,omitempty"`
 	AuthType       string          `json:"authType,omitempty"`
 	AuthMountPath  string          `json:"authMountPath,omitempty"`
+	Namespace      string          `json:"namespace,omitempty"`
 	AuthOptions    json.RawMessage `json:"authOptions,omitempty"`
 }
 
@@ -88,6 +89,10 @@ func New(ctx context.Context, opts apiv1.Options) (*VaultCAS, error) {
 	}
 	if err != nil {
 		return nil, fmt.Errorf("unable to configure %s auth method: %w", vc.AuthType, err)
+	}
+
+	if vc.Namespace != "" {
+		client.SetNamespace(vc.Namespace)
 	}
 
 	authInfo, err := client.Auth().Login(ctx, method)
