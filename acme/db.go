@@ -12,6 +12,12 @@ import (
 // account.
 var ErrNotFound = errors.New("not found")
 
+// IsErrNotFound returns true if the error is a "not found" error. Returns false
+// otherwise.
+func IsErrNotFound(err error) bool {
+	return errors.Is(err, ErrNotFound)
+}
+
 // DB is the DB interface expected by the step-ca ACME API.
 type DB interface {
 	CreateAccount(ctx context.Context, acc *Account) error
