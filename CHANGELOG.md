@@ -27,6 +27,12 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
 
 ## [Unreleased]
 
+### Fixed
+
+- Improved authentication for ACME requests using kid and provisioner name
+  (smallstep/certificates#1386).
+
+
 ## [v0.24.2] - 2023-05-11
 
 ### Added
