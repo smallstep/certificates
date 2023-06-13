@@ -4,7 +4,7 @@ go 1.19
 
 require (
 	cloud.google.com/go/longrunning v0.5.0
-	cloud.google.com/go/security v1.14.1
+	cloud.google.com/go/security v1.15.0
 	github.com/Masterminds/sprig/v3 v3.2.3
 	github.com/fxamacker/cbor/v2 v2.4.0
 	github.com/go-chi/chi v4.1.2+incompatible
@@ -44,7 +44,7 @@ require (
 	cloud.google.com/go v0.110.2 // indirect
 	cloud.google.com/go/compute v1.19.3 // indirect
 	cloud.google.com/go/compute/metadata v0.2.3 // indirect
-	cloud.google.com/go/iam v0.13.0 // indirect
+	cloud.google.com/go/iam v1.0.1 // indirect
 	cloud.google.com/go/kms v1.10.2 // indirect
 	filippo.io/edwards25519 v1.0.0 // indirect
 	github.com/AndreasBriese/bbloom v0.0.0-20190825152654-46b345b51c96 // indirect
