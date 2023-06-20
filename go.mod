@@ -34,7 +34,7 @@ require (
 	golang.org/x/crypto v0.10.0
 	golang.org/x/exp v0.0.0-20230310171629-522b1b587ee0
 	golang.org/x/net v0.11.0
-	google.golang.org/api v0.126.0
+	google.golang.org/api v0.128.0
 	google.golang.org/grpc v1.56.0
 	google.golang.org/protobuf v1.30.0
 	gopkg.in/square/go-jose.v2 v2.6.0
@@ -84,7 +84,7 @@ require (
 	github.com/google/go-tpm-tools v0.3.12 // indirect
 	github.com/google/go-tspi v0.3.0 // indirect
 	github.com/google/s2a-go v0.1.4 // indirect
-	github.com/googleapis/enterprise-certificate-proxy v0.2.3 // indirect
+	github.com/googleapis/enterprise-certificate-proxy v0.2.4 // indirect
 	github.com/hashicorp/errwrap v1.1.0 // indirect
 	github.com/hashicorp/go-cleanhttp v0.5.2 // indirect
 	github.com/hashicorp/go-multierror v1.1.1 // indirect
