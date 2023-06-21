@@ -63,6 +63,25 @@ DATE    := $(shell date -u '+%Y-%m-%d %H:%M UTC')
 LDFLAGS := -ldflags='-w -X "main.Version=$(VERSION)" -X "main.BuildTime=$(DATE)"'
 GOFLAGS := CGO_ENABLED=0
 
+# Check for programs required for a CGO build
+check_gcc := $(shell command -v gcc 2> /dev/null)
+# pkg-config is run by the go-piv build on Linux, to discover
+# properties of pcsclite library.
+# See https://github.com/go-piv/piv-go/blob/5418a1a438791fc94745accde6c0f3cafac93311/piv/pcsc_unix.go#L23
+check_pkgconfig := $(shell command -v pkg-config 2> /dev/null)
+
+ifeq (,$(findstring CGO_ENABLED=0,$(GOFLAGS)))
+	ifeq (,$(check_gcc))
+		$(error "Please install gcc before building with cgo enabled.")
+	endif
+	UNAME_S := $(shell uname -s)
+	ifeq ($(UNAME_S),Linux)
+		ifeq (,$(check_pkgconfig))
+			$(error "Please install pkg-config before building with cgo enabled.")
+		endif
+	endif
+endif
+
 download:
 	$Q go mod download
 
