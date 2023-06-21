@@ -61,26 +61,8 @@ endif
 
 DATE    := $(shell date -u '+%Y-%m-%d %H:%M UTC')
 LDFLAGS := -ldflags='-w -X "main.Version=$(VERSION)" -X "main.BuildTime=$(DATE)"'
-GOFLAGS := CGO_ENABLED=0
-
-# Check for programs required for a CGO build
-check_gcc := $(shell command -v gcc 2> /dev/null)
-# pkg-config is run by the go-piv build on Linux, to discover
-# properties of pcsclite library.
-# See https://github.com/go-piv/piv-go/blob/5418a1a438791fc94745accde6c0f3cafac93311/piv/pcsc_unix.go#L23
-check_pkgconfig := $(shell command -v pkg-config 2> /dev/null)
-
-ifeq (,$(findstring CGO_ENABLED=0,$(GOFLAGS)))
-	ifeq (,$(check_gcc))
-		$(error "Please install gcc before building with cgo enabled.")
-	endif
-	UNAME_S := $(shell uname -s)
-	ifeq ($(UNAME_S),Linux)
-		ifeq (,$(check_pkgconfig))
-			$(error "Please install pkg-config before building with cgo enabled.")
-		endif
-	endif
-endif
+GOFLAGS ?= 
+GO_ENVS := CGO_ENABLED=0
 
 download:
 	$Q go mod download
@@ -90,7 +72,7 @@ build: $(PREFIX)bin/$(BINNAME)
 
 $(PREFIX)bin/$(BINNAME): download $(call rwildcard,*.go)
 	$Q mkdir -p $(@D)
-	$Q $(GOOS_OVERRIDE) $(GOFLAGS) go build -v -o $(PREFIX)bin/$(BINNAME) $(LDFLAGS) $(PKG)
+	$Q $(GOOS_OVERRIDE) $(GO_ENVS) go build -v -o $(PREFIX)bin/$(BINNAME) $(LDFLAGS) $(PKG)
 
 # Target to force a build of step-ca without running tests
 simple: build
@@ -112,7 +94,7 @@ generate:
 test: testdefault testtpmsimulator combinecoverage
 
 testdefault:
-	$Q $(GOFLAGS) gotestsum -- -coverprofile=defaultcoverage.out -short -covermode=atomic ./...
+	$Q $(GO_ENVS) gotestsum -- -coverprofile=defaultcoverage.out -short -covermode=atomic ./...
 
 testtpmsimulator:
 	$Q CGO_ENALBED=1 gotestsum -- -coverprofile=tpmsimulatorcoverage.out -short -covermode=atomic -tags tpmsimulator ./acme 
@@ -128,7 +110,7 @@ combinecoverage:
 integrate: integration
 
 integration: bin/$(BINNAME)
-	$Q $(GOFLAGS) gotestsum -- -tags=integration ./integration/...
+	$Q $(GO_ENVS) gotestsum -- -tags=integration ./integration/...
 
 .PHONY: integrate integration
 
