@@ -61,14 +61,22 @@ endif
 
 DATE    := $(shell date -u '+%Y-%m-%d %H:%M UTC')
 LDFLAGS := -ldflags='-w -X "main.Version=$(VERSION)" -X "main.BuildTime=$(DATE)"'
-GOFLAGS := -v
 
-ifeq (,$(GOFLAGS))
-	ifeq (,$(findstring CGO_ENABLED=0,$(GO_ENVS)))
+# Always explicitly enable or disable cgo,
+# so that go doesn't silently fall back on
+# non-cgo when gcc is not found.
+ifeq (,$(findstring CGO_ENABLED,$(GO_ENVS)))
+	ifneq ($(origin GOFLAGS),undefined)
+		# This section is for backward compatibility with 
+		# 
+		# $ make build GOFLAGS=""
+		#
+		# which is how we recommended building step-ca with cgo support
+		# until June 2023.
 		GO_ENVS := $(GO_ENVS) CGO_ENABLED=1
+	else
+		GO_ENVS := $(GO_ENVS) CGO_ENABLED=0
 	endif
-else
-	GO_ENVS := $(GO_ENVS) CGO_ENABLED=0
 endif
 
 download:
@@ -79,7 +87,7 @@ build: $(PREFIX)bin/$(BINNAME)
 
 $(PREFIX)bin/$(BINNAME): download $(call rwildcard,*.go)
 	$Q mkdir -p $(@D)
-	$Q $(GOOS_OVERRIDE) $(GO_ENVS) go build $(GOFLAGS) -o $(PREFIX)bin/$(BINNAME) $(LDFLAGS) $(PKG)
+	$Q $(GOOS_OVERRIDE) GOFLAGS=$(GOFLAGS) $(GO_ENVS) go build -v -o $(PREFIX)bin/$(BINNAME) $(LDFLAGS) $(PKG)
 
 # Target to force a build of step-ca without running tests
 simple: build

@@ -119,17 +119,11 @@ See our installation docs [here](https://smallstep.com/docs/step-ca/installation
 
 ## Documentation
 
-Documentation can be found in a handful of different places:
-
-1. On the web at https://smallstep.com/docs/step-ca.
-
-2. On the command line with `step help ca xxx` where `xxx` is the subcommand
-you are interested in. Ex: `step help ca provisioner list`.
-
-3. In your browser, by running `step help --http=:8080 ca` from the command line
+* [Official documentation](https://smallstep.com/docs/step-ca) is on smallstep.com
+* The `step` command reference is available via `step help`,
+[or on smallstep.com](https://smallstep.com/docs/step-cli/reference/),
+or by running `step help --http=:8080` from the command line
 and visiting http://localhost:8080.
-
-4. The [docs](./docs/README.md) folder is being deprecated, but it still has some documentation and tutorials.
 
 ## Feedback?
 
