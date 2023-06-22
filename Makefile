@@ -87,7 +87,7 @@ build: $(PREFIX)bin/$(BINNAME)
 
 $(PREFIX)bin/$(BINNAME): download $(call rwildcard,*.go)
 	$Q mkdir -p $(@D)
-	$Q $(GOOS_OVERRIDE) GOFLAGS=$(GOFLAGS) $(GO_ENVS) go build -v -o $(PREFIX)bin/$(BINNAME) $(LDFLAGS) $(PKG)
+	$Q $(GOOS_OVERRIDE) GOFLAGS="$(GOFLAGS)" $(GO_ENVS) go build -v -o $(PREFIX)bin/$(BINNAME) $(LDFLAGS) $(PKG)
 
 # Target to force a build of step-ca without running tests
 simple: build
