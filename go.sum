@@ -48,8 +48,8 @@ cloud.google.com/go/datastore v1.1.0/go.mod h1:umbIZjpQpHh4hmRpGhH4tLFup+FVzqBi1
 cloud.google.com/go/firestore v1.1.0/go.mod h1:ulACoGHTpvq5r8rxGJ4ddJZBZqakUQqClKRT5SZwBmk=
 cloud.google.com/go/iam v1.1.0 h1:67gSqaPukx7O8WLLHMa0PNs3EBGd2eE4d+psbO/CO94=
 cloud.google.com/go/iam v1.1.0/go.mod h1:nxdHjaKfCr7fNYx/HJMM8LgiMugmveWlkatear5gVyk=
-cloud.google.com/go/kms v1.11.0 h1:0LPJPKamw3xsVpkel1bDtK0vVJec3EyqdQOLitiD030=
-cloud.google.com/go/kms v1.11.0/go.mod h1:hwdiYC0xjnWsKQQCQQmIQnS9asjYVSK6jtXm+zFqXLM=
+cloud.google.com/go/kms v1.12.0 h1:IEYV44WsGc6yVO1PlvnRlYzsHM2ImpB598Cglh/3uGw=
+cloud.google.com/go/kms v1.12.0/go.mod h1:syfpIBSOqQ/ZqK48RLPkwUhFhvbsA1SyGAq/vPohd20=
 cloud.google.com/go/longrunning v0.5.0 h1:DK8BH0+hS+DIvc9a2TPnteUievsTCH4ORMAASSb7JcQ=
 cloud.google.com/go/longrunning v0.5.0/go.mod h1:0JNuqRShmscVAhIACGtskSAWtqtOoPkwP0YF1oVEchc=
 cloud.google.com/go/monitoring v0.1.0/go.mod h1:Hpm3XfzJv+UTiXzCG5Ffp0wijzHTC7Cv4eR7o3x/fEE=
@@ -88,8 +88,8 @@ github.com/Azure/azure-amqp-common-go/v2 v2.1.0/go.mod h1:R8rea+gJRuJR6QxTir/XuE
 github.com/Azure/azure-pipeline-go v0.2.1/go.mod h1:UGSo8XybXnIGZ3epmeBw7Jdz+HiUVpqIlpz/HKHylF4=
 github.com/Azure/azure-sdk-for-go v29.0.0+incompatible/go.mod h1:9XXNKU+eRnpl9moKnB4QOLf1HestfXbmab5FXxiDBjc=
 github.com/Azure/azure-sdk-for-go v30.1.0+incompatible/go.mod h1:9XXNKU+eRnpl9moKnB4QOLf1HestfXbmab5FXxiDBjc=
-github.com/Azure/azure-sdk-for-go/sdk/azcore v1.6.0 h1:8kDqDngH+DmVBiCtIjCFTGa7MBnsIOkF9IccInFEbjk=
-github.com/Azure/azure-sdk-for-go/sdk/azcore v1.6.0/go.mod h1:bjGvMhVMb+EEm3VRNQawDMUyMMjo+S5ewNjflkep/0Q=
+github.com/Azure/azure-sdk-for-go/sdk/azcore v1.6.1 h1:SEy2xmstIphdPwNBUi7uhvjyjhVKISfwjfOJmuy7kg4=
+github.com/Azure/azure-sdk-for-go/sdk/azcore v1.6.1/go.mod h1:bjGvMhVMb+EEm3VRNQawDMUyMMjo+S5ewNjflkep/0Q=
 github.com/Azure/azure-sdk-for-go/sdk/azidentity v1.3.0 h1:vcYCAze6p19qBW7MhZybIsqD8sMV8js0NyQM8JDnVtg=
 github.com/Azure/azure-sdk-for-go/sdk/azidentity v1.3.0/go.mod h1:OQeznEEkTZ9OrhHJoDD8ZDq51FHgXjqtP9z6bEwBq9U=
 github.com/Azure/azure-sdk-for-go/sdk/internal v1.3.0 h1:sXr+ck84g/ZlZUOZiNELInmMgOsuGwdjjVkEIde0OtY=
@@ -165,8 +165,8 @@ github.com/aws/aws-sdk-go v1.25.11/go.mod h1:KmX6BPdI08NWTb3/sm4ZGu5ShLoqVDhKgpi
 github.com/aws/aws-sdk-go v1.25.37/go.mod h1:KmX6BPdI08NWTb3/sm4ZGu5ShLoqVDhKgpiN924inxo=
 github.com/aws/aws-sdk-go v1.27.0/go.mod h1:KmX6BPdI08NWTb3/sm4ZGu5ShLoqVDhKgpiN924inxo=
 github.com/aws/aws-sdk-go v1.37.0/go.mod h1:hcU610XS61/+aQV88ixoOzUoG7v3b31pl2zKMmprdro=
-github.com/aws/aws-sdk-go v1.44.276 h1:ywPlx9C5Yc482dUgAZ9bHpQ6onVvJvYE9FJWsNDCEy0=
-github.com/aws/aws-sdk-go v1.44.276/go.mod h1:aVsgQcEevwlmQ7qHE9I3h+dtQgpqhFB+i8Phjh7fkwI=
+github.com/aws/aws-sdk-go v1.44.281 h1:z/ptheJvINaIAsKXthxONM+toTKw2pxyk700Hfm6yUw=
+github.com/aws/aws-sdk-go v1.44.281/go.mod h1:aVsgQcEevwlmQ7qHE9I3h+dtQgpqhFB+i8Phjh7fkwI=
 github.com/aws/aws-sdk-go-v2 v0.18.0/go.mod h1:JWVYvqSMppoMJC0x5wdwiImzgXTI9FuZwxzkQq9wy+g=
 github.com/aybabtme/rgbterm v0.0.0-20170906152045-cc83f3b3ce59/go.mod h1:q/89r3U2H7sSsE2t6Kca0lfwTK8JdoNGS/yzM/4iH5I=
 github.com/benbjohnson/clock v1.0.3/go.mod h1:bGMdMPoPVvcYyt1gHDf4J2KE153Yf9BuiUKYMaxlTDM=
@@ -1063,8 +1063,8 @@ go.opentelemetry.io/otel/trace v0.20.0/go.mod h1:6GjCW8zgDjwGHGa6GkyeB8+/5vjT16g
 go.opentelemetry.io/proto/otlp v0.7.0/go.mod h1:PqfVotwruBrMGOCsRd/89rSnXhoiJIqeYNgFYFoEGnI=
 go.step.sm/cli-utils v0.7.6 h1:YkpLVrepmy2c5+eaz/wduiGxlgrRx3YdAStE37if25g=
 go.step.sm/cli-utils v0.7.6/go.mod h1:j+FxFZ2gbWkAJl0eded/rksuxmNqWpmyxbkXcukGJaY=
-go.step.sm/crypto v0.32.0 h1:6vW12tmOLZ9czP0ezW5bFaLvy/jAlXtIOTBCU09n8jI=
-go.step.sm/crypto v0.32.0/go.mod h1:eRZkOZVHvZWyWBrxfiR9XCndRtxjuJRpBQLm4MezNEQ=
+go.step.sm/crypto v0.32.1 h1:kAiL21zTqAgYu1geOYxH+ApUCUX+oclB25TccnNEYTU=
+go.step.sm/crypto v0.32.1/go.mod h1:JwarCq+Sn6N8IbRSKfSJfjUNKfO8c4N1mcNxYXuxXzc=
 go.step.sm/linkedca v0.19.1 h1:uY0ByT/uB3FCQ8zIo9mU7MWG7HKf5sDXNEBeN94MuP8=
 go.step.sm/linkedca v0.19.1/go.mod h1:vPV2ad3LFQJmV7XWt87VlnJSs6UOqgsbVGVWe3veEmI=
 go.uber.org/atomic v1.3.2/go.mod h1:gD2HeocX3+yG+ygLZcrzQJaqmWj9AIm7n08wl/qW/PE=
