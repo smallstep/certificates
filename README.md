@@ -121,7 +121,7 @@ See our installation docs [here](https://smallstep.com/docs/step-ca/installation
 
 * [Official documentation](https://smallstep.com/docs/step-ca) is on smallstep.com
 * The `step` command reference is available via `step help`,
-[or on smallstep.com](https://smallstep.com/docs/step-cli/reference/),
+[on smallstep.com](https://smallstep.com/docs/step-cli/reference/),
 or by running `step help --http=:8080` from the command line
 and visiting http://localhost:8080.
 
