@@ -112,7 +112,7 @@ testdefault:
 	$Q $(GO_ENVS) gotestsum -- -coverprofile=defaultcoverage.out -short -covermode=atomic ./...
 
 testtpmsimulator:
-	$Q CGO_ENALBED=1 gotestsum -- -coverprofile=tpmsimulatorcoverage.out -short -covermode=atomic -tags tpmsimulator ./acme 
+	$Q CGO_ENABLED=1 gotestsum -- -coverprofile=tpmsimulatorcoverage.out -short -covermode=atomic -tags tpmsimulator ./acme 
 
 testcgo:
 	$Q gotestsum -- -coverprofile=coverage.out -short -covermode=atomic ./...
