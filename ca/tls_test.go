@@ -229,7 +229,7 @@ func TestClient_GetServerTLSConfig_http(t *testing.T) {
 					defer resp.Body.Close()
 					b, err := io.ReadAll(resp.Body)
 					if err != nil {
-						t.Fatalf("ioutil.RealAdd() error = %v", err)
+						t.Fatalf("io.ReadAll() error = %v", err)
 					}
 					if !bytes.Equal(b, []byte("ok")) {
 						t.Errorf("response body unexpected, got %s, want ok", b)
@@ -343,7 +343,7 @@ func TestClient_GetServerTLSConfig_renew(t *testing.T) {
 					defer resp.Body.Close()
 					b, err := io.ReadAll(resp.Body)
 					if err != nil {
-						t.Errorf("ioutil.RealAdd() error = %v", err)
+						t.Errorf("io.ReadAll() error = %v", err)
 						return
 					}
 					if !bytes.Equal(b, []byte("ok")) {
