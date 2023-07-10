@@ -55,6 +55,8 @@ func GetProvisioner(w http.ResponseWriter, r *http.Request) {
 		render.Error(w, err)
 		return
 	}
+
+	w.Header().Set("Cache-Control", "private, no-store")
 	render.ProtoJSON(w, prov)
 }
 
@@ -72,6 +74,7 @@ func GetProvisioners(w http.ResponseWriter, r *http.Request) {
 		render.Error(w, errs.InternalServerErr(err))
 		return
 	}
+
 	render.JSON(w, &GetProvisionersResponse{
 		Provisioners: p,
 		NextCursor:   next,
@@ -102,6 +105,8 @@ func CreateProvisioner(w http.ResponseWriter, r *http.Request) {
 		render.Error(w, admin.WrapErrorISE(err, "error storing provisioner %s", prov.Name))
 		return
 	}
+
+	w.Header().Set("Cache-Control", "private, no-store")
 	render.ProtoJSONStatus(w, prov, http.StatusCreated)
 }
 
@@ -198,6 +203,8 @@ func UpdateProvisioner(w http.ResponseWriter, r *http.Request) {
 		render.Error(w, err)
 		return
 	}
+
+	w.Header().Set("Cache-Control", "private, no-store")
 	render.ProtoJSON(w, nu)
 }
 
