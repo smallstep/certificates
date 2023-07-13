@@ -74,7 +74,7 @@ sudo yum install pcsc-lite-devel
 To build `step-ca`, clone this repository and run the following:
 
 ```shell
-make bootstrap && make build GOFLAGS=""
+make bootstrap && make build GO_ENVS="CGO_ENABLED=1"
 ```
 
 When the build is complete, you will find binaries in `bin/`.
