@@ -2,11 +2,11 @@ package main
 
 import (
 	"bytes"
+	"encoding/base64"
 	"encoding/binary"
 	"errors"
 	"flag"
 	"fmt"
-	"log"
 	"os"
 	"path/filepath"
 
@@ -62,6 +62,7 @@ func main() {
 	var v1, v2 bool
 	var dir, valueDir string
 	var typ, database string
+	var key string
 
 	fs := flag.NewFlagSet(os.Args[0], flag.ExitOnError)
 
@@ -71,25 +72,33 @@ func main() {
 	fs.StringVar(&valueDir, "value-dir", "", "badger database value directory")
 	fs.StringVar(&typ, "type", "", "the destination database type to use")
 	fs.StringVar(&database, "database", "", "the destination driver-specific data source name")
+	fs.StringVar(&key, "key", "", "the key used to resume the migration")
 	fs.Usage = func() { usage(fs) }
 	fs.Parse(os.Args[1:])
 
 	switch {
 	case v1 == v2:
-		fatal("flag --v1 or --v2 are required")
+		fatal("flag -v1 or -v2 are required")
 	case dir == "":
-		fatal("flag --dir is required")
+		fatal("flag -dir is required")
 	case typ != "postgresql" && typ != "mysql":
-		fatal(`flag --type must be "postgresql" or "mysql"`)
+		fatal(`flag -type must be "postgresql" or "mysql"`)
 	case database == "":
 		fatal("flag --database required")
 	}
 
 	var (
-		err  error
-		v1DB *badgerv1.DB
-		v2DB *badgerv2.DB
+		err     error
+		v1DB    *badgerv1.DB
+		v2DB    *badgerv2.DB
+		lastKey []byte
 	)
+
+	if key != "" {
+		if lastKey, err = base64.StdEncoding.DecodeString(key); err != nil {
+			fatal("error decoding key: %v", err)
+		}
+	}
 
 	if v1 {
 		if v1DB, err = badgerV1Open(dir, valueDir); err != nil {
@@ -109,30 +118,55 @@ func main() {
 	allTables := append([]string{}, authorityTables...)
 	allTables = append(allTables, acmeTables...)
 
-	for _, table := range allTables {
+	// Convert prefix names to badger key prefixes
+	badgerKeys := make([][]byte, len(allTables))
+	for i, name := range allTables {
+		badgerKeys[i], err = badgerEncode([]byte(name))
+		if err != nil {
+			fatal("error encoding table %s: %v", name, err)
+		}
+	}
+
+	for i, prefix := range badgerKeys {
+		table := allTables[i]
+
+		// With a key flag, resume from that table and prefix
+		if lastKey != nil {
+			bucket, _ := parseBadgerEncode(lastKey)
+			if table != string(bucket) {
+				fmt.Printf("skipping table %s\n", table)
+				continue
+			}
+			// Continue with a new prefix
+			prefix = lastKey
+			lastKey = nil
+		}
+
 		var n int64
-		fmt.Printf("migrating %s ...\n", table)
+		fmt.Printf("migrating %s ...", table)
 		if err := db.CreateTable([]byte(table)); err != nil {
 			fatal("error creating table %s: %v", table, err)
 		}
 
 		if v1 {
-			if err := badgerV1Iterate(v1DB, []byte(table), func(bucket, key, value []byte) error {
+			if badgerKey, err := badgerV1Iterate(v1DB, prefix, func(bucket, key, value []byte) error {
 				n++
 				return db.Set(bucket, key, value)
 			}); err != nil {
-				fatal("error inserting into %s: %v", table, err)
+				fmt.Println()
+				fatal("error inserting into %s: %v\nLast key: %s", table, err, base64.StdEncoding.EncodeToString(badgerKey))
 			}
 		} else {
-			if err := badgerV2Iterate(v2DB, []byte(table), func(bucket, key, value []byte) error {
+			if badgerKey, err := badgerV2Iterate(v2DB, prefix, func(bucket, key, value []byte) error {
 				n++
 				return db.Set(bucket, key, value)
 			}); err != nil {
-				fatal("error inserting into %s: %v", table, err)
+				fmt.Println()
+				fatal("error inserting into %s: %v\nLast key: %s", table, err, base64.StdEncoding.EncodeToString(badgerKey))
 			}
 		}
 
-		log.Printf("%d rows\n", n)
+		fmt.Printf(" %d rows\n", n)
 	}
 }
 
@@ -158,95 +192,70 @@ func badgerV2Open(dir, valueDir string) (*badgerv2.DB, error) {
 	return badgerv2.Open(opts)
 }
 
-func badgerV1Iterate(db *badgerv1.DB, table []byte, fn func(table, key, value []byte) error) error {
-	return db.View(func(txn *badgerv1.Txn) error {
-		var tableExists bool
-
-		it := txn.NewIterator(badgerv1.DefaultIteratorOptions)
-		defer it.Close()
-
-		prefix, err := badgerEncode(table)
-		if err != nil {
-			return err
-		}
-
-		for it.Seek(prefix); it.ValidForPrefix(prefix); it.Next() {
-			tableExists = true
-			item := it.Item()
-			bk := item.KeyCopy(nil)
-			if isBadgerTable(bk) {
-				continue
-			}
-
-			bucket, key, err := fromBadgerKey(bk)
-			if err != nil {
-				return fmt.Errorf("error converting from badger key %s", bk)
-			}
-			if !bytes.Equal(table, bucket) {
-				return fmt.Errorf("bucket names do not match; want %s, but got %s", table, bucket)
-			}
-
-			v, err := item.ValueCopy(nil)
-			if err != nil {
-				return fmt.Errorf("error retrieving contents from database value: %w", err)
-			}
-			value := cloneBytes(v)
-
-			if err := fn(bucket, key, value); err != nil {
-				return fmt.Errorf("error exporting %s[%s]=%v", table, key, value)
-			}
-		}
-
-		if !tableExists {
-			fmt.Printf("bucket %s not found\n", table)
-		}
-
-		return nil
-	})
+type Iterator interface {
+	Seek([]byte)
+	ValidForPrefix([]byte) bool
+	Next()
 }
 
-func badgerV2Iterate(db *badgerv2.DB, table []byte, fn func(table, key, value []byte) error) error {
-	return db.View(func(txn *badgerv2.Txn) error {
-		var tableExists bool
+type Item interface {
+	KeyCopy([]byte) []byte
+	ValueCopy([]byte) ([]byte, error)
+}
 
+func badgerV1Iterate(db *badgerv1.DB, prefix []byte, fn func(bucket, key, value []byte) error) (badgerKey []byte, err error) {
+	err = db.View(func(txn *badgerv1.Txn) error {
+		it := txn.NewIterator(badgerv1.DefaultIteratorOptions)
+		defer it.Close()
+		badgerKey, err = badgerIterate(it, prefix, fn)
+		return err
+	})
+	return
+}
+
+func badgerV2Iterate(db *badgerv2.DB, prefix []byte, fn func(bucket, key, value []byte) error) (badgerKey []byte, err error) {
+	err = db.View(func(txn *badgerv2.Txn) error {
 		it := txn.NewIterator(badgerv2.DefaultIteratorOptions)
 		defer it.Close()
-
-		prefix, err := badgerEncode(table)
-		if err != nil {
-			return err
-		}
-		for it.Seek(prefix); it.ValidForPrefix(prefix); it.Next() {
-			tableExists = true
-			item := it.Item()
-			bk := item.KeyCopy(nil)
-			if isBadgerTable(bk) {
-				continue
-			}
-
-			bucket, key, err := fromBadgerKey(bk)
-			if err != nil {
-				return fmt.Errorf("error converting from badgerKey %s: %w", bk, err)
-			}
-			if !bytes.Equal(table, bucket) {
-				return fmt.Errorf("bucket names do not match; want %s, but got %s", table, bucket)
-			}
-
-			v, err := item.ValueCopy(nil)
-			if err != nil {
-				return fmt.Errorf("error retrieving contents from database value: %w", err)
-			}
-			value := cloneBytes(v)
-
-			if err := fn(bucket, key, value); err != nil {
-				return fmt.Errorf("error exporting %s[%s]=%v", table, key, value)
-			}
-		}
-		if !tableExists {
-			log.Printf("bucket %s not found", table)
-		}
-		return nil
+		badgerKey, err = badgerIterate(it, prefix, fn)
+		return err
 	})
+	return
+}
+
+func badgerIterate(it Iterator, prefix []byte, fn func(bucket, key, value []byte) error) ([]byte, error) {
+	var badgerKey []byte
+	for it.Seek(prefix); it.ValidForPrefix(prefix); it.Next() {
+		var item Item
+		switch itt := it.(type) {
+		case *badgerv1.Iterator:
+			item = itt.Item()
+		case *badgerv2.Iterator:
+			item = itt.Item()
+		default:
+			return badgerKey, fmt.Errorf("unexpected iterator type %T", it)
+		}
+
+		badgerKey = item.KeyCopy(nil)
+		if isBadgerTable(badgerKey) {
+			continue
+		}
+
+		bucket, key, err := fromBadgerKey(badgerKey)
+		if err != nil {
+			return badgerKey, fmt.Errorf("error converting from badger key %s", badgerKey)
+		}
+		value, err := item.ValueCopy(nil)
+		if err != nil {
+			return badgerKey, fmt.Errorf("error retrieving contents from database value: %w", err)
+		}
+
+		if err := fn(bucket, key, value); err != nil {
+			return badgerKey, fmt.Errorf("error exporting %s[%s]=%x", bucket, key, value)
+		}
+	}
+
+	return badgerKey, nil
 }
 
 // badgerEncode encodes a byte slice into a section of a BadgerKey.
@@ -264,6 +273,31 @@ func badgerEncode(val []byte) ([]byte, error) {
 			return nil, fmt.Errorf("error doing binary Write: %w", err)
 		}
 		return append(lb.Bytes(), val...), nil
+	}
+}
+
+// parseBadgerEncode decodes the badger key and returns the bucket and the rest.
+func parseBadgerEncode(bk []byte) (value, rest []byte) {
+	var (
+		keyLen uint16
+		start  = uint16(2)
+		length = uint16(len(bk))
+	)
+	if uint16(len(bk)) < start {
+		return nil, bk
+	}
+	// First 2 bytes stores the length of the value.
+	if err := binary.Read(bytes.NewReader(bk[:2]), binary.LittleEndian, &keyLen); err != nil {
+		return nil, bk
+	}
+	end := start + keyLen
+	switch {
+	case length < end:
+		return nil, bk
+	case length == end:
+		return bk[start:end], nil
+	default:
+		return bk[start:end], bk[end:]
 	}
 }
 
@@ -292,35 +326,4 @@ func fromBadgerKey(bk []byte) ([]byte, []byte, error) {
 	}
 
 	return bucket, key, nil
-}
-
-// cloneBytes returns a copy of a given slice.
-func cloneBytes(v []byte) []byte {
-	var clone = make([]byte, len(v))
-	copy(clone, v)
-	return clone
-}
-
-func parseBadgerEncode(bk []byte) (value, rest []byte) {
-	var (
-		keyLen uint16
-		start  = uint16(2)
-		length = uint16(len(bk))
-	)
-	if uint16(len(bk)) < start {
-		return nil, bk
-	}
-	// First 2 bytes stores the length of the value.
-	if err := binary.Read(bytes.NewReader(bk[:2]), binary.LittleEndian, &keyLen); err != nil {
-		return nil, bk
-	}
-	end := start + keyLen
-	switch {
-	case length < end:
-		return nil, bk
-	case length == end:
-		return bk[start:end], nil
-	default:
-		return bk[start:end], bk[end:]
-	}
 }
