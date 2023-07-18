@@ -4,6 +4,7 @@ import (
 	"context"
 	"crypto/x509"
 	"net/http"
+	"os"
 	"regexp"
 	"strings"
 	"time"
@@ -108,9 +109,13 @@ type AuthorizeRenewFunc func(ctx context.Context, p *Controller, cert *x509.Cert
 // given SSH certificate is enabled.
 type AuthorizeSSHRenewFunc func(ctx context.Context, p *Controller, cert *ssh.Certificate) error
 
-// DefaultIdentityFunc return a default identity depending on the provisioner
-// type. For OIDC email is always present and the usernames might
-// contain empty strings.
+// DefaultIdentityFunc returns a default identity depending on the provisioner
+// type. For OIDC email is always present and the usernames might contain empty
+// strings.
+//
+// By default, the user principal from the OIDC email must validate the regular
+// expression "^[a-z][-a-z0-9_]*$", but a custom regular expression can be
+// defined using the environment variable STEP_SSH_USER_REGEXP.
 func DefaultIdentityFunc(_ context.Context, p Interface, email string) (*Identity, error) {
 	switch k := p.(type) {
 	case *OIDC:
@@ -120,7 +125,7 @@ func DefaultIdentityFunc(_ context.Context, p Interface, email string) (*Identit
 		// 3. Raw local (if different).
 		// 4. Email address.
 		name := SanitizeSSHUserPrincipal(email)
-		if !sshUserRegex.MatchString(name) {
+		if !sshUserRegexp.MatchString(name) {
 			return nil, errors.Errorf("invalid principal '%s' from email '%s'", name, email)
 		}
 		usernames := []string{name}
@@ -178,7 +183,16 @@ func DefaultAuthorizeSSHRenew(_ context.Context, p *Controller, cert *ssh.Certif
 	return nil
 }
 
-var sshUserRegex = regexp.MustCompile("^[a-z][-a-z0-9_]*$")
+// sshUserRegexp is the regular expression used to validate the SSH user
+// principals in DefaultIdentityFunc.
+var sshUserRegexp *regexp.Regexp
+
+func init() {
+	if v := os.Getenv("STEP_SSH_USER_REGEXP"); v != "" {
+		sshUserRegexp = regexp.MustCompile(v)
+	}
+	sshUserRegexp = regexp.MustCompile("^[a-z][-a-z0-9_]*$")
+}
 
 // SanitizeStringSlices removes duplicated an empty strings.
 func SanitizeStringSlices(original []string) []string {

@@ -5,6 +5,7 @@ import (
 	"crypto/x509"
 	"fmt"
 	"reflect"
+	"regexp"
 	"testing"
 	"time"
 
@@ -144,9 +145,15 @@ func TestNewController(t *testing.T) {
 
 func TestController_GetIdentity(t *testing.T) {
 	ctx := context.Background()
+	defaultUserRegexp := sshUserRegexp
+	t.Cleanup(func() {
+		sshUserRegexp = defaultUserRegexp
+	})
+
 	type fields struct {
 		Interface    Interface
 		IdentityFunc GetIdentityFunc
+		SSHUserRegex *regexp.Regexp
 	}
 	type args struct {
 		ctx   context.Context
@@ -159,21 +166,27 @@ func TestController_GetIdentity(t *testing.T) {
 		want    *Identity
 		wantErr bool
 	}{
-		{"ok", fields{&OIDC{}, nil}, args{ctx, "jane@doe.org"}, &Identity{
+		{"ok", fields{&OIDC{}, nil, defaultUserRegexp}, args{ctx, "jane@doe.org"}, &Identity{
 			Usernames: []string{"jane", "jane@doe.org"},
 		}, false},
 		{"ok custom", fields{&OIDC{}, func(ctx context.Context, p Interface, email string) (*Identity, error) {
 			return &Identity{Usernames: []string{"jane"}}, nil
-		}}, args{ctx, "jane@doe.org"}, &Identity{
+		}, defaultUserRegexp}, args{ctx, "jane@doe.org"}, &Identity{
 			Usernames: []string{"jane"},
 		}, false},
-		{"fail provisioner", fields{&JWK{}, nil}, args{ctx, "jane@doe.org"}, nil, true},
+		{"ok custom regex", fields{&OIDC{}, nil, regexp.MustCompile("^[a-z0-9]*$")}, args{ctx, "1000@doe.org"}, &Identity{
+			Usernames: []string{"1000", "1000@doe.org"},
+		}, false},
+		{"fail provisioner", fields{&JWK{}, nil, defaultUserRegexp}, args{ctx, "jane@doe.org"}, nil, true},
 		{"fail custom", fields{&OIDC{}, func(ctx context.Context, p Interface, email string) (*Identity, error) {
 			return nil, fmt.Errorf("an error")
-		}}, args{ctx, "jane@doe.org"}, nil, true},
+		}, defaultUserRegexp}, args{ctx, "jane@doe.org"}, nil, true},
+		{"fail regex", fields{&OIDC{}, nil, defaultUserRegexp}, args{ctx, "1000@doe.org"}, nil, true},
+		{"fail custom regex", fields{&OIDC{}, nil, regexp.MustCompile("^[a-z]*$")}, args{ctx, "jane1000@doe.org"}, nil, true},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			sshUserRegexp = tt.fields.SSHUserRegex
 			c := &Controller{
 				Interface:    tt.fields.Interface,
 				IdentityFunc: tt.fields.IdentityFunc,
