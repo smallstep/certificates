@@ -258,8 +258,8 @@ func badgerIterate(it Iterator, prefix []byte, fn func(bucket, key, value []byte
 	return badgerKey, nil
 }
 
-// badgerEncode encodes a byte slice into a section of a BadgerKey.
-// See documentation for toBadgerKey.
+// badgerEncode encodes a byte slice into a section of a BadgerKey. See
+// documentation for toBadgerKey.
 func badgerEncode(val []byte) ([]byte, error) {
 	l := len(val)
 	switch {
@@ -301,10 +301,10 @@ func parseBadgerEncode(bk []byte) (value, rest []byte) {
 	}
 }
 
-// isBadgerTable returns True if the slice is a badgerTable token, false otherwise.
-// badgerTable means that the slice contains only the [size|value] of one section
-// of a badgerKey and no remainder. A badgerKey is [buket|key], while a badgerTable
-// is only the bucket section.
+// isBadgerTable returns True if the slice is a badgerTable token, false
+// otherwise. badgerTable means that the slice contains only the [size|value] of
+// one section of a badgerKey and no remainder. A badgerKey is [bucket|key],
+// while a badgerTable is only the bucket section.
 func isBadgerTable(bk []byte) bool {
 	if k, rest := parseBadgerEncode(bk); len(k) > 0 && len(rest) == 0 {
 		return true
@@ -312,8 +312,8 @@ func isBadgerTable(bk []byte) bool {
 	return false
 }
 
-// fromBadgerKey returns the bucket and key encoded in a BadgerKey.
-// See documentation for toBadgerKey.
+// fromBadgerKey returns the bucket and key encoded in a BadgerKey. See
+// documentation for toBadgerKey.
 func fromBadgerKey(bk []byte) ([]byte, []byte, error) {
 	bucket, rest := parseBadgerEncode(bk)
 	if len(bucket) == 0 || len(rest) == 0 {
