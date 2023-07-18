@@ -47,13 +47,13 @@ var (
 
 func usage(fs *flag.FlagSet) {
 	name := filepath.Base(os.Args[0])
-	fmt.Fprintf(os.Stderr, "%s is a tool to migrate Badger databases to MySQL or PostgreSQL.\n", name)
+	fmt.Fprintf(os.Stderr, "%s is a tool to migrate data from BadgerDB to MySQL or PostgreSQL.\n", name)
 	fmt.Fprintln(os.Stderr, "\nUsage:")
 	fmt.Fprintf(os.Stderr, "  %s [-v1|-v2] -dir=<path> [-value-dir=<path>] -type=type -database=<source>\n", name)
 	fmt.Fprintln(os.Stderr, "\nExamples:")
 	fmt.Fprintf(os.Stderr, "  %s -v1 -dir /var/lib/step-ca/db -type=mysql -database \"user@unix/step_ca\"\n", name)
 	fmt.Fprintf(os.Stderr, "  %s -v2 -dir /var/lib/step-ca/db -type=mysql -database \"user:password@tcp(localhost:3306)/step_ca\"\n", name)
-	fmt.Fprintf(os.Stderr, "  %s -v2 -dir /var/lib/step-ca/db -type=postgresql --database \"user=postgres dbname=step_ca\"\n", name)
+	fmt.Fprintf(os.Stderr, "  %s -v2 -dir /var/lib/step-ca/db -type=postgresql -database \"user=postgres dbname=step_ca\"\n", name)
 	fmt.Fprintln(os.Stderr, "\nOptions:")
 	fs.PrintDefaults()
 }
@@ -93,10 +93,10 @@ func main() {
 
 	if v1 {
 		if v1DB, err = badgerV1Open(dir, valueDir); err != nil {
-			fatal("error opening badger v2 database: %v", err)
+			fatal("error opening badger v1 database: %v", err)
 		}
 	} else {
-		if v2DB, err = badgerV2Open("/tmp/db", ""); err != nil {
+		if v2DB, err = badgerV2Open(dir, valueDir); err != nil {
 			fatal("error opening badger v2 database: %v", err)
 		}
 	}

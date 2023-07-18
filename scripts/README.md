@@ -4,5 +4,5 @@ Please note that `install-step-ra.sh` is referenced on the `files.smallstep.com`
 
 ## badger-migration
 
-badger-migration is a tool that allows to migrate data from a BadgerDB (v1 or
+badger-migration is a tool that allows migrating data data from BadgerDB (v1 or
 v2) to MySQL or PostgreSQL.
