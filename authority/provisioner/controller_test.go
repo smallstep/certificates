@@ -167,6 +167,12 @@ func TestController_GetIdentity(t *testing.T) {
 		}}, args{ctx, "jane@doe.org"}, &Identity{
 			Usernames: []string{"jane"},
 		}, false},
+		{"ok badname", fields{&OIDC{}, nil}, args{ctx, "1000@doe.org"}, &Identity{
+			Usernames: []string{"1000", "1000@doe.org"},
+		}, false},
+		{"ok sanitized badname", fields{&OIDC{}, nil}, args{ctx, "1000+10@doe.org"}, &Identity{
+			Usernames: []string{"1000_10", "1000+10", "1000+10@doe.org"},
+		}, false},
 		{"fail provisioner", fields{&JWK{}, nil}, args{ctx, "jane@doe.org"}, nil, true},
 		{"fail custom", fields{&OIDC{}, func(ctx context.Context, p Interface, email string) (*Identity, error) {
 			return nil, fmt.Errorf("an error")
