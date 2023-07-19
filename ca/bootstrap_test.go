@@ -606,7 +606,13 @@ func doReload(ca *CA) error {
 	}
 	// Use same address in new server
 	newCA.srv.Addr = ca.srv.Addr
-	return ca.srv.Reload(newCA.srv)
+	if err := ca.srv.Reload(newCA.srv); err != nil {
+		return err
+	}
+
+	// Wait a few ms until the http server calls listener.Accept()
+	time.Sleep(100 * time.Millisecond)
+	return nil
 }
 
 func TestBootstrapListener(t *testing.T) {
