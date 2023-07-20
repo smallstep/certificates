@@ -4,6 +4,7 @@ import (
 	"crypto/hmac"
 	"crypto/sha256"
 	"crypto/tls"
+	"crypto/x509"
 	"encoding/base64"
 	"encoding/hex"
 	"encoding/json"
@@ -16,6 +17,7 @@ import (
 	"github.com/pkg/errors"
 	"github.com/smallstep/assert"
 	"github.com/smallstep/certificates/webhook"
+	"go.step.sm/crypto/pemutil"
 	"go.step.sm/crypto/x509util"
 	"go.step.sm/linkedca"
 )
@@ -96,12 +98,18 @@ func TestWebhookController_isCertTypeOK(t *testing.T) {
 }
 
 func TestWebhookController_Enrich(t *testing.T) {
+	cert, err := pemutil.ReadCertificate("testdata/certs/x5c-leaf.crt", pemutil.WithFirstBlock())
+	if err != nil {
+		t.Fatal(err)
+	}
+
 	type test struct {
 		ctl                *WebhookController
 		req                *webhook.RequestBody
 		responses          []*webhook.ResponseBody
 		expectErr          bool
 		expectTemplateData any
+		assertRequest      func(t *testing.T, req *webhook.RequestBody)
 	}
 	tests := map[string]test{
 		"ok/no enriching webhooks": {
@@ -170,11 +178,48 @@ func TestWebhookController_Enrich(t *testing.T) {
 				},
 			},
 		},
+		"ok/with options": {
+			ctl: &WebhookController{
+				client:       http.DefaultClient,
+				webhooks:     []*Webhook{{Name: "people", Kind: "ENRICHING"}},
+				TemplateData: x509util.TemplateData{},
+				options:      []webhook.RequestBodyOption{webhook.WithX5CCertificate(cert)},
+			},
+			req:                &webhook.RequestBody{},
+			responses:          []*webhook.ResponseBody{{Allow: true, Data: map[string]any{"role": "bar"}}},
+			expectErr:          false,
+			expectTemplateData: x509util.TemplateData{"Webhooks": map[string]any{"people": map[string]any{"role": "bar"}}},
+			assertRequest: func(t *testing.T, req *webhook.RequestBody) {
+				key, err := x509.MarshalPKIXPublicKey(cert.PublicKey)
+				assert.FatalError(t, err)
+				assert.Equals(t, &webhook.X5CCertificate{
+					Raw:                cert.Raw,
+					PublicKey:          key,
+					PublicKeyAlgorithm: cert.PublicKeyAlgorithm.String(),
+					NotBefore:          cert.NotBefore,
+					NotAfter:           cert.NotAfter,
+				}, req.X5CCertificate)
+			},
+		},
 		"deny": {
 			ctl: &WebhookController{
 				client:       http.DefaultClient,
 				webhooks:     []*Webhook{{Name: "people", Kind: "ENRICHING"}},
 				TemplateData: x509util.TemplateData{},
+			},
+			req:                &webhook.RequestBody{},
+			responses:          []*webhook.ResponseBody{{Allow: false}},
+			expectErr:          true,
+			expectTemplateData: x509util.TemplateData{},
+		},
+		"fail/with options": {
+			ctl: &WebhookController{
+				client:       http.DefaultClient,
+				webhooks:     []*Webhook{{Name: "people", Kind: "ENRICHING"}},
+				TemplateData: x509util.TemplateData{},
+				options: []webhook.RequestBodyOption{webhook.WithX5CCertificate(&x509.Certificate{
+					PublicKey: []byte("bad"),
+				})},
 			},
 			req:                &webhook.RequestBody{},
 			responses:          []*webhook.ResponseBody{{Allow: false}},
@@ -200,16 +245,25 @@ func TestWebhookController_Enrich(t *testing.T) {
 				t.Fatalf("Got err %v, want %v", err, test.expectErr)
 			}
 			assert.Equals(t, test.expectTemplateData, test.ctl.TemplateData)
+			if test.assertRequest != nil {
+				test.assertRequest(t, test.req)
+			}
 		})
 	}
 }
 
 func TestWebhookController_Authorize(t *testing.T) {
+	cert, err := pemutil.ReadCertificate("testdata/certs/x5c-leaf.crt", pemutil.WithFirstBlock())
+	if err != nil {
+		t.Fatal(err)
+	}
+
 	type test struct {
-		ctl       *WebhookController
-		req       *webhook.RequestBody
-		responses []*webhook.ResponseBody
-		expectErr bool
+		ctl           *WebhookController
+		req           *webhook.RequestBody
+		responses     []*webhook.ResponseBody
+		expectErr     bool
+		assertRequest func(t *testing.T, req *webhook.RequestBody)
 	}
 	tests := map[string]test{
 		"ok/no enriching webhooks": {
@@ -240,10 +294,43 @@ func TestWebhookController_Authorize(t *testing.T) {
 			responses: []*webhook.ResponseBody{{Allow: false}},
 			expectErr: false,
 		},
+		"ok/with options": {
+			ctl: &WebhookController{
+				client:   http.DefaultClient,
+				webhooks: []*Webhook{{Name: "people", Kind: "AUTHORIZING"}},
+				options:  []webhook.RequestBodyOption{webhook.WithX5CCertificate(cert)},
+			},
+			req:       &webhook.RequestBody{},
+			responses: []*webhook.ResponseBody{{Allow: true}},
+			expectErr: false,
+			assertRequest: func(t *testing.T, req *webhook.RequestBody) {
+				key, err := x509.MarshalPKIXPublicKey(cert.PublicKey)
+				assert.FatalError(t, err)
+				assert.Equals(t, &webhook.X5CCertificate{
+					Raw:                cert.Raw,
+					PublicKey:          key,
+					PublicKeyAlgorithm: cert.PublicKeyAlgorithm.String(),
+					NotBefore:          cert.NotBefore,
+					NotAfter:           cert.NotAfter,
+				}, req.X5CCertificate)
+			},
+		},
 		"deny": {
 			ctl: &WebhookController{
 				client:   http.DefaultClient,
 				webhooks: []*Webhook{{Name: "people", Kind: "AUTHORIZING"}},
+			},
+			req:       &webhook.RequestBody{},
+			responses: []*webhook.ResponseBody{{Allow: false}},
+			expectErr: true,
+		},
+		"fail/with options": {
+			ctl: &WebhookController{
+				client:   http.DefaultClient,
+				webhooks: []*Webhook{{Name: "people", Kind: "AUTHORIZING"}},
+				options: []webhook.RequestBodyOption{webhook.WithX5CCertificate(&x509.Certificate{
+					PublicKey: []byte("bad"),
+				})},
 			},
 			req:       &webhook.RequestBody{},
 			responses: []*webhook.ResponseBody{{Allow: false}},
@@ -266,6 +353,9 @@ func TestWebhookController_Authorize(t *testing.T) {
 			err := test.ctl.Authorize(test.req)
 			if (err != nil) != test.expectErr {
 				t.Fatalf("Got err %v, want %v", err, test.expectErr)
+			}
+			if test.assertRequest != nil {
+				test.assertRequest(t, test.req)
 			}
 		})
 	}

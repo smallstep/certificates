@@ -10,6 +10,7 @@ import (
 
 	"github.com/pkg/errors"
 	"github.com/smallstep/certificates/errs"
+	"github.com/smallstep/certificates/webhook"
 	"go.step.sm/linkedca"
 	"golang.org/x/crypto/ssh"
 )
@@ -77,7 +78,7 @@ func (c *Controller) AuthorizeSSHRenew(ctx context.Context, cert *ssh.Certificat
 	return DefaultAuthorizeSSHRenew(ctx, c, cert)
 }
 
-func (c *Controller) newWebhookController(templateData WebhookSetter, certType linkedca.Webhook_CertType) *WebhookController {
+func (c *Controller) newWebhookController(templateData WebhookSetter, certType linkedca.Webhook_CertType, opts ...webhook.RequestBodyOption) *WebhookController {
 	client := c.webhookClient
 	if client == nil {
 		client = http.DefaultClient
@@ -87,6 +88,7 @@ func (c *Controller) newWebhookController(templateData WebhookSetter, certType l
 		client:       client,
 		webhooks:     c.webhooks,
 		certType:     certType,
+		options:      opts,
 	}
 }
 

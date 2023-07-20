@@ -56,6 +56,17 @@ type AttestationData struct {
 	PermanentIdentifier string `json:"permanentIdentifier"`
 }
 
+// X5CCertificate is the authorization certificate sent to webhook servers for
+// enriching or authorizing webhooks when signing X509 or SSH certificates using
+// the X5C provisioner.
+type X5CCertificate struct {
+	Raw                []byte    `json:"raw"`
+	PublicKey          []byte    `json:"publicKey"`
+	PublicKeyAlgorithm string    `json:"publicKeyAlgorithm"`
+	NotBefore          time.Time `json:"notBefore"`
+	NotAfter           time.Time `json:"notAfter"`
+}
+
 // RequestBody is the body sent to webhook servers.
 type RequestBody struct {
 	Timestamp time.Time `json:"timestamp"`
@@ -71,4 +82,6 @@ type RequestBody struct {
 	// Only set for SCEP challenge validation requests
 	SCEPChallenge     string `json:"scepChallenge,omitempty"`
 	SCEPTransactionID string `json:"scepTransactionID,omitempty"`
+	// Only set for X5C provisioners
+	X5CCertificate *X5CCertificate `json:"x5cCertificate,omitempty"`
 }
