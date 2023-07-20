@@ -30,6 +30,7 @@ type WebhookController struct {
 	client       *http.Client
 	webhooks     []*Webhook
 	certType     linkedca.Webhook_CertType
+	options      []webhook.RequestBodyOption
 	TemplateData WebhookSetter
 }
 
@@ -39,6 +40,14 @@ func (wc *WebhookController) Enrich(req *webhook.RequestBody) error {
 	if wc == nil {
 		return nil
 	}
+
+	// Apply extra options in the webhook controller
+	for _, fn := range wc.options {
+		if err := fn(req); err != nil {
+			return err
+		}
+	}
+
 	for _, wh := range wc.webhooks {
 		if wh.Kind != linkedca.Webhook_ENRICHING.String() {
 			continue
@@ -63,6 +72,14 @@ func (wc *WebhookController) Authorize(req *webhook.RequestBody) error {
 	if wc == nil {
 		return nil
 	}
+
+	// Apply extra options in the webhook controller
+	for _, fn := range wc.options {
+		if err := fn(req); err != nil {
+			return err
+		}
+	}
+
 	for _, wh := range wc.webhooks {
 		if wh.Kind != linkedca.Webhook_AUTHORIZING.String() {
 			continue

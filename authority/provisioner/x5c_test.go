@@ -12,6 +12,7 @@ import (
 	"go.step.sm/crypto/jose"
 	"go.step.sm/crypto/pemutil"
 	"go.step.sm/crypto/randutil"
+	"go.step.sm/linkedca"
 
 	"github.com/smallstep/assert"
 	"github.com/smallstep/certificates/api/render"
@@ -497,6 +498,8 @@ func TestX5C_AuthorizeSign(t *testing.T) {
 								assert.Equals(t, nil, v.policyEngine)
 							case *WebhookController:
 								assert.Len(t, 0, v.webhooks)
+								assert.Equals(t, linkedca.Webhook_X509, v.certType)
+								assert.Len(t, 1, v.options)
 							default:
 								assert.FatalError(t, fmt.Errorf("unexpected sign option of type %T", v))
 							}
@@ -801,6 +804,8 @@ func TestX5C_AuthorizeSSHSign(t *testing.T) {
 							case *sshDefaultPublicKeyValidator, *sshCertDefaultValidator, sshCertificateOptionsFunc:
 							case *WebhookController:
 								assert.Len(t, 0, v.webhooks)
+								assert.Equals(t, linkedca.Webhook_SSH, v.certType)
+								assert.Len(t, 1, v.options)
 							default:
 								assert.FatalError(t, fmt.Errorf("unexpected sign option of type %T", v))
 							}

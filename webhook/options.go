@@ -95,3 +95,23 @@ func WithSSHCertificate(cert *sshutil.Certificate, certTpl *ssh.Certificate) Req
 		return nil
 	}
 }
+
+func WithX5CCertificate(leaf *x509.Certificate) RequestBodyOption {
+	return func(rb *RequestBody) error {
+		rb.X5CCertificate = &X5CCertificate{
+			Raw:                leaf.Raw,
+			PublicKeyAlgorithm: leaf.PublicKeyAlgorithm.String(),
+			NotBefore:          leaf.NotBefore,
+			NotAfter:           leaf.NotAfter,
+		}
+		if leaf.PublicKey != nil {
+			key, err := x509.MarshalPKIXPublicKey(leaf.PublicKey)
+			if err != nil {
+				return err
+			}
+			rb.X5CCertificate.PublicKey = key
+		}
+
+		return nil
+	}
+}
