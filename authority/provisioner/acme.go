@@ -257,7 +257,7 @@ func (p *ACME) AuthorizeSign(context.Context, string) ([]SignOption, error) {
 	opts := []SignOption{
 		p,
 		// modifiers / withOptions
-		newProvisionerExtensionOption(TypeACME, p.Name, ""),
+		newProvisionerExtensionOption(TypeACME, p.Name, "").WithControllerOptions(p.ctl),
 		newForceCNOption(p.ForceCN),
 		profileDefaultDuration(p.ctl.Claimer.DefaultTLSCertDuration()),
 		// validators

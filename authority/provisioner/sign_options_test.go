@@ -604,14 +604,24 @@ func Test_newProvisionerExtension_Option(t *testing.T) {
 		t.Fatal(err)
 	}
 
+	// Claims with smallstep extensions disabled.
+	claimer, err := NewClaimer(&Claims{
+		DisableSmallstepExtensions: &trueValue,
+	}, globalProvisionerClaims)
+	if err != nil {
+		t.Fatal(err)
+	}
+
 	type test struct {
-		cert  *x509.Certificate
-		valid func(*x509.Certificate)
+		modifier *provisionerExtensionOption
+		cert     *x509.Certificate
+		valid    func(*x509.Certificate)
 	}
 	tests := map[string]func() test{
 		"ok/one-element": func() test {
 			return test{
-				cert: new(x509.Certificate),
+				modifier: newProvisionerExtensionOption(TypeJWK, "name", "credentialId", "key", "value"),
+				cert:     new(x509.Certificate),
 				valid: func(cert *x509.Certificate) {
 					if assert.Len(t, 1, cert.ExtraExtensions) {
 						ext := cert.ExtraExtensions[0]
@@ -625,7 +635,8 @@ func Test_newProvisionerExtension_Option(t *testing.T) {
 		},
 		"ok/replace": func() test {
 			return test{
-				cert: &x509.Certificate{ExtraExtensions: []pkix.Extension{{Id: StepOIDProvisioner, Critical: true}, {Id: []int{1, 2, 3}}}},
+				modifier: newProvisionerExtensionOption(TypeJWK, "name", "credentialId", "key", "value"),
+				cert:     &x509.Certificate{ExtraExtensions: []pkix.Extension{{Id: StepOIDProvisioner, Critical: true}, {Id: []int{1, 2, 3}}}},
 				valid: func(cert *x509.Certificate) {
 					if assert.Len(t, 2, cert.ExtraExtensions) {
 						ext := cert.ExtraExtensions[0]
@@ -636,11 +647,22 @@ func Test_newProvisionerExtension_Option(t *testing.T) {
 				},
 			}
 		},
+		"ok/disabled": func() test {
+			return test{
+				modifier: newProvisionerExtensionOption(TypeJWK, "name", "credentialId", "key", "value").WithControllerOptions(&Controller{
+					Claimer: claimer,
+				}),
+				cert: new(x509.Certificate),
+				valid: func(cert *x509.Certificate) {
+					assert.Len(t, 0, cert.ExtraExtensions)
+				},
+			}
+		},
 	}
 	for name, run := range tests {
 		t.Run(name, func(t *testing.T) {
 			tt := run()
-			assert.FatalError(t, newProvisionerExtensionOption(TypeJWK, "name", "credentialId", "key", "value").Modify(tt.cert, SignOptions{}))
+			assert.FatalError(t, tt.modifier.Modify(tt.cert, SignOptions{}))
 			tt.valid(tt.cert)
 		})
 	}

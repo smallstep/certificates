@@ -430,6 +430,7 @@ func (o *forceCNOption) Modify(cert *x509.Certificate, _ SignOptions) error {
 
 type provisionerExtensionOption struct {
 	Extension
+	Disabled bool
 }
 
 func newProvisionerExtensionOption(typ Type, name, credentialID string, keyValuePairs ...string) *provisionerExtensionOption {
@@ -443,7 +444,18 @@ func newProvisionerExtensionOption(typ Type, name, credentialID string, keyValue
 	}
 }
 
+// WithControllerOptions returns the provisionerExtensionOption options from the
+// controller. Currently only the claim DisableSmallstepExtensions is used.
+func (o *provisionerExtensionOption) WithControllerOptions(c *Controller) *provisionerExtensionOption {
+	o.Disabled = c.Claimer.IsDisableSmallstepExtensions()
+	return o
+}
+
 func (o *provisionerExtensionOption) Modify(cert *x509.Certificate, _ SignOptions) error {
+	if o.Disabled {
+		return nil
+	}
+
 	ext, err := o.ToExtension()
 	if err != nil {
 		return errs.NewError(http.StatusInternalServerError, err, "error creating certificate")
