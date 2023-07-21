@@ -43,6 +43,11 @@ var (
 		"acme_external_account_keyID_reference_index",
 		"acme_external_account_keyID_provisionerID_index",
 	}
+	adminTables = []string{
+		"admins",
+		"provisioners",
+		"authority_policies",
+	}
 )
 
 func usage(fs *flag.FlagSet) {
@@ -67,7 +72,7 @@ func main() {
 	fs := flag.NewFlagSet(os.Args[0], flag.ExitOnError)
 
 	fs.BoolVar(&v1, "v1", false, "use badger v1 as the source database")
-	fs.BoolVar(&v2, "v2", true, "use badger v2 as the source database")
+	fs.BoolVar(&v2, "v2", false, "use badger v2 as the source database")
 	fs.StringVar(&dir, "dir", "", "badger database directory")
 	fs.StringVar(&valueDir, "value-dir", "", "badger database value directory")
 	fs.StringVar(&typ, "type", "", "the destination database type to use")
@@ -117,6 +122,7 @@ func main() {
 
 	allTables := append([]string{}, authorityTables...)
 	allTables = append(allTables, acmeTables...)
+	allTables = append(allTables, adminTables...)
 
 	// Convert prefix names to badger key prefixes
 	badgerKeys := make([][]byte, len(allTables))
