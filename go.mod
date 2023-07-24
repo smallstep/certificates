@@ -6,6 +6,8 @@ require (
 	cloud.google.com/go/longrunning v0.5.1
 	cloud.google.com/go/security v1.15.1
 	github.com/Masterminds/sprig/v3 v3.2.3
+	github.com/dgraph-io/badger v1.6.2
+	github.com/dgraph-io/badger/v2 v2.2007.4
 	github.com/fxamacker/cbor/v2 v2.4.0
 	github.com/go-chi/chi v4.1.2+incompatible
 	github.com/golang/mock v1.6.0
@@ -30,7 +32,7 @@ require (
 	go.mozilla.org/pkcs7 v0.0.0-20210826202110-33d05740a352
 	go.step.sm/cli-utils v0.7.6
 	go.step.sm/crypto v0.32.4
-	go.step.sm/linkedca v0.19.1
+	go.step.sm/linkedca v0.20.0
 	golang.org/x/crypto v0.11.0
 	golang.org/x/exp v0.0.0-20230310171629-522b1b587ee0
 	golang.org/x/net v0.12.0
@@ -64,8 +66,6 @@ require (
 	github.com/chzyer/readline v1.5.1 // indirect
 	github.com/cpuguy83/go-md2man/v2 v2.0.2 // indirect
 	github.com/davecgh/go-spew v1.1.1 // indirect
-	github.com/dgraph-io/badger v1.6.2 // indirect
-	github.com/dgraph-io/badger/v2 v2.2007.4 // indirect
 	github.com/dgraph-io/ristretto v0.1.0 // indirect
 	github.com/dgryski/go-farm v0.0.0-20200201041132-a6ae2369ad13 // indirect
 	github.com/dustin/go-humanize v1.0.0 // indirect
