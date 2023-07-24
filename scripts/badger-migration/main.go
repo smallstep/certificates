@@ -50,6 +50,16 @@ var (
 	}
 )
 
+type DB interface {
+	CreateTable([]byte) error
+	Set(bucket, key, value []byte) error
+}
+
+type dryRunDB struct{}
+
+func (*dryRunDB) CreateTable([]byte) error            { return nil }
+func (*dryRunDB) Set(bucket, key, value []byte) error { return nil }
+
 func usage(fs *flag.FlagSet) {
 	name := filepath.Base(os.Args[0])
 	fmt.Fprintf(os.Stderr, "%s is a tool to migrate data from BadgerDB to MySQL or PostgreSQL.\n", name)
@@ -57,14 +67,15 @@ func usage(fs *flag.FlagSet) {
 	fmt.Fprintf(os.Stderr, "  %s [-v1|-v2] -dir=<path> [-value-dir=<path>] -type=type -database=<source>\n", name)
 	fmt.Fprintln(os.Stderr, "\nExamples:")
 	fmt.Fprintf(os.Stderr, "  %s -v1 -dir /var/lib/step-ca/db -type=mysql -database \"user@unix/step_ca\"\n", name)
-	fmt.Fprintf(os.Stderr, "  %s -v2 -dir /var/lib/step-ca/db -type=mysql -database \"user:password@tcp(localhost:3306)/step_ca\"\n", name)
+	fmt.Fprintf(os.Stderr, "  %s -v1 -dir /var/lib/step-ca/db -type=mysql -database \"user:password@tcp(localhost:3306)/step_ca\"\n", name)
 	fmt.Fprintf(os.Stderr, "  %s -v2 -dir /var/lib/step-ca/db -type=postgresql -database \"user=postgres dbname=step_ca\"\n", name)
+	fmt.Fprintf(os.Stderr, "  %s -v2 -dir /var/lib/step-ca/db -dry-run\"\n", name)
 	fmt.Fprintln(os.Stderr, "\nOptions:")
 	fs.PrintDefaults()
 }
 
 func main() {
-	var v1, v2 bool
+	var v1, v2, dryRun bool
 	var dir, valueDir string
 	var typ, database string
 	var key string
@@ -78,6 +89,7 @@ func main() {
 	fs.StringVar(&typ, "type", "", "the destination database type to use")
 	fs.StringVar(&database, "database", "", "the destination driver-specific data source name")
 	fs.StringVar(&key, "key", "", "the key used to resume the migration")
+	fs.BoolVar(&dryRun, "dry-run", false, "runs the migration scripts without writing anything")
 	fs.Usage = func() { usage(fs) }
 	fs.Parse(os.Args[1:])
 
@@ -86,9 +98,9 @@ func main() {
 		fatal("flag -v1 or -v2 are required")
 	case dir == "":
 		fatal("flag -dir is required")
-	case typ != "postgresql" && typ != "mysql":
+	case typ != "postgresql" && typ != "mysql" && !dryRun:
 		fatal(`flag -type must be "postgresql" or "mysql"`)
-	case database == "":
+	case database == "" && !dryRun:
 		fatal("flag --database required")
 	}
 
@@ -115,9 +127,14 @@ func main() {
 		}
 	}
 
-	db, err := nosql.New(typ, database)
-	if err != nil {
-		fatal("error opening %s database: %v", typ, err)
+	var db DB
+	if dryRun {
+		db = &dryRunDB{}
+	} else {
+		db, err = nosql.New(typ, database)
+		if err != nil {
+			fatal("error opening %s database: %v", typ, err)
+		}
 	}
 
 	allTables := append([]string{}, authorityTables...)
