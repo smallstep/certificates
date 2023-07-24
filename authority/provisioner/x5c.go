@@ -248,7 +248,12 @@ func (p *X5C) AuthorizeSign(_ context.Context, token string) ([]SignOption, erro
 		defaultPublicKeyValidator{},
 		newValidityValidator(p.ctl.Claimer.MinTLSCertDuration(), p.ctl.Claimer.MaxTLSCertDuration()),
 		newX509NamePolicyValidator(p.ctl.getPolicy().getX509()),
-		p.ctl.newWebhookController(data, linkedca.Webhook_X509, webhook.WithX5CCertificate(x5cLeaf)),
+		p.ctl.newWebhookController(
+			data,
+			linkedca.Webhook_X509,
+			webhook.WithX5CCertificate(x5cLeaf),
+			webhook.WithAuthorizationPrincipal(x5cLeaf.Subject.CommonName),
+		),
 	}, nil
 }
 
@@ -338,6 +343,11 @@ func (p *X5C) AuthorizeSSHSign(_ context.Context, token string) ([]SignOption, e
 		// Ensure that all principal names are allowed
 		newSSHNamePolicyValidator(p.ctl.getPolicy().getSSHHost(), p.ctl.getPolicy().getSSHUser()),
 		// Call webhooks
-		p.ctl.newWebhookController(data, linkedca.Webhook_SSH, webhook.WithX5CCertificate(x5cLeaf)),
+		p.ctl.newWebhookController(
+			data,
+			linkedca.Webhook_SSH,
+			webhook.WithX5CCertificate(x5cLeaf),
+			webhook.WithAuthorizationPrincipal(x5cLeaf.Subject.CommonName),
+		),
 	), nil
 }

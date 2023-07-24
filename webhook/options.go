@@ -68,6 +68,13 @@ func WithAttestationData(data *AttestationData) RequestBodyOption {
 	}
 }
 
+func WithAuthorizationPrincipal(p string) RequestBodyOption {
+	return func(rb *RequestBody) error {
+		rb.AuthorizationPrincipal = p
+		return nil
+	}
+}
+
 func WithSSHCertificateRequest(cr sshutil.CertificateRequest) RequestBodyOption {
 	return func(rb *RequestBody) error {
 		rb.SSHCertificateRequest = &SSHCertificateRequest{
