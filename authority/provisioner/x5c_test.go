@@ -499,7 +499,7 @@ func TestX5C_AuthorizeSign(t *testing.T) {
 							case *WebhookController:
 								assert.Len(t, 0, v.webhooks)
 								assert.Equals(t, linkedca.Webhook_X509, v.certType)
-								assert.Len(t, 1, v.options)
+								assert.Len(t, 2, v.options)
 							default:
 								assert.FatalError(t, fmt.Errorf("unexpected sign option of type %T", v))
 							}
@@ -805,7 +805,7 @@ func TestX5C_AuthorizeSSHSign(t *testing.T) {
 							case *WebhookController:
 								assert.Len(t, 0, v.webhooks)
 								assert.Equals(t, linkedca.Webhook_SSH, v.certType)
-								assert.Len(t, 1, v.options)
+								assert.Len(t, 2, v.options)
 							default:
 								assert.FatalError(t, fmt.Errorf("unexpected sign option of type %T", v))
 							}

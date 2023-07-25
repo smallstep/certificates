@@ -84,4 +84,6 @@ type RequestBody struct {
 	SCEPTransactionID string `json:"scepTransactionID,omitempty"`
 	// Only set for X5C provisioners
 	X5CCertificate *X5CCertificate `json:"x5cCertificate,omitempty"`
+	// Set for X5C, AWS, GCP, and Azure provisioners
+	AuthorizationPrincipal string `json:"authorizationPrincipal,omitempty"`
 }
