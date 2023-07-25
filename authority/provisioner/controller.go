@@ -4,7 +4,6 @@ import (
 	"context"
 	"crypto/x509"
 	"net/http"
-	"regexp"
 	"strings"
 	"time"
 
@@ -117,20 +116,18 @@ func DefaultIdentityFunc(_ context.Context, p Interface, email string) (*Identit
 	switch k := p.(type) {
 	case *OIDC:
 		// OIDC principals would be:
-		// ~~1. Preferred usernames.~~ Note: Under discussion, currently disabled
-		// 2. Sanitized local.
-		// 3. Raw local (if different).
-		// 4. Email address.
+		//   ~~1. Preferred usernames.~~ Note: Under discussion, currently disabled
+		//   2. Sanitized local.
+		//   3. Raw local (if different).
+		//   4. Email address.
 		name := SanitizeSSHUserPrincipal(email)
-		if !sshUserRegex.MatchString(name) {
-			return nil, errors.Errorf("invalid principal '%s' from email '%s'", name, email)
-		}
 		usernames := []string{name}
 		if i := strings.LastIndex(email, "@"); i >= 0 {
 			usernames = append(usernames, email[:i])
 		}
 		usernames = append(usernames, email)
 		return &Identity{
+			// Remove duplicated and empty usernames.
 			Usernames: SanitizeStringSlices(usernames),
 		}, nil
 	default:
@@ -179,8 +176,6 @@ func DefaultAuthorizeSSHRenew(_ context.Context, p *Controller, cert *ssh.Certif
 
 	return nil
 }
-
-var sshUserRegex = regexp.MustCompile("^[a-z][-a-z0-9_]*$")
 
 // SanitizeStringSlices removes duplicated an empty strings.
 func SanitizeStringSlices(original []string) []string {

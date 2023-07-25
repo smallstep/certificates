@@ -76,13 +76,6 @@ func TestDefaultIdentityFunc(t *testing.T) {
 				err: errors.New("provisioner type '*provisioner.X5C' not supported by identity function"),
 			}
 		},
-		"fail/bad-ssh-regex": func(t *testing.T) test {
-			return test{
-				p:     &OIDC{},
-				email: "$%^#_>@smallstep.com",
-				err:   errors.New("invalid principal '______' from email '$%^#_>@smallstep.com'"),
-			}
-		},
 		"ok": func(t *testing.T) test {
 			return test{
 				p:        &OIDC{},
@@ -140,6 +133,13 @@ func TestDefaultIdentityFunc(t *testing.T) {
 				email:     "john@smallstep.com",
 				usernames: []string{""},
 				identity:  &Identity{Usernames: []string{"john", "john@smallstep.com"}},
+			}
+		},
+		"ok/badname": func(t *testing.T) test {
+			return test{
+				p:        &OIDC{},
+				email:    "$%^#_>@smallstep.com",
+				identity: &Identity{Usernames: []string{"______", "$%^#_>", "$%^#_>@smallstep.com"}},
 			}
 		},
 	}
