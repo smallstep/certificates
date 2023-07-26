@@ -20,6 +20,16 @@ type Account struct {
 	Status                 Status           `json:"status"`
 	OrdersURL              string           `json:"orders"`
 	ExternalAccountBinding interface{}      `json:"externalAccountBinding,omitempty"`
+	LocationPrefix         string           `json:"-"`
+	ProvisionerName        string           `json:"-"`
+}
+
+// GetLocation returns the URL location of the given account.
+func (a *Account) GetLocation() string {
+	if a.LocationPrefix == "" {
+		return ""
+	}
+	return a.LocationPrefix + a.ID
 }
 
 // ToLog enables response logging.
@@ -72,6 +82,7 @@ func (p *Policy) GetAllowedNameOptions() *policy.X509NameOptions {
 		IPRanges:   p.X509.Allowed.IPRanges,
 	}
 }
+
 func (p *Policy) GetDeniedNameOptions() *policy.X509NameOptions {
 	if p == nil {
 		return nil

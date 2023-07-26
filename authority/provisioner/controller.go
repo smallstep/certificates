@@ -4,12 +4,12 @@ import (
 	"context"
 	"crypto/x509"
 	"net/http"
-	"regexp"
 	"strings"
 	"time"
 
 	"github.com/pkg/errors"
 	"github.com/smallstep/certificates/errs"
+	"github.com/smallstep/certificates/webhook"
 	"go.step.sm/linkedca"
 	"golang.org/x/crypto/ssh"
 )
@@ -77,7 +77,7 @@ func (c *Controller) AuthorizeSSHRenew(ctx context.Context, cert *ssh.Certificat
 	return DefaultAuthorizeSSHRenew(ctx, c, cert)
 }
 
-func (c *Controller) newWebhookController(templateData WebhookSetter, certType linkedca.Webhook_CertType) *WebhookController {
+func (c *Controller) newWebhookController(templateData WebhookSetter, certType linkedca.Webhook_CertType, opts ...webhook.RequestBodyOption) *WebhookController {
 	client := c.webhookClient
 	if client == nil {
 		client = http.DefaultClient
@@ -87,6 +87,7 @@ func (c *Controller) newWebhookController(templateData WebhookSetter, certType l
 		client:       client,
 		webhooks:     c.webhooks,
 		certType:     certType,
+		options:      opts,
 	}
 }
 
@@ -115,20 +116,18 @@ func DefaultIdentityFunc(_ context.Context, p Interface, email string) (*Identit
 	switch k := p.(type) {
 	case *OIDC:
 		// OIDC principals would be:
-		// ~~1. Preferred usernames.~~ Note: Under discussion, currently disabled
-		// 2. Sanitized local.
-		// 3. Raw local (if different).
-		// 4. Email address.
+		//   ~~1. Preferred usernames.~~ Note: Under discussion, currently disabled
+		//   2. Sanitized local.
+		//   3. Raw local (if different).
+		//   4. Email address.
 		name := SanitizeSSHUserPrincipal(email)
-		if !sshUserRegex.MatchString(name) {
-			return nil, errors.Errorf("invalid principal '%s' from email '%s'", name, email)
-		}
 		usernames := []string{name}
 		if i := strings.LastIndex(email, "@"); i >= 0 {
 			usernames = append(usernames, email[:i])
 		}
 		usernames = append(usernames, email)
 		return &Identity{
+			// Remove duplicated and empty usernames.
 			Usernames: SanitizeStringSlices(usernames),
 		}, nil
 	default:
@@ -177,8 +176,6 @@ func DefaultAuthorizeSSHRenew(_ context.Context, p *Controller, cert *ssh.Certif
 
 	return nil
 }
-
-var sshUserRegex = regexp.MustCompile("^[a-z][-a-z0-9_]*$")
 
 // SanitizeStringSlices removes duplicated an empty strings.
 func SanitizeStringSlices(original []string) []string {
