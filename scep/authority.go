@@ -130,7 +130,7 @@ func (a *Authority) LoadProvisionerByName(name string) (provisioner.Interface, e
 // Some clients do need the root certificate however; also see: https://github.com/openxpki/openxpki/issues/73
 //
 // In case a provisioner specific decrypter is available, this is used as the "SCEP Server (RA)" certificate
-// instead of the CA intermediate directly. This uses a distinct instance of a KMS for doing the SCEp key
+// instead of the CA intermediate directly. This uses a distinct instance of a KMS for doing the SCEP key
 // operations, so that RSA can be used for just SCEP.
 //
 // Using an RA does not seem to exist in https://tools.ietf.org/html/rfc8894, but is mentioned in
@@ -354,8 +354,12 @@ func (a *Authority) SignCSR(ctx context.Context, csr *x509.CertificateRequest, m
 	// as the first certificate in the array
 	signedData.AddCertificate(cert)
 
-	authCert := a.signerCertificate
-	signer := a.signer
+	// authCert := a.signerCertificate
+	// signer := a.signer
+
+	sc, sr := p.GetSigner()
+	authCert := sc
+	signer := sr
 
 	// sign the attributes
 	if err := signedData.AddSigner(authCert, signer, config); err != nil {
@@ -386,7 +390,7 @@ func (a *Authority) SignCSR(ctx context.Context, csr *x509.CertificateRequest, m
 }
 
 // CreateFailureResponse creates an appropriately signed reply for PKI operations
-func (a *Authority) CreateFailureResponse(_ context.Context, _ *x509.CertificateRequest, msg *PKIMessage, info FailInfoName, infoText string) (*PKIMessage, error) {
+func (a *Authority) CreateFailureResponse(ctx context.Context, _ *x509.CertificateRequest, msg *PKIMessage, info FailInfoName, infoText string) (*PKIMessage, error) {
 	config := pkcs7.SignerInfoConfig{
 		ExtraSignedAttributes: []pkcs7.Attribute{
 			{
@@ -425,8 +429,17 @@ func (a *Authority) CreateFailureResponse(_ context.Context, _ *x509.Certificate
 		return nil, err
 	}
 
+	p := provisionerFromContext(ctx)
+
+	// authCert := a.signerCertificate
+	// signer := a.signer
+
+	sc, sr := p.GetSigner()
+	authCert := sc
+	signer := sr
+
 	// sign the attributes
-	if err := signedData.AddSigner(a.signerCertificate, a.signer, config); err != nil {
+	if err := signedData.AddSigner(authCert, signer, config); err != nil {
 		return nil, err
 	}
 

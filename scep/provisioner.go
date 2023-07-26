@@ -17,6 +17,7 @@ type Provisioner interface {
 	GetCapabilities() []string
 	ShouldIncludeRootInChain() bool
 	GetDecrypter() (*x509.Certificate, crypto.Decrypter)
+	GetSigner() (*x509.Certificate, crypto.Signer)
 	GetContentEncryptionAlgorithm() int
 	ValidateChallenge(ctx context.Context, challenge, transactionID string) error
 }

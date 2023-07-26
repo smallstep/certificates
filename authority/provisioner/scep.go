@@ -3,7 +3,6 @@ package provisioner
 import (
 	"context"
 	"crypto"
-	"crypto/rsa"
 	"crypto/subtle"
 	"crypto/x509"
 	"encoding/pem"
@@ -15,6 +14,7 @@ import (
 
 	"go.step.sm/crypto/kms"
 	kmsapi "go.step.sm/crypto/kms/apiv1"
+	"go.step.sm/crypto/kms/uri"
 	"go.step.sm/linkedca"
 
 	"github.com/smallstep/certificates/webhook"
@@ -38,11 +38,10 @@ type SCEP struct {
 	// MinimumPublicKeyLength is the minimum length for public keys in CSRs
 	MinimumPublicKeyLength int `json:"minimumPublicKeyLength,omitempty"`
 
-	// TODO
-	KMS                  *kms.Options `json:"kms,omitempty"`
-	DecrypterCertificate []byte       `json:"decrypterCertificate"`
-	DecrypterKey         string       `json:"decrypterKey"`
-	DecrypterKeyPassword string       `json:"decrypterKeyPassword"`
+	// TODO(hs): also support a separate signer configuration?
+	DecrypterCertificate []byte `json:"decrypterCertificate"`
+	DecrypterKey         string `json:"decrypterKey"`
+	DecrypterKeyPassword string `json:"decrypterKeyPassword"`
 
 	// Numerical identifier for the ContentEncryptionAlgorithm as defined in github.com/mozilla-services/pkcs7
 	// at https://github.com/mozilla-services/pkcs7/blob/33d05740a3526e382af6395d3513e73d4e66d1cb/encrypt.go#L63
@@ -56,6 +55,7 @@ type SCEP struct {
 	keyManager                    kmsapi.KeyManager
 	decrypter                     crypto.Decrypter
 	decrypterCertificate          *x509.Certificate
+	signer                        crypto.Signer
 }
 
 // GetID returns the provisioner unique identifier.
@@ -192,43 +192,79 @@ func (s *SCEP) Init(config Config) (err error) {
 		s.GetOptions().GetWebhooks(),
 	)
 
-	if s.KMS != nil {
-		if s.keyManager, err = kms.New(context.Background(), *s.KMS); err != nil {
+	skip := false // TODO(hs): remove this; currently a helper for debugging
+	if decryptionKey := s.DecrypterKey; decryptionKey != "" && !skip {
+		u, err := uri.Parse(s.DecrypterKey)
+		if err != nil {
+			return fmt.Errorf("failed parsing decrypter key: %w", err)
+		}
+		var kmsType string
+		switch {
+		case u.Scheme != "":
+			kmsType = u.Scheme
+		default:
+			kmsType = "softkms"
+		}
+		opts := kms.Options{
+			Type: kms.Type(kmsType),
+			URI:  s.DecrypterKey,
+		}
+		if s.keyManager, err = kms.New(context.Background(), opts); err != nil {
 			return fmt.Errorf("failed initializing kms: %w", err)
 		}
-		km, ok := s.keyManager.(kmsapi.Decrypter)
+		kmsDecrypter, ok := s.keyManager.(kmsapi.Decrypter)
 		if !ok {
-			return fmt.Errorf("%q is not a kmsapi.Decrypter", s.KMS.Type)
+			return fmt.Errorf("%q is not a kmsapi.Decrypter", opts.Type)
 		}
-		if s.DecrypterKey != "" || len(s.DecrypterCertificate) > 0 {
-			if s.decrypter, err = km.CreateDecrypter(&kmsapi.CreateDecrypterRequest{
-				DecryptionKey: s.DecrypterKey,
-				Password:      []byte(s.DecrypterKeyPassword),
-			}); err != nil {
-				return fmt.Errorf("failed creating decrypter: %w", err)
-			}
-
-			// parse the decrypter certificate
-			block, rest := pem.Decode(s.DecrypterCertificate)
-			if len(rest) > 0 {
-				return errors.New("failed parsing decrypter certificate: trailing data")
-			}
-			if block == nil {
-				return errors.New("failed parsing decrypter certificate: no PEM block found")
-			}
-			if s.decrypterCertificate, err = x509.ParseCertificate(block.Bytes); err != nil {
-				return fmt.Errorf("failed parsing decrypter certificate: %w", err)
-			}
-
-			// validate the decrypter key
-			decrypterPublicKey, ok := s.decrypter.Public().(*rsa.PublicKey)
-			if !ok {
-				return fmt.Errorf("only RSA keys are supported")
-			}
-			if !decrypterPublicKey.Equal(s.decrypterCertificate.PublicKey) {
-				return errors.New("mismatch between decryption certificate and decrypter public keys")
-			}
+		if kmsType != "softkms" { // TODO(hs): this should likely become more transparent?
+			decryptionKey = u.Opaque
 		}
+		if s.decrypter, err = kmsDecrypter.CreateDecrypter(&kmsapi.CreateDecrypterRequest{
+			DecryptionKey: decryptionKey,
+			Password:      []byte(s.DecrypterKeyPassword),
+		}); err != nil {
+			return fmt.Errorf("failed creating decrypter: %w", err)
+		}
+		if s.signer, err = s.keyManager.CreateSigner(&kmsapi.CreateSignerRequest{
+			SigningKey: decryptionKey, // TODO(hs): support distinct signer key
+			Password:   []byte(s.DecrypterKeyPassword),
+		}); err != nil {
+			return fmt.Errorf("failed creating signer: %w", err)
+		}
+	}
+
+	// parse the decrypter certificate contents if available
+	if len(s.DecrypterCertificate) > 0 {
+		block, rest := pem.Decode(s.DecrypterCertificate)
+		if len(rest) > 0 {
+			return errors.New("failed parsing decrypter certificate: trailing data")
+		}
+		if block == nil {
+			return errors.New("failed parsing decrypter certificate: no PEM block found")
+		}
+		if s.decrypterCertificate, err = x509.ParseCertificate(block.Bytes); err != nil {
+			return fmt.Errorf("failed parsing decrypter certificate: %w", err)
+		}
+	}
+
+	// TODO(hs): alternatively, check if the KMS keyManager is a CertificateManager
+	// and load the certificate corresponding to the decryption key.
+
+	// final validation for the decrypter
+	if s.decrypter != nil {
+		// // TODO(hs): enable this validation again
+		// if s.decrypterCertificate == nil {
+		// 	// TODO: don't hard skip at init?
+		// 	return fmt.Errorf("no decrypter certificate available for decrypter in %q", s.Name)
+		// }
+		// // validate the decrypter key
+		// decrypterPublicKey, ok := s.decrypter.Public().(*rsa.PublicKey)
+		// if !ok {
+		// 	return fmt.Errorf("only RSA keys are supported")
+		// }
+		// if !decrypterPublicKey.Equal(s.decrypterCertificate.PublicKey) {
+		// 	return errors.New("mismatch between decryption certificate and decrypter public keys")
+		// }
 	}
 
 	// TODO: add other, SCEP specific, options?
@@ -316,4 +352,8 @@ func (s *SCEP) selectValidationMethod() validationMethod {
 
 func (s *SCEP) GetDecrypter() (*x509.Certificate, crypto.Decrypter) {
 	return s.decrypterCertificate, s.decrypter
+}
+
+func (s *SCEP) GetSigner() (*x509.Certificate, crypto.Signer) {
+	return s.decrypterCertificate, s.signer
 }

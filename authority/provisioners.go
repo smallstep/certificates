@@ -8,7 +8,6 @@ import (
 	"encoding/pem"
 	"fmt"
 	"os"
-	"strings"
 
 	"github.com/pkg/errors"
 	"gopkg.in/square/go-jose.v2/jwt"
@@ -16,7 +15,6 @@ import (
 	"go.step.sm/cli-utils/step"
 	"go.step.sm/cli-utils/ui"
 	"go.step.sm/crypto/jose"
-	"go.step.sm/crypto/kms"
 	"go.step.sm/linkedca"
 
 	"github.com/smallstep/certificates/authority/admin"
@@ -976,12 +974,6 @@ func ProvisionerToCertificates(p *linkedca.Provisioner) (provisioner.Interface, 
 			Options:                       options,
 		}
 		if decrypter := cfg.GetDecrypter(); decrypter != nil {
-			if dkms := decrypter.GetKms(); dkms != nil {
-				s.KMS = &kms.Options{
-					Type:            kms.Type(strings.ToLower(linkedca.KMS_Type_name[int32(dkms.Type)])),
-					CredentialsFile: dkms.CredentialsFile,
-				}
-			}
 			s.DecrypterCertificate = decrypter.DecrypterCertificate
 			s.DecrypterKey = decrypter.DecrypterKey
 			s.DecrypterKeyPassword = decrypter.DecrypterKeyPassword
