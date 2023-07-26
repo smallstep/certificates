@@ -6,6 +6,7 @@ import (
 
 	"github.com/pkg/errors"
 
+	"go.step.sm/cli-utils/step"
 	"go.step.sm/crypto/jose"
 	"go.step.sm/crypto/x509util"
 
@@ -160,7 +161,7 @@ func CustomTemplateOptions(o *Options, data x509util.TemplateData, defaultTempla
 		// Load a template from a file if Template is not defined.
 		if opts.Template == "" && opts.TemplateFile != "" {
 			return []x509util.Option{
-				x509util.WithTemplateFile(opts.TemplateFile, data),
+				x509util.WithTemplateFile(step.Abs(opts.TemplateFile), data),
 			}
 		}
 
