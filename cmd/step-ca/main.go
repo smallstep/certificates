@@ -102,6 +102,12 @@ Please send us a sentence or two, good or bad: **feedback@smallstep.com** or htt
 `
 
 func main() {
+	// initialize step environment.
+	if err := step.Init(); err != nil {
+		fmt.Fprintln(os.Stderr, err.Error())
+		os.Exit(1)
+	}
+
 	// Initialize windows terminal
 	ui.Init()
 
