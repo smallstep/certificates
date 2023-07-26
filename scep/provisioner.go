@@ -4,17 +4,15 @@ import (
 	"context"
 	"crypto"
 	"crypto/x509"
-	"time"
 
 	"github.com/smallstep/certificates/authority/provisioner"
 )
 
-// Provisioner is an interface that implements a subset of the provisioner.Interface --
-// only those methods required by the SCEP api/authority.
+// Provisioner is an interface that embeds the
+// provisioner.Interface and adds some SCEP specific
+// functions.
 type Provisioner interface {
-	AuthorizeSign(ctx context.Context, token string) ([]provisioner.SignOption, error)
-	GetName() string
-	DefaultTLSCertDuration() time.Duration
+	provisioner.Interface
 	GetOptions() *provisioner.Options
 	GetCapabilities() []string
 	ShouldIncludeRootInChain() bool

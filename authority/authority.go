@@ -262,7 +262,7 @@ func (a *Authority) ReloadAdminResources(ctx context.Context) error {
 	a.config.AuthorityConfig.Admins = adminList
 	a.admins = adminClxn
 
-	// update the SCEP service with the currently active SCEP
+	// update the SCEP Authority with the currently active SCEP
 	// provisioner names and revalidate the configuration.
 	if a.scepAuthority != nil {
 		a.scepAuthority.UpdateProvisioners(a.getSCEPProvisionerNames())
@@ -651,10 +651,10 @@ func (a *Authority) init() error {
 	}
 
 	// The SCEP functionality is provided through an instance of
-	// scep.Service. It is initialized once when the CA is started.
-	// TODO(hs): should the SCEP service support reloading? For example,
+	// scep.Authority. It is initialized once when the CA is started.
+	// TODO(hs): should the SCEP Authority support reloading? For example,
 	// when the admin resources are reloaded, specifically the provisioners,
-	// it can happen that the SCEP service is no longer required and can
+	// it can happen that the SCEP Authority is no longer required and can
 	// be destroyed, or that it needs to be instantiated. It may also need
 	// to be revalidated, because not all SCEP provisioner may have a
 	// valid decrypter available.
@@ -674,7 +674,7 @@ func (a *Authority) init() error {
 		}
 
 		// TODO(hs): instead of creating the decrypter here, pass the
-		// intermediate key + chain down to the SCEP service / authority,
+		// intermediate key + chain down to the SCEP authority,
 		// and only instantiate it when required there. Is that possible?
 		// Also with entering passwords?
 		// TODO(hs): if moving the logic, try improving the logic for the

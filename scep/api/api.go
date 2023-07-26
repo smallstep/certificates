@@ -18,6 +18,7 @@ import (
 
 	"github.com/smallstep/certificates/api"
 	"github.com/smallstep/certificates/api/log"
+	"github.com/smallstep/certificates/authority"
 	"github.com/smallstep/certificates/authority/provisioner"
 	"github.com/smallstep/certificates/scep"
 )
@@ -208,7 +209,7 @@ func lookupProvisioner(next http.HandlerFunc) http.HandlerFunc {
 		}
 
 		ctx := r.Context()
-		auth := scep.MustFromContext(ctx)
+		auth := authority.MustFromContext(ctx)
 		p, err := auth.LoadProvisionerByName(provisionerName)
 		if err != nil {
 			fail(w, err)
