@@ -1,4 +1,4 @@
-FROM golang AS builder
+FROM golang:bullseye AS builder
 
 WORKDIR /src
 COPY . .
@@ -21,6 +21,11 @@ RUN apt-get update
 RUN apt-get install -y --no-install-recommends pcscd libpcsclite1
 RUN mkdir -p /run/pcscd
 RUN chown step:step /run/pcscd
+
+# Add user `step` to pcscd group
+RUN groupadd pcscd
+RUN usermod -a -G pcscd step
+
 USER step
 
 ENV CONFIGPATH="/home/step/config/ca.json"
