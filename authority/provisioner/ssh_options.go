@@ -5,6 +5,7 @@ import (
 	"strings"
 
 	"github.com/pkg/errors"
+	"go.step.sm/cli-utils/step"
 	"go.step.sm/crypto/sshutil"
 
 	"github.com/smallstep/certificates/authority/policy"
@@ -144,7 +145,7 @@ func CustomSSHTemplateOptions(o *Options, data sshutil.TemplateData, defaultTemp
 		// Load a template from a file if Template is not defined.
 		if opts.Template == "" && opts.TemplateFile != "" {
 			return []sshutil.Option{
-				sshutil.WithTemplateFile(opts.TemplateFile, data),
+				sshutil.WithTemplateFile(step.Abs(opts.TemplateFile), data),
 			}
 		}
 
