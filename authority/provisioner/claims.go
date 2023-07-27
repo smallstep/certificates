@@ -115,8 +115,8 @@ func (c *Claimer) IsDisableRenewal() bool {
 	return *c.claims.DisableRenewal
 }
 
-// IsDisableSmallstepExtensions returns if the Smallstep extensions, like the
-// provisioner extension, should be excluded from the certificate.
+// IsDisableSmallstepExtensions returns whether Smallstep extensions, such as
+// the provisioner extension, should be excluded from the certificate.
 func (c *Claimer) IsDisableSmallstepExtensions() bool {
 	if c.claims == nil || c.claims.DisableSmallstepExtensions == nil {
 		return *c.global.DisableSmallstepExtensions

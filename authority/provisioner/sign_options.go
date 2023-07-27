@@ -444,8 +444,9 @@ func newProvisionerExtensionOption(typ Type, name, credentialID string, keyValue
 	}
 }
 
-// WithControllerOptions returns the provisionerExtensionOption options from the
-// controller. Currently only the claim DisableSmallstepExtensions is used.
+// WithControllerOptions updates the provisionerExtensionOption with options
+// from the controller. Currently only the DisableSmallstepExtensions
+// provisioner claim is used.
 func (o *provisionerExtensionOption) WithControllerOptions(c *Controller) *provisionerExtensionOption {
 	o.Disabled = c.Claimer.IsDisableSmallstepExtensions()
 	return o

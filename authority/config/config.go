@@ -35,8 +35,8 @@ var (
 	// DefaultEnableSSHCA enable SSH CA features per provisioner or globally
 	// for all provisioners.
 	DefaultEnableSSHCA = false
-	// DefaultDisableSmallstepExtensions disables the Smallstep extensions in
-	// the certificate.
+	// DefaultDisableSmallstepExtensions is the default value for the
+	// DisableSmallstepExtensions provisioner claim.
 	DefaultDisableSmallstepExtensions = false
 	// DefaultCRLCacheDuration is the default cache duration for the CRL.
 	DefaultCRLCacheDuration = &provisioner.Duration{Duration: 24 * time.Hour}
