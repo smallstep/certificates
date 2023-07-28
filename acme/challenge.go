@@ -952,28 +952,28 @@ func doStepAttestationFormat(_ context.Context, prov Provisioner, ch *Challenge,
 	// Extract x5c and verify certificate
 	x5c, ok := att.AttStatement["x5c"].([]interface{})
 	if !ok {
-		return nil, NewError(ErrorBadAttestationStatementType, "x5c not present")
+		return nil, NewError(ErrorBadAttestationStatementType, "x5c not present").WithAdditionalErrorDetail()
 	}
 	if len(x5c) == 0 {
-		return nil, NewError(ErrorRejectedIdentifierType, "x5c is empty")
+		return nil, NewError(ErrorRejectedIdentifierType, "x5c is empty").WithAdditionalErrorDetail()
 	}
 	der, ok := x5c[0].([]byte)
 	if !ok {
-		return nil, NewError(ErrorBadAttestationStatementType, "x5c is malformed")
+		return nil, NewError(ErrorBadAttestationStatementType, "x5c is malformed").WithAdditionalErrorDetail()
 	}
 	leaf, err := x509.ParseCertificate(der)
 	if err != nil {
-		return nil, WrapError(ErrorBadAttestationStatementType, err, "x5c is malformed")
+		return nil, WrapError(ErrorBadAttestationStatementType, err, "x5c is malformed").WithAdditionalErrorDetail()
 	}
 	intermediates := x509.NewCertPool()
 	for _, v := range x5c[1:] {
 		der, ok = v.([]byte)
 		if !ok {
-			return nil, NewError(ErrorBadAttestationStatementType, "x5c is malformed")
+			return nil, NewError(ErrorBadAttestationStatementType, "x5c is malformed").WithAdditionalErrorDetail()
 		}
 		cert, err := x509.ParseCertificate(der)
 		if err != nil {
-			return nil, WrapError(ErrorBadAttestationStatementType, err, "x5c is malformed")
+			return nil, WrapError(ErrorBadAttestationStatementType, err, "x5c is malformed").WithAdditionalErrorDetail()
 		}
 		intermediates.AddCert(cert)
 	}
@@ -983,7 +983,7 @@ func doStepAttestationFormat(_ context.Context, prov Provisioner, ch *Challenge,
 		CurrentTime:   time.Now().Truncate(time.Second),
 		KeyUsages:     []x509.ExtKeyUsage{x509.ExtKeyUsageAny},
 	}); err != nil {
-		return nil, WrapError(ErrorBadAttestationStatementType, err, "x5c is not valid")
+		return nil, WrapError(ErrorBadAttestationStatementType, err, "x5c is not valid").WithAdditionalErrorDetail()
 	}
 
 	// Verify proof of possession of private key validating the key
@@ -993,10 +993,10 @@ func doStepAttestationFormat(_ context.Context, prov Provisioner, ch *Challenge,
 	var sig []byte
 	csig, ok := att.AttStatement["sig"].([]byte)
 	if !ok {
-		return nil, NewError(ErrorBadAttestationStatementType, "sig not present")
+		return nil, NewError(ErrorBadAttestationStatementType, "sig not present").WithAdditionalErrorDetail()
 	}
 	if err := cbor.Unmarshal(csig, &sig); err != nil {
-		return nil, NewError(ErrorBadAttestationStatementType, "sig is malformed")
+		return nil, NewError(ErrorBadAttestationStatementType, "sig is malformed").WithAdditionalErrorDetail()
 	}
 	keyAuth, err := KeyAuthorization(ch.Token, jwk)
 	if err != nil {
@@ -1006,23 +1006,23 @@ func doStepAttestationFormat(_ context.Context, prov Provisioner, ch *Challenge,
 	switch pub := leaf.PublicKey.(type) {
 	case *ecdsa.PublicKey:
 		if pub.Curve != elliptic.P256() {
-			return nil, WrapError(ErrorBadAttestationStatementType, err, "unsupported elliptic curve %s", pub.Curve)
+			return nil, WrapError(ErrorBadAttestationStatementType, err, "unsupported elliptic curve %s", pub.Curve).WithAdditionalErrorDetail()
 		}
 		sum := sha256.Sum256([]byte(keyAuth))
 		if !ecdsa.VerifyASN1(pub, sum[:], sig) {
-			return nil, NewError(ErrorBadAttestationStatementType, "failed to validate signature")
+			return nil, NewError(ErrorBadAttestationStatementType, "failed to validate signature").WithAdditionalErrorDetail()
 		}
 	case *rsa.PublicKey:
 		sum := sha256.Sum256([]byte(keyAuth))
 		if err := rsa.VerifyPKCS1v15(pub, crypto.SHA256, sum[:], sig); err != nil {
-			return nil, NewError(ErrorBadAttestationStatementType, "failed to validate signature")
+			return nil, NewError(ErrorBadAttestationStatementType, "failed to validate signature").WithAdditionalErrorDetail()
 		}
 	case ed25519.PublicKey:
 		if !ed25519.Verify(pub, []byte(keyAuth), sig) {
-			return nil, NewError(ErrorBadAttestationStatementType, "failed to validate signature")
+			return nil, NewError(ErrorBadAttestationStatementType, "failed to validate signature").WithAdditionalErrorDetail()
 		}
 	default:
-		return nil, NewError(ErrorBadAttestationStatementType, "unsupported public key type %T", pub)
+		return nil, NewError(ErrorBadAttestationStatementType, "unsupported public key type %T", pub).WithAdditionalErrorDetail()
 	}
 
 	// Parse attestation data:
