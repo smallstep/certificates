@@ -19,6 +19,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"log"
 	"net"
 	"net/url"
 	"os"
@@ -463,10 +464,14 @@ func wireDPOP01Validate(ctx context.Context, ch *Challenge, db DB, jwk *jose.JSO
 		return NewErrorISE("missing provisioner")
 	}
 
-	kid, thumbprintErr := jwk.Thumbprint(crypto.SHA256)
+	rawKid, thumbprintErr := jwk.Thumbprint(crypto.SHA256)
 	if thumbprintErr != nil {
 		return storeError(ctx, db, ch, false, WrapError(ErrorServerInternalType, thumbprintErr, "failed to compute JWK thumbprint"))
 	}
+
+	kid := string(rawKid)
+
+	log.Printf("kid: %s", kid)
 
 	dpopOptions := provisioner.GetOptions().GetDPOPOptions()
 	key := dpopOptions.GetSigningKey()
@@ -529,7 +534,7 @@ func wireDPOP01Validate(ctx context.Context, ch *Challenge, db DB, jwk *jose.JSO
 		"--hash-algorithm",
 		`SHA-256`,
 		"--kid",
-		string(kid),
+		kid,
 		"--key",
 		file.Name(),
 	)
