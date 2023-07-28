@@ -398,7 +398,7 @@ func (p *Azure) AuthorizeSign(_ context.Context, token string) ([]SignOption, er
 		p,
 		templateOptions,
 		// modifiers / withOptions
-		newProvisionerExtensionOption(TypeAzure, p.Name, p.TenantID),
+		newProvisionerExtensionOption(TypeAzure, p.Name, p.TenantID).WithControllerOptions(p.ctl),
 		profileDefaultDuration(p.ctl.Claimer.DefaultTLSCertDuration()),
 		// validators
 		defaultPublicKeyValidator{},

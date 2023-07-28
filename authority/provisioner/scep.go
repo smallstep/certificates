@@ -190,7 +190,7 @@ func (s *SCEP) AuthorizeSign(context.Context, string) ([]SignOption, error) {
 	return []SignOption{
 		s,
 		// modifiers / withOptions
-		newProvisionerExtensionOption(TypeSCEP, s.Name, ""),
+		newProvisionerExtensionOption(TypeSCEP, s.Name, "").WithControllerOptions(s.ctl),
 		newForceCNOption(s.ForceCN),
 		profileDefaultDuration(s.ctl.Claimer.DefaultTLSCertDuration()),
 		// validators

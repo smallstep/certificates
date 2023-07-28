@@ -646,8 +646,9 @@ func claimsToCertificates(c *linkedca.Claims) (*provisioner.Claims, error) {
 	}
 
 	pc := &provisioner.Claims{
-		DisableRenewal:          &c.DisableRenewal,
-		AllowRenewalAfterExpiry: &c.AllowRenewalAfterExpiry,
+		DisableRenewal:             &c.DisableRenewal,
+		AllowRenewalAfterExpiry:    &c.AllowRenewalAfterExpiry,
+		DisableSmallstepExtensions: &c.DisableSmallstepExtensions,
 	}
 
 	var err error
@@ -686,6 +687,7 @@ func claimsToLinkedca(c *provisioner.Claims) *linkedca.Claims {
 
 	disableRenewal := config.DefaultDisableRenewal
 	allowRenewalAfterExpiry := config.DefaultAllowRenewalAfterExpiry
+	disableSmallstepExtensions := config.DefaultDisableSmallstepExtensions
 
 	if c.DisableRenewal != nil {
 		disableRenewal = *c.DisableRenewal
@@ -693,10 +695,14 @@ func claimsToLinkedca(c *provisioner.Claims) *linkedca.Claims {
 	if c.AllowRenewalAfterExpiry != nil {
 		allowRenewalAfterExpiry = *c.AllowRenewalAfterExpiry
 	}
+	if c.DisableSmallstepExtensions != nil {
+		disableSmallstepExtensions = *c.DisableSmallstepExtensions
+	}
 
 	lc := &linkedca.Claims{
-		DisableRenewal:          disableRenewal,
-		AllowRenewalAfterExpiry: allowRenewalAfterExpiry,
+		DisableRenewal:             disableRenewal,
+		AllowRenewalAfterExpiry:    allowRenewalAfterExpiry,
+		DisableSmallstepExtensions: disableSmallstepExtensions,
 	}
 
 	if c.DefaultTLSDur != nil || c.MinTLSDur != nil || c.MaxTLSDur != nil {
