@@ -30,6 +30,7 @@ import (
 	"golang.org/x/exp/slices"
 
 	"github.com/smallstep/go-attestation/attest"
+
 	"go.step.sm/crypto/jose"
 	"go.step.sm/crypto/keyutil"
 	"go.step.sm/crypto/pemutil"
@@ -398,6 +399,7 @@ func deviceAttest01Validate(ctx context.Context, ch *Challenge, db DB, jwk *jose
 			}
 			return WrapErrorISE(err, "error validating attestation")
 		}
+
 		// Validate nonce with SHA-256 of the token.
 		if len(data.Nonce) != 0 {
 			sum := sha256.Sum256([]byte(ch.Token))
@@ -410,8 +412,26 @@ func deviceAttest01Validate(ctx context.Context, ch *Challenge, db DB, jwk *jose
 		// identifiers.
 		//
 		// Note: We might want to use an external service for this.
+		var subproblem *Subproblem
+		switch {
+		case data.UDID != ch.Value:
+			s := NewSubproblemWithIdentifier(
+				ErrorMalformedType,
+				Identifier{Type: "permanent-identifier", Value: ch.Value},
+				"challenge identifier %q doesn't match the attested hardware identifier %q", ch.Value, data.UDID,
+			)
+			subproblem = &s
+		case data.SerialNumber != ch.Value:
+			s := NewSubproblemWithIdentifier(
+				ErrorMalformedType,
+				Identifier{Type: "permanent-identifier", Value: ch.Value},
+				"challenge identifier %q doesn't match the attested hardware identifier %q", ch.Value, data.SerialNumber,
+			)
+			subproblem = &s
+		}
+
 		if data.UDID != ch.Value && data.SerialNumber != ch.Value {
-			return storeError(ctx, db, ch, true, NewError(ErrorBadAttestationStatementType, "permanent identifier does not match"))
+			return storeError(ctx, db, ch, true, NewError(ErrorBadAttestationStatementType, "permanent identifier does not match").AddSubproblems(*subproblem))
 		}
 
 		// Update attestation key fingerprint to compare against the CSR
@@ -838,30 +858,30 @@ func doAppleAttestationFormat(_ context.Context, prov Provisioner, _ *Challenge,
 
 	x5c, ok := att.AttStatement["x5c"].([]interface{})
 	if !ok {
-		return nil, NewError(ErrorBadAttestationStatementType, "x5c not present")
+		return nil, NewError(ErrorBadAttestationStatementType, "x5c not present").WithAdditionalErrorDetail()
 	}
 	if len(x5c) == 0 {
-		return nil, NewError(ErrorRejectedIdentifierType, "x5c is empty")
+		return nil, NewError(ErrorBadAttestationStatementType, "x5c is empty").WithAdditionalErrorDetail()
 	}
 
 	der, ok := x5c[0].([]byte)
 	if !ok {
-		return nil, NewError(ErrorBadAttestationStatementType, "x5c is malformed")
+		return nil, NewError(ErrorBadAttestationStatementType, "x5c is malformed").WithAdditionalErrorDetail()
 	}
 	leaf, err := x509.ParseCertificate(der)
 	if err != nil {
-		return nil, WrapError(ErrorBadAttestationStatementType, err, "x5c is malformed")
+		return nil, WrapError(ErrorBadAttestationStatementType, err, "x5c is malformed").WithAdditionalErrorDetail()
 	}
 
 	intermediates := x509.NewCertPool()
 	for _, v := range x5c[1:] {
 		der, ok = v.([]byte)
 		if !ok {
-			return nil, NewError(ErrorBadAttestationStatementType, "x5c is malformed")
+			return nil, NewError(ErrorBadAttestationStatementType, "x5c is malformed").WithAdditionalErrorDetail()
 		}
 		cert, err := x509.ParseCertificate(der)
 		if err != nil {
-			return nil, WrapError(ErrorBadAttestationStatementType, err, "x5c is malformed")
+			return nil, WrapError(ErrorBadAttestationStatementType, err, "x5c is malformed").WithAdditionalErrorDetail()
 		}
 		intermediates.AddCert(cert)
 	}
@@ -872,7 +892,7 @@ func doAppleAttestationFormat(_ context.Context, prov Provisioner, _ *Challenge,
 		CurrentTime:   time.Now().Truncate(time.Second),
 		KeyUsages:     []x509.ExtKeyUsage{x509.ExtKeyUsageAny},
 	}); err != nil {
-		return nil, WrapError(ErrorBadAttestationStatementType, err, "x5c is not valid")
+		return nil, WrapError(ErrorBadAttestationStatementType, err, "x5c is not valid").WithAdditionalErrorDetail()
 	}
 
 	data := &appleAttestationData{

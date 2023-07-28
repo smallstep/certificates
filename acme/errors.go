@@ -293,6 +293,11 @@ type Subproblem struct {
 	Identifier *Identifier `json:"identifier,omitempty"`
 }
 
+// NewError creates a new Error.
+func NewError(pt ProblemType, msg string, args ...interface{}) *Error {
+	return newError(pt, errors.Errorf(msg, args...))
+}
+
 // AddSubproblems adds the Subproblems to Error. It
 // returns the Error, allowing for fluent addition.
 func (e *Error) AddSubproblems(subproblems ...Subproblem) *Error {
@@ -300,9 +305,12 @@ func (e *Error) AddSubproblems(subproblems ...Subproblem) *Error {
 	return e
 }
 
-// NewError creates a new Error type.
-func NewError(pt ProblemType, msg string, args ...interface{}) *Error {
-	return newError(pt, errors.Errorf(msg, args...))
+// WithAdditionalErrorDetail adds the underlying error
+// to the existing (default) ACME error detail, providing
+// more information to the ACME client.
+func (e *Error) WithAdditionalErrorDetail() *Error {
+	e.Detail = fmt.Sprintf("%s: %s", e.Detail, e.Err)
+	return e
 }
 
 // NewSubproblem creates a new Subproblem. The msg and args
