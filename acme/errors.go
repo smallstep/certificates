@@ -309,6 +309,12 @@ func (e *Error) AddSubproblems(subproblems ...Subproblem) *Error {
 // to the existing (default) ACME error detail, providing
 // more information to the ACME client.
 func (e *Error) WithAdditionalErrorDetail() *Error {
+	// prevent internal server errors from disclosing
+	// the internal error to the client.
+	if e.Status >= 500 {
+		return e
+	}
+
 	e.Detail = fmt.Sprintf("%s: %s", e.Detail, e.Err)
 	return e
 }
