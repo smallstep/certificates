@@ -237,7 +237,7 @@ func Test_deviceAttest01ValidateWithTPMSimulator(t *testing.T) {
 							assert.Equal(t, ChallengeType("device-attest-01"), updch.Type)
 							assert.Equal(t, "device.id.12345678", updch.Value)
 
-							err := NewError(ErrorBadAttestationStatementType, `version "bogus" is not supported`)
+							err := NewError(ErrorBadAttestationStatementType, `version "bogus" is not supported`).WithAdditionalErrorDetail()
 
 							assert.EqualError(t, updch.Error.Err, err.Err.Error())
 							assert.Equal(t, err.Type, updch.Error.Type)
@@ -283,6 +283,7 @@ func Test_deviceAttest01ValidateWithTPMSimulator(t *testing.T) {
 							assert.Equal(t, "device.id.99999999", updch.Value)
 
 							err := NewError(ErrorRejectedIdentifierType, `permanent identifier does not match`).
+								WithAdditionalErrorDetail().
 								AddSubproblems(NewSubproblemWithIdentifier(
 									ErrorMalformedType,
 									Identifier{Type: "permanent-identifier", Value: "device.id.99999999"},
@@ -828,7 +829,7 @@ func Test_doTPMAttestationFormat(t *testing.T) {
 				"certInfo": params.CreateAttestation,
 				"pubArea":  params.Public,
 			},
-		}}, nil, newBadAttestationStatementError("key authorization does not match")},
+		}}, nil, newBadAttestationStatementError("key authorization invalid")},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
