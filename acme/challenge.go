@@ -469,7 +469,7 @@ func wireDPOP01Validate(ctx context.Context, ch *Challenge, db DB, jwk *jose.JSO
 		return storeError(ctx, db, ch, false, WrapError(ErrorServerInternalType, thumbprintErr, "failed to compute JWK thumbprint"))
 	}
 
-	kid := string(rawKid)
+	kid := base64.RawURLEncoding.EncodeToString(rawKid)
 
 	log.Printf("kid: %s", kid)
 
