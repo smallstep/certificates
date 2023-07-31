@@ -310,8 +310,9 @@ func (e *Error) AddSubproblems(subproblems ...Subproblem) *Error {
 // more information to the ACME client.
 func (e *Error) WithAdditionalErrorDetail() *Error {
 	// prevent internal server errors from disclosing
-	// the internal error to the client at all times.
-	if e == nil || e.Status >= 500 {
+	// the internal error to the client at all times and
+	// prevent nil pointers.
+	if e == nil || e.Status >= 500 || e.Err == nil {
 		return e
 	}
 
