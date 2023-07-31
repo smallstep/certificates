@@ -3626,7 +3626,7 @@ func Test_deviceAttest01Validate(t *testing.T) {
 							assert.Equal(t, "non-matching-value", updch.Value)
 
 							subproblem := NewSubproblemWithIdentifier(
-								ErrorMalformedType,
+								ErrorRejectedIdentifierType,
 								Identifier{Type: "permanent-identifier", Value: "non-matching-value"},
 								`challenge identifier "non-matching-value" doesn't match any of the attested hardware identifiers [udid serial-number]`,
 							)
@@ -3760,7 +3760,7 @@ func Test_deviceAttest01Validate(t *testing.T) {
 							err := NewError(ErrorBadAttestationStatementType, "permanent identifier does not match").
 								WithAdditionalErrorDetail().
 								AddSubproblems(NewSubproblemWithIdentifier(
-									ErrorMalformedType,
+									ErrorRejectedIdentifierType,
 									Identifier{Type: "permanent-identifier", Value: "12345678"},
 									"challenge identifier \"12345678\" doesn't match the attested hardware identifier \"87654321\"",
 								))

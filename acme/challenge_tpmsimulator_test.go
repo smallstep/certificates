@@ -282,12 +282,12 @@ func Test_deviceAttest01ValidateWithTPMSimulator(t *testing.T) {
 							assert.Equal(t, ChallengeType("device-attest-01"), updch.Type)
 							assert.Equal(t, "device.id.99999999", updch.Value)
 
-							err := NewError(ErrorRejectedIdentifierType, `permanent identifier does not match`).
+							err := NewError(ErrorBadAttestationStatementType, `permanent identifier does not match`).
 								WithAdditionalErrorDetail().
 								AddSubproblems(NewSubproblemWithIdentifier(
-									ErrorMalformedType,
+									ErrorRejectedIdentifierType,
 									Identifier{Type: "permanent-identifier", Value: "device.id.99999999"},
-									`challenge identifier "device.id.99999999" doesn't match any of the attested hardware identifiers ["device.id.12345678"]`,
+									`challenge identifier "device.id.99999999" doesn't match any of the attested hardware identifiers [device.id.12345678]`,
 								))
 
 							assert.EqualError(t, updch.Error.Err, err.Err.Error())

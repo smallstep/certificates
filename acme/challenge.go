@@ -414,7 +414,7 @@ func deviceAttest01Validate(ctx context.Context, ch *Challenge, db DB, jwk *jose
 		// Note: We might want to use an external service for this.
 		if data.UDID != ch.Value && data.SerialNumber != ch.Value {
 			subproblem := NewSubproblemWithIdentifier(
-				ErrorMalformedType,
+				ErrorRejectedIdentifierType,
 				Identifier{Type: "permanent-identifier", Value: ch.Value},
 				"challenge identifier %q doesn't match any of the attested hardware identifiers %s", ch.Value, []string{data.UDID, data.SerialNumber},
 			)
@@ -442,7 +442,7 @@ func deviceAttest01Validate(ctx context.Context, ch *Challenge, db DB, jwk *jose
 		// Note: We might want to use an external service for this.
 		if data.SerialNumber != ch.Value {
 			subproblem := NewSubproblemWithIdentifier(
-				ErrorMalformedType,
+				ErrorRejectedIdentifierType,
 				Identifier{Type: "permanent-identifier", Value: ch.Value},
 				"challenge identifier %q doesn't match the attested hardware identifier %q", ch.Value, data.SerialNumber,
 			)
@@ -472,11 +472,11 @@ func deviceAttest01Validate(ctx context.Context, ch *Challenge, db DB, jwk *jose
 		// still fail if the challenge value isn't equal to the CSR subject.
 		if len(data.PermanentIdentifiers) > 0 && !slices.Contains(data.PermanentIdentifiers, ch.Value) { // TODO(hs): add support for HardwareModuleName
 			subproblem := NewSubproblemWithIdentifier(
-				ErrorMalformedType,
+				ErrorRejectedIdentifierType,
 				Identifier{Type: "permanent-identifier", Value: ch.Value},
-				"challenge identifier %q doesn't match any of the attested hardware identifiers %q", ch.Value, data.PermanentIdentifiers,
+				"challenge identifier %q doesn't match any of the attested hardware identifiers %s", ch.Value, data.PermanentIdentifiers,
 			)
-			return storeError(ctx, db, ch, true, NewError(ErrorRejectedIdentifierType, "permanent identifier does not match").WithAdditionalErrorDetail().AddSubproblems(subproblem))
+			return storeError(ctx, db, ch, true, NewError(ErrorBadAttestationStatementType, "permanent identifier does not match").WithAdditionalErrorDetail().AddSubproblems(subproblem))
 		}
 
 		// Update attestation key fingerprint to compare against the CSR
