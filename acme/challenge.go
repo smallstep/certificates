@@ -380,13 +380,18 @@ func deviceAttest01Validate(ctx context.Context, ch *Challenge, db DB, jwk *jose
 		return WrapErrorISE(err, "error unmarshalling CBOR")
 	}
 
+	format := att.Format
 	prov := MustProvisionerFromContext(ctx)
-	if !prov.IsAttestationFormatEnabled(ctx, provisioner.ACMEAttestationFormat(att.Format)) {
+	if !prov.IsAttestationFormatEnabled(ctx, provisioner.ACMEAttestationFormat(format)) {
+		if format != "apple" && format != "step" && format != "tpm" {
+			return storeError(ctx, db, ch, true, NewError(ErrorBadAttestationStatementType, "unsupported attestation object format %q", format).WithAdditionalErrorDetail())
+		}
+
 		return storeError(ctx, db, ch, true,
-			NewError(ErrorBadAttestationStatementType, "attestation format %q is not enabled", att.Format))
+			NewError(ErrorBadAttestationStatementType, "attestation format %q is not enabled", format))
 	}
 
-	switch att.Format {
+	switch format {
 	case "apple":
 		data, err := doAppleAttestationFormat(ctx, prov, ch, &att)
 		if err != nil {
@@ -482,7 +487,7 @@ func deviceAttest01Validate(ctx context.Context, ch *Challenge, db DB, jwk *jose
 		// Update attestation key fingerprint to compare against the CSR
 		az.Fingerprint = data.Fingerprint
 	default:
-		return storeError(ctx, db, ch, true, NewError(ErrorBadAttestationStatementType, "unexpected attestation object format"))
+		return storeError(ctx, db, ch, true, NewError(ErrorBadAttestationStatementType, "unsupported attestation object format %q", format).WithAdditionalErrorDetail())
 	}
 
 	// Update and store the challenge.

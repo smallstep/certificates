@@ -3853,7 +3853,7 @@ func Test_deviceAttest01Validate(t *testing.T) {
 							assert.Equal(t, ChallengeType("device-attest-01"), updch.Type)
 							assert.Equal(t, "12345678", updch.Value)
 
-							err := NewError(ErrorBadAttestationStatementType, "unexpected attestation object format")
+							err := NewError(ErrorBadAttestationStatementType, `unsupported attestation object format "bogus-format"`).WithAdditionalErrorDetail()
 
 							assert.EqualError(t, updch.Error.Err, err.Err.Error())
 							assert.Equal(t, err.Type, updch.Error.Type)
