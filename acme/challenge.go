@@ -455,8 +455,6 @@ func deviceAttest01Validate(ctx context.Context, ch *Challenge, db DB, jwk *jose
 	case "tpm":
 		data, err := doTPMAttestationFormat(ctx, prov, ch, jwk, &att)
 		if err != nil {
-			// TODO(hs): we should provide more details in the error reported to the client;
-			// "Attestation statement cannot be verified" is VERY generic. Also holds true for the other formats.
 			var acmeError *Error
 			if errors.As(err, &acmeError) {
 				if acmeError.Status == 500 {
@@ -699,7 +697,6 @@ func doTPMAttestationFormat(_ context.Context, prov Provisioner, ch *Challenge, 
 
 	publicKey, err := pub.Key()
 	if err != nil {
-		// TODO(hs): to return the detail or not? Is it just internal at this point?
 		return nil, WrapError(ErrorBadAttestationStatementType, err, "failed getting public key").WithAdditionalErrorDetail()
 	}
 
