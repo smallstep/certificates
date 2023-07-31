@@ -819,19 +819,33 @@ ZwFEh9bhKjJ+5VQ9/Do1os0u3LEkgN/r
 -----END CERTIFICATE-----`
 
 var (
-	oidAppleSerialNumber                    = asn1.ObjectIdentifier{1, 2, 840, 113635, 100, 8, 9, 1}
-	oidAppleUniqueDeviceIdentifier          = asn1.ObjectIdentifier{1, 2, 840, 113635, 100, 8, 9, 2}
-	oidAppleSecureEnclaveProcessorOSVersion = asn1.ObjectIdentifier{1, 2, 840, 113635, 100, 8, 10, 2}
-	oidAppleNonce                           = asn1.ObjectIdentifier{1, 2, 840, 113635, 100, 8, 11, 1}
+	oidAppleSerialNumber                      = asn1.ObjectIdentifier{1, 2, 840, 113635, 100, 8, 9, 1}
+	oidAppleUniqueDeviceIdentifier            = asn1.ObjectIdentifier{1, 2, 840, 113635, 100, 8, 9, 2}
+	oidAppleSecureEnclaveEnrollmentIdentifier = asn1.ObjectIdentifier{1, 2, 840, 113635, 100, 8, 9, 3}
+	oidAppleSoftwareUpdateDeviceIdentifier    = asn1.ObjectIdentifier{1, 2, 840, 113635, 100, 8, 9, 4}
+	oidAppleOperatingSystemVersion            = asn1.ObjectIdentifier{1, 2, 840, 113635, 100, 8, 10, 1}
+	oidAppleSecureEnclaveProcessorOSVersion   = asn1.ObjectIdentifier{1, 2, 840, 113635, 100, 8, 10, 2}
+	oidAppleLowLevelBootloaderVersion         = asn1.ObjectIdentifier{1, 2, 840, 113635, 100, 8, 10, 3}
+	oidAppleNonce                             = asn1.ObjectIdentifier{1, 2, 840, 113635, 100, 8, 11, 1}
+	oidAppleSIPStatus                         = asn1.ObjectIdentifier{1, 2, 840, 113635, 100, 8, 13, 1}
+	oidAppleSecureBootStatus                  = asn1.ObjectIdentifier{1, 2, 840, 113635, 100, 8, 13, 2}
+	oidAppleThirdPartyKernelExtensionsAllowed = asn1.ObjectIdentifier{1, 2, 840, 113635, 100, 8, 13, 3}
 )
 
 type appleAttestationData struct {
-	Nonce        []byte
-	SerialNumber string
-	UDID         string
-	SEPVersion   string
-	Certificate  *x509.Certificate
-	Fingerprint  string
+	Nonce                             []byte
+	SerialNumber                      string
+	UDID                              string
+	OSVersion                         string
+	SEPVersion                        string
+	LLBVersion                        string
+	SecureEnclaveEnrollmentID         string
+	SoftwareUpdateDeviceID            string
+	SIPStatus                         string
+	SecureBootStatus                  string
+	ThirdPartyKernelExtensionsAllowed string // TODO(hs): check if this can/should be bool instead
+	Certificate                       *x509.Certificate
+	Fingerprint                       string
 }
 
 func doAppleAttestationFormat(_ context.Context, prov Provisioner, _ *Challenge, att *attestationObject) (*appleAttestationData, error) {
@@ -901,6 +915,20 @@ func doAppleAttestationFormat(_ context.Context, prov Provisioner, _ *Challenge,
 			data.SEPVersion = string(ext.Value)
 		case ext.Id.Equal(oidAppleNonce):
 			data.Nonce = ext.Value
+		case ext.Id.Equal(oidAppleOperatingSystemVersion):
+			data.OSVersion = string(ext.Value)
+		case ext.Id.Equal(oidAppleLowLevelBootloaderVersion):
+			data.LLBVersion = string(ext.Value)
+		case ext.Id.Equal(oidAppleSecureEnclaveEnrollmentIdentifier):
+			data.SecureEnclaveEnrollmentID = string(ext.Value)
+		case ext.Id.Equal(oidAppleSoftwareUpdateDeviceIdentifier):
+			data.SoftwareUpdateDeviceID = string(ext.Value)
+		case ext.Id.Equal(oidAppleSIPStatus):
+			data.SIPStatus = string(ext.Value)
+		case ext.Id.Equal(oidAppleSecureBootStatus):
+			data.SecureBootStatus = string(ext.Value)
+		case ext.Id.Equal(oidAppleThirdPartyKernelExtensionsAllowed):
+			data.ThirdPartyKernelExtensionsAllowed = string(ext.Value)
 		}
 	}
 
