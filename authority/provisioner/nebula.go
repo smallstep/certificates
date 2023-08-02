@@ -150,7 +150,7 @@ func (p *Nebula) AuthorizeSign(_ context.Context, token string) ([]SignOption, e
 		p,
 		templateOptions,
 		// modifiers / withOptions
-		newProvisionerExtensionOption(TypeNebula, p.Name, ""),
+		newProvisionerExtensionOption(TypeNebula, p.Name, "").WithControllerOptions(p.ctl),
 		profileLimitDuration{
 			def:       p.ctl.Claimer.DefaultTLSCertDuration(),
 			notBefore: crt.Details.NotBefore,

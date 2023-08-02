@@ -187,7 +187,7 @@ func (p *JWK) AuthorizeSign(_ context.Context, token string) ([]SignOption, erro
 		self,
 		templateOptions,
 		// modifiers / withOptions
-		newProvisionerExtensionOption(TypeJWK, p.Name, p.Key.KeyID),
+		newProvisionerExtensionOption(TypeJWK, p.Name, p.Key.KeyID).WithControllerOptions(p.ctl),
 		profileDefaultDuration(p.ctl.Claimer.DefaultTLSCertDuration()),
 		// validators
 		commonNameValidator(claims.Subject),

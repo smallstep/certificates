@@ -351,7 +351,7 @@ func (o *OIDC) AuthorizeSign(_ context.Context, token string) ([]SignOption, err
 		o,
 		templateOptions,
 		// modifiers / withOptions
-		newProvisionerExtensionOption(TypeOIDC, o.Name, o.ClientID),
+		newProvisionerExtensionOption(TypeOIDC, o.Name, o.ClientID).WithControllerOptions(o.ctl),
 		profileDefaultDuration(o.ctl.Claimer.DefaultTLSCertDuration()),
 		// validators
 		defaultPublicKeyValidator{},

@@ -30,14 +30,14 @@ require (
 	github.com/stretchr/testify v1.8.4
 	github.com/urfave/cli v1.22.14
 	go.mozilla.org/pkcs7 v0.0.0-20210826202110-33d05740a352
-	go.step.sm/cli-utils v0.7.6
-	go.step.sm/crypto v0.32.4
+	go.step.sm/cli-utils v0.8.0
+	go.step.sm/crypto v0.33.0
 	go.step.sm/linkedca v0.20.0
 	golang.org/x/crypto v0.11.0
 	golang.org/x/exp v0.0.0-20230310171629-522b1b587ee0
 	golang.org/x/net v0.12.0
-	google.golang.org/api v0.132.0
-	google.golang.org/grpc v1.56.2
+	google.golang.org/api v0.134.0
+	google.golang.org/grpc v1.57.0
 	google.golang.org/protobuf v1.31.0
 	gopkg.in/square/go-jose.v2 v2.6.0
 )
@@ -47,10 +47,10 @@ require (
 	cloud.google.com/go/compute v1.20.1 // indirect
 	cloud.google.com/go/compute/metadata v0.2.3 // indirect
 	cloud.google.com/go/iam v1.1.0 // indirect
-	cloud.google.com/go/kms v1.13.0 // indirect
+	cloud.google.com/go/kms v1.15.0 // indirect
 	filippo.io/edwards25519 v1.0.0 // indirect
 	github.com/AndreasBriese/bbloom v0.0.0-20190825152654-46b345b51c96 // indirect
-	github.com/Azure/azure-sdk-for-go/sdk/azcore v1.6.1 // indirect
+	github.com/Azure/azure-sdk-for-go/sdk/azcore v1.7.0 // indirect
 	github.com/Azure/azure-sdk-for-go/sdk/azidentity v1.3.0 // indirect
 	github.com/Azure/azure-sdk-for-go/sdk/internal v1.3.0 // indirect
 	github.com/Azure/azure-sdk-for-go/sdk/keyvault/azkeys v0.10.0 // indirect
@@ -59,7 +59,7 @@ require (
 	github.com/Masterminds/goutils v1.1.1 // indirect
 	github.com/Masterminds/semver/v3 v3.2.0 // indirect
 	github.com/ThalesIgnite/crypto11 v1.2.5 // indirect
-	github.com/aws/aws-sdk-go v1.44.295 // indirect
+	github.com/aws/aws-sdk-go v1.44.307 // indirect
 	github.com/cenkalti/backoff/v3 v3.0.0 // indirect
 	github.com/cespare/xxhash v1.1.0 // indirect
 	github.com/cespare/xxhash/v2 v2.2.0 // indirect
@@ -130,21 +130,16 @@ require (
 	go.etcd.io/bbolt v1.3.7 // indirect
 	go.opencensus.io v0.24.0 // indirect
 	golang.org/x/oauth2 v0.10.0 // indirect
+	golang.org/x/sync v0.3.0 // indirect
 	golang.org/x/sys v0.10.0 // indirect
 	golang.org/x/text v0.11.0 // indirect
 	golang.org/x/time v0.1.0 // indirect
 	google.golang.org/appengine v1.6.7 // indirect
 	google.golang.org/genproto v0.0.0-20230706204954-ccb25ca9f130 // indirect
 	google.golang.org/genproto/googleapis/api v0.0.0-20230706204954-ccb25ca9f130 // indirect
-	google.golang.org/genproto/googleapis/rpc v0.0.0-20230711160842-782d3b101e98 // indirect
+	google.golang.org/genproto/googleapis/rpc v0.0.0-20230720185612-659f7aaaa771 // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 )
-
-// replace github.com/smallstep/nosql => ../nosql
-// replace go.step.sm/crypto => ../crypto
-
-// replace go.step.sm/cli-utils => ../cli-utils
-// replace go.step.sm/linkedca => ../linkedca
 
 // use github.com/smallstep/pkcs7 fork with patches applied
 replace go.mozilla.org/pkcs7 => github.com/smallstep/pkcs7 v0.0.0-20230615175518-7ce6486b74eb
