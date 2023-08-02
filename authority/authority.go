@@ -262,13 +262,22 @@ func (a *Authority) ReloadAdminResources(ctx context.Context) error {
 	a.config.AuthorityConfig.Admins = adminList
 	a.admins = adminClxn
 
-	// update the SCEP Authority with the currently active SCEP
-	// provisioner names and revalidate the configuration.
-	if a.scepAuthority != nil {
+	switch {
+	case a.requiresSCEP() && a.GetSCEP() == nil:
+		// TODO(hs): try to initialize SCEP here too? It's a bit
+		// problematic if this method is called as part of an update
+		// via Admin API and a password needs to be provided.
+	case a.requiresSCEP() && a.GetSCEP() != nil:
+		// update the SCEP Authority with the currently active SCEP
+		// provisioner names and revalidate the configuration.
 		a.scepAuthority.UpdateProvisioners(a.getSCEPProvisionerNames())
 		if err := a.scepAuthority.Validate(); err != nil {
 			log.Printf("failed validating SCEP authority: %v\n", err)
 		}
+	case !a.requiresSCEP() && a.GetSCEP() != nil:
+		// TODO(hs): don't remove the authority if we can't also
+		// reload it.
+		//a.scepAuthority = nil
 	}
 
 	return nil
@@ -651,14 +660,17 @@ func (a *Authority) init() error {
 	}
 
 	// The SCEP functionality is provided through an instance of
-	// scep.Authority. It is initialized once when the CA is started.
-	// TODO(hs): should the SCEP Authority support reloading? For example,
-	// when the admin resources are reloaded, specifically the provisioners,
-	// it can happen that the SCEP Authority is no longer required and can
-	// be destroyed, or that it needs to be instantiated. It may also need
-	// to be revalidated, because not all SCEP provisioner may have a
-	// valid decrypter available.
-	if a.requiresSCEP() && a.GetSCEP() == nil {
+	// scep.Authority. It is initialized when the CA is started and
+	// if it doesn't exist yet. It gets refreshed if it already
+	// exists. If the SCEP authority is no longer required on reload,
+	// it gets removed.
+	// TODO(hs): reloading through SIGHUP doesn't hit these cases. This
+	// is because an entirely new authority.Authority is created, including
+	// a new scep.Authority. Look into this to see if we want this to
+	// keep working like that, or want to reuse a single instance and
+	// update that.
+	switch {
+	case a.requiresSCEP() && a.GetSCEP() == nil:
 		var options scep.Options
 		options.Roots = a.rootX509Certs
 		options.Intermediates, err = pemutil.ReadCertificateBundle(a.config.IntermediateCert)
@@ -698,14 +710,27 @@ func (a *Authority) init() error {
 		options.SCEPProvisionerNames = a.getSCEPProvisionerNames()
 
 		// create a new SCEP authority
-		a.scepAuthority, err = scep.New(a, options)
+		scepAuthority, err := scep.New(a, options)
 		if err != nil {
 			return err
 		}
 
 		// validate the SCEP authority
-		if err := a.scepAuthority.Validate(); err != nil {
+		if err := scepAuthority.Validate(); err != nil {
 			a.initLogf("failed validating SCEP authority: %v", err)
+		}
+
+		// set the SCEP authority
+		a.scepAuthority = scepAuthority
+	case !a.requiresSCEP() && a.GetSCEP() != nil:
+		// clear the SCEP authority if it's no longer required
+		a.scepAuthority = nil
+	case a.requiresSCEP() && a.GetSCEP() != nil:
+		// update the SCEP Authority with the currently active SCEP
+		// provisioner names and revalidate the configuration.
+		a.scepAuthority.UpdateProvisioners(a.getSCEPProvisionerNames())
+		if err := a.scepAuthority.Validate(); err != nil {
+			log.Printf("failed validating SCEP authority: %v\n", err)
 		}
 	}
 
@@ -869,12 +894,15 @@ func (a *Authority) requiresSCEP() bool {
 	return false
 }
 
+// getSCEPProvisionerNames returns the names of the SCEP provisioners
+// that are currently available in the CA.
 func (a *Authority) getSCEPProvisionerNames() (names []string) {
 	for _, p := range a.config.AuthorityConfig.Provisioners {
 		if p.GetType() == provisioner.TypeSCEP {
 			names = append(names, p.GetName())
 		}
 	}
+
 	return
 }
 

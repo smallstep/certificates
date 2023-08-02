@@ -6,6 +6,7 @@ import (
 	"crypto/x509"
 	"errors"
 	"fmt"
+	"sync"
 
 	microx509util "github.com/micromdm/scep/v2/cryptoutil/x509util"
 	microscep "github.com/micromdm/scep/v2/scep"
@@ -25,6 +26,8 @@ type Authority struct {
 	signer               crypto.Signer
 	defaultDecrypter     crypto.Decrypter
 	scepProvisionerNames []string
+
+	mu sync.RWMutex
 }
 
 type authorityKey struct{}
@@ -77,6 +80,13 @@ func New(signAuth SignAuthority, opts Options) (*Authority, error) {
 // The validation includes a check if a decrypter is available, either
 // an authority wide decrypter, or a provisioner specific decrypter.
 func (a *Authority) Validate() error {
+	if a == nil {
+		return nil
+	}
+
+	a.mu.RLock()
+	defer a.mu.RUnlock()
+
 	noDefaultDecrypterAvailable := a.defaultDecrypter == nil
 	for _, name := range a.scepProvisionerNames {
 		p, err := a.LoadProvisionerByName(name)
@@ -102,6 +112,13 @@ func (a *Authority) Validate() error {
 // current SCEP provisioners configured. This allows the Authority to be
 // validated with the latest data.
 func (a *Authority) UpdateProvisioners(scepProvisionerNames []string) {
+	if a == nil {
+		return
+	}
+
+	a.mu.Lock()
+	defer a.mu.Unlock()
+
 	a.scepProvisionerNames = scepProvisionerNames
 }
 

@@ -250,19 +250,9 @@ func (ca *CA) Init(cfg *config.Config) (*CA, error) {
 
 	var scepAuthority *scep.Authority
 	if ca.shouldServeSCEPEndpoints() {
-		// validate the SCEP authority configuration. Currently this
-		// will not result in a failure to start if one or more SCEP
-		// provisioners are not correctly configured. Only a log will
-		// be emitted.
+		// get the SCEP authority configuration. Validation is
+		// performed within the authority instantiation process.
 		scepAuthority = auth.GetSCEP()
-		if err := scepAuthority.Validate(); err != nil {
-			err = errors.Wrap(err, "failed validating SCEP authority")
-			shouldFail := false
-			if shouldFail {
-				return nil, err
-			}
-			log.Println(err)
-		}
 
 		// According to the RFC (https://tools.ietf.org/html/rfc8894#section-7.10),
 		// SCEP operations are performed using HTTP, so that's why the API is mounted
