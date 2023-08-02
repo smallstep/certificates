@@ -237,7 +237,7 @@ func (p *X5C) AuthorizeSign(_ context.Context, token string) ([]SignOption, erro
 		self,
 		templateOptions,
 		// modifiers / withOptions
-		newProvisionerExtensionOption(TypeX5C, p.Name, ""),
+		newProvisionerExtensionOption(TypeX5C, p.Name, "").WithControllerOptions(p.ctl),
 		profileLimitDuration{
 			p.ctl.Claimer.DefaultTLSCertDuration(),
 			x5cLeaf.NotBefore, x5cLeaf.NotAfter,

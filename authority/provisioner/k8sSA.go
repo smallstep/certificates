@@ -238,7 +238,7 @@ func (p *K8sSA) AuthorizeSign(_ context.Context, token string) ([]SignOption, er
 		p,
 		templateOptions,
 		// modifiers / withOptions
-		newProvisionerExtensionOption(TypeK8sSA, p.Name, ""),
+		newProvisionerExtensionOption(TypeK8sSA, p.Name, "").WithControllerOptions(p.ctl),
 		profileDefaultDuration(p.ctl.Claimer.DefaultTLSCertDuration()),
 		// validators
 		defaultPublicKeyValidator{},

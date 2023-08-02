@@ -27,11 +27,30 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
 
 ## [Unreleased]
 
+### Added
+
+- Added support for TPM KMS (smallstep/crypto#253)
+- Added support for disableSmallstepExtensions provisioner claim
+  (smallstep/certificates#1484)
+- Added script to migrate a badger DB to MySQL or PostgreSQL
+  (smallstep/certificates#1477)
+- Added AWS public certificates for me-central-1 and ap-southeast-3
+  (smallstep/certificates#1404)
+- Add namespace field to VaultCAS JSON config (smallstep/certificates#1424)
+
+### Changed
+
+- Changed the Makefile to produce cgo-enabled builds running
+  `make build GO_ENVS="CGO_ENABLED=1"` (smallstep/certificates#1446)
+
 ### Fixed
 
 - Improved authentication for ACME requests using kid and provisioner name
   (smallstep/certificates#1386).
-
+- Fixed indentation of KMS configuration in helm charts
+  (smallstep/certificates#1405)
+- Fixed simultaneous sign or decrypt operation on a YubiKey
+  (smallstep/certificates#1476, smallstep/crypto#288)
 
 ## [v0.24.2] - 2023-05-11
 

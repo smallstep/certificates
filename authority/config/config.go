@@ -35,6 +35,9 @@ var (
 	// DefaultEnableSSHCA enable SSH CA features per provisioner or globally
 	// for all provisioners.
 	DefaultEnableSSHCA = false
+	// DefaultDisableSmallstepExtensions is the default value for the
+	// DisableSmallstepExtensions provisioner claim.
+	DefaultDisableSmallstepExtensions = false
 	// DefaultCRLCacheDuration is the default cache duration for the CRL.
 	DefaultCRLCacheDuration = &provisioner.Duration{Duration: 24 * time.Hour}
 	// DefaultCRLExpiredDuration is the default duration in which expired
@@ -43,18 +46,19 @@ var (
 	// GlobalProvisionerClaims is the default duration that expired certificates
 	// remain in the CRL after expiration.
 	GlobalProvisionerClaims = provisioner.Claims{
-		MinTLSDur:               &provisioner.Duration{Duration: 5 * time.Minute}, // TLS certs
-		MaxTLSDur:               &provisioner.Duration{Duration: 24 * time.Hour},
-		DefaultTLSDur:           &provisioner.Duration{Duration: 24 * time.Hour},
-		MinUserSSHDur:           &provisioner.Duration{Duration: 5 * time.Minute}, // User SSH certs
-		MaxUserSSHDur:           &provisioner.Duration{Duration: 24 * time.Hour},
-		DefaultUserSSHDur:       &provisioner.Duration{Duration: 16 * time.Hour},
-		MinHostSSHDur:           &provisioner.Duration{Duration: 5 * time.Minute}, // Host SSH certs
-		MaxHostSSHDur:           &provisioner.Duration{Duration: 30 * 24 * time.Hour},
-		DefaultHostSSHDur:       &provisioner.Duration{Duration: 30 * 24 * time.Hour},
-		EnableSSHCA:             &DefaultEnableSSHCA,
-		DisableRenewal:          &DefaultDisableRenewal,
-		AllowRenewalAfterExpiry: &DefaultAllowRenewalAfterExpiry,
+		MinTLSDur:                  &provisioner.Duration{Duration: 5 * time.Minute}, // TLS certs
+		MaxTLSDur:                  &provisioner.Duration{Duration: 24 * time.Hour},
+		DefaultTLSDur:              &provisioner.Duration{Duration: 24 * time.Hour},
+		MinUserSSHDur:              &provisioner.Duration{Duration: 5 * time.Minute}, // User SSH certs
+		MaxUserSSHDur:              &provisioner.Duration{Duration: 24 * time.Hour},
+		DefaultUserSSHDur:          &provisioner.Duration{Duration: 16 * time.Hour},
+		MinHostSSHDur:              &provisioner.Duration{Duration: 5 * time.Minute}, // Host SSH certs
+		MaxHostSSHDur:              &provisioner.Duration{Duration: 30 * 24 * time.Hour},
+		DefaultHostSSHDur:          &provisioner.Duration{Duration: 30 * 24 * time.Hour},
+		EnableSSHCA:                &DefaultEnableSSHCA,
+		DisableRenewal:             &DefaultDisableRenewal,
+		AllowRenewalAfterExpiry:    &DefaultAllowRenewalAfterExpiry,
+		DisableSmallstepExtensions: &DefaultDisableSmallstepExtensions,
 	}
 )
 
