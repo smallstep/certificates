@@ -145,4 +145,4 @@ require (
 replace go.mozilla.org/pkcs7 => github.com/smallstep/pkcs7 v0.0.0-20230615175518-7ce6486b74eb
 
 // temporary replace until https://github.com/smallstep/linkedca/pull/55 is merged
-replace go.step.sm/linkedca => ./../linkedca
+replace go.step.sm/linkedca => go.step.sm/linkedca v0.0.0-20230802134415-b577c7565f6d
