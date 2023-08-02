@@ -210,21 +210,6 @@ func (a *Authority) DecryptPKIEnvelope(ctx context.Context, msg *PKIMessage) err
 	return nil
 }
 
-func (a *Authority) selectDecrypter(ctx context.Context) (cert *x509.Certificate, pkey crypto.PrivateKey, err error) {
-	p := provisionerFromContext(ctx)
-
-	// return provisioner specific decrypter, if available
-	if cert, pkey = p.GetDecrypter(); cert != nil && pkey != nil {
-		return
-	}
-
-	// fallback to the CA wide decrypter
-	cert = a.signerCertificate
-	pkey = a.defaultDecrypter
-
-	return
-}
-
 // SignCSR creates an x509.Certificate based on a CSR template and Cert Authority credentials
 // returns a new PKIMessage with CertRep data
 func (a *Authority) SignCSR(ctx context.Context, csr *x509.CertificateRequest, msg *PKIMessage) (*PKIMessage, error) {
@@ -354,15 +339,13 @@ func (a *Authority) SignCSR(ctx context.Context, csr *x509.CertificateRequest, m
 	// as the first certificate in the array
 	signedData.AddCertificate(cert)
 
-	// authCert := a.signerCertificate
-	// signer := a.signer
-
-	sc, sr := p.GetSigner()
-	authCert := sc
-	signer := sr
+	signerCert, signer, err := a.selectSigner(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("failed selecting signer: %w", err)
+	}
 
 	// sign the attributes
-	if err := signedData.AddSigner(authCert, signer, config); err != nil {
+	if err := signedData.AddSigner(signerCert, signer, config); err != nil {
 		return nil, err
 	}
 
@@ -429,17 +412,13 @@ func (a *Authority) CreateFailureResponse(ctx context.Context, _ *x509.Certifica
 		return nil, err
 	}
 
-	p := provisionerFromContext(ctx)
-
-	// authCert := a.signerCertificate
-	// signer := a.signer
-
-	sc, sr := p.GetSigner()
-	authCert := sc
-	signer := sr
+	signerCert, signer, err := a.selectSigner(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("failed selecting signer: %w", err)
+	}
 
 	// sign the attributes
-	if err := signedData.AddSigner(authCert, signer, config); err != nil {
+	if err := signedData.AddSigner(signerCert, signer, config); err != nil {
 		return nil, err
 	}
 
@@ -486,4 +465,34 @@ func (a *Authority) GetCACaps(ctx context.Context) []string {
 func (a *Authority) ValidateChallenge(ctx context.Context, challenge, transactionID string) error {
 	p := provisionerFromContext(ctx)
 	return p.ValidateChallenge(ctx, challenge, transactionID)
+}
+
+func (a *Authority) selectDecrypter(ctx context.Context) (cert *x509.Certificate, pkey crypto.PrivateKey, err error) {
+	p := provisionerFromContext(ctx)
+
+	// return provisioner specific decrypter, if available
+	if cert, pkey = p.GetDecrypter(); cert != nil && pkey != nil {
+		return
+	}
+
+	// fallback to the CA wide decrypter
+	cert = a.signerCertificate
+	pkey = a.defaultDecrypter
+
+	return
+}
+
+func (a *Authority) selectSigner(ctx context.Context) (cert *x509.Certificate, pkey crypto.PrivateKey, err error) {
+	p := provisionerFromContext(ctx)
+
+	// return provisioner specific decrypter, if available
+	if cert, pkey = p.GetSigner(); cert != nil && pkey != nil {
+		return
+	}
+
+	// fallback to the CA wide signer
+	cert = a.signerCertificate
+	pkey = a.defaultDecrypter
+
+	return
 }
