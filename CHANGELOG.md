@@ -51,6 +51,8 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
   (smallstep/certificates#1405)
 - Fixed simultaneous sign or decrypt operation on a YubiKey
   (smallstep/certificates#1476, smallstep/crypto#288)
+- Fixed adding certificate templates with ASN.1 functions
+  (smallstep/certificates#1500, smallstep/crypto#302)
 
 ## [v0.24.2] - 2023-05-11
 
