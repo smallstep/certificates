@@ -421,7 +421,7 @@ func deviceAttest01Validate(ctx context.Context, ch *Challenge, db DB, jwk *jose
 			subproblem := NewSubproblemWithIdentifier(
 				ErrorRejectedIdentifierType,
 				Identifier{Type: "permanent-identifier", Value: ch.Value},
-				"challenge identifier %q doesn't match any of the attested hardware identifiers %s", ch.Value, []string{data.UDID, data.SerialNumber},
+				"challenge identifier %q doesn't match any of the attested hardware identifiers %q", ch.Value, []string{data.UDID, data.SerialNumber},
 			)
 			return storeError(ctx, db, ch, true, NewError(ErrorBadAttestationStatementType, "permanent identifier does not match").WithAdditionalErrorDetail().AddSubproblems(subproblem))
 		}
@@ -479,7 +479,7 @@ func deviceAttest01Validate(ctx context.Context, ch *Challenge, db DB, jwk *jose
 			subproblem := NewSubproblemWithIdentifier(
 				ErrorRejectedIdentifierType,
 				Identifier{Type: "permanent-identifier", Value: ch.Value},
-				"challenge identifier %q doesn't match any of the attested hardware identifiers %s", ch.Value, data.PermanentIdentifiers,
+				"challenge identifier %q doesn't match any of the attested hardware identifiers %q", ch.Value, data.PermanentIdentifiers,
 			)
 			return storeError(ctx, db, ch, true, NewError(ErrorBadAttestationStatementType, "permanent identifier does not match").WithAdditionalErrorDetail().AddSubproblems(subproblem))
 		}
