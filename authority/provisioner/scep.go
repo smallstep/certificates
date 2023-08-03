@@ -3,6 +3,7 @@ package provisioner
 import (
 	"context"
 	"crypto"
+	"crypto/rsa"
 	"crypto/subtle"
 	"crypto/x509"
 	"encoding/pem"
@@ -177,23 +178,23 @@ func (s *SCEP) Init(config Config) (err error) {
 	if s.MinimumPublicKeyLength == 0 {
 		s.MinimumPublicKeyLength = 2048
 	}
-
 	if s.MinimumPublicKeyLength%8 != 0 {
 		return errors.Errorf("%d bits is not exactly divisible by 8", s.MinimumPublicKeyLength)
 	}
 
+	// Set the encryption algorithm to use
 	s.encryptionAlgorithm = s.EncryptionAlgorithmIdentifier // TODO(hs): we might want to upgrade the default security to AES-CBC?
 	if s.encryptionAlgorithm < 0 || s.encryptionAlgorithm > 4 {
 		return errors.New("only encryption algorithm identifiers from 0 to 4 are valid")
 	}
 
+	// Prepare the SCEP challenge validator
 	s.challengeValidationController = newChallengeValidationController(
 		config.WebhookClient,
 		s.GetOptions().GetWebhooks(),
 	)
 
-	skip := false // TODO(hs): remove this; currently a helper for debugging
-	if decryptionKey := s.DecrypterKey; decryptionKey != "" && !skip {
+	if decryptionKey := s.DecrypterKey; decryptionKey != "" {
 		u, err := uri.Parse(s.DecrypterKey)
 		if err != nil {
 			return fmt.Errorf("failed parsing decrypter key: %w", err)
@@ -226,7 +227,7 @@ func (s *SCEP) Init(config Config) (err error) {
 			return fmt.Errorf("failed creating decrypter: %w", err)
 		}
 		if s.signer, err = s.keyManager.CreateSigner(&kmsapi.CreateSignerRequest{
-			SigningKey: decryptionKey, // TODO(hs): support distinct signer key
+			SigningKey: decryptionKey, // TODO(hs): support distinct signer key in the future?
 			Password:   []byte(s.DecrypterKeyPassword),
 		}); err != nil {
 			return fmt.Errorf("failed creating signer: %w", err)
@@ -248,23 +249,19 @@ func (s *SCEP) Init(config Config) (err error) {
 	}
 
 	// TODO(hs): alternatively, check if the KMS keyManager is a CertificateManager
-	// and load the certificate corresponding to the decryption key.
+	// and load the certificate corresponding to the decryption key?
 
-	// final validation for the decrypter
-	if s.decrypter != nil {
-		// // TODO(hs): enable this validation again
-		// if s.decrypterCertificate == nil {
-		// 	// TODO: don't hard skip at init?
-		// 	return fmt.Errorf("no decrypter certificate available for decrypter in %q", s.Name)
-		// }
-		// // validate the decrypter key
-		// decrypterPublicKey, ok := s.decrypter.Public().(*rsa.PublicKey)
-		// if !ok {
-		// 	return fmt.Errorf("only RSA keys are supported")
-		// }
-		// if !decrypterPublicKey.Equal(s.decrypterCertificate.PublicKey) {
-		// 	return errors.New("mismatch between decryption certificate and decrypter public keys")
-		// }
+	// Final validation for the decrypter. If both the decrypter and the certificate
+	// are available, the public keys must match. We currently allow the decrypter to
+	// be set without a certificate without warning the user, but
+	if s.decrypter != nil && s.decrypterCertificate != nil {
+		decrypterPublicKey, ok := s.decrypter.Public().(*rsa.PublicKey)
+		if !ok {
+			return fmt.Errorf("only RSA keys are supported")
+		}
+		if !decrypterPublicKey.Equal(s.decrypterCertificate.PublicKey) {
+			return errors.New("mismatch between decryption certificate and decrypter public keys")
+		}
 	}
 
 	// TODO: add other, SCEP specific, options?
@@ -350,10 +347,19 @@ func (s *SCEP) selectValidationMethod() validationMethod {
 	return validationMethodNone
 }
 
+// GetDecrypter returns the provisioner specific decrypter,
+// used to decrypt SCEP request messages sent by a SCEP client.
+// The decrypter consists of a crypto.Decrypter (a private key)
+// and a certificate for the public key corresponding to the
+// private key.
 func (s *SCEP) GetDecrypter() (*x509.Certificate, crypto.Decrypter) {
 	return s.decrypterCertificate, s.decrypter
 }
 
+// GetSigner returns the provisioner specific signer, used to
+// sign SCEP response messages for the client. The signer consists
+// of a crypto.Signer and a certificate for the public key
+// corresponding to the private key.
 func (s *SCEP) GetSigner() (*x509.Certificate, crypto.Signer) {
 	return s.decrypterCertificate, s.signer
 }

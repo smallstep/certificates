@@ -486,19 +486,22 @@ func (a *Authority) ValidateChallenge(ctx context.Context, challenge, transactio
 
 func (a *Authority) selectDecrypter(ctx context.Context) (cert *x509.Certificate, pkey crypto.Decrypter, err error) {
 	p := provisionerFromContext(ctx)
-
-	// return provisioner specific decrypter, if available
-	if cert, pkey = p.GetDecrypter(); cert != nil && pkey != nil {
+	cert, pkey = p.GetDecrypter()
+	switch {
+	case cert != nil && pkey != nil:
 		return
+	case cert == nil && pkey != nil:
+		return nil, nil, fmt.Errorf("provisioner %q does not have a decrypter certificate available", p.GetName())
+	case cert != nil && pkey == nil:
+		return nil, nil, fmt.Errorf("provisioner %q does not have a decrypter available", p.GetName())
 	}
 
-	// fallback to the CA wide RSA decrypter, which is the
-	// intermediate CA.
-	cert = a.signerCertificate
-	pkey = a.defaultDecrypter
-
-	if cert == nil || pkey == nil {
-		return nil, nil, fmt.Errorf("provisioner %q does not have a decrypter available", p.GetName())
+	cert, pkey = a.signerCertificate, a.defaultDecrypter
+	switch {
+	case cert == nil && pkey != nil:
+		return nil, nil, fmt.Errorf("provisioner %q does not have a default decrypter certificate available", p.GetName())
+	case cert != nil && pkey == nil:
+		return nil, nil, fmt.Errorf("provisioner %q does not have a default decrypter available", p.GetName())
 	}
 
 	return
@@ -506,19 +509,22 @@ func (a *Authority) selectDecrypter(ctx context.Context) (cert *x509.Certificate
 
 func (a *Authority) selectSigner(ctx context.Context) (cert *x509.Certificate, pkey crypto.PrivateKey, err error) {
 	p := provisionerFromContext(ctx)
-
-	// return provisioner specific signer, if available
-	if cert, pkey = p.GetSigner(); cert != nil && pkey != nil {
+	cert, pkey = p.GetSigner()
+	switch {
+	case cert != nil && pkey != nil:
 		return
+	case cert == nil && pkey != nil:
+		return nil, nil, fmt.Errorf("provisioner %q does not have a signer certificate available", p.GetName())
+	case cert != nil && pkey == nil:
+		return nil, nil, fmt.Errorf("provisioner %q does not have a signer available", p.GetName())
 	}
 
-	// fallback to the CA wide RSA signer, which is the
-	// intermediate CA.
-	cert = a.signerCertificate
-	pkey = a.defaultSigner
-
-	if cert == nil || pkey == nil {
-		return nil, nil, fmt.Errorf("provisioner %q does not have a signer available", p.GetName())
+	cert, pkey = a.signerCertificate, a.defaultSigner
+	switch {
+	case cert == nil && pkey != nil:
+		return nil, nil, fmt.Errorf("provisioner %q does not have a default signer certificate available", p.GetName())
+	case cert != nil && pkey == nil:
+		return nil, nil, fmt.Errorf("provisioner %q does not have a default signer available", p.GetName())
 	}
 
 	return
