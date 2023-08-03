@@ -57,6 +57,7 @@ type SCEP struct {
 	decrypter                     crypto.Decrypter
 	decrypterCertificate          *x509.Certificate
 	signer                        crypto.Signer
+	signerCertificate             *x509.Certificate
 }
 
 // GetID returns the provisioner unique identifier.
@@ -246,6 +247,8 @@ func (s *SCEP) Init(config Config) (err error) {
 		if s.decrypterCertificate, err = x509.ParseCertificate(block.Bytes); err != nil {
 			return fmt.Errorf("failed parsing decrypter certificate: %w", err)
 		}
+		// the decrypter certificate is also the signer certificate
+		s.signerCertificate = s.decrypterCertificate
 	}
 
 	// TODO(hs): alternatively, check if the KMS keyManager is a CertificateManager
@@ -361,5 +364,5 @@ func (s *SCEP) GetDecrypter() (*x509.Certificate, crypto.Decrypter) {
 // of a crypto.Signer and a certificate for the public key
 // corresponding to the private key.
 func (s *SCEP) GetSigner() (*x509.Certificate, crypto.Signer) {
-	return s.decrypterCertificate, s.signer
+	return s.signerCertificate, s.signer
 }

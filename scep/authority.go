@@ -22,9 +22,10 @@ type Authority struct {
 	signAuth             SignAuthority
 	roots                []*x509.Certificate
 	intermediates        []*x509.Certificate
-	signerCertificate    *x509.Certificate
 	defaultSigner        crypto.Signer
+	signerCertificate    *x509.Certificate
 	defaultDecrypter     crypto.Decrypter
+	decrypterCertificate *x509.Certificate
 	scepProvisionerNames []string
 
 	mu sync.RWMutex
@@ -64,16 +65,17 @@ func New(signAuth SignAuthority, opts Options) (*Authority, error) {
 	if err := opts.Validate(); err != nil {
 		return nil, err
 	}
-	authority := &Authority{
+
+	return &Authority{
 		signAuth:             signAuth, // TODO: provide signAuth through context instead?
 		roots:                opts.Roots,
 		intermediates:        opts.Intermediates,
-		signerCertificate:    opts.SignerCert,
 		defaultSigner:        opts.Signer,
+		signerCertificate:    opts.SignerCert,
 		defaultDecrypter:     opts.Decrypter,
+		decrypterCertificate: opts.SignerCert, // the intermediate signer cert is also the decrypter cert (if RSA)
 		scepProvisionerNames: opts.SCEPProvisionerNames,
-	}
-	return authority, nil
+	}, nil
 }
 
 // Validate validates if the SCEP Authority has a valid configuration.
@@ -181,12 +183,12 @@ func (a *Authority) DecryptPKIEnvelope(ctx context.Context, msg *PKIMessage) err
 		return fmt.Errorf("error parsing pkcs7 content: %w", err)
 	}
 
-	cert, pkey, err := a.selectDecrypter(ctx)
+	cert, decrypter, err := a.selectDecrypter(ctx)
 	if err != nil {
 		return fmt.Errorf("failed selecting decrypter: %w", err)
 	}
 
-	envelope, err := p7c.Decrypt(cert, pkey)
+	envelope, err := p7c.Decrypt(cert, decrypter)
 	if err != nil {
 		return fmt.Errorf("error decrypting encrypted pkcs7 content: %w", err)
 	}
@@ -209,7 +211,7 @@ func (a *Authority) DecryptPKIEnvelope(ctx context.Context, msg *PKIMessage) err
 		if err := csr.CheckSignature(); err != nil {
 			return fmt.Errorf("invalid CSR signature; %w", err)
 		}
-		// check for challengePassword
+		// extract the challenge password
 		cp, err := microx509util.ParseChallengePassword(msg.pkiEnvelope)
 		if err != nil {
 			return fmt.Errorf("parse challenge password in pkiEnvelope: %w", err)
@@ -484,46 +486,46 @@ func (a *Authority) ValidateChallenge(ctx context.Context, challenge, transactio
 	return p.ValidateChallenge(ctx, challenge, transactionID)
 }
 
-func (a *Authority) selectDecrypter(ctx context.Context) (cert *x509.Certificate, pkey crypto.Decrypter, err error) {
+func (a *Authority) selectDecrypter(ctx context.Context) (cert *x509.Certificate, decrypter crypto.Decrypter, err error) {
 	p := provisionerFromContext(ctx)
-	cert, pkey = p.GetDecrypter()
+	cert, decrypter = p.GetDecrypter()
 	switch {
-	case cert != nil && pkey != nil:
+	case cert != nil && decrypter != nil:
 		return
-	case cert == nil && pkey != nil:
+	case cert == nil && decrypter != nil:
 		return nil, nil, fmt.Errorf("provisioner %q does not have a decrypter certificate available", p.GetName())
-	case cert != nil && pkey == nil:
+	case cert != nil && decrypter == nil:
 		return nil, nil, fmt.Errorf("provisioner %q does not have a decrypter available", p.GetName())
 	}
 
-	cert, pkey = a.signerCertificate, a.defaultDecrypter
+	cert, decrypter = a.decrypterCertificate, a.defaultDecrypter
 	switch {
-	case cert == nil && pkey != nil:
+	case cert == nil && decrypter != nil:
 		return nil, nil, fmt.Errorf("provisioner %q does not have a default decrypter certificate available", p.GetName())
-	case cert != nil && pkey == nil:
+	case cert != nil && decrypter == nil:
 		return nil, nil, fmt.Errorf("provisioner %q does not have a default decrypter available", p.GetName())
 	}
 
 	return
 }
 
-func (a *Authority) selectSigner(ctx context.Context) (cert *x509.Certificate, pkey crypto.PrivateKey, err error) {
+func (a *Authority) selectSigner(ctx context.Context) (cert *x509.Certificate, signer crypto.Signer, err error) {
 	p := provisionerFromContext(ctx)
-	cert, pkey = p.GetSigner()
+	cert, signer = p.GetSigner()
 	switch {
-	case cert != nil && pkey != nil:
+	case cert != nil && signer != nil:
 		return
-	case cert == nil && pkey != nil:
+	case cert == nil && signer != nil:
 		return nil, nil, fmt.Errorf("provisioner %q does not have a signer certificate available", p.GetName())
-	case cert != nil && pkey == nil:
+	case cert != nil && signer == nil:
 		return nil, nil, fmt.Errorf("provisioner %q does not have a signer available", p.GetName())
 	}
 
-	cert, pkey = a.signerCertificate, a.defaultSigner
+	cert, signer = a.signerCertificate, a.defaultSigner
 	switch {
-	case cert == nil && pkey != nil:
+	case cert == nil && signer != nil:
 		return nil, nil, fmt.Errorf("provisioner %q does not have a default signer certificate available", p.GetName())
-	case cert != nil && pkey == nil:
+	case cert != nil && signer == nil:
 		return nil, nil, fmt.Errorf("provisioner %q does not have a default signer available", p.GetName())
 	}
 
