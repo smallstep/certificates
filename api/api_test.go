@@ -1613,7 +1613,7 @@ func TestProvisionersResponse_MarshalJSON(t *testing.T) {
 				"type":                          "scep",
 				"name":                          "scep",
 				"challenge":                     "*** REDACTED ***",
-				"decrypterCertificate":          "KioqIFJFREFDVEVEICoqKg==", // base64 representation of "*** REDACTED ***""
+				"decrypterCertificate":          "*** REDACTED ***",
 				"decrypterKey":                  "*** REDACTED ***",
 				"decrypterKeyPassword":          "*** REDACTED ***",
 				"minimumPublicKeyLength":        2048,
