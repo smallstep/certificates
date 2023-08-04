@@ -289,6 +289,14 @@ func (a *Authority) Sign(csr *x509.CertificateRequest, signOpts provisioner.Sign
 		}
 	}
 
+	// Store certificate and certificate request in the db.
+	if err = a.storeCertificateAndRequest(csr, fullchain); err != nil {
+		if !errors.Is(err, db.ErrNotImplemented) {
+			return nil, errs.Wrap(http.StatusInternalServerError, err,
+				"authority.Sign; error storing certificate and request in db", opts...)
+		}
+	}
+
 	return fullchain, nil
 }
 
@@ -447,6 +455,30 @@ func (a *Authority) RenewContext(ctx context.Context, oldCert *x509.Certificate,
 	}
 
 	return fullchain, nil
+}
+
+// storeCertificateAndRequest logs the full chain of certificates and its
+// certificate signing request.
+func (a *Authority) storeCertificateAndRequest(csr *x509.CertificateRequest, fullchain []*x509.Certificate) error {
+	type certificateChainAndRequestStorer interface {
+		StoreCertificateChainAndRequest(*x509.CertificateRequest, ...*x509.Certificate) error
+	}
+
+	// Store certificate and request in linkedca
+	if s, ok := a.adminDB.(certificateChainAndRequestStorer); ok {
+		return s.StoreCertificateChainAndRequest(csr, fullchain...)
+	}
+
+	// Store certificate in local db
+	switch s := a.db.(type) {
+	case certificateChainAndRequestStorer:
+		return s.StoreCertificateChainAndRequest(csr, fullchain...)
+	case db.CertificateAndRequestStorer:
+		return s.StoreCertificateAndRequest(csr, fullchain[0])
+	default:
+		return nil
+	}
+
 }
 
 // storeCertificate allows to use an extension of the db.AuthDB interface that

@@ -19,6 +19,7 @@ import (
 	"github.com/smallstep/certificates/api"
 	"github.com/smallstep/certificates/api/log"
 	"github.com/smallstep/certificates/authority/provisioner"
+
 	"github.com/smallstep/certificates/scep"
 )
 
@@ -304,44 +305,70 @@ func PKIOperation(ctx context.Context, req request) (Response, error) {
 	}
 
 	// NOTE: at this point we have sufficient information for returning nicely signed CertReps
-	csr := msg.CSRReqMessage.CSR
-	transactionID := string(msg.TransactionID)
-	challengePassword := msg.CSRReqMessage.ChallengePassword
 
-	// NOTE: we're blocking the RenewalReq if the challenge does not match, because otherwise we don't have any authentication.
-	// The macOS SCEP client performs renewals using PKCSreq. The CertNanny SCEP client will use PKCSreq with challenge too, it seems,
-	// even if using the renewal flow as described in the README.md. MicroMDM SCEP client also only does PKCSreq by default, unless
-	// a certificate exists; then it will use RenewalReq. Adding the challenge check here may be a small breaking change for clients.
-	// We'll have to see how it works out.
-	if msg.MessageType == microscep.PKCSReq || msg.MessageType == microscep.RenewalReq {
-		if err := auth.ValidateChallenge(ctx, challengePassword, transactionID); err != nil {
-			if errors.Is(err, provisioner.ErrSCEPChallengeInvalid) {
+	switch msg.MessageType {
+	case microscep.CertPoll:
+		transactionID := string(msg.TransactionID)
+		var csr *x509.CertificateRequest
+		if csr, err = auth.GetCertificateRequest(transactionID); err != nil {
+			return createFailureResponse(ctx, csr, msg, microscep.BadRequest, err)
+		}
+		if isSigned, _ := auth.CertificateIsSigned(csr); isSigned {
+			// Reconstruct CSRReqMessage before sending a success response.
+			certReq := &microscep.CSRReqMessage{
+				CSR: csr,
+			}
+			msg := &scep.PKIMessage{
+				TransactionID:  msg.TransactionID,
+				MessageType:    msg.MessageType,
+				SenderNonce:    msg.SenderNonce,
+				CSRReqMessage:  certReq,
+				CertRepMessage: msg.CertRepMessage,
+				Raw:            msg.Raw,
+				P7:             msg.P7,
+				Recipients:     msg.Recipients,
+			}
+			return createSuccessResponse(ctx, csr, msg)
+		}
+		return createPendingResponse(ctx, msg)
+	default:
+		csr := msg.CSRReqMessage.CSR
+		transactionID := string(msg.TransactionID)
+		challengePassword := msg.CSRReqMessage.ChallengePassword
+		if auth.IsEnabled() {
+			var isInDB bool
+			if isInDB, err = auth.CertificateRequestInDB(transactionID); err != nil {
 				return createFailureResponse(ctx, csr, msg, microscep.BadRequest, err)
 			}
-			return createFailureResponse(ctx, csr, msg, microscep.BadRequest, errors.New("failed validating challenge password"))
+			if !isInDB {
+				err := auth.StoreCertificateRequest(transactionID, csr)
+				if err != nil {
+					return createFailureResponse(ctx, csr, msg, microscep.BadRequest, err)
+				}
+			}
+			return createPendingResponse(ctx, msg)
+			// NOTE: we're blocking the RenewalReq if the challenge does not match, because otherwise we don't have any authentication.
+			// The macOS SCEP client performs renewals using PKCSreq. The CertNanny SCEP client will use PKCSreq with challenge too, it seems,
+			// even if using the renewal flow as described in the README.md. MicroMDM SCEP client also only does PKCSreq by default, unless
+			// a certificate exists; then it will use RenewalReq. Adding the challenge check here may be a small breaking change for clients.
+			// We'll have to see how it works out.
+		} else if msg.MessageType == microscep.PKCSReq || msg.MessageType == microscep.RenewalReq {
+			if err := auth.ValidateChallenge(ctx, challengePassword, transactionID); err != nil {
+				if errors.Is(err, provisioner.ErrSCEPChallengeInvalid) {
+					return createFailureResponse(ctx, csr, msg, microscep.BadRequest, err)
+				}
+				return createFailureResponse(ctx, csr, msg, microscep.BadRequest, errors.New("failed validating challenge password"))
+			}
 		}
+		// TODO: authorize renewal: we can authorize renewals with the challenge password (if reusable secrets are used).
+		// Renewals OPTIONALLY include the challenge if the existing cert is used as authentication, but client SHOULD omit the challenge.
+		// This means that for renewal requests we should check the certificate provided to be signed before by the CA. We could
+		// enforce use of the challenge if we want too. That way we could be more flexible in terms of authentication scheme (i.e. reusing
+		// tokens from other provisioners, calling a webhook, storing multiple secrets, allowing them to be multi-use, etc).
+		// Authentication by the (self-signed) certificate with an optional challenge is required; supporting renewals incl. verification
+		// of the client cert is not.
+		return createSuccessResponse(ctx, csr, msg)
 	}
-
-	// TODO: authorize renewal: we can authorize renewals with the challenge password (if reusable secrets are used).
-	// Renewals OPTIONALLY include the challenge if the existing cert is used as authentication, but client SHOULD omit the challenge.
-	// This means that for renewal requests we should check the certificate provided to be signed before by the CA. We could
-	// enforce use of the challenge if we want too. That way we could be more flexible in terms of authentication scheme (i.e. reusing
-	// tokens from other provisioners, calling a webhook, storing multiple secrets, allowing them to be multi-use, etc).
-	// Authentication by the (self-signed) certificate with an optional challenge is required; supporting renewals incl. verification
-	// of the client cert is not.
-
-	certRep, err := auth.SignCSR(ctx, csr, msg)
-	if err != nil {
-		return createFailureResponse(ctx, csr, msg, microscep.BadRequest, fmt.Errorf("error when signing new certificate: %w", err))
-	}
-
-	res := Response{
-		Operation:   opnPKIOperation,
-		Data:        certRep.Raw,
-		Certificate: certRep.Certificate,
-	}
-
-	return res, nil
 }
 
 func formatCapabilities(caps []string) []byte {
@@ -379,6 +406,34 @@ func createFailureResponse(ctx context.Context, csr *x509.CertificateRequest, ms
 		Data:      certRepMsg.Raw,
 		Error:     failError,
 	}, nil
+}
+
+func createPendingResponse(ctx context.Context, msg *scep.PKIMessage) (Response, error) {
+	auth := scep.MustFromContext(ctx)
+	certRep, err := auth.CreatePendingResponse(msg)
+	if err != nil {
+		return Response{}, err
+	}
+	return Response{
+		Operation: opnPKIOperation,
+		Data:      certRep.Raw,
+	}, nil
+}
+
+func createSuccessResponse(ctx context.Context, csr *x509.CertificateRequest, msg *scep.PKIMessage) (Response, error) {
+	auth := scep.MustFromContext(ctx)
+	certRep, err := auth.SignCSR(ctx, csr, msg)
+	if err != nil {
+		return createFailureResponse(ctx, csr, msg, microscep.BadRequest, fmt.Errorf("error when signing new certificate: %w", err))
+	}
+
+	res := Response{
+		Operation:   opnPKIOperation,
+		Data:        certRep.Raw,
+		Certificate: certRep.Certificate,
+	}
+
+	return res, nil
 }
 
 func contentHeader(r Response) string {

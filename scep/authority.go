@@ -14,6 +14,7 @@ import (
 	"go.step.sm/crypto/x509util"
 
 	"github.com/smallstep/certificates/authority/provisioner"
+	"github.com/smallstep/certificates/db"
 )
 
 // Authority is the layer that handles all SCEP interactions.
@@ -24,6 +25,8 @@ type Authority struct {
 	caCerts                 []*x509.Certificate // TODO(hs): change to use these instead of root and intermediate
 	service                 *Service
 	signAuth                SignAuthority
+	db                      db.PollingDB
+	polling                 bool
 }
 
 type authorityKey struct{}
@@ -60,6 +63,9 @@ type AuthorityOptions struct {
 	// Prefix is a URL path prefix under which the SCEP api is served. This
 	// prefix is required to generate accurate SCEP links.
 	Prefix string
+
+	DB      db.PollingDB
+	Polling bool
 }
 
 // SignAuthority is the interface for a signing authority
@@ -74,6 +80,8 @@ func New(signAuth SignAuthority, ops AuthorityOptions) (*Authority, error) {
 		prefix:   ops.Prefix,
 		dns:      ops.DNS,
 		signAuth: signAuth,
+		db:       ops.DB,
+		polling:  ops.Polling,
 	}
 
 	// TODO: this is not really nice to do; the Service should be removed
@@ -220,7 +228,7 @@ func (a *Authority) DecryptPKIEnvelope(_ context.Context, msg *PKIMessage) error
 		}
 		return nil
 	case microscep.GetCRL, microscep.GetCert, microscep.CertPoll:
-		return errors.New("not implemented")
+		return nil
 	}
 
 	return nil
@@ -441,6 +449,64 @@ func (a *Authority) CreateFailureResponse(_ context.Context, _ *x509.Certificate
 	cr := &CertRepMessage{
 		PKIStatus:      microscep.FAILURE,
 		FailInfo:       microscep.FailInfo(info),
+		RecipientNonce: microscep.RecipientNonce(msg.SenderNonce),
+	}
+
+	// create a CertRep message from the original
+	crepMsg := &PKIMessage{
+		Raw:            certRepBytes,
+		TransactionID:  msg.TransactionID,
+		MessageType:    microscep.CertRep,
+		CertRepMessage: cr,
+	}
+
+	return crepMsg, nil
+}
+
+// CreatePendingResponse creates a pending reply when the CA is in polling mode
+func (a *Authority) CreatePendingResponse(msg *PKIMessage) (*PKIMessage, error) {
+	config := pkcs7.SignerInfoConfig{
+		ExtraSignedAttributes: []pkcs7.Attribute{
+			{
+				Type:  oidSCEPtransactionID,
+				Value: msg.TransactionID,
+			},
+			{
+				Type:  oidSCEPpkiStatus,
+				Value: microscep.PENDING,
+			},
+			{
+				Type:  oidSCEPmessageType,
+				Value: microscep.CertRep,
+			},
+			{
+				Type:  oidSCEPsenderNonce,
+				Value: msg.SenderNonce,
+			},
+			{
+				Type:  oidSCEPrecipientNonce,
+				Value: msg.SenderNonce,
+			},
+		},
+	}
+
+	signedData, err := pkcs7.NewSignedData(nil)
+	if err != nil {
+		return nil, err
+	}
+
+	// sign the attributes
+	if err := signedData.AddSigner(a.intermediateCertificate, a.service.signer, config); err != nil {
+		return nil, err
+	}
+
+	certRepBytes, err := signedData.Finish()
+	if err != nil {
+		return nil, err
+	}
+
+	cr := &CertRepMessage{
+		PKIStatus:      microscep.PENDING,
 		RecipientNonce: microscep.RecipientNonce(msg.SenderNonce),
 	}
 

@@ -20,6 +20,8 @@ var (
 	certsDataTable         = []byte("x509_certs_data")
 	revokedCertsTable      = []byte("revoked_x509_certs")
 	crlTable               = []byte("x509_crl")
+	csrTable               = []byte("x509_csr")
+	certByCSRTable         = []byte("x509_certs_csr")
 	revokedSSHCertsTable   = []byte("revoked_ssh_certs")
 	usedOTTTable           = []byte("used_ott")
 	sshCertsTable          = []byte("ssh_certs")
@@ -85,6 +87,12 @@ func MustFromContext(ctx context.Context) AuthDB {
 	}
 }
 
+// CertificateAndRequestStorer is an interface that allows to store
+// certificates and certificate requests.
+type CertificateAndRequestStorer interface {
+	StoreCertificateAndRequest(csr *x509.CertificateRequest, cert *x509.Certificate) error
+}
+
 // CertificateStorer is an extension of AuthDB that allows to store
 // certificates.
 type CertificateStorer interface {
@@ -97,6 +105,13 @@ type CertificateRevocationListDB interface {
 	GetRevokedCertificates() (*[]RevokedCertificateInfo, error)
 	GetCRL() (*CertificateRevocationListInfo, error)
 	StoreCRL(*CertificateRevocationListInfo) error
+}
+
+// PollingDB is an interface that implements SCEP polling functionality
+type PollingDB interface {
+	GetCSR(transactionID string) (*x509.CertificateRequest, error)
+	StoreCSR(transactionID string, csr *x509.CertificateRequest) error
+	GetCertificateByCSR(csr *x509.CertificateRequest) (*x509.Certificate, error)
 }
 
 // DB is a wrapper over the nosql.DB interface.
@@ -125,7 +140,7 @@ func New(c *Config) (AuthDB, error) {
 	tables := [][]byte{
 		revokedCertsTable, certsTable, usedOTTTable,
 		sshCertsTable, sshHostsTable, sshHostPrincipalsTable, sshUsersTable,
-		revokedSSHCertsTable, certsDataTable, crlTable,
+		revokedSSHCertsTable, certsDataTable, crlTable, csrTable, certByCSRTable,
 	}
 	for _, b := range tables {
 		if err := db.CreateTable(b); err != nil {
@@ -321,6 +336,40 @@ func (db *DB) StoreCertificate(crt *x509.Certificate) error {
 	return nil
 }
 
+// GetCSR returns a certificate request based off a transaction ID.
+func (db *DB) GetCSR(transactionID string) (*x509.CertificateRequest, error) {
+	asn1Data, err := db.Get(csrTable, []byte(transactionID))
+	if err != nil {
+		return nil, errors.Wrap(err, "database Get error")
+	}
+	csr, err := x509.ParseCertificateRequest(asn1Data)
+	if err != nil {
+		return nil, errors.Wrapf(err, "error parsing certificate request with transaction ID %s", transactionID)
+	}
+	return csr, nil
+}
+
+// StoreCSR stores a certificate signing request.
+func (db *DB) StoreCSR(transactionID string, csr *x509.CertificateRequest) error {
+	if err := db.Set(csrTable, []byte(transactionID), csr.Raw); err != nil {
+		return errors.Wrap(err, "database Set error")
+	}
+	return nil
+}
+
+// GetCertificateByCSR returns a certificate using its certificate signing request.
+func (db *DB) GetCertificateByCSR(csr *x509.CertificateRequest) (*x509.Certificate, error) {
+	asn1Data, err := db.Get(certByCSRTable, csr.Raw)
+	if err != nil {
+		return nil, errors.Wrap(err, "database Get error")
+	}
+	cert, err := x509.ParseCertificate(asn1Data)
+	if err != nil {
+		return nil, errors.Wrapf(err, "error parsing certificate with csr %s", csr.Subject.SerialNumber)
+	}
+	return cert, nil
+}
+
 // CertificateData is the JSON representation of the data stored in
 // x509_certs_data table.
 type CertificateData struct {
@@ -364,6 +413,29 @@ func (db *DB) StoreCertificateChain(p provisioner.Interface, chain ...*x509.Cert
 	tx := new(database.Tx)
 	tx.Set(certsTable, serialNumber, leaf.Raw)
 	tx.Set(certsDataTable, serialNumber, b)
+	if err := db.Update(tx); err != nil {
+		return errors.Wrap(err, "database Update error")
+	}
+	return nil
+}
+
+// StoreCertificateChainAndRequest stores the leaf certificate and the
+// matching certificate request
+func (db *DB) StoreCertificateChainAndRequest(csr *x509.CertificateRequest, chain ...*x509.Certificate) error {
+	leaf := chain[0]
+	tx := new(database.Tx)
+	tx.Set(certByCSRTable, csr.Raw, leaf.Raw)
+	if err := db.Update(tx); err != nil {
+		return errors.Wrap(err, "database Update error")
+	}
+	return nil
+}
+
+// StoreCertificateAndRequest stores the leaf certificate and the
+// matching certificate request
+func (db *DB) StoreCertificateAndRequest(csr *x509.CertificateRequest, cert *x509.Certificate) error {
+	tx := new(database.Tx)
+	tx.Set(certByCSRTable, csr.Raw, cert.Raw)
 	if err := db.Update(tx); err != nil {
 		return errors.Wrap(err, "database Update error")
 	}
