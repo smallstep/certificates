@@ -1,6 +1,7 @@
 package config
 
 import (
+	"bytes"
 	"encoding/json"
 	"fmt"
 	"net"
@@ -258,15 +259,16 @@ func (c *Config) Init() {
 
 // Save saves the configuration to the given filename.
 func (c *Config) Save(filename string) error {
-	f, err := os.OpenFile(filename, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0600)
-	if err != nil {
-		return errors.Wrapf(err, "error opening %s", filename)
-	}
-	defer f.Close()
-
-	enc := json.NewEncoder(f)
+	var b bytes.Buffer
+	enc := json.NewEncoder(&b)
 	enc.SetIndent("", "\t")
-	return errors.Wrapf(enc.Encode(c), "error writing %s", filename)
+	if err := enc.Encode(c); err != nil {
+		return fmt.Errorf("error encoding configuration: %w", err)
+	}
+	if err := os.WriteFile(filename, b.Bytes(), 0600); err != nil {
+		return fmt.Errorf("error writing %q: %w", filename, err)
+	}
+	return nil
 }
 
 // Commit saves the current configuration to the same
