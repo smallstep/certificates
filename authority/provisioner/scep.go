@@ -222,14 +222,16 @@ func (s *SCEP) Init(config Config) (err error) {
 			decryptionKey = u.Opaque
 		}
 		if s.decrypter, err = kmsDecrypter.CreateDecrypter(&kmsapi.CreateDecrypterRequest{
-			DecryptionKey: decryptionKey,
-			Password:      []byte(s.DecrypterKeyPassword),
+			DecryptionKey:    decryptionKey,
+			Password:         []byte(s.DecrypterKeyPassword),
+			PasswordPrompter: kmsapi.NonInteractivePasswordPrompter,
 		}); err != nil {
 			return fmt.Errorf("failed creating decrypter: %w", err)
 		}
 		if s.signer, err = s.keyManager.CreateSigner(&kmsapi.CreateSignerRequest{
-			SigningKey: decryptionKey, // TODO(hs): support distinct signer key in the future?
-			Password:   []byte(s.DecrypterKeyPassword),
+			SigningKey:       decryptionKey, // TODO(hs): support distinct signer key in the future?
+			Password:         []byte(s.DecrypterKeyPassword),
+			PasswordPrompter: kmsapi.NonInteractivePasswordPrompter,
 		}); err != nil {
 			return fmt.Errorf("failed creating signer: %w", err)
 		}
@@ -254,16 +256,17 @@ func (s *SCEP) Init(config Config) (err error) {
 	// TODO(hs): alternatively, check if the KMS keyManager is a CertificateManager
 	// and load the certificate corresponding to the decryption key?
 
-	// Final validation for the decrypter. If both the decrypter and the certificate
-	// are available, the public keys must match. We currently allow the decrypter to
-	// be set without a certificate without warning the user, but
-	if s.decrypter != nil && s.decrypterCertificate != nil {
+	// Final validation for the decrypter.
+	if s.decrypter != nil {
 		decrypterPublicKey, ok := s.decrypter.Public().(*rsa.PublicKey)
 		if !ok {
 			return fmt.Errorf("only RSA keys are supported")
 		}
+		if s.decrypterCertificate == nil {
+			return fmt.Errorf("provisioner %q does not have a decrypter certificate set", s.Name)
+		}
 		if !decrypterPublicKey.Equal(s.decrypterCertificate.PublicKey) {
-			return errors.New("mismatch between decryption certificate and decrypter public keys")
+			return errors.New("mismatch between decrypter certificate and decrypter public keys")
 		}
 	}
 
