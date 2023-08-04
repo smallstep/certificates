@@ -293,16 +293,32 @@ type Subproblem struct {
 	Identifier *Identifier `json:"identifier,omitempty"`
 }
 
+// NewError creates a new Error.
+func NewError(pt ProblemType, msg string, args ...interface{}) *Error {
+	return newError(pt, errors.Errorf(msg, args...))
+}
+
+// NewDetailedError creates a new Error that includes the error
+// message in the details, providing more information to the
+// ACME client.
+func NewDetailedError(pt ProblemType, msg string, args ...interface{}) *Error {
+	return NewError(pt, msg, args...).withDetail()
+}
+
+func (e *Error) withDetail() *Error {
+	if e == nil || e.Status >= 500 || e.Err == nil {
+		return e
+	}
+
+	e.Detail = fmt.Sprintf("%s: %s", e.Detail, e.Err)
+	return e
+}
+
 // AddSubproblems adds the Subproblems to Error. It
 // returns the Error, allowing for fluent addition.
 func (e *Error) AddSubproblems(subproblems ...Subproblem) *Error {
 	e.Subproblems = append(e.Subproblems, subproblems...)
 	return e
-}
-
-// NewError creates a new Error type.
-func NewError(pt ProblemType, msg string, args ...interface{}) *Error {
-	return newError(pt, errors.Errorf(msg, args...))
 }
 
 // NewSubproblem creates a new Subproblem. The msg and args
@@ -366,6 +382,10 @@ func WrapError(typ ProblemType, err error, msg string, args ...interface{}) *Err
 	default:
 		return newError(typ, errors.Wrapf(err, msg, args...))
 	}
+}
+
+func WrapDetailedError(typ ProblemType, err error, msg string, args ...interface{}) *Error {
+	return WrapError(typ, err, msg, args...).withDetail()
 }
 
 // WrapErrorISE shortcut to wrap an internal server error type.

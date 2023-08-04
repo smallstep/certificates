@@ -3532,7 +3532,7 @@ func Test_deviceAttest01Validate(t *testing.T) {
 							assert.Equal(t, ChallengeType("device-attest-01"), updch.Type)
 							assert.Equal(t, "12345678", updch.Value)
 
-							err := NewError(ErrorBadAttestationStatementType, "x5c not present")
+							err := NewDetailedError(ErrorBadAttestationStatementType, "x5c not present")
 
 							assert.EqualError(t, updch.Error.Err, err.Err.Error())
 							assert.Equal(t, err.Type, updch.Error.Type)
@@ -3579,7 +3579,7 @@ func Test_deviceAttest01Validate(t *testing.T) {
 							assert.Equal(t, ChallengeType("device-attest-01"), updch.Type)
 							assert.Equal(t, "serial-number", updch.Value)
 
-							err := NewError(ErrorBadAttestationStatementType, "challenge token does not match")
+							err := NewDetailedError(ErrorBadAttestationStatementType, "challenge token does not match")
 
 							assert.EqualError(t, updch.Error.Err, err.Err.Error())
 							assert.Equal(t, err.Type, updch.Error.Type)
@@ -3625,7 +3625,12 @@ func Test_deviceAttest01Validate(t *testing.T) {
 							assert.Equal(t, ChallengeType("device-attest-01"), updch.Type)
 							assert.Equal(t, "non-matching-value", updch.Value)
 
-							err := NewError(ErrorBadAttestationStatementType, "permanent identifier does not match")
+							subproblem := NewSubproblemWithIdentifier(
+								ErrorRejectedIdentifierType,
+								Identifier{Type: "permanent-identifier", Value: "non-matching-value"},
+								`challenge identifier "non-matching-value" doesn't match any of the attested hardware identifiers ["udid" "serial-number"]`,
+							)
+							err := NewDetailedError(ErrorBadAttestationStatementType, "permanent identifier does not match").AddSubproblems(subproblem)
 
 							assert.EqualError(t, updch.Error.Err, err.Err.Error())
 							assert.Equal(t, err.Type, updch.Error.Type)
@@ -3698,7 +3703,7 @@ func Test_deviceAttest01Validate(t *testing.T) {
 							assert.Equal(t, ChallengeType("device-attest-01"), updch.Type)
 							assert.Equal(t, "12345678", updch.Value)
 
-							err := NewError(ErrorBadAttestationStatementType, "x5c not present")
+							err := NewDetailedError(ErrorBadAttestationStatementType, "x5c not present")
 
 							assert.EqualError(t, updch.Error.Err, err.Err.Error())
 							assert.Equal(t, err.Type, updch.Error.Type)
@@ -3752,9 +3757,9 @@ func Test_deviceAttest01Validate(t *testing.T) {
 							assert.Equal(t, ChallengeType("device-attest-01"), updch.Type)
 							assert.Equal(t, "12345678", updch.Value)
 
-							err := NewError(ErrorBadAttestationStatementType, "permanent identifier does not match").
+							err := NewDetailedError(ErrorBadAttestationStatementType, "permanent identifier does not match").
 								AddSubproblems(NewSubproblemWithIdentifier(
-									ErrorMalformedType,
+									ErrorRejectedIdentifierType,
 									Identifier{Type: "permanent-identifier", Value: "12345678"},
 									"challenge identifier \"12345678\" doesn't match the attested hardware identifier \"87654321\"",
 								))
@@ -3847,7 +3852,7 @@ func Test_deviceAttest01Validate(t *testing.T) {
 							assert.Equal(t, ChallengeType("device-attest-01"), updch.Type)
 							assert.Equal(t, "12345678", updch.Value)
 
-							err := NewError(ErrorBadAttestationStatementType, "unexpected attestation object format")
+							err := NewDetailedError(ErrorBadAttestationStatementType, `unsupported attestation object format "bogus-format"`)
 
 							assert.EqualError(t, updch.Error.Err, err.Err.Error())
 							assert.Equal(t, err.Type, updch.Error.Type)
