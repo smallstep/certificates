@@ -28,7 +28,8 @@ type Authority struct {
 	decrypterCertificate *x509.Certificate
 	scepProvisionerNames []string
 
-	mu sync.RWMutex
+	provisionersMutex        sync.RWMutex
+	encryptionAlgorithmMutex sync.Mutex
 }
 
 type authorityKey struct{}
@@ -86,8 +87,8 @@ func (a *Authority) Validate() error {
 		return nil
 	}
 
-	a.mu.RLock()
-	defer a.mu.RUnlock()
+	a.provisionersMutex.RLock()
+	defer a.provisionersMutex.RUnlock()
 
 	noDefaultDecrypterAvailable := a.defaultDecrypter == nil
 	for _, name := range a.scepProvisionerNames {
@@ -118,8 +119,8 @@ func (a *Authority) UpdateProvisioners(scepProvisionerNames []string) {
 		return
 	}
 
-	a.mu.Lock()
-	defer a.mu.Unlock()
+	a.provisionersMutex.Lock()
+	defer a.provisionersMutex.Unlock()
 
 	a.scepProvisionerNames = scepProvisionerNames
 }
@@ -307,20 +308,13 @@ func (a *Authority) SignCSR(ctx context.Context, csr *x509.CertificateRequest, m
 	// and create a degenerate cert structure
 	deg, err := microscep.DegenerateCertificates([]*x509.Certificate{cert})
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed generating degenerate certificate: %w", err)
 	}
 
-	// apparently the pkcs7 library uses a global default setting for the content encryption
-	// algorithm to use when en- or decrypting data. We need to restore the current setting after
-	// the cryptographic operation, so that other usages of the library are not influenced by
-	// this call to Encrypt(). We are not required to use the same algorithm the SCEP client uses.
-	encryptionAlgorithmToRestore := pkcs7.ContentEncryptionAlgorithm
-	pkcs7.ContentEncryptionAlgorithm = p.GetContentEncryptionAlgorithm()
-	e7, err := pkcs7.Encrypt(deg, msg.P7.Certificates)
+	e7, err := a.encrypt(deg, msg.P7.Certificates, p.GetContentEncryptionAlgorithm())
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed encrypting degenerate certificate: %w", err)
 	}
-	pkcs7.ContentEncryptionAlgorithm = encryptionAlgorithmToRestore
 
 	// PKIMessageAttributes to be signed
 	config := pkcs7.SignerInfoConfig{
@@ -389,6 +383,28 @@ func (a *Authority) SignCSR(ctx context.Context, csr *x509.CertificateRequest, m
 	}
 
 	return crepMsg, nil
+}
+
+func (a *Authority) encrypt(content []byte, recipients []*x509.Certificate, algorithm int) ([]byte, error) {
+	// apparently the pkcs7 library uses a global default setting for the content encryption
+	// algorithm to use when en- or decrypting data. We need to restore the current setting after
+	// the cryptographic operation, so that other usages of the library are not influenced by
+	// this call to Encrypt(). We are not required to use the same algorithm the SCEP client uses.
+	a.encryptionAlgorithmMutex.Lock()
+	defer a.encryptionAlgorithmMutex.Unlock()
+
+	encryptionAlgorithmToRestore := pkcs7.ContentEncryptionAlgorithm
+	defer func() {
+		pkcs7.ContentEncryptionAlgorithm = encryptionAlgorithmToRestore
+	}()
+
+	pkcs7.ContentEncryptionAlgorithm = algorithm
+	e7, err := pkcs7.Encrypt(content, recipients)
+	if err != nil {
+		return nil, err
+	}
+
+	return e7, nil
 }
 
 // CreateFailureResponse creates an appropriately signed reply for PKI operations
