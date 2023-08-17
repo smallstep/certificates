@@ -873,3 +873,27 @@ func TestAWS_AuthorizeRenew(t *testing.T) {
 		})
 	}
 }
+
+func TestAWS_HardcodedCertificates(t *testing.T) {
+	certBytes := []byte(awsCertificate)
+
+	var certs []*x509.Certificate
+	for len(certBytes) > 0 {
+		var block *pem.Block
+		block, certBytes = pem.Decode(certBytes)
+		if block == nil {
+			break
+		}
+		if block.Type != "CERTIFICATE" || len(block.Headers) != 0 {
+			continue
+		}
+
+		cert, err := x509.ParseCertificate(block.Bytes)
+		assert.FatalError(t, err)
+
+		// check that the certificate is not expired
+		assert.True(t, cert.NotAfter.After(time.Now()))
+		certs = append(certs, cert)
+	}
+	assert.Len(t, 14, certs, "expected 14 certificates in aws_certificates.pem")
+}
