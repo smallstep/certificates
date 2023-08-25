@@ -465,7 +465,7 @@ func TestWebhook_Do(t *testing.T) {
 			},
 			errStatusCode: 404,
 			serverErrMsg:  "item not found",
-			expectErr:     errors.New("Webhook server responded with 404"),
+			expectErr:     errors.New("Webhook server responded with 404: item not found"),
 		},
 	}
 	for name, tc := range tests {

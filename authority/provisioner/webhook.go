@@ -8,9 +8,11 @@ import (
 	"encoding/base64"
 	"encoding/hex"
 	"encoding/json"
+	"io"
 	"fmt"
 	"log"
 	"net/http"
+	"strings"
 	"text/template"
 	"time"
 
@@ -219,7 +221,11 @@ retry:
 		goto retry
 	}
 	if resp.StatusCode >= 400 {
-		return nil, fmt.Errorf("Webhook server responded with %d", resp.StatusCode)
+		b, err := io.ReadAll(resp.Body)
+		if err != nil {
+			return nil, fmt.Errorf("Webhook server responded with %d", resp.StatusCode)
+		}
+		return nil, fmt.Errorf("Webhook server responded with %d: %s", resp.StatusCode, strings.TrimSpace(string(b)))
 	}
 
 	respBody := &webhook.ResponseBody{}
