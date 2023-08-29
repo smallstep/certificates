@@ -57,7 +57,9 @@ type DB interface {
 
 type dryRunDB struct{}
 
-func (*dryRunDB) CreateTable([]byte) error            { return nil }
+func (*dryRunDB) CreateTable([]byte) error { return nil }
+
+//nolint:revive // allow unused parameters to show function signature
 func (*dryRunDB) Set(bucket, key, value []byte) error { return nil }
 
 func usage(fs *flag.FlagSet) {

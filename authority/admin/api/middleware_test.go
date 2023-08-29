@@ -72,7 +72,7 @@ func TestHandler_requireAPIEnabled(t *testing.T) {
 		tc := prep(t)
 		t.Run(name, func(t *testing.T) {
 			mockMustAuthority(t, tc.auth)
-			req := httptest.NewRequest("GET", "/foo", nil) // chi routing is prepared in test setup
+			req := httptest.NewRequest("GET", "/foo", http.NoBody) // chi routing is prepared in test setup
 			req = req.WithContext(tc.ctx)
 			w := httptest.NewRecorder()
 			requireAPIEnabled(tc.next)(w, req)
@@ -113,7 +113,7 @@ func TestHandler_extractAuthorizeTokenAdmin(t *testing.T) {
 	}
 	var tests = map[string]func(t *testing.T) test{
 		"fail/missing-authorization-token": func(t *testing.T) test {
-			req := httptest.NewRequest("GET", "/foo", nil)
+			req := httptest.NewRequest("GET", "/foo", http.NoBody)
 			req.Header["Authorization"] = []string{""}
 			return test{
 				ctx:        context.Background(),
@@ -128,7 +128,7 @@ func TestHandler_extractAuthorizeTokenAdmin(t *testing.T) {
 			}
 		},
 		"fail/auth.AuthorizeAdminToken": func(t *testing.T) test {
-			req := httptest.NewRequest("GET", "/foo", nil)
+			req := httptest.NewRequest("GET", "/foo", http.NoBody)
 			req.Header["Authorization"] = []string{"token"}
 			auth := &mockAdminAuthority{
 				MockAuthorizeAdminToken: func(r *http.Request, token string) (*linkedca.Admin, error) {
@@ -153,7 +153,7 @@ func TestHandler_extractAuthorizeTokenAdmin(t *testing.T) {
 			}
 		},
 		"ok": func(t *testing.T) test {
-			req := httptest.NewRequest("GET", "/foo", nil)
+			req := httptest.NewRequest("GET", "/foo", http.NoBody)
 			req.Header["Authorization"] = []string{"token"}
 			createdAt := time.Now()
 			var deletedAt time.Time
@@ -324,7 +324,7 @@ func TestHandler_loadProvisionerByName(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			mockMustAuthority(t, tc.auth)
 			ctx := admin.NewContext(tc.ctx, tc.adminDB)
-			req := httptest.NewRequest("GET", "/foo", nil) // chi routing is prepared in test setup
+			req := httptest.NewRequest("GET", "/foo", http.NoBody) // chi routing is prepared in test setup
 			req = req.WithContext(ctx)
 
 			w := httptest.NewRecorder()
@@ -399,7 +399,7 @@ func TestHandler_checkAction(t *testing.T) {
 		tc := prep(t)
 		t.Run(name, func(t *testing.T) {
 			ctx := admin.NewContext(context.Background(), tc.adminDB)
-			req := httptest.NewRequest("GET", "/foo", nil).WithContext(ctx)
+			req := httptest.NewRequest("GET", "/foo", http.NoBody).WithContext(ctx)
 			w := httptest.NewRecorder()
 			checkAction(tc.next, tc.supportedInStandalone)(w, req)
 			res := w.Result()
@@ -643,7 +643,7 @@ func TestHandler_loadExternalAccountKey(t *testing.T) {
 		tc := prep(t)
 		t.Run(name, func(t *testing.T) {
 			ctx := acme.NewDatabaseContext(tc.ctx, tc.acmeDB)
-			req := httptest.NewRequest("GET", "/foo", nil)
+			req := httptest.NewRequest("GET", "/foo", http.NoBody)
 			req = req.WithContext(ctx)
 			w := httptest.NewRecorder()
 			loadExternalAccountKey(tc.next)(w, req)

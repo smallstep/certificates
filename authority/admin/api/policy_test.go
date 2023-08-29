@@ -241,7 +241,7 @@ func TestPolicyAdminResponder_GetAuthorityPolicy(t *testing.T) {
 			ctx := admin.NewContext(tc.ctx, tc.adminDB)
 			par := NewPolicyAdminResponder()
 
-			req := httptest.NewRequest("GET", "/foo", nil)
+			req := httptest.NewRequest("GET", "/foo", http.NoBody)
 			req = req.WithContext(ctx)
 			w := httptest.NewRecorder()
 
@@ -1164,7 +1164,7 @@ func TestPolicyAdminResponder_GetProvisionerPolicy(t *testing.T) {
 			ctx = acme.NewDatabaseContext(ctx, tc.acmeDB)
 			par := NewPolicyAdminResponder()
 
-			req := httptest.NewRequest("GET", "/foo", nil)
+			req := httptest.NewRequest("GET", "/foo", http.NoBody)
 			req = req.WithContext(ctx)
 			w := httptest.NewRecorder()
 
@@ -1986,7 +1986,7 @@ func TestPolicyAdminResponder_GetACMEAccountPolicy(t *testing.T) {
 			ctx = acme.NewDatabaseContext(ctx, tc.acmeDB)
 			par := NewPolicyAdminResponder()
 
-			req := httptest.NewRequest("GET", "/foo", nil)
+			req := httptest.NewRequest("GET", "/foo", http.NoBody)
 			req = req.WithContext(ctx)
 			w := httptest.NewRecorder()
 

@@ -24,7 +24,7 @@ func Test_decodeRequest(t *testing.T) {
 		{
 			name: "fail/unsupported-method",
 			args: args{
-				r: httptest.NewRequest(http.MethodPatch, "http://scep:8080/?operation=AnUnsupportOperation", nil),
+				r: httptest.NewRequest(http.MethodPatch, "http://scep:8080/?operation=AnUnsupportOperation", http.NoBody),
 			},
 			want:    request{},
 			wantErr: true,
@@ -32,7 +32,7 @@ func Test_decodeRequest(t *testing.T) {
 		{
 			name: "fail/get-unsupported-operation",
 			args: args{
-				r: httptest.NewRequest(http.MethodGet, "http://scep:8080/?operation=AnUnsupportOperation", nil),
+				r: httptest.NewRequest(http.MethodGet, "http://scep:8080/?operation=AnUnsupportOperation", http.NoBody),
 			},
 			want:    request{},
 			wantErr: true,
@@ -40,7 +40,7 @@ func Test_decodeRequest(t *testing.T) {
 		{
 			name: "fail/get-PKIOperation",
 			args: args{
-				r: httptest.NewRequest(http.MethodGet, "http://scep:8080/?operation=PKIOperation&message='somewronginput'", nil),
+				r: httptest.NewRequest(http.MethodGet, "http://scep:8080/?operation=PKIOperation&message='somewronginput'", http.NoBody),
 			},
 			want:    request{},
 			wantErr: true,
@@ -56,7 +56,7 @@ func Test_decodeRequest(t *testing.T) {
 		{
 			name: "ok/get-GetCACert",
 			args: args{
-				r: httptest.NewRequest(http.MethodGet, "http://scep:8080/?operation=GetCACert", nil),
+				r: httptest.NewRequest(http.MethodGet, "http://scep:8080/?operation=GetCACert", http.NoBody),
 			},
 			want: request{
 				Operation: "GetCACert",
@@ -67,7 +67,7 @@ func Test_decodeRequest(t *testing.T) {
 		{
 			name: "ok/get-GetCACaps",
 			args: args{
-				r: httptest.NewRequest(http.MethodGet, "http://scep:8080/?operation=GetCACaps", nil),
+				r: httptest.NewRequest(http.MethodGet, "http://scep:8080/?operation=GetCACaps", http.NoBody),
 			},
 			want: request{
 				Operation: "GetCACaps",
@@ -78,7 +78,7 @@ func Test_decodeRequest(t *testing.T) {
 		{
 			name: "ok/get-PKIOperation",
 			args: args{
-				r: httptest.NewRequest(http.MethodGet, "http://scep:8080/?operation=PKIOperation&message=MTIzNA==", nil),
+				r: httptest.NewRequest(http.MethodGet, "http://scep:8080/?operation=PKIOperation&message=MTIzNA==", http.NoBody),
 			},
 			want: request{
 				Operation: "PKIOperation",

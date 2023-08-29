@@ -58,7 +58,7 @@ func TestHealthOKHandling(t *testing.T) {
 				next:    tt.handler,
 			}
 
-			r := httptest.NewRequest("GET", tt.path, nil)
+			r := httptest.NewRequest("GET", tt.path, http.NoBody)
 			w := httptest.NewRecorder()
 			l.ServeHTTP(w, r)
 
@@ -132,7 +132,7 @@ func TestHandlingRegardlessOfOptions(t *testing.T) {
 					next: tt.handler,
 				}
 
-				r := httptest.NewRequest("GET", tt.path, nil)
+				r := httptest.NewRequest("GET", tt.path, http.NoBody)
 				w := httptest.NewRecorder()
 				l.ServeHTTP(w, r)
 
