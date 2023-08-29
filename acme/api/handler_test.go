@@ -60,7 +60,7 @@ func TestHandler_GetNonce(t *testing.T) {
 	}
 
 	// Request with chi context
-	req := httptest.NewRequest("GET", "http://ca.smallstep.com/nonce", nil)
+	req := httptest.NewRequest("GET", "http://ca.smallstep.com/nonce", http.NoBody)
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -175,7 +175,7 @@ func TestHandler_GetDirectory(t *testing.T) {
 		tc := run(t)
 		t.Run(name, func(t *testing.T) {
 			ctx := acme.NewLinkerContext(tc.ctx, acme.NewLinker("test.ca.smallstep.com", "acme"))
-			req := httptest.NewRequest("GET", "/foo/bar", nil)
+			req := httptest.NewRequest("GET", "/foo/bar", http.NoBody)
 			req = req.WithContext(ctx)
 			w := httptest.NewRecorder()
 			GetDirectory(w, req)
@@ -347,7 +347,7 @@ func TestHandler_GetAuthorization(t *testing.T) {
 		tc := run(t)
 		t.Run(name, func(t *testing.T) {
 			ctx := acme.NewContext(tc.ctx, tc.db, nil, acme.NewLinker("test.ca.smallstep.com", "acme"), nil)
-			req := httptest.NewRequest("GET", "/foo/bar", nil)
+			req := httptest.NewRequest("GET", "/foo/bar", http.NoBody)
 			req = req.WithContext(ctx)
 			w := httptest.NewRecorder()
 			GetAuthorization(w, req)
@@ -489,7 +489,7 @@ func TestHandler_GetCertificate(t *testing.T) {
 		tc := run(t)
 		t.Run(name, func(t *testing.T) {
 			ctx := acme.NewDatabaseContext(tc.ctx, tc.db)
-			req := httptest.NewRequest("GET", u, nil)
+			req := httptest.NewRequest("GET", u, http.NoBody)
 			req = req.WithContext(ctx)
 			w := httptest.NewRecorder()
 			GetCertificate(w, req)
@@ -747,7 +747,7 @@ func TestHandler_GetChallenge(t *testing.T) {
 		tc := run(t)
 		t.Run(name, func(t *testing.T) {
 			ctx := acme.NewContext(tc.ctx, tc.db, nil, acme.NewLinker("test.ca.smallstep.com", "acme"), nil)
-			req := httptest.NewRequest("GET", u, nil)
+			req := httptest.NewRequest("GET", u, http.NoBody)
 			req = req.WithContext(ctx)
 			w := httptest.NewRecorder()
 			GetChallenge(w, req)

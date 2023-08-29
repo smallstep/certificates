@@ -803,7 +803,7 @@ func Test_CRLGeneration(t *testing.T) {
 	}
 
 	chiCtx := chi.NewRouteContext()
-	req := httptest.NewRequest("GET", "http://example.com/crl", nil)
+	req := httptest.NewRequest("GET", "http://example.com/crl", http.NoBody)
 	req = req.WithContext(context.WithValue(context.Background(), chi.RouteCtxKey, chiCtx))
 
 	for _, tt := range tests {
@@ -856,7 +856,7 @@ func Test_caHandler_Route(t *testing.T) {
 }
 
 func Test_Health(t *testing.T) {
-	req := httptest.NewRequest("GET", "http://example.com/health", nil)
+	req := httptest.NewRequest("GET", "http://example.com/health", http.NoBody)
 	w := httptest.NewRecorder()
 	Health(w, req)
 
@@ -890,7 +890,7 @@ func Test_Root(t *testing.T) {
 	// Request with chi context
 	chiCtx := chi.NewRouteContext()
 	chiCtx.URLParams.Add("sha", "efc7d6b475a56fe587650bcdb999a4a308f815ba44db4bf0371ea68a786ccd36")
-	req := httptest.NewRequest("GET", "http://example.com/root/efc7d6b475a56fe587650bcdb999a4a308f815ba44db4bf0371ea68a786ccd36", nil)
+	req := httptest.NewRequest("GET", "http://example.com/root/efc7d6b475a56fe587650bcdb999a4a308f815ba44db4bf0371ea68a786ccd36", http.NoBody)
 	req = req.WithContext(context.WithValue(context.Background(), chi.RouteCtxKey, chiCtx))
 
 	expected := []byte(`{"ca":"` + strings.ReplaceAll(rootPEM, "\n", `\n`) + `\n"}`)
@@ -1105,7 +1105,7 @@ func Test_Renew(t *testing.T) {
 					return nil
 				},
 			})
-			req := httptest.NewRequest("POST", "http://example.com/renew", nil)
+			req := httptest.NewRequest("POST", "http://example.com/renew", http.NoBody)
 			req.TLS = tt.tls
 			req.Header = tt.header
 			w := httptest.NewRecorder()
@@ -1313,7 +1313,7 @@ func Test_ProvisionerKey(t *testing.T) {
 	// Request with chi context
 	chiCtx := chi.NewRouteContext()
 	chiCtx.URLParams.Add("kid", "oV1p0MJeGQ7qBlK6B-oyfVdBRjh_e7VSK_YSEEqgW00")
-	req := httptest.NewRequest("GET", "http://example.com/provisioners/oV1p0MJeGQ7qBlK6B-oyfVdBRjh_e7VSK_YSEEqgW00/encrypted-key", nil)
+	req := httptest.NewRequest("GET", "http://example.com/provisioners/oV1p0MJeGQ7qBlK6B-oyfVdBRjh_e7VSK_YSEEqgW00/encrypted-key", http.NoBody)
 	req = req.WithContext(context.WithValue(context.Background(), chi.RouteCtxKey, chiCtx))
 
 	tests := []struct {
@@ -1381,7 +1381,7 @@ func Test_Roots(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			mockMustAuthority(t, &mockAuthority{ret1: []*x509.Certificate{tt.root}, err: tt.err})
-			req := httptest.NewRequest("GET", "http://example.com/roots", nil)
+			req := httptest.NewRequest("GET", "http://example.com/roots", http.NoBody)
 			req.TLS = tt.tls
 			w := httptest.NewRecorder()
 			Roots(w, req)
@@ -1422,7 +1422,7 @@ func Test_caHandler_RootsPEM(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			mockMustAuthority(t, &mockAuthority{ret1: tt.roots, err: tt.err})
-			req := httptest.NewRequest("GET", "https://example.com/roots", nil)
+			req := httptest.NewRequest("GET", "https://example.com/roots", http.NoBody)
 			w := httptest.NewRecorder()
 			RootsPEM(w, req)
 			res := w.Result()
@@ -1467,7 +1467,7 @@ func Test_Federation(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			mockMustAuthority(t, &mockAuthority{ret1: []*x509.Certificate{tt.root}, err: tt.err})
-			req := httptest.NewRequest("GET", "http://example.com/federation", nil)
+			req := httptest.NewRequest("GET", "http://example.com/federation", http.NoBody)
 			req.TLS = tt.tls
 			w := httptest.NewRecorder()
 			Federation(w, req)
