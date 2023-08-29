@@ -533,6 +533,8 @@ func wireDPOP01Validate(ctx context.Context, ch *Challenge, db DB, jwk *jose.JSO
 		kid,
 		"--key",
 		file.Name(),
+		"--api-version",
+		"5",
 	)
 
 	stdin, err := cmd.StdinPipe()
