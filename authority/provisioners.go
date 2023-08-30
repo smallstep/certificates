@@ -754,12 +754,16 @@ func provisionerOptionsToLinkedca(p *provisioner.Options) (*linkedca.Template, *
 		}
 
 		if p.X509.Template != "" {
-			x509Template.Template = []byte(p.SSH.Template)
+			x509Template.Template = []byte(p.X509.Template)
 		} else if p.X509.TemplateFile != "" {
 			filename := step.Abs(p.X509.TemplateFile)
 			if x509Template.Template, err = os.ReadFile(filename); err != nil {
 				return nil, nil, nil, errors.Wrap(err, "error reading x509 template")
 			}
+		}
+
+		if p.X509.TemplateData != nil {
+			x509Template.Data = p.X509.TemplateData
 		}
 	}
 
@@ -776,6 +780,10 @@ func provisionerOptionsToLinkedca(p *provisioner.Options) (*linkedca.Template, *
 			if sshTemplate.Template, err = os.ReadFile(filename); err != nil {
 				return nil, nil, nil, errors.Wrap(err, "error reading ssh template")
 			}
+		}
+
+		if p.SSH.TemplateData != nil {
+			sshTemplate.Data = p.SSH.TemplateData
 		}
 	}
 
