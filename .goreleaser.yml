@@ -36,7 +36,6 @@ archives:
     # Most common use case is to archive as zip on Windows.
     # Default is empty.
     name_template: "{{ .ProjectName }}_{{ .Os }}_{{ .Version }}_{{ .Arch }}{{ if .Arm }}v{{ .Arm }}{{ end }}{{ if .Mips }}_{{ .Mips }}{{ end }}"
-    rlcp: true
     format_overrides:
       - goos: windows
         format: zip
@@ -88,7 +87,6 @@ nfpms:
 
 source:
   enabled: true
-  rlcp: true
   name_template: '{{ .ProjectName }}_{{ .Version }}'
 
 checksum:
@@ -199,6 +197,124 @@ release:
   #  - glob: ./glob/**/to/**/file/**/*
   #  - glob: ./glob/foo/to/bar/file/foobar/override_from_previous
 
+winget:
+  - 
+    # IDs of the archives to use.
+    # Empty means all IDs.
+    ids: [ default ]
+
+    #
+    # Default: ProjectName
+    # Templates: allowed
+    name: step-ca
+
+    # Publisher name.
+    #
+    # Templates: allowed
+    # Required.
+    publisher: Smallstep
+
+    # Your app's description.
+    #
+    # Templates: allowed
+    # Required.
+    short_description: "A private certificate authority (X.509 & SSH) & ACME server for secure automated certificate management."
+
+    # License name.
+    #
+    # Templates: allowed
+    # Required.
+    license: "Apache-2.0"
+
+    # Publisher URL.
+    #
+    # Templates: allowed
+    publisher_url: "https://smallstep.com"
+
+    # Publisher support URL.
+    #
+    # Templates: allowed
+    publisher_support_url: "https://github.com/smallstep/certificates/discussions"
+
+    # URL which is determined by the given Token (github, gitlab or gitea).
+    #
+    # Default depends on the client.
+    # Templates: allowed
+    url_template: "https://github.com/smallstep/certificates/releases/download/{{ .Tag }}/{{ .ArtifactName }}"
+
+    # Git author used to commit to the repository.
+    commit_author:
+      name: goreleaserbot
+      email: goreleaser@smallstep.com
+
+    # The project name and current git tag are used in the format string.
+    #
+    # Templates: allowed
+    commit_msg_template: "{{ .PackageIdentifier }}: {{ .Tag }}"
+
+    # Your app's homepage.
+    homepage: "https://github.com/smallstep/certificates"
+
+    # Your app's long description.
+    #
+    # Templates: allowed
+    description: ""
+
+    # License URL.
+    #
+    # Templates: allowed
+    license_url: "https://github.com/smallstep/certificates/blob/master/LICENSE"
+
+    # Release notes URL.
+    #
+    # Templates: allowed
+    release_notes_url: "https://github.com/smallstep/certificates/releases/tag/{{.Version}}"
+
+    # Create the PR - for testing
+    skip_upload: false
+
+    # Tags.
+    tags:
+      - certificates
+      - smallstep
+      - tls
+
+    # Repository to push the generated files to.
+    repository:
+      owner: smallstep
+      name: winget-pkgs
+      branch: step
+
+      # Optionally a token can be provided, if it differs from the token
+      # provided to GoReleaser
+      # Templates: allowed
+      #token: "{{ .Env.GITHUB_PERSONAL_AUTH_TOKEN }}"
+
+      # Sets up pull request creation instead of just pushing to the given branch.
+      # Make sure the 'branch' property is different from base before enabling
+      # it.
+      #
+      # Since: v1.17
+      pull_request:
+        # Whether to enable it or not.
+        enabled: true
+        #check_boxes: true
+        # Whether to open the PR as a draft or not.
+        #
+        # Default: false
+        # Since: v1.19
+        # draft: true
+
+        # Base can also be another repository, in which case the owner and name
+        # above will be used as HEAD, allowing cross-repository pull requests.
+        #
+        # Since: v1.19
+        base:
+          owner: microsoft
+          name: winget-pkgs
+          branch: master
+
+
 scoops:
   -
     ids: [ default ]
@@ -208,7 +324,7 @@ scoops:
     # Default for gitea is "https://gitea.com/<repo_owner>/<repo_name>/releases/download/{{ .Tag }}/{{ .ArtifactName }}"
     url_template: "http://github.com/smallstep/certificates/releases/download/{{ .Tag }}/{{ .ArtifactName }}"
     # Repository to push the app manifest to.
-    bucket:
+    repository:
       owner: smallstep
       name: scoop-bucket
 
