@@ -164,9 +164,15 @@ func (a *Authority) GetCACertificates(ctx context.Context) (certs []*x509.Certif
 		certs = append(certs, decrypterCertificate)
 	}
 
-	// TODO(hs): ensure logic is in place that checks the signer is the first
-	// intermediate and that there are no double certificates.
-	certs = append(certs, a.intermediates...)
+	// the CA intermediate is added to the chain by default. It's possible to
+	// exclude it from being added through configuration. This can be useful in
+	// environments where the SCEP client doesn't select the right RSA decrypter
+	// certificate, resulting in the wrong recipient in the PKCS7 message.
+	if p.ShouldIncludeIntermediateInChain() || len(certs) == 0 {
+		// TODO(hs): ensure logic is in place that checks the signer is the first
+		// intermediate and that there are no double certificates.
+		certs = append(certs, a.intermediates...)
+	}
 
 	// the CA roots are added for completeness when configured to do so. Clients
 	// are responsible to select the right cert(s) to store and use.

@@ -23,6 +23,7 @@ type SCEP struct {
 	ChallengePassword             string               `json:"challenge,omitempty"`
 	Capabilities                  []string             `json:"capabilities,omitempty"`
 	IncludeRoot                   bool                 `json:"includeRoot,omitempty"`
+	ExcludeIntermediate           bool                 `json:"excludeIntermediate,omitempty"`
 	MinimumPublicKeyLength        int                  `json:"minimumPublicKeyLength,omitempty"`
 	DecrypterCertificate          string               `json:"decrypterCertificate"`
 	DecrypterKey                  string               `json:"decrypterKey"`

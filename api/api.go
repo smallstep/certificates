@@ -243,6 +243,7 @@ func scepFromProvisioner(p *provisioner.SCEP) *models.SCEP {
 		ChallengePassword:             redacted,
 		Capabilities:                  p.Capabilities,
 		IncludeRoot:                   p.IncludeRoot,
+		ExcludeIntermediate:           p.ExcludeIntermediate,
 		MinimumPublicKeyLength:        p.MinimumPublicKeyLength,
 		DecrypterCertificate:          redacted,
 		DecrypterKey:                  redacted,

@@ -36,6 +36,10 @@ type SCEP struct {
 	// intermediate in the GetCACerts response
 	IncludeRoot bool `json:"includeRoot,omitempty"`
 
+	// ExcludeIntermediate makes the provisioner skip the intermediate CA in the
+	// GetCACerts response
+	ExcludeIntermediate bool `json:"excludeIntermediate,omitempty"`
+
 	// MinimumPublicKeyLength is the minimum length for public keys in CSRs
 	MinimumPublicKeyLength int `json:"minimumPublicKeyLength,omitempty"`
 
@@ -305,6 +309,15 @@ func (s *SCEP) GetCapabilities() []string {
 // its chain.
 func (s *SCEP) ShouldIncludeRootInChain() bool {
 	return s.IncludeRoot
+}
+
+// ShouldIncludeIntermediateInChain indicates if the
+// CA should include the intermediate CA certificate in the
+// GetCACerts response. This is true by default, but can be
+// overriden through configuration in case SCEP clients
+// don't pick the right recipient.
+func (s *SCEP) ShouldIncludeIntermediateInChain() bool {
+	return !s.ExcludeIntermediate
 }
 
 // GetContentEncryptionAlgorithm returns the numeric identifier
