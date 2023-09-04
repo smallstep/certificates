@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"errors"
 	"io"
+	"net/http"
 	"net/http/httptest"
 	"strings"
 	"testing"
@@ -375,7 +376,7 @@ func TestWebhookAdminResponder_DeleteProvisionerWebhook(t *testing.T) {
 			}
 			ctx = linkedca.NewContextWithProvisioner(ctx, prov)
 			ctx = admin.NewContext(ctx, &admin.MockDB{})
-			req := httptest.NewRequest("DELETE", "/foo", nil).WithContext(ctx)
+			req := httptest.NewRequest("DELETE", "/foo", http.NoBody).WithContext(ctx)
 
 			war := NewWebhookAdminResponder()
 
