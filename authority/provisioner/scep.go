@@ -314,7 +314,7 @@ func (s *SCEP) ShouldIncludeRootInChain() bool {
 // ShouldIncludeIntermediateInChain indicates if the
 // CA should include the intermediate CA certificate in the
 // GetCACerts response. This is true by default, but can be
-// overriden through configuration in case SCEP clients
+// overridden through configuration in case SCEP clients
 // don't pick the right recipient.
 func (s *SCEP) ShouldIncludeIntermediateInChain() bool {
 	return !s.ExcludeIntermediate

@@ -68,7 +68,7 @@ func (s *SCEP) GetTokenID(string) (string, error) {
 }
 
 // Init initializes and validates the fields of a SCEP type.
-func (s *SCEP) Init(config provisioner.Config) (err error) {
+func (s *SCEP) Init(_ provisioner.Config) (err error) {
 	return errDummyImplementation
 }
 
