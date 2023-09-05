@@ -40,6 +40,13 @@ func NewContext(ctx context.Context, db DB, client Client, linker Linker, fn Pre
 	return ctx
 }
 
+// SkipPermanentIdentiferValidation allows one to bypass the code which validates
+// that a) that the attested UUID or serial for "device-attest-01" request match
+// the permanent identifier and b) that the CN presented in the final CSRs match the permanent
+// identifier. The logic to bypass this is to allow external CAs to control the validation temporarily
+// Setting this at true at this global level is extremely discouraged (unless you know what you are doing)
+var SkipPermanentIdentiferValidation bool
+
 // PrerequisitesChecker is a function that checks if all prerequisites for
 // serving ACME are met by the CA configuration.
 type PrerequisitesChecker func(ctx context.Context) (bool, error)
