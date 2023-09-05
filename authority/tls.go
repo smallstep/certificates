@@ -263,6 +263,17 @@ func (a *Authority) Sign(csr *x509.CertificateRequest, signOpts provisioner.Sign
 		)
 	}
 
+	var clientIdentifier string
+	var extraIdentifiers []string
+	if attData != nil {
+		if attData.PermanentIdentifier != "" {
+			clientIdentifier = attData.PermanentIdentifier
+		}
+		if attData.ExtraIdentifiers != nil {
+			extraIdentifiers = attData.ExtraIdentifiers
+		}
+	}
+
 	// Sign certificate
 	lifetime := leaf.NotAfter.Sub(leaf.NotBefore.Add(signOpts.Backdate))
 	resp, err := a.x509CAService.CreateCertificate(&casapi.CreateCertificateRequest{
@@ -271,6 +282,8 @@ func (a *Authority) Sign(csr *x509.CertificateRequest, signOpts provisioner.Sign
 		Lifetime:    lifetime,
 		Backdate:    signOpts.Backdate,
 		Provisioner: pInfo,
+		ClientIdentifier: clientIdentifier,
+		ExtraIdentifiers: extraIdentifiers,
 	})
 	if err != nil {
 		return nil, errs.Wrap(http.StatusInternalServerError, err, "authority.Sign; error creating certificate", opts...)

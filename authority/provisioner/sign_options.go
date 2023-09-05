@@ -80,7 +80,8 @@ func (fn CertificateEnforcerFunc) Enforce(cert *x509.Certificate) error {
 // AttestationData is a SignOption used to pass attestation information to the
 // sign methods.
 type AttestationData struct {
-	PermanentIdentifier string
+	PermanentIdentifier string //
+	ExtraIdentifiers	[]string
 }
 
 // defaultPublicKeyValidator validates the public key of a certificate request.
