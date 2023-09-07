@@ -271,7 +271,7 @@ winget:
     release_notes_url: "https://github.com/smallstep/certificates/releases/tag/{{.Version}}"
 
     # Create the PR - for testing
-    skip_upload: false
+    skip_upload: auto
 
     # Tags.
     tags:
