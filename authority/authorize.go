@@ -177,7 +177,7 @@ func (a *Authority) AuthorizeAdminToken(r *http.Request, token string) (*linkedc
 	if !adminFound {
 		return nil, admin.NewError(admin.ErrorUnauthorizedType,
 			"adminHandler.authorizeToken; unable to load admin with subject(s) %s and provisioner '%s'",
-			adminSANs, claims.Issuer)
+			adminSANs, prov.GetName())
 	}
 
 	if strings.HasPrefix(r.URL.Path, "/admin/admins") && (r.Method != "GET") && adm.Type != linkedca.Admin_SUPER_ADMIN {
