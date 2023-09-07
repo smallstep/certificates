@@ -141,7 +141,7 @@ func Test_challengeValidationController_Validate(t *testing.T) {
 			}
 
 			ctx := context.Background()
-			err := c.Validate(ctx, tt.args.challenge, tt.args.transactionID)
+			err := c.Validate(ctx, nil, tt.args.challenge, tt.args.transactionID)
 
 			if tt.expErr != nil {
 				assert.EqualError(t, err, tt.expErr.Error())
@@ -330,7 +330,7 @@ func TestSCEP_ValidateChallenge(t *testing.T) {
 			require.NoError(t, err)
 			ctx := context.Background()
 
-			err = tt.p.ValidateChallenge(ctx, tt.args.challenge, tt.args.transactionID)
+			err = tt.p.ValidateChallenge(ctx, nil, tt.args.challenge, tt.args.transactionID)
 			if tt.expErr != nil {
 				assert.EqualError(t, err, tt.expErr.Error())
 				return

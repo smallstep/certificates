@@ -503,9 +503,9 @@ func (a *Authority) GetCACaps(ctx context.Context) []string {
 	return caps
 }
 
-func (a *Authority) ValidateChallenge(ctx context.Context, challenge, transactionID string) error {
+func (a *Authority) ValidateChallenge(ctx context.Context, csr *x509.CertificateRequest, challenge, transactionID string) error {
 	p := provisionerFromContext(ctx)
-	return p.ValidateChallenge(ctx, challenge, transactionID)
+	return p.ValidateChallenge(ctx, csr, challenge, transactionID)
 }
 
 func (a *Authority) selectDecrypter(ctx context.Context) (cert *x509.Certificate, decrypter crypto.Decrypter, err error) {
