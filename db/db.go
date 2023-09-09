@@ -119,7 +119,7 @@ func New(c *Config) (AuthDB, error) {
 
 	db, err := nosql.New(c.Type, c.DataSource, opts...)
 	if err != nil {
-		return nil, errors.Wrapf(err, "Error opening database of Type %s with source %s", c.Type, c.DataSource)
+		return nil, errors.Wrapf(err, "Error opening database of Type %s", c.Type)
 	}
 
 	tables := [][]byte{
