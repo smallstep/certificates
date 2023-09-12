@@ -447,7 +447,7 @@ func wireOIDC01Validate(ctx context.Context, ch *Challenge, db DB, jwk *jose.JSO
 		return WrapErrorISE(err, "There are not enough orders for this account for this custom OIDC challenge")
 	}
 
-	order := orders[len(orders)]
+	order := orders[len(orders)-1]
 
 	if err := db.CreateOidcToken(ctx, order, oidcToken); err != nil {
 		return WrapErrorISE(err, "Failed storing OIDC id token")
