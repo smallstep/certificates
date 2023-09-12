@@ -443,11 +443,13 @@ func wireOIDC01Validate(ctx context.Context, ch *Challenge, db DB, jwk *jose.JSO
 		return WrapErrorISE(err, "Could not find current order by account id")
 	}
 
-	if len(orders) != 1 {
-		return WrapErrorISE(err, "There are too many orders for this account for this custom OIDC challenge")
+	if len(orders) == 0 {
+		return WrapErrorISE(err, "There are not enough orders for this account for this custom OIDC challenge")
 	}
 
-	if err := db.CreateOidcToken(ctx, orders[0], oidcToken); err != nil {
+	order := orders[len(orders)]
+
+	if err := db.CreateOidcToken(ctx, order, oidcToken); err != nil {
 		return WrapErrorISE(err, "Failed storing OIDC id token")
 	}
 
