@@ -286,13 +286,10 @@ func (p *ACME) AuthorizeRenew(ctx context.Context, cert *x509.Certificate) error
 	return p.ctl.AuthorizeRenew(ctx, cert)
 }
 
-// IsChallengeEnabled checks if the given challenge is enabled. By default
-// http-01, dns-01 and tls-alpn-01 are enabled, to disable any of them the
-// Challenge provisioner property should have at least one element.
+// IsChallengeEnabled checks if the given challenge is enabled.
+// Leave the challenges empty to skip challenge validation.
 func (p *ACME) IsChallengeEnabled(_ context.Context, challenge ACMEChallenge) bool {
-	enabledChallenges := []ACMEChallenge{
-		HTTP_01, DNS_01, TLS_ALPN_01,
-	}
+	enabledChallenges := []ACMEChallenge{}
 	if len(p.Challenges) > 0 {
 		enabledChallenges = p.Challenges
 	}
