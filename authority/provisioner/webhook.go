@@ -56,7 +56,11 @@ func (wc *WebhookController) Enrich(req *webhook.RequestBody) error {
 		if !wc.isCertTypeOK(wh) {
 			continue
 		}
-		resp, err := wh.Do(wc.client, req, wc.TemplateData)
+		// TODO(hs): propagate context from above
+		ctx, cancel := context.WithTimeout(context.Background(), time.Second*10)
+		defer cancel()
+
+		resp, err := wh.DoWithContext(ctx, wc.client, req, wc.TemplateData)
 		if err != nil {
 			return err
 		}
@@ -88,7 +92,12 @@ func (wc *WebhookController) Authorize(req *webhook.RequestBody) error {
 		if !wc.isCertTypeOK(wh) {
 			continue
 		}
-		resp, err := wh.Do(wc.client, req, wc.TemplateData)
+
+		// TODO(hs): propagate context from above
+		ctx, cancel := context.WithTimeout(context.Background(), time.Second*10)
+		defer cancel()
+
+		resp, err := wh.DoWithContext(ctx, wc.client, req, wc.TemplateData)
 		if err != nil {
 			return err
 		}
@@ -122,13 +131,6 @@ type Webhook struct {
 		Username string
 		Password string
 	} `json:"-"`
-}
-
-func (w *Webhook) Do(client *http.Client, reqBody *webhook.RequestBody, data any) (*webhook.ResponseBody, error) {
-	ctx, cancel := context.WithTimeout(context.Background(), time.Second*10)
-	defer cancel()
-
-	return w.DoWithContext(ctx, client, reqBody, data)
 }
 
 func (w *Webhook) DoWithContext(ctx context.Context, client *http.Client, reqBody *webhook.RequestBody, data any) (*webhook.ResponseBody, error) {

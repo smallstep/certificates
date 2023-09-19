@@ -1,6 +1,7 @@
 package provisioner
 
 import (
+	"context"
 	"crypto/hmac"
 	"crypto/sha256"
 	"crypto/tls"
@@ -13,6 +14,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"testing"
+	"time"
 
 	"github.com/pkg/errors"
 	"github.com/smallstep/assert"
@@ -522,7 +524,11 @@ func TestWebhook_Do(t *testing.T) {
 
 			reqBody, err := webhook.NewRequestBody(webhook.WithX509CertificateRequest(csr))
 			assert.FatalError(t, err)
-			got, err := tc.webhook.Do(http.DefaultClient, reqBody, tc.dataArg)
+
+			ctx, cancel := context.WithTimeout(context.Background(), time.Second*10)
+			defer cancel()
+
+			got, err := tc.webhook.DoWithContext(ctx, http.DefaultClient, reqBody, tc.dataArg)
 			if tc.expectErr != nil {
 				assert.Equals(t, tc.expectErr.Error(), err.Error())
 				return
@@ -553,11 +559,18 @@ func TestWebhook_Do(t *testing.T) {
 		}
 		reqBody, err := webhook.NewRequestBody(webhook.WithX509CertificateRequest(csr))
 		assert.FatalError(t, err)
-		_, err = wh.Do(client, reqBody, nil)
+
+		ctx, cancel := context.WithTimeout(context.Background(), time.Second*10)
+		defer cancel()
+
+		_, err = wh.DoWithContext(ctx, client, reqBody, nil)
 		assert.FatalError(t, err)
 
+		ctx, cancel = context.WithTimeout(context.Background(), time.Second*10)
+		defer cancel()
+
 		wh.DisableTLSClientAuth = true
-		_, err = wh.Do(client, reqBody, nil)
+		_, err = wh.DoWithContext(ctx, client, reqBody, nil)
 		assert.Error(t, err)
 	})
 }
