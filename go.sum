@@ -347,6 +347,7 @@ github.com/gogo/protobuf v1.2.1/go.mod h1:hp+jE20tsWTFYpLwKvXlhS1hjn+gTNwPg2I6zV
 github.com/gogo/protobuf v1.3.0/go.mod h1:SlYgWuQ5SjCEi6WLHjHCa1yvBfUnHcTbrrZtXPKa29o=
 github.com/gogo/protobuf v1.3.1/go.mod h1:SlYgWuQ5SjCEi6WLHjHCa1yvBfUnHcTbrrZtXPKa29o=
 github.com/gogo/protobuf v1.3.2/go.mod h1:P1XiOD3dCwIKUDQYPy72D8LYyHL2YPYrpS2s69NZV8Q=
+github.com/golang-jwt/jwt v3.2.1+incompatible/go.mod h1:8pz2t5EyA70fFQQSrl6XZXzqecmYZeUEB8OUGHkxJ+I=
 github.com/golang-jwt/jwt/v4 v4.5.0 h1:7cYmW1XlMY7h7ii7UhUyChSgS5wUJEnm9uZVTGqOWzg=
 github.com/golang-jwt/jwt/v4 v4.5.0/go.mod h1:m21LjoU+eqJr34lmDMbreY2eSTRJ1cv77w39/MY0Ch0=
 github.com/golang/glog v0.0.0-20160126235308-23def4e6c14b/go.mod h1:SBH7ygxi8pfUlaOkMMuAQtPIUF8ecWP5IEl/CR7VP2Q=
@@ -913,6 +914,8 @@ github.com/smallstep/assert v0.0.0-20200723003110-82e2b9b3b262 h1:unQFBIznI+VYD1
 github.com/smallstep/assert v0.0.0-20200723003110-82e2b9b3b262/go.mod h1:MyOHs9Po2fbM1LHej6sBUT8ozbxmMOFG+E+rx/GSGuc=
 github.com/smallstep/go-attestation v0.4.4-0.20230509120429-e17291421738 h1:h+cZgVniTaE0uuRMdxTThLaJeuxsv4aas6oStz6f5VQ=
 github.com/smallstep/go-attestation v0.4.4-0.20230509120429-e17291421738/go.mod h1:mk2hyNbyai1oon+ilW9t42BuBVw7ee8elDdgrPq4394=
+github.com/smallstep/go-attestation v0.4.4-0.20230627102604-cf579e53cbd2 h1:UIAS8DTWkeclraEGH2aiJPyNPu16VbT41w4JoBlyFfU=
+github.com/smallstep/go-attestation v0.4.4-0.20230627102604-cf579e53cbd2/go.mod h1:vNAduivU014fubg6ewygkAvQC0IQVXqdc8vaGl/0er4=
 github.com/smallstep/nosql v0.6.0 h1:ur7ysI8s9st0cMXnTvB8tA3+x5Eifmkb6hl4uqNV5jc=
 github.com/smallstep/nosql v0.6.0/go.mod h1:jOXwLtockXORUPPZ2MCUcIkGR6w0cN1QGZniY9DITQA=
 github.com/smallstep/pkcs7 v0.0.0-20230302202335-4c094085c948 h1:/80FqDt6pzL9clNW8G2IsRAzKGNAuzsEs7g1Y5oaM/Y=
