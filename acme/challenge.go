@@ -26,7 +26,7 @@ import (
 	"time"
 
 	"github.com/fxamacker/cbor/v2"
-	"github.com/google/go-tpm/tpm2"
+	"github.com/google/go-tpm/legacy/tpm2"
 	"golang.org/x/exp/slices"
 
 	"github.com/smallstep/go-attestation/attest"
