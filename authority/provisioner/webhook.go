@@ -15,6 +15,7 @@ import (
 	"time"
 
 	"github.com/pkg/errors"
+	"github.com/smallstep/certificates/logging"
 	"github.com/smallstep/certificates/templates"
 	"github.com/smallstep/certificates/webhook"
 	"go.step.sm/linkedca"
@@ -167,6 +168,11 @@ retry:
 	req, err := http.NewRequestWithContext(ctx, "POST", url, bytes.NewReader(reqBytes))
 	if err != nil {
 		return nil, err
+	}
+
+	requestID, ok := logging.GetRequestID(ctx)
+	if ok {
+		req.Header.Set("X-Request-ID", requestID)
 	}
 
 	secret, err := base64.StdEncoding.DecodeString(w.Secret)
