@@ -285,6 +285,10 @@ func (m *mockCA) Sign(*x509.CertificateRequest, provisioner.SignOptions, ...prov
 	return nil, nil
 }
 
+func (m *mockCA) SignWithContext(context.Context, *x509.CertificateRequest, provisioner.SignOptions, ...provisioner.SignOption) ([]*x509.Certificate, error) {
+	return nil, nil
+}
+
 func (m *mockCA) AreSANsAllowed(ctx context.Context, sans []string) error {
 	if m.MockAreSANsallowed != nil {
 		return m.MockAreSANsallowed(ctx, sans)

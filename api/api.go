@@ -42,6 +42,7 @@ type Authority interface {
 	GetTLSOptions() *config.TLSOptions
 	Root(shasum string) (*x509.Certificate, error)
 	Sign(cr *x509.CertificateRequest, opts provisioner.SignOptions, signOpts ...provisioner.SignOption) ([]*x509.Certificate, error)
+	SignWithContext(ctx context.Context, cr *x509.CertificateRequest, opts provisioner.SignOptions, signOpts ...provisioner.SignOption) ([]*x509.Certificate, error)
 	Renew(peer *x509.Certificate) ([]*x509.Certificate, error)
 	RenewContext(ctx context.Context, peer *x509.Certificate, pk crypto.PublicKey) ([]*x509.Certificate, error)
 	Rekey(peer *x509.Certificate, pk crypto.PublicKey) ([]*x509.Certificate, error)

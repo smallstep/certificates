@@ -91,8 +91,17 @@ func withDefaultASN1DN(def *config.ASN1DN) provisioner.CertificateModifierFunc {
 	}
 }
 
-// Sign creates a signed certificate from a certificate signing request.
+// Sign creates a signed certificate from a certificate signing request. It
+// creates a new context.Context, and calls into SignWithContext.
+//
+// Deprecated: Use authority.SignWithContext with an actual context.Context.
 func (a *Authority) Sign(csr *x509.CertificateRequest, signOpts provisioner.SignOptions, extraOpts ...provisioner.SignOption) ([]*x509.Certificate, error) {
+	return a.SignWithContext(context.Background(), csr, signOpts, extraOpts...)
+}
+
+// SignWithContext creates a signed certificate from a certificate signing request,
+// taking the provided context.Context.
+func (a *Authority) SignWithContext(ctx context.Context, csr *x509.CertificateRequest, signOpts provisioner.SignOptions, extraOpts ...provisioner.SignOption) ([]*x509.Certificate, error) {
 	var (
 		certOptions    []x509util.Option
 		certValidators []provisioner.CertificateValidator
@@ -163,7 +172,7 @@ func (a *Authority) Sign(csr *x509.CertificateRequest, signOpts provisioner.Sign
 		}
 	}
 
-	if err := callEnrichingWebhooksX509(webhookCtl, attData, csr); err != nil {
+	if err := callEnrichingWebhooksX509(ctx, webhookCtl, attData, csr); err != nil {
 		return nil, errs.ApplyOptions(
 			errs.ForbiddenErr(err, err.Error()),
 			errs.WithKeyVal("csr", csr),
@@ -256,7 +265,7 @@ func (a *Authority) Sign(csr *x509.CertificateRequest, signOpts provisioner.Sign
 	}
 
 	// Send certificate to webhooks for authorization
-	if err := callAuthorizingWebhooksX509(webhookCtl, cert, leaf, attData); err != nil {
+	if err := callAuthorizingWebhooksX509(ctx, webhookCtl, cert, leaf, attData); err != nil {
 		return nil, errs.ApplyOptions(
 			errs.ForbiddenErr(err, "error creating certificate"),
 			opts...,
@@ -952,7 +961,7 @@ func templatingError(err error) error {
 	return errors.Wrap(cause, "error applying certificate template")
 }
 
-func callEnrichingWebhooksX509(webhookCtl webhookController, attData *provisioner.AttestationData, csr *x509.CertificateRequest) error {
+func callEnrichingWebhooksX509(ctx context.Context, webhookCtl webhookController, attData *provisioner.AttestationData, csr *x509.CertificateRequest) error {
 	if webhookCtl == nil {
 		return nil
 	}
@@ -969,10 +978,10 @@ func callEnrichingWebhooksX509(webhookCtl webhookController, attData *provisione
 	if err != nil {
 		return err
 	}
-	return webhookCtl.Enrich(whEnrichReq)
+	return webhookCtl.Enrich(ctx, whEnrichReq)
 }
 
-func callAuthorizingWebhooksX509(webhookCtl webhookController, cert *x509util.Certificate, leaf *x509.Certificate, attData *provisioner.AttestationData) error {
+func callAuthorizingWebhooksX509(ctx context.Context, webhookCtl webhookController, cert *x509util.Certificate, leaf *x509.Certificate, attData *provisioner.AttestationData) error {
 	if webhookCtl == nil {
 		return nil
 	}
@@ -989,5 +998,5 @@ func callAuthorizingWebhooksX509(webhookCtl webhookController, cert *x509util.Ce
 	if err != nil {
 		return err
 	}
-	return webhookCtl.Authorize(whAuthBody)
+	return webhookCtl.Authorize(ctx, whAuthBody)
 }

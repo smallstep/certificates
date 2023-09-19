@@ -242,7 +242,7 @@ func TestWebhookController_Enrich(t *testing.T) {
 				wh.URL = ts.URL
 			}
 
-			err := test.ctl.Enrich(test.req)
+			err := test.ctl.Enrich(context.Background(), test.req)
 			if (err != nil) != test.expectErr {
 				t.Fatalf("Got err %v, want %v", err, test.expectErr)
 			}
@@ -352,7 +352,7 @@ func TestWebhookController_Authorize(t *testing.T) {
 				wh.URL = ts.URL
 			}
 
-			err := test.ctl.Authorize(test.req)
+			err := test.ctl.Authorize(context.Background(), test.req)
 			if (err != nil) != test.expectErr {
 				t.Fatalf("Got err %v, want %v", err, test.expectErr)
 			}
