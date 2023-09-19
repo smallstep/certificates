@@ -78,7 +78,7 @@ func Sign(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	certChain, err := a.Sign(body.CsrPEM.CertificateRequest, opts, signOpts...)
+	certChain, err := a.SignWithContext(ctx, body.CsrPEM.CertificateRequest, opts, signOpts...)
 	if err != nil {
 		render.Error(w, errs.ForbiddenErr(err, "error signing certificate"))
 		return
