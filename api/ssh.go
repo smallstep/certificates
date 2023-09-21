@@ -289,6 +289,7 @@ func SSHSign(w http.ResponseWriter, r *http.Request) {
 
 	ctx := provisioner.NewContextWithMethod(r.Context(), provisioner.SSHSignMethod)
 	ctx = provisioner.NewContextWithToken(ctx, body.OTT)
+	ctx = provisioner.NewContextWithCertType(ctx, opts.CertType)
 
 	a := mustAuthority(ctx)
 	signOpts, err := a.Authorize(ctx, body.OTT)
