@@ -315,7 +315,7 @@ func PKIOperation(ctx context.Context, req request) (Response, error) {
 	// a certificate exists; then it will use RenewalReq. Adding the challenge check here may be a small breaking change for clients.
 	// We'll have to see how it works out.
 	if msg.MessageType == microscep.PKCSReq || msg.MessageType == microscep.RenewalReq {
-		if err := auth.ValidateChallenge(ctx, challengePassword, transactionID); err != nil {
+		if err := auth.ValidateChallenge(ctx, csr, challengePassword, transactionID); err != nil {
 			if errors.Is(err, provisioner.ErrSCEPChallengeInvalid) {
 				return createFailureResponse(ctx, csr, msg, microscep.BadRequest, err)
 			}
