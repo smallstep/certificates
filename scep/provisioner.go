@@ -21,6 +21,8 @@ type Provisioner interface {
 	GetSigner() (*x509.Certificate, crypto.Signer)
 	GetContentEncryptionAlgorithm() int
 	ValidateChallenge(ctx context.Context, csr *x509.CertificateRequest, challenge, transactionID string) error
+	NotifySuccess(ctx context.Context, csr *x509.CertificateRequest, cert *x509.Certificate, transactionID string) error
+	NotifyFailure(ctx context.Context, csr *x509.CertificateRequest, transactionID string) error
 }
 
 // provisionerKey is the key type for storing and searching a
