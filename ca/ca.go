@@ -251,11 +251,24 @@ func (ca *CA) Init(cfg *config.Config) (*CA, error) {
 	var scepAuthority *scep.Authority
 	if ca.shouldServeSCEPEndpoints() {
 		scepPrefix := "scep"
+		var pollingDB db.PollingDB = nil
+		var polling bool = false
+		if cfg.Polling.IsEnabled() {
+			authDB := auth.GetDatabase()
+			if authDB == nil {
+				return nil, errors.Wrap(err, "error initializing AuthDB")
+			}
+			pollingDB = authDB.(db.PollingDB)
+			polling = true
+		}
 		scepAuthority, err = scep.New(auth, scep.AuthorityOptions{
 			Service: auth.GetSCEPService(),
 			DNS:     dns,
 			Prefix:  scepPrefix,
+			DB:      pollingDB,
+			Polling: polling,
 		})
+
 		if err != nil {
 			return nil, errors.Wrap(err, "error creating SCEP authority")
 		}

@@ -83,10 +83,16 @@ type Config struct {
 	Templates        *templates.Templates `json:"templates,omitempty"`
 	CommonName       string               `json:"commonName,omitempty"`
 	CRL              *CRLConfig           `json:"crl,omitempty"`
+	Polling          *PollingConfig       `json:"polling,omitempty"`
 	SkipValidation   bool                 `json:"-"`
 
 	// Keeps record of the filename the Config is read from
 	loadedFromFilepath string
+}
+
+// PollingConfig represents config options for SCEP polling
+type PollingConfig struct {
+	Enabled bool `json:"enabled"`
 }
 
 // CRLConfig represents config options for CRL generation
@@ -96,6 +102,11 @@ type CRLConfig struct {
 	CacheDuration    *provisioner.Duration `json:"cacheDuration,omitempty"`
 	RenewPeriod      *provisioner.Duration `json:"renewPeriod,omitempty"`
 	IDPurl           string                `json:"idpURL,omitempty"`
+}
+
+// IsEnabled returns if polling is enabled.
+func (c *PollingConfig) IsEnabled() bool {
+	return c != nil && c.Enabled
 }
 
 // IsEnabled returns if the CRL is enabled.
