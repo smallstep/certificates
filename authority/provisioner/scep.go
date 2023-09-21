@@ -196,8 +196,6 @@ func (c *notificationController) Success(ctx context.Context, csr *x509.Certific
 			return fmt.Errorf("failed creating new webhook request: %w", err)
 		}
 		req.X509Certificate.Raw = cert.Raw // adding the full certificate DER bytes
-
-		// TODO(hs): more properties required?
 		req.SCEPTransactionID = transactionID
 		resp, err := wh.DoWithContext(ctx, c.client, req, nil)
 		if err != nil {
@@ -211,14 +209,15 @@ func (c *notificationController) Success(ctx context.Context, csr *x509.Certific
 	return nil
 }
 
-func (c *notificationController) Failure(ctx context.Context, csr *x509.CertificateRequest, transactionID string) error {
+func (c *notificationController) Failure(ctx context.Context, csr *x509.CertificateRequest, transactionID string, errorCode int, errorDescription string) error {
 	for _, wh := range c.webhooks {
 		req, err := webhook.NewRequestBody(webhook.WithX509CertificateRequest(csr))
 		if err != nil {
 			return fmt.Errorf("failed creating new webhook request: %w", err)
 		}
-		// TODO(hs): more properties, such as error message / code required?
 		req.SCEPTransactionID = transactionID
+		req.SCEPErrorCode = errorCode
+		req.SCEPErrorDescription = errorDescription
 		resp, err := wh.DoWithContext(ctx, c.client, req, nil)
 		if err != nil {
 			return fmt.Errorf("failed executing webhook request: %w", err)
@@ -427,11 +426,11 @@ func (s *SCEP) NotifySuccess(ctx context.Context, csr *x509.CertificateRequest, 
 	return s.notificationController.Success(ctx, csr, cert, transactionID)
 }
 
-func (s *SCEP) NotifyFailure(ctx context.Context, csr *x509.CertificateRequest, transactionID string) error {
+func (s *SCEP) NotifyFailure(ctx context.Context, csr *x509.CertificateRequest, transactionID string, errorCode int, errorDescription string) error {
 	if s.notificationController == nil {
 		return fmt.Errorf("provisioner %q wasn't initialized", s.Name)
 	}
-	return s.notificationController.Failure(ctx, csr, transactionID)
+	return s.notificationController.Failure(ctx, csr, transactionID, errorCode, errorDescription)
 }
 
 type validationMethod string

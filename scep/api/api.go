@@ -333,6 +333,9 @@ func PKIOperation(ctx context.Context, req request) (Response, error) {
 
 	certRep, err := auth.SignCSR(ctx, csr, msg)
 	if err != nil {
+		// default to ERROR_INTERNAL_ERROR: https://learn.microsoft.com/en-us/openspecs/windows_protocols/ms-erref/18d8fbe8-a967-4f1c-ae50-99ca8e491d2d
+		errorCode := 0x0000054F
+		errorDescription := err.Error()
 		if notifyErr := auth.NotifyFailure(ctx, csr, transactionID); notifyErr != nil {
 			// TODO(hs): ignore this error case? It's not critical if the notification fails; but logging it might be good
 			_ = notifyErr

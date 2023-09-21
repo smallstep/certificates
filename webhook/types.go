@@ -81,8 +81,10 @@ type RequestBody struct {
 	SSHCertificateRequest  *SSHCertificateRequest  `json:"sshCertificateRequest,omitempty"`
 	SSHCertificate         *SSHCertificate         `json:"sshCertificate,omitempty"`
 	// Only set for SCEP challenge validation requests
-	SCEPChallenge     string `json:"scepChallenge,omitempty"`
-	SCEPTransactionID string `json:"scepTransactionID,omitempty"`
+	SCEPChallenge        string `json:"scepChallenge,omitempty"`
+	SCEPTransactionID    string `json:"scepTransactionID,omitempty"`
+	SCEPErrorCode        int    `json:"scepErrorCode,omitempty"`
+	SCEPErrorDescription string `json:"scepErrorDescription,omitempty"`
 	// Only set for X5C provisioners
 	X5CCertificate *X5CCertificate `json:"x5cCertificate,omitempty"`
 	// Set for X5C, AWS, GCP, and Azure provisioners

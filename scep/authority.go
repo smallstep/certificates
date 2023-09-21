@@ -513,9 +513,9 @@ func (a *Authority) NotifySuccess(ctx context.Context, csr *x509.CertificateRequ
 	return p.NotifySuccess(ctx, csr, cert, transactionID)
 }
 
-func (a *Authority) NotifyFailure(ctx context.Context, csr *x509.CertificateRequest, transactionID string) error {
+func (a *Authority) NotifyFailure(ctx context.Context, csr *x509.CertificateRequest, transactionID string, errorCode int, errorDescription string) error {
 	p := provisionerFromContext(ctx)
-	return p.NotifyFailure(ctx, csr, transactionID)
+	return p.NotifyFailure(ctx, csr, transactionID, errorCode, errorDescription)
 }
 
 func (a *Authority) selectDecrypter(ctx context.Context) (cert *x509.Certificate, decrypter crypto.Decrypter, err error) {
