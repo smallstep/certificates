@@ -190,34 +190,28 @@ func newNotificationController(client *http.Client, webhooks []*Webhook) *notifi
 }
 
 func (c *notificationController) Success(ctx context.Context, csr *x509.CertificateRequest, cert *x509.Certificate, transactionID string) error {
-	if len(c.webhooks) == 0 {
-		return nil
-	}
-
 	for _, wh := range c.webhooks {
 		req, err := webhook.NewRequestBody(webhook.WithX509CertificateRequest(csr), webhook.WithX509Certificate(nil, cert)) // TODO(hs): pass in the x509util.Certifiate too?
 		if err != nil {
 			return fmt.Errorf("failed creating new webhook request: %w", err)
 		}
+		req.X509Certificate.Raw = cert.Raw // adding the full certificate DER bytes
+
 		// TODO(hs): more properties required?
 		req.SCEPTransactionID = transactionID
 		resp, err := wh.DoWithContext(ctx, c.client, req, nil)
 		if err != nil {
 			return fmt.Errorf("failed executing webhook request: %w", err)
 		}
-		if resp.Allow { // TODO(hs): different response for notifying?
-			return nil // return early when response is positive
+		if !resp.Allow { // TODO(hs): different response for notifying?
+			return ErrSCEPNotificationFailed // return early
 		}
 	}
 
-	return ErrSCEPNotificationFailed
+	return nil
 }
 
 func (c *notificationController) Failure(ctx context.Context, csr *x509.CertificateRequest, transactionID string) error {
-	if len(c.webhooks) == 0 {
-		return nil
-	}
-
 	for _, wh := range c.webhooks {
 		req, err := webhook.NewRequestBody(webhook.WithX509CertificateRequest(csr))
 		if err != nil {
@@ -229,12 +223,12 @@ func (c *notificationController) Failure(ctx context.Context, csr *x509.Certific
 		if err != nil {
 			return fmt.Errorf("failed executing webhook request: %w", err)
 		}
-		if resp.Allow { // TODO(hs): different response for notifying?
-			return nil // return early when response is positive
+		if !resp.Allow { // TODO(hs): different response for notifying?
+			return ErrSCEPNotificationFailed // return early
 		}
 	}
 
-	return ErrSCEPNotificationFailed
+	return nil
 }
 
 // isCertTypeOK returns whether or not the webhook can be used

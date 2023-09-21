@@ -30,6 +30,7 @@ type X509Certificate struct {
 	PublicKeyAlgorithm string    `json:"publicKeyAlgorithm"`
 	NotBefore          time.Time `json:"notBefore"`
 	NotAfter           time.Time `json:"notAfter"`
+	Raw                []byte    `json:"raw"`
 }
 
 // SSHCertificateRequest is the certificate request sent to webhook servers for
