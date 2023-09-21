@@ -12,12 +12,12 @@ require (
 	github.com/go-chi/chi v4.1.2+incompatible
 	github.com/golang/mock v1.6.0
 	github.com/google/go-cmp v0.5.9
-	github.com/google/go-tpm v0.3.3
+	github.com/google/go-tpm v0.9.0
 	github.com/google/uuid v1.3.1
 	github.com/googleapis/gax-go/v2 v2.12.0
-	github.com/hashicorp/vault/api v1.9.2
-	github.com/hashicorp/vault/api/auth/approle v0.4.1
-	github.com/hashicorp/vault/api/auth/kubernetes v0.4.1
+	github.com/hashicorp/vault/api v1.10.0
+	github.com/hashicorp/vault/api/auth/approle v0.5.0
+	github.com/hashicorp/vault/api/auth/kubernetes v0.5.0
 	github.com/micromdm/scep/v2 v2.1.0
 	github.com/newrelic/go-agent/v3 v3.24.1
 	github.com/pkg/errors v0.9.1
@@ -25,19 +25,19 @@ require (
 	github.com/sirupsen/logrus v1.9.3
 	github.com/slackhq/nebula v1.6.1
 	github.com/smallstep/assert v0.0.0-20200723003110-82e2b9b3b262
-	github.com/smallstep/go-attestation v0.4.4-0.20230509120429-e17291421738
+	github.com/smallstep/go-attestation v0.4.4-0.20230627102604-cf579e53cbd2
 	github.com/smallstep/nosql v0.6.0
 	github.com/stretchr/testify v1.8.4
 	github.com/urfave/cli v1.22.14
 	go.mozilla.org/pkcs7 v0.0.0-20210826202110-33d05740a352
 	go.step.sm/cli-utils v0.8.0
-	go.step.sm/crypto v0.35.0
+	go.step.sm/crypto v0.35.1
 	go.step.sm/linkedca v0.20.1-0.20230904124610-b6e003ee7e36
-	golang.org/x/crypto v0.12.0
+	golang.org/x/crypto v0.13.0
 	golang.org/x/exp v0.0.0-20230310171629-522b1b587ee0
-	golang.org/x/net v0.14.0
-	google.golang.org/api v0.138.0
-	google.golang.org/grpc v1.57.0
+	golang.org/x/net v0.15.0
+	google.golang.org/api v0.141.0
+	google.golang.org/grpc v1.58.1
 	google.golang.org/protobuf v1.31.0
 	gopkg.in/square/go-jose.v2 v2.6.0
 )
@@ -47,19 +47,19 @@ require (
 	cloud.google.com/go/compute v1.23.0 // indirect
 	cloud.google.com/go/compute/metadata v0.2.3 // indirect
 	cloud.google.com/go/iam v1.1.1 // indirect
-	cloud.google.com/go/kms v1.15.1 // indirect
+	cloud.google.com/go/kms v1.15.2 // indirect
 	filippo.io/edwards25519 v1.0.0 // indirect
 	github.com/AndreasBriese/bbloom v0.0.0-20190825152654-46b345b51c96 // indirect
-	github.com/Azure/azure-sdk-for-go/sdk/azcore v1.7.1 // indirect
-	github.com/Azure/azure-sdk-for-go/sdk/azidentity v1.3.0 // indirect
+	github.com/Azure/azure-sdk-for-go/sdk/azcore v1.7.2 // indirect
+	github.com/Azure/azure-sdk-for-go/sdk/azidentity v1.3.1 // indirect
 	github.com/Azure/azure-sdk-for-go/sdk/internal v1.3.0 // indirect
 	github.com/Azure/azure-sdk-for-go/sdk/keyvault/azkeys v0.10.0 // indirect
 	github.com/Azure/azure-sdk-for-go/sdk/keyvault/internal v0.7.1 // indirect
-	github.com/AzureAD/microsoft-authentication-library-for-go v1.0.0 // indirect
+	github.com/AzureAD/microsoft-authentication-library-for-go v1.1.1 // indirect
 	github.com/Masterminds/goutils v1.1.1 // indirect
 	github.com/Masterminds/semver/v3 v3.2.0 // indirect
 	github.com/ThalesIgnite/crypto11 v1.2.5 // indirect
-	github.com/aws/aws-sdk-go v1.44.318 // indirect
+	github.com/aws/aws-sdk-go v1.45.12 // indirect
 	github.com/cenkalti/backoff/v3 v3.0.0 // indirect
 	github.com/cespare/xxhash v1.1.0 // indirect
 	github.com/cespare/xxhash/v2 v2.2.0 // indirect
@@ -74,16 +74,16 @@ require (
 	github.com/go-logfmt/logfmt v0.5.1 // indirect
 	github.com/go-piv/piv-go v1.11.0 // indirect
 	github.com/go-sql-driver/mysql v1.7.1 // indirect
-	github.com/golang-jwt/jwt/v4 v4.5.0 // indirect
+	github.com/golang-jwt/jwt/v5 v5.0.0 // indirect
 	github.com/golang/glog v1.1.0 // indirect
 	github.com/golang/groupcache v0.0.0-20210331224755-41bb18bfe9da // indirect
 	github.com/golang/protobuf v1.5.3 // indirect
 	github.com/golang/snappy v0.0.4 // indirect
 	github.com/google/btree v1.1.2 // indirect
 	github.com/google/certificate-transparency-go v1.1.6 // indirect
-	github.com/google/go-tpm-tools v0.3.12 // indirect
+	github.com/google/go-tpm-tools v0.4.1 // indirect
 	github.com/google/go-tspi v0.3.0 // indirect
-	github.com/google/s2a-go v0.1.5 // indirect
+	github.com/google/s2a-go v0.1.7 // indirect
 	github.com/googleapis/enterprise-certificate-proxy v0.2.5 // indirect
 	github.com/hashicorp/errwrap v1.1.0 // indirect
 	github.com/hashicorp/go-cleanhttp v0.5.2 // indirect
@@ -129,7 +129,7 @@ require (
 	github.com/x448/float16 v0.8.4 // indirect
 	go.etcd.io/bbolt v1.3.7 // indirect
 	go.opencensus.io v0.24.0 // indirect
-	golang.org/x/oauth2 v0.11.0 // indirect
+	golang.org/x/oauth2 v0.12.0 // indirect
 	golang.org/x/sync v0.3.0 // indirect
 	golang.org/x/sys v0.12.0 // indirect
 	golang.org/x/text v0.13.0 // indirect
@@ -137,7 +137,7 @@ require (
 	google.golang.org/appengine v1.6.7 // indirect
 	google.golang.org/genproto v0.0.0-20230803162519-f966b187b2e5 // indirect
 	google.golang.org/genproto/googleapis/api v0.0.0-20230803162519-f966b187b2e5 // indirect
-	google.golang.org/genproto/googleapis/rpc v0.0.0-20230822172742-b8732ec3820d // indirect
+	google.golang.org/genproto/googleapis/rpc v0.0.0-20230911183012-2d3300fd4832 // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 )
 
