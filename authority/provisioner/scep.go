@@ -197,12 +197,8 @@ func (c *notificationController) Success(ctx context.Context, csr *x509.Certific
 		}
 		req.X509Certificate.Raw = cert.Raw // adding the full certificate DER bytes
 		req.SCEPTransactionID = transactionID
-		resp, err := wh.DoWithContext(ctx, c.client, req, nil)
-		if err != nil {
-			return fmt.Errorf("failed executing webhook request: %w", err)
-		}
-		if !resp.Allow { // TODO(hs): different response for notifying?
-			return ErrSCEPNotificationFailed // return early
+		if _, err = wh.DoWithContext(ctx, c.client, req, nil); err != nil {
+			return fmt.Errorf("failed executing webhook request: %w: %w", ErrSCEPNotificationFailed, err)
 		}
 	}
 
@@ -218,12 +214,8 @@ func (c *notificationController) Failure(ctx context.Context, csr *x509.Certific
 		req.SCEPTransactionID = transactionID
 		req.SCEPErrorCode = errorCode
 		req.SCEPErrorDescription = errorDescription
-		resp, err := wh.DoWithContext(ctx, c.client, req, nil)
-		if err != nil {
-			return fmt.Errorf("failed executing webhook request: %w", err)
-		}
-		if !resp.Allow { // TODO(hs): different response for notifying?
-			return ErrSCEPNotificationFailed // return early
+		if _, err = wh.DoWithContext(ctx, c.client, req, nil); err != nil {
+			return fmt.Errorf("failed executing webhook request: %w: %w", ErrSCEPNotificationFailed, err)
 		}
 	}
 
