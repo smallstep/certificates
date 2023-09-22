@@ -333,7 +333,16 @@ func PKIOperation(ctx context.Context, req request) (Response, error) {
 
 	certRep, err := auth.SignCSR(ctx, csr, msg)
 	if err != nil {
+		if notifyErr := auth.NotifyFailure(ctx, csr, transactionID, 0, err.Error()); notifyErr != nil {
+			// TODO(hs): ignore this error case? It's not critical if the notification fails; but logging it might be good
+			_ = notifyErr
+		}
 		return createFailureResponse(ctx, csr, msg, microscep.BadRequest, fmt.Errorf("error when signing new certificate: %w", err))
+	}
+
+	if notifyErr := auth.NotifySuccess(ctx, csr, certRep.Certificate, transactionID); notifyErr != nil {
+		// TODO(hs): ignore this error case? It's not critical if the notification fails; but logging it might be good
+		_ = notifyErr
 	}
 
 	res := Response{

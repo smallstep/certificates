@@ -58,6 +58,7 @@ type SCEP struct {
 	ctl                           *Controller
 	encryptionAlgorithm           int
 	challengeValidationController *challengeValidationController
+	notificationController        *notificationController
 	keyManager                    kmsapi.KeyManager
 	decrypter                     crypto.Decrypter
 	decrypterCertificate          *x509.Certificate
@@ -135,7 +136,8 @@ func newChallengeValidationController(client *http.Client, webhooks []*Webhook) 
 }
 
 var (
-	ErrSCEPChallengeInvalid = errors.New("webhook server did not allow request")
+	ErrSCEPChallengeInvalid   = errors.New("webhook server did not allow request")
+	ErrSCEPNotificationFailed = errors.New("scep notification failed")
 )
 
 // Validate executes zero or more configured webhooks to
@@ -162,6 +164,63 @@ func (c *challengeValidationController) Validate(ctx context.Context, csr *x509.
 	}
 
 	return ErrSCEPChallengeInvalid
+}
+
+type notificationController struct {
+	client   *http.Client
+	webhooks []*Webhook
+}
+
+// newNotificationController creates a new notificationController
+// that performs SCEP notifications through webhooks.
+func newNotificationController(client *http.Client, webhooks []*Webhook) *notificationController {
+	scepHooks := []*Webhook{}
+	for _, wh := range webhooks {
+		if wh.Kind != linkedca.Webhook_NOTIFYING.String() {
+			continue
+		}
+		if !isCertTypeOK(wh) {
+			continue
+		}
+		scepHooks = append(scepHooks, wh)
+	}
+	return &notificationController{
+		client:   client,
+		webhooks: scepHooks,
+	}
+}
+
+func (c *notificationController) Success(ctx context.Context, csr *x509.CertificateRequest, cert *x509.Certificate, transactionID string) error {
+	for _, wh := range c.webhooks {
+		req, err := webhook.NewRequestBody(webhook.WithX509CertificateRequest(csr), webhook.WithX509Certificate(nil, cert)) // TODO(hs): pass in the x509util.Certifiate too?
+		if err != nil {
+			return fmt.Errorf("failed creating new webhook request: %w", err)
+		}
+		req.X509Certificate.Raw = cert.Raw // adding the full certificate DER bytes
+		req.SCEPTransactionID = transactionID
+		if _, err = wh.DoWithContext(ctx, c.client, req, nil); err != nil {
+			return fmt.Errorf("failed executing webhook request: %w: %w", ErrSCEPNotificationFailed, err)
+		}
+	}
+
+	return nil
+}
+
+func (c *notificationController) Failure(ctx context.Context, csr *x509.CertificateRequest, transactionID string, errorCode int, errorDescription string) error {
+	for _, wh := range c.webhooks {
+		req, err := webhook.NewRequestBody(webhook.WithX509CertificateRequest(csr))
+		if err != nil {
+			return fmt.Errorf("failed creating new webhook request: %w", err)
+		}
+		req.SCEPTransactionID = transactionID
+		req.SCEPErrorCode = errorCode
+		req.SCEPErrorDescription = errorDescription
+		if _, err = wh.DoWithContext(ctx, c.client, req, nil); err != nil {
+			return fmt.Errorf("failed executing webhook request: %w: %w", ErrSCEPNotificationFailed, err)
+		}
+	}
+
+	return nil
 }
 
 // isCertTypeOK returns whether or not the webhook can be used
@@ -198,6 +257,12 @@ func (s *SCEP) Init(config Config) (err error) {
 
 	// Prepare the SCEP challenge validator
 	s.challengeValidationController = newChallengeValidationController(
+		config.WebhookClient,
+		s.GetOptions().GetWebhooks(),
+	)
+
+	// Prepare the SCEP notification controller
+	s.notificationController = newNotificationController(
 		config.WebhookClient,
 		s.GetOptions().GetWebhooks(),
 	)
@@ -381,6 +446,20 @@ func (s *SCEP) ValidateChallenge(ctx context.Context, csr *x509.CertificateReque
 		}
 		return nil
 	}
+}
+
+func (s *SCEP) NotifySuccess(ctx context.Context, csr *x509.CertificateRequest, cert *x509.Certificate, transactionID string) error {
+	if s.notificationController == nil {
+		return fmt.Errorf("provisioner %q wasn't initialized", s.Name)
+	}
+	return s.notificationController.Success(ctx, csr, cert, transactionID)
+}
+
+func (s *SCEP) NotifyFailure(ctx context.Context, csr *x509.CertificateRequest, transactionID string, errorCode int, errorDescription string) error {
+	if s.notificationController == nil {
+		return fmt.Errorf("provisioner %q wasn't initialized", s.Name)
+	}
+	return s.notificationController.Failure(ctx, csr, transactionID, errorCode, errorDescription)
 }
 
 type validationMethod string
