@@ -406,6 +406,9 @@ func (p *GCP) AuthorizeSSHSign(_ context.Context, token string) ([]SignOption, e
 
 	// Validated principals.
 	principals := []string{
+		claims.Email,
+		SanitizeSSHUserPrincipal(claims.Email),
+		fmt.Sprintf("%s.c.%s.internal", ce.InstanceName, ce.ProjectID),
 		fmt.Sprintf("%s.c.%s.internal", ce.InstanceName, ce.ProjectID),
 		fmt.Sprintf("%s.%s.c.%s.internal", ce.InstanceName, ce.Zone, ce.ProjectID),
 	}
@@ -426,7 +429,7 @@ func (p *GCP) AuthorizeSSHSign(_ context.Context, token string) ([]SignOption, e
 		data.SetToken(v)
 	}
 
-	templateOptions, err := CustomSSHTemplateOptions(p.Options, data, sshutil.DefaultIIDTemplate)
+	templateOptions, err := CustomSSHTemplateOptions(p.Options, data, sshutil.CertificateRequestTemplate)
 	if err != nil {
 		return nil, errs.Wrap(http.StatusInternalServerError, err, "gcp.AuthorizeSSHSign")
 	}
@@ -434,8 +437,8 @@ func (p *GCP) AuthorizeSSHSign(_ context.Context, token string) ([]SignOption, e
 
 	return append(signOptions,
 		p,
-		// Validate user SignSSHOptions.
-		sshCertOptionsValidator(defaults),
+		// Require type, key-id and principals in the SignSSHOptions.
+		&sshCertOptionsRequireValidator{CertType: true, KeyID: true, Principals: true},
 		// Set the validity bounds if not set.
 		&sshDefaultDuration{p.ctl.Claimer},
 		// Validate public key
@@ -445,12 +448,10 @@ func (p *GCP) AuthorizeSSHSign(_ context.Context, token string) ([]SignOption, e
 		// Require all the fields in the SSH certificate
 		&sshCertDefaultValidator{},
 		// Ensure that all principal names are allowed
-		newSSHNamePolicyValidator(p.ctl.getPolicy().getSSHHost(), nil),
+		newSSHNamePolicyValidator(p.ctl.getPolicy().getSSHHost(), p.ctl.getPolicy().getSSHUser()),
 		// Call webhooks
 		p.ctl.newWebhookController(
 			data,
-			linkedca.Webhook_SSH,
-			webhook.WithAuthorizationPrincipal(ce.InstanceID),
-		),
+			linkedca.Webhook_SSH),
 	), nil
 }
