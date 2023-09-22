@@ -173,7 +173,9 @@ retry:
 	if err != nil {
 		return nil, err
 	}
-	sig := hmac.New(sha256.New, secret).Sum(reqBytes)
+	h := hmac.New(sha256.New, secret)
+	h.Write(reqBytes)
+	sig := h.Sum(nil)
 	req.Header.Set("X-Smallstep-Signature", hex.EncodeToString(sig))
 	req.Header.Set("X-Smallstep-Webhook-ID", w.ID)
 

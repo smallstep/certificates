@@ -19,7 +19,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/go-chi/chi"
+	"github.com/go-chi/chi/v5"
 	"github.com/pkg/errors"
 	"go.step.sm/crypto/sshutil"
 	"golang.org/x/crypto/ssh"
