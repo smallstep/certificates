@@ -14,7 +14,6 @@ import (
 	"github.com/pkg/errors"
 
 	"go.step.sm/crypto/kms"
-	"go.step.sm/crypto/kms/apiv1"
 	kmsapi "go.step.sm/crypto/kms/apiv1"
 	"go.step.sm/crypto/kms/uri"
 	"go.step.sm/linkedca"
@@ -214,7 +213,7 @@ func (s *SCEP) Init(config Config) (err error) {
 			return errors.New("failed parsing decrypter key: no PEM block found")
 		}
 		opts := kms.Options{
-			Type: apiv1.SoftKMS,
+			Type: kmsapi.SoftKMS,
 		}
 		if s.keyManager, err = kms.New(context.Background(), opts); err != nil {
 			return fmt.Errorf("failed initializing kms: %w", err)
@@ -244,12 +243,12 @@ func (s *SCEP) Init(config Config) (err error) {
 		if err != nil {
 			return fmt.Errorf("failed parsing decrypter key: %w", err)
 		}
-		var kmsType apiv1.Type
+		var kmsType kmsapi.Type
 		switch {
 		case u.Scheme != "":
 			kmsType = kms.Type(u.Scheme)
 		default:
-			kmsType = apiv1.SoftKMS
+			kmsType = kmsapi.SoftKMS
 		}
 		opts := kms.Options{
 			Type: kmsType,
