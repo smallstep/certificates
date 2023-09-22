@@ -989,10 +989,10 @@ func ProvisionerToCertificates(p *linkedca.Provisioner) (provisioner.Interface, 
 			Options:                       options,
 		}
 		if decrypter := cfg.GetDecrypter(); decrypter != nil {
-			s.DecrypterCertificate = decrypter.DecrypterCertificate
-			s.DecrypterKeyPEM = decrypter.DecrypterKey
-			s.DecrypterKeyURI = decrypter.DecrypterKeyUri
-			s.DecrypterKeyPassword = decrypter.DecrypterKeyPassword
+			s.DecrypterCertificate = decrypter.Certificate
+			s.DecrypterKeyPEM = decrypter.Key
+			s.DecrypterKeyURI = decrypter.KeyUri
+			s.DecrypterKeyPassword = decrypter.KeyPassword
 		}
 		return s, nil
 	case *linkedca.ProvisionerDetails_Nebula:
@@ -1252,10 +1252,10 @@ func ProvisionerToLinkedca(p provisioner.Interface) (*linkedca.Provisioner, erro
 						ExcludeIntermediate:           p.ExcludeIntermediate,
 						EncryptionAlgorithmIdentifier: int32(p.EncryptionAlgorithmIdentifier),
 						Decrypter: &linkedca.SCEPDecrypter{
-							DecrypterCertificate: p.DecrypterCertificate,
-							DecrypterKey:         p.DecrypterKeyPEM,
-							DecrypterKeyUri:      p.DecrypterKeyURI,
-							DecrypterKeyPassword: p.DecrypterKeyPassword,
+							Certificate: p.DecrypterCertificate,
+							Key:         p.DecrypterKeyPEM,
+							KeyUri:      p.DecrypterKeyURI,
+							KeyPassword: p.DecrypterKeyPassword,
 						},
 					},
 				},
