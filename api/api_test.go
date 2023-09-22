@@ -1569,7 +1569,6 @@ func mustCertificate(t *testing.T, pub, priv interface{}) *x509.Certificate {
 }
 
 func TestProvisionersResponse_MarshalJSON(t *testing.T) {
-
 	k := map[string]any{
 		"use": "sig",
 		"kty": "EC",
@@ -1581,9 +1580,14 @@ func TestProvisionersResponse_MarshalJSON(t *testing.T) {
 	}
 	key := squarejose.JSONWebKey{}
 	b, err := json.Marshal(k)
-	assert.FatalError(t, err)
+	require.NoError(t, err)
 	err = json.Unmarshal(b, &key)
-	assert.FatalError(t, err)
+	require.NoError(t, err)
+
+	var encodedPassword bytes.Buffer
+	enc := base64.NewEncoder(base64.StdEncoding, &encodedPassword)
+	_, err = enc.Write([]byte("super-secret-password"))
+	require.NoError(t, err)
 
 	r := ProvisionersResponse{
 		Provisioners: provisioner.List{
@@ -1593,9 +1597,12 @@ func TestProvisionersResponse_MarshalJSON(t *testing.T) {
 				ChallengePassword:             "not-so-secret",
 				MinimumPublicKeyLength:        2048,
 				EncryptionAlgorithmIdentifier: 2,
+				IncludeRoot:                   true,
+				ExcludeIntermediate:           true,
 				DecrypterCertificate:          []byte{1, 2, 3, 4},
-				DecrypterKey:                  "softkms:path=/path/to/private.key",
-				DecrypterKeyPassword:          "super-secret-password",
+				DecrypterKeyPEM:               []byte{5, 6, 7, 8},
+				DecrypterKeyURI:               "softkms:path=/path/to/private.key",
+				DecrypterKeyPassword:          encodedPassword.Bytes(),
 			},
 			&provisioner.JWK{
 				EncryptedKey: "eyJhbGciOiJQQkVTMi1IUzI1NitBMTI4S1ciLCJlbmMiOiJBMTI4R0NNIiwicDJjIjoxMDAwMDAsInAycyI6IlhOdmYxQjgxSUlLMFA2NUkwcmtGTGcifQ.XaN9zcPQeWt49zchUDm34FECUTHfQTn_.tmNHPQDqR3ebsWfd.9WZr3YVdeOyJh36vvx0VlRtluhvYp4K7jJ1KGDr1qypwZ3ziBVSNbYYQ71du7fTtrnfG1wgGTVR39tWSzBU-zwQ5hdV3rpMAaEbod5zeW6SHd95H3Bvcb43YiiqJFNL5sGZzFb7FqzVmpsZ1efiv6sZaGDHtnCAL6r12UG5EZuqGfM0jGCZitUz2m9TUKXJL5DJ7MOYbFfkCEsUBPDm_TInliSVn2kMJhFa0VOe5wZk5YOuYM3lNYW64HGtbf-llN2Xk-4O9TfeSPizBx9ZqGpeu8pz13efUDT2WL9tWo6-0UE-CrG0bScm8lFTncTkHcu49_a5NaUBkYlBjEiw.thPcx3t1AUcWuEygXIY3Fg",
@@ -1612,9 +1619,13 @@ func TestProvisionersResponse_MarshalJSON(t *testing.T) {
 			{
 				"type":                          "scep",
 				"name":                          "scep",
+				"forceCN":                       false,
+				"includeRoot":                   true,
+				"excludeIntermediate":           true,
 				"challenge":                     "*** REDACTED ***",
 				"decrypterCertificate":          "*** REDACTED ***",
 				"decrypterKey":                  "*** REDACTED ***",
+				"decrypterKeyPEM":               "*** REDACTED ***",
 				"decrypterKeyPassword":          "*** REDACTED ***",
 				"minimumPublicKeyLength":        2048,
 				"encryptionAlgorithmIdentifier": 2,
@@ -1652,9 +1663,12 @@ func TestProvisionersResponse_MarshalJSON(t *testing.T) {
 			ChallengePassword:             "not-so-secret",
 			MinimumPublicKeyLength:        2048,
 			EncryptionAlgorithmIdentifier: 2,
+			IncludeRoot:                   true,
+			ExcludeIntermediate:           true,
 			DecrypterCertificate:          []byte{1, 2, 3, 4},
-			DecrypterKey:                  "softkms:path=/path/to/private.key",
-			DecrypterKeyPassword:          "super-secret-password",
+			DecrypterKeyPEM:               []byte{5, 6, 7, 8},
+			DecrypterKeyURI:               "softkms:path=/path/to/private.key",
+			DecrypterKeyPassword:          encodedPassword.Bytes(),
 		},
 		&provisioner.JWK{
 			EncryptedKey: "eyJhbGciOiJQQkVTMi1IUzI1NitBMTI4S1ciLCJlbmMiOiJBMTI4R0NNIiwicDJjIjoxMDAwMDAsInAycyI6IlhOdmYxQjgxSUlLMFA2NUkwcmtGTGcifQ.XaN9zcPQeWt49zchUDm34FECUTHfQTn_.tmNHPQDqR3ebsWfd.9WZr3YVdeOyJh36vvx0VlRtluhvYp4K7jJ1KGDr1qypwZ3ziBVSNbYYQ71du7fTtrnfG1wgGTVR39tWSzBU-zwQ5hdV3rpMAaEbod5zeW6SHd95H3Bvcb43YiiqJFNL5sGZzFb7FqzVmpsZ1efiv6sZaGDHtnCAL6r12UG5EZuqGfM0jGCZitUz2m9TUKXJL5DJ7MOYbFfkCEsUBPDm_TInliSVn2kMJhFa0VOe5wZk5YOuYM3lNYW64HGtbf-llN2Xk-4O9TfeSPizBx9ZqGpeu8pz13efUDT2WL9tWo6-0UE-CrG0bScm8lFTncTkHcu49_a5NaUBkYlBjEiw.thPcx3t1AUcWuEygXIY3Fg",

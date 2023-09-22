@@ -19,17 +19,17 @@ type SCEP struct {
 	ID                            string               `json:"-"`
 	Type                          string               `json:"type"`
 	Name                          string               `json:"name"`
-	ForceCN                       bool                 `json:"forceCN,omitempty"`
-	ChallengePassword             string               `json:"challenge,omitempty"`
+	ForceCN                       bool                 `json:"forceCN"`
+	ChallengePassword             string               `json:"challenge"`
 	Capabilities                  []string             `json:"capabilities,omitempty"`
-	IncludeRoot                   bool                 `json:"includeRoot,omitempty"`
-	ExcludeIntermediate           bool                 `json:"excludeIntermediate,omitempty"`
-	MinimumPublicKeyLength        int                  `json:"minimumPublicKeyLength,omitempty"`
+	IncludeRoot                   bool                 `json:"includeRoot"`
+	ExcludeIntermediate           bool                 `json:"excludeIntermediate"`
+	MinimumPublicKeyLength        int                  `json:"minimumPublicKeyLength"`
 	DecrypterCertificate          string               `json:"decrypterCertificate"`
 	DecrypterKeyPEM               string               `json:"decrypterKeyPEM"`
 	DecrypterKeyURI               string               `json:"decrypterKey"`
 	DecrypterKeyPassword          string               `json:"decrypterKeyPassword"`
-	EncryptionAlgorithmIdentifier int                  `json:"encryptionAlgorithmIdentifier,omitempty"`
+	EncryptionAlgorithmIdentifier int                  `json:"encryptionAlgorithmIdentifier"`
 	Options                       *provisioner.Options `json:"options,omitempty"`
 	Claims                        *provisioner.Claims  `json:"claims,omitempty"`
 }

@@ -990,7 +990,8 @@ func ProvisionerToCertificates(p *linkedca.Provisioner) (provisioner.Interface, 
 		}
 		if decrypter := cfg.GetDecrypter(); decrypter != nil {
 			s.DecrypterCertificate = decrypter.DecrypterCertificate
-			s.DecrypterKey = decrypter.DecrypterKey
+			s.DecrypterKeyPEM = decrypter.DecrypterKey
+			s.DecrypterKeyURI = decrypter.DecrypterKeyUri
 			s.DecrypterKeyPassword = decrypter.DecrypterKeyPassword
 		}
 		return s, nil
@@ -1250,6 +1251,12 @@ func ProvisionerToLinkedca(p provisioner.Interface) (*linkedca.Provisioner, erro
 						IncludeRoot:                   p.IncludeRoot,
 						ExcludeIntermediate:           p.ExcludeIntermediate,
 						EncryptionAlgorithmIdentifier: int32(p.EncryptionAlgorithmIdentifier),
+						Decrypter: &linkedca.SCEPDecrypter{
+							DecrypterCertificate: p.DecrypterCertificate,
+							DecrypterKey:         p.DecrypterKeyPEM,
+							DecrypterKeyUri:      p.DecrypterKeyURI,
+							DecrypterKeyPassword: p.DecrypterKeyPassword,
+						},
 					},
 				},
 			},
