@@ -630,21 +630,54 @@ func TestGCP_AuthorizeSSHSign(t *testing.T) {
 	assert.FatalError(t, err)
 
 	hostDuration := p1.ctl.Claimer.DefaultHostSSHCertDuration()
+	allPrincipals := []string{"instance-name.c.project-id.internal", "instance-name.zone.c.project-id.internal", "foo@developer.gserviceaccount.com", "foo"}
+	validHostPrincipals := []string{"instance-name.c.project-id.internal", "instance-name.zone.c.project-id.internal"}
+	hostCertRequest := SignSSHOptions{CertType: "host", KeyID: "instance-name", Principals: allPrincipals}
+	userCertRequest := SignSSHOptions{CertType: "user", KeyID: "foo@developer.gserviceaccount.com", Principals: allPrincipals}
+	hostCertValidHostsRequest := SignSSHOptions{CertType: "host", KeyID: "instance-name", Principals: validHostPrincipals}
+	hostCertOneValidHostRequest := SignSSHOptions{CertType: "host", KeyID: "instance-name", Principals: []string{"instance-name.c.project-id.internal"}}
+	hostCertOneValidZoneHostRequest := SignSSHOptions{CertType: "host", KeyID: "instance-name", Principals: []string{"instance-name.zone.c.project-id.internal"}}
 	expectedHostOptions := &SignSSHOptions{
-		CertType: "host", Principals: []string{"instance-name.c.project-id.internal", "instance-name.zone.c.project-id.internal"},
-		ValidAfter: NewTimeDuration(tm), ValidBefore: NewTimeDuration(tm.Add(hostDuration)),
+		CertType:    "host",
+		KeyID:       "instance-name",
+		Principals:  allPrincipals,
+		ValidAfter:  NewTimeDuration(tm),
+		ValidBefore: NewTimeDuration(tm.Add(hostDuration)),
+	}
+	expectedUserOptions := &SignSSHOptions{
+		CertType:    "user",
+		KeyID:       "foo@developer.gserviceaccount.com",
+		Principals:  allPrincipals,
+		ValidAfter:  NewTimeDuration(tm),
+		ValidBefore: NewTimeDuration(tm.Add(p1.ctl.Claimer.DefaultUserSSHCertDuration())),
+	}
+	expectedHostOptionsValidHostPrincipals := &SignSSHOptions{
+		CertType:    "host",
+		KeyID:       "instance-name",
+		Principals:  []string{"instance-name.c.project-id.internal", "instance-name.zone.c.project-id.internal"},
+		ValidAfter:  NewTimeDuration(tm),
+		ValidBefore: NewTimeDuration(tm.Add(hostDuration)),
 	}
 	expectedHostOptionsPrincipal1 := &SignSSHOptions{
-		CertType: "host", Principals: []string{"instance-name.c.project-id.internal"},
-		ValidAfter: NewTimeDuration(tm), ValidBefore: NewTimeDuration(tm.Add(hostDuration)),
+		CertType:    "host",
+		KeyID:       "instance-name",
+		Principals:  []string{"instance-name.c.project-id.internal"},
+		ValidAfter:  NewTimeDuration(tm),
+		ValidBefore: NewTimeDuration(tm.Add(hostDuration)),
 	}
 	expectedHostOptionsPrincipal2 := &SignSSHOptions{
-		CertType: "host", Principals: []string{"instance-name.zone.c.project-id.internal"},
-		ValidAfter: NewTimeDuration(tm), ValidBefore: NewTimeDuration(tm.Add(hostDuration)),
+		CertType:    "host",
+		KeyID:       "instance-name",
+		Principals:  []string{"instance-name.zone.c.project-id.internal"},
+		ValidAfter:  NewTimeDuration(tm),
+		ValidBefore: NewTimeDuration(tm.Add(hostDuration)),
 	}
 	expectedCustomOptions := &SignSSHOptions{
-		CertType: "host", Principals: []string{"foo.bar", "bar.foo"},
-		ValidAfter: NewTimeDuration(tm), ValidBefore: NewTimeDuration(tm.Add(hostDuration)),
+		CertType:    "host",
+		KeyID:       "instance-name",
+		Principals:  []string{"foo.bar", "bar.foo"},
+		ValidAfter:  NewTimeDuration(tm),
+		ValidBefore: NewTimeDuration(tm.Add(hostDuration)),
 	}
 
 	type args struct {
@@ -661,20 +694,18 @@ func TestGCP_AuthorizeSSHSign(t *testing.T) {
 		wantErr     bool
 		wantSignErr bool
 	}{
-		{"ok", p1, args{t1, SignSSHOptions{}, pub}, expectedHostOptions, http.StatusOK, false, false},
-		{"ok-rsa2048", p1, args{t1, SignSSHOptions{}, rsa2048.Public()}, expectedHostOptions, http.StatusOK, false, false},
-		{"ok-type", p1, args{t1, SignSSHOptions{CertType: "host"}, pub}, expectedHostOptions, http.StatusOK, false, false},
-		{"ok-principals", p1, args{t1, SignSSHOptions{Principals: []string{"instance-name.c.project-id.internal", "instance-name.zone.c.project-id.internal"}}, pub}, expectedHostOptions, http.StatusOK, false, false},
-		{"ok-principal1", p1, args{t1, SignSSHOptions{Principals: []string{"instance-name.c.project-id.internal"}}, pub}, expectedHostOptionsPrincipal1, http.StatusOK, false, false},
-		{"ok-principal2", p1, args{t1, SignSSHOptions{Principals: []string{"instance-name.zone.c.project-id.internal"}}, pub}, expectedHostOptionsPrincipal2, http.StatusOK, false, false},
-		{"ok-options", p1, args{t1, SignSSHOptions{CertType: "host", Principals: []string{"instance-name.c.project-id.internal", "instance-name.zone.c.project-id.internal"}}, pub}, expectedHostOptions, http.StatusOK, false, false},
-		{"ok-custom", p2, args{t2, SignSSHOptions{Principals: []string{"foo.bar", "bar.foo"}}, pub}, expectedCustomOptions, http.StatusOK, false, false},
-		{"fail-rsa1024", p1, args{t1, SignSSHOptions{}, rsa1024.Public()}, expectedHostOptions, http.StatusOK, false, true},
-		{"fail-type", p1, args{t1, SignSSHOptions{CertType: "user"}, pub}, nil, http.StatusOK, false, true},
-		{"fail-principal", p1, args{t1, SignSSHOptions{Principals: []string{"smallstep.com"}}, pub}, nil, http.StatusOK, false, true},
-		{"fail-extra-principal", p1, args{t1, SignSSHOptions{Principals: []string{"instance-name.c.project-id.internal", "instance-name.zone.c.project-id.internal", "smallstep.com"}}, pub}, nil, http.StatusOK, false, true},
-		{"fail-sshCA-disabled", p3, args{"foo", SignSSHOptions{}, pub}, expectedHostOptions, http.StatusUnauthorized, true, false},
-		{"fail-invalid-token", p1, args{"foo", SignSSHOptions{}, pub}, expectedHostOptions, http.StatusUnauthorized, true, false},
+		{"ok", p1, args{t1, hostCertRequest, pub}, expectedHostOptions, http.StatusOK, false, false},
+		{"ok-rsa2048", p1, args{t1, hostCertRequest, rsa2048.Public()}, expectedHostOptions, http.StatusOK, false, false},
+		{"ok-type-user", p1, args{t1, userCertRequest, pub}, expectedUserOptions, http.StatusOK, false, false},
+		{"ok-principals", p1, args{t1, hostCertValidHostsRequest, pub}, expectedHostOptionsValidHostPrincipals, http.StatusOK, false, false},
+		{"ok-principal1", p1, args{t1, hostCertOneValidHostRequest, pub}, expectedHostOptionsPrincipal1, http.StatusOK, false, false},
+		{"ok-principal2", p1, args{t1, hostCertOneValidZoneHostRequest, pub}, expectedHostOptionsPrincipal2, http.StatusOK, false, false},
+		{"ok-custom", p2, args{t2, SignSSHOptions{CertType: "host", KeyID: "instance-name", Principals: []string{"foo.bar", "bar.foo"}}, pub}, expectedCustomOptions, http.StatusOK, false, false},
+		{"fail-rsa1024", p1, args{t1, SignSSHOptions{CertType: "host"}, rsa1024.Public()}, expectedHostOptions, http.StatusOK, false, true},
+		{"fail-principal", p1, args{t1, SignSSHOptions{CertType: "host", Principals: []string{"smallstep.com"}}, pub}, nil, http.StatusOK, false, true},
+		{"fail-extra-principal", p1, args{t1, SignSSHOptions{CertType: "host", Principals: []string{"instance-name.c.project-id.internal", "instance-name.zone.c.project-id.internal", "smallstep.com"}}, pub}, nil, http.StatusOK, false, true},
+		{"fail-sshCA-disabled", p3, args{"foo", SignSSHOptions{CertType: "host"}, pub}, expectedHostOptions, http.StatusUnauthorized, true, false},
+		{"fail-invalid-token", p1, args{"foo", SignSSHOptions{CertType: "host"}, pub}, expectedHostOptions, http.StatusUnauthorized, true, false},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {

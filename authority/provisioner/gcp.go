@@ -398,16 +398,16 @@ func (p *GCP) AuthorizeSSHSign(_ context.Context, token string) ([]SignOption, e
 
 	ce := claims.Google.ComputeEngine
 	signOptions := []SignOption{}
-
-	// Enforce host certificate.
-	defaults := SignSSHOptions{
-		CertType: SSHHostCert,
-	}
+	defaults := SignSSHOptions{}
 
 	// Validated principals.
 	principals := []string{
 		fmt.Sprintf("%s.c.%s.internal", ce.InstanceName, ce.ProjectID),
 		fmt.Sprintf("%s.%s.c.%s.internal", ce.InstanceName, ce.Zone, ce.ProjectID),
+	}
+
+	if claims.Email != "" {
+		principals = append(principals, claims.Email, SanitizeSSHUserPrincipal(claims.Email))
 	}
 
 	// Only enforce known principals if disable custom sans is true.
@@ -426,7 +426,7 @@ func (p *GCP) AuthorizeSSHSign(_ context.Context, token string) ([]SignOption, e
 		data.SetToken(v)
 	}
 
-	templateOptions, err := CustomSSHTemplateOptions(p.Options, data, sshutil.DefaultIIDTemplate)
+	templateOptions, err := CustomSSHTemplateOptions(p.Options, data, sshutil.CertificateRequestTemplate)
 	if err != nil {
 		return nil, errs.Wrap(http.StatusInternalServerError, err, "gcp.AuthorizeSSHSign")
 	}
@@ -445,7 +445,7 @@ func (p *GCP) AuthorizeSSHSign(_ context.Context, token string) ([]SignOption, e
 		// Require all the fields in the SSH certificate
 		&sshCertDefaultValidator{},
 		// Ensure that all principal names are allowed
-		newSSHNamePolicyValidator(p.ctl.getPolicy().getSSHHost(), nil),
+		newSSHNamePolicyValidator(p.ctl.getPolicy().getSSHHost(), p.ctl.getPolicy().getSSHUser()),
 		// Call webhooks
 		p.ctl.newWebhookController(
 			data,

@@ -31,7 +31,7 @@ To get up and running quickly, or as an alternative to running your own `step-ca
 [Documentation](https://smallstep.com/docs) |
 [Installation](https://smallstep.com/docs/step-ca/installation) |
 [Getting Started](https://smallstep.com/docs/step-ca/getting-started) |
-[Contributor's Guide](./docs/CONTRIBUTING.md)
+[Contributor's Guide](./CONTRIBUTING.md)
 
 [![GitHub release](https://img.shields.io/github/release/smallstep/certificates.svg)](https://github.com/smallstep/certificates/releases/latest)
 [![Go Report Card](https://goreportcard.com/badge/github.com/smallstep/certificates)](https://goreportcard.com/report/github.com/smallstep/certificates)
