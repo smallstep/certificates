@@ -26,7 +26,8 @@ type SCEP struct {
 	ExcludeIntermediate           bool                 `json:"excludeIntermediate,omitempty"`
 	MinimumPublicKeyLength        int                  `json:"minimumPublicKeyLength,omitempty"`
 	DecrypterCertificate          string               `json:"decrypterCertificate"`
-	DecrypterKey                  string               `json:"decrypterKey"`
+	DecrypterKeyPEM               string               `json:"decrypterKeyPEM"`
+	DecrypterKeyURI               string               `json:"decrypterKey"`
 	DecrypterKeyPassword          string               `json:"decrypterKeyPassword"`
 	EncryptionAlgorithmIdentifier int                  `json:"encryptionAlgorithmIdentifier,omitempty"`
 	Options                       *provisioner.Options `json:"options,omitempty"`
