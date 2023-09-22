@@ -32,12 +32,12 @@ require (
 	go.mozilla.org/pkcs7 v0.0.0-20210826202110-33d05740a352
 	go.step.sm/cli-utils v0.8.0
 	go.step.sm/crypto v0.35.1
-	go.step.sm/linkedca v0.20.1-0.20230921084813-2442dc2382ef
+	go.step.sm/linkedca v0.20.1-0.20230922094312-7d2f2f79fa6a
 	golang.org/x/crypto v0.13.0
 	golang.org/x/exp v0.0.0-20230310171629-522b1b587ee0
 	golang.org/x/net v0.15.0
 	google.golang.org/api v0.141.0
-	google.golang.org/grpc v1.58.1
+	google.golang.org/grpc v1.58.2
 	google.golang.org/protobuf v1.31.0
 	gopkg.in/square/go-jose.v2 v2.6.0
 )

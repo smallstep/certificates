@@ -45,8 +45,9 @@ type SCEP struct {
 
 	// TODO(hs): also support a separate signer configuration?
 	DecrypterCertificate []byte `json:"decrypterCertificate"`
-	DecrypterKey         string `json:"decrypterKey"`
-	DecrypterKeyPassword string `json:"decrypterKeyPassword"`
+	DecrypterKeyPEM      []byte `json:"decrypterKeyPEM"`
+	DecrypterKeyURI      string `json:"decrypterKey"`
+	DecrypterKeyPassword []byte `json:"decrypterKeyPassword"`
 
 	// Numerical identifier for the ContentEncryptionAlgorithm as defined in github.com/mozilla-services/pkcs7
 	// at https://github.com/mozilla-services/pkcs7/blob/33d05740a3526e382af6395d3513e73d4e66d1cb/encrypt.go#L63
@@ -266,21 +267,57 @@ func (s *SCEP) Init(config Config) (err error) {
 		s.GetOptions().GetWebhooks(),
 	)
 
-	if decryptionKey := s.DecrypterKey; decryptionKey != "" {
-		u, err := uri.Parse(s.DecrypterKey)
+	// parse the decrypter key PEM contents if available
+	if decryptionKeyPEM := s.DecrypterKeyPEM; len(decryptionKeyPEM) > 0 {
+		// try reading the PEM for validation
+		block, rest := pem.Decode(decryptionKeyPEM)
+		if len(rest) > 0 {
+			return errors.New("failed parsing decrypter key: trailing data")
+		}
+		if block == nil {
+			return errors.New("failed parsing decrypter key: no PEM block found")
+		}
+		opts := kms.Options{
+			Type: kmsapi.SoftKMS,
+		}
+		if s.keyManager, err = kms.New(context.Background(), opts); err != nil {
+			return fmt.Errorf("failed initializing kms: %w", err)
+		}
+		kmsDecrypter, ok := s.keyManager.(kmsapi.Decrypter)
+		if !ok {
+			return fmt.Errorf("%q is not a kmsapi.Decrypter", opts.Type)
+		}
+		if s.decrypter, err = kmsDecrypter.CreateDecrypter(&kmsapi.CreateDecrypterRequest{
+			DecryptionKeyPEM: decryptionKeyPEM,
+			Password:         s.DecrypterKeyPassword,
+			PasswordPrompter: kmsapi.NonInteractivePasswordPrompter,
+		}); err != nil {
+			return fmt.Errorf("failed creating decrypter: %w", err)
+		}
+		if s.signer, err = s.keyManager.CreateSigner(&kmsapi.CreateSignerRequest{
+			SigningKeyPEM:    decryptionKeyPEM, // TODO(hs): support distinct signer key in the future?
+			Password:         s.DecrypterKeyPassword,
+			PasswordPrompter: kmsapi.NonInteractivePasswordPrompter,
+		}); err != nil {
+			return fmt.Errorf("failed creating signer: %w", err)
+		}
+	}
+
+	if decryptionKeyURI := s.DecrypterKeyURI; len(decryptionKeyURI) > 0 {
+		u, err := uri.Parse(s.DecrypterKeyURI)
 		if err != nil {
 			return fmt.Errorf("failed parsing decrypter key: %w", err)
 		}
-		var kmsType string
+		var kmsType kmsapi.Type
 		switch {
 		case u.Scheme != "":
-			kmsType = u.Scheme
+			kmsType = kms.Type(u.Scheme)
 		default:
-			kmsType = "softkms"
+			kmsType = kmsapi.SoftKMS
 		}
 		opts := kms.Options{
-			Type: kms.Type(kmsType),
-			URI:  s.DecrypterKey,
+			Type: kmsType,
+			URI:  s.DecrypterKeyURI,
 		}
 		if s.keyManager, err = kms.New(context.Background(), opts); err != nil {
 			return fmt.Errorf("failed initializing kms: %w", err)
@@ -290,18 +327,18 @@ func (s *SCEP) Init(config Config) (err error) {
 			return fmt.Errorf("%q is not a kmsapi.Decrypter", opts.Type)
 		}
 		if kmsType != "softkms" { // TODO(hs): this should likely become more transparent?
-			decryptionKey = u.Opaque
+			decryptionKeyURI = u.Opaque
 		}
 		if s.decrypter, err = kmsDecrypter.CreateDecrypter(&kmsapi.CreateDecrypterRequest{
-			DecryptionKey:    decryptionKey,
-			Password:         []byte(s.DecrypterKeyPassword),
+			DecryptionKey:    decryptionKeyURI,
+			Password:         s.DecrypterKeyPassword,
 			PasswordPrompter: kmsapi.NonInteractivePasswordPrompter,
 		}); err != nil {
 			return fmt.Errorf("failed creating decrypter: %w", err)
 		}
 		if s.signer, err = s.keyManager.CreateSigner(&kmsapi.CreateSignerRequest{
-			SigningKey:       decryptionKey, // TODO(hs): support distinct signer key in the future?
-			Password:         []byte(s.DecrypterKeyPassword),
+			SigningKey:       decryptionKeyURI, // TODO(hs): support distinct signer key in the future?
+			Password:         s.DecrypterKeyPassword,
 			PasswordPrompter: kmsapi.NonInteractivePasswordPrompter,
 		}); err != nil {
 			return fmt.Errorf("failed creating signer: %w", err)
