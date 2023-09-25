@@ -2,6 +2,7 @@ package scep
 
 import (
 	"crypto"
+	"crypto/rsa"
 	"crypto/x509"
 	"errors"
 )
@@ -56,28 +57,27 @@ func (o *Options) Validate() error {
 		return nil
 	}
 
-	// TODO(hs): reenable this validation
-	// // If a decrypter is available, check that it's backed by an RSA key. According to the
-	// // RFC: https://tools.ietf.org/html/rfc8894#section-3.1, SCEP can be used with something
-	// // different than RSA, but requires the encryption to be performed using the challenge
-	// // password in that case. An older version of specification states that only RSA is
-	// // supported: https://tools.ietf.org/html/draft-nourse-scep-23#section-2.1.1. Other
-	// // algorithms do not seem to be supported in certnanny/sscep, but it might work
-	// // in micromdm/scep. Currently only RSA is allowed, but it might be an option
-	// // to try other algorithms in the future.
-	// decrypterPublicKey, ok := o.Decrypter.Public().(*rsa.PublicKey)
-	// if !ok {
-	// 	return errors.New("only RSA keys are (currently) supported as decrypters")
-	// }
+	// If a decrypter is available, check that it's backed by an RSA key. According to the
+	// RFC: https://tools.ietf.org/html/rfc8894#section-3.1, SCEP can be used with something
+	// different than RSA, but requires the encryption to be performed using the challenge
+	// password in that case. An older version of specification states that only RSA is
+	// supported: https://tools.ietf.org/html/draft-nourse-scep-23#section-2.1.1. Other
+	// algorithms do not seem to be supported in certnanny/sscep, but it might work
+	// in micromdm/scep. Currently only RSA is allowed, but it might be an option
+	// to try other algorithms in the future.
+	decrypterPublicKey, ok := o.Decrypter.Public().(*rsa.PublicKey)
+	if !ok {
+		return errors.New("only RSA keys are (currently) supported as decrypters")
+	}
 
-	// // check if intermediate public key is the same as the decrypter public key.
-	// // In certnanny/sscep it's mentioned that the signing key can be different
-	// // from the decrypting (and encrypting) key. These options are only used and
-	// // validated when the intermediate CA is also used as the decrypter, though,
-	// // so they should match.
-	// if !decrypterPublicKey.Equal(o.SignerCert.PublicKey) {
-	// 	return errors.New("mismatch between certificate chain and decrypter public keys")
-	// }
+	// check if intermediate public key is the same as the decrypter public key.
+	// In certnanny/sscep it's mentioned that the signing key can be different
+	// from the decrypting (and encrypting) key. These options are only used and
+	// validated when the intermediate CA is also used as the decrypter, though,
+	// so they should match.
+	if !decrypterPublicKey.Equal(o.SignerCert.PublicKey) {
+		return errors.New("mismatch between certificate chain and decrypter public keys")
+	}
 
 	return nil
 }

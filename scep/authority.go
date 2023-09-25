@@ -83,10 +83,7 @@ func New(signAuth SignAuthority, opts Options) (*Authority, error) {
 // The validation includes a check if a decrypter is available, either
 // an authority wide decrypter, or a provisioner specific decrypter.
 func (a *Authority) Validate() error {
-	// TODO(hs): don't return early
-	return nil //nolint:revive // validation temporarily disabled
-
-	if a == nil { //nolint:govet // validation temporarily disabled
+	if a == nil {
 		return nil
 	}
 

@@ -18,6 +18,7 @@ import (
 	"github.com/smallstep/certificates/cas"
 	casapi "github.com/smallstep/certificates/cas/apiv1"
 	"github.com/smallstep/certificates/db"
+	"github.com/smallstep/certificates/scep"
 )
 
 // Option sets options to the Authority.
@@ -205,11 +206,19 @@ func WithX509SignerFunc(fn func() ([]*x509.Certificate, crypto.Signer, error)) O
 	}
 }
 
-func WithSCEPOptions(crt *x509.Certificate, s crypto.Signer, d crypto.Decrypter) Option {
+// func WithSCEPOptions(crt *x509.Certificate, s crypto.Signer, d crypto.Decrypter) Option {
+// 	return func(a *Authority) error {
+// 		a.scepCertificate = crt
+// 		a.scepSigner = s
+// 		a.scepDecrypter = d
+// 		return nil
+// 	}
+// }
+
+func WithFullSCEPOptions(options *scep.Options) Option {
 	return func(a *Authority) error {
-		a.scepCertificate = crt
-		a.scepSigner = s
-		a.scepDecrypter = d
+		a.scepOptions = options
+		a.validateSCEP = false
 		return nil
 	}
 }
