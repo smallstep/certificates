@@ -44,10 +44,10 @@ type SCEP struct {
 	MinimumPublicKeyLength int `json:"minimumPublicKeyLength,omitempty"`
 
 	// TODO(hs): also support a separate signer configuration?
-	DecrypterCertificate []byte `json:"decrypterCertificate"`
-	DecrypterKeyPEM      []byte `json:"decrypterKeyPEM"`
-	DecrypterKeyURI      string `json:"decrypterKey"`
-	DecrypterKeyPassword []byte `json:"decrypterKeyPassword"`
+	DecrypterCertificate []byte `json:"decrypterCertificate,omitempty"`
+	DecrypterKeyPEM      []byte `json:"decrypterKeyPEM,omitempty"`
+	DecrypterKeyURI      string `json:"decrypterKey,omitempty"`
+	DecrypterKeyPassword []byte `json:"decrypterKeyPassword,omitempty"`
 
 	// Numerical identifier for the ContentEncryptionAlgorithm as defined in github.com/mozilla-services/pkcs7
 	// at https://github.com/mozilla-services/pkcs7/blob/33d05740a3526e382af6395d3513e73d4e66d1cb/encrypt.go#L63
