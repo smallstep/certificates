@@ -206,15 +206,9 @@ func WithX509SignerFunc(fn func() ([]*x509.Certificate, crypto.Signer, error)) O
 	}
 }
 
-// func WithSCEPOptions(crt *x509.Certificate, s crypto.Signer, d crypto.Decrypter) Option {
-// 	return func(a *Authority) error {
-// 		a.scepCertificate = crt
-// 		a.scepSigner = s
-// 		a.scepDecrypter = d
-// 		return nil
-// 	}
-// }
-
+// WithFullSCEPOptions defines the options used for SCEP support.
+//
+// This feature is EXPERIMENTAL and might change at any time.
 func WithFullSCEPOptions(options *scep.Options) Option {
 	return func(a *Authority) error {
 		a.scepOptions = options

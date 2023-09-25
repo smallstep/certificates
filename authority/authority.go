@@ -707,12 +707,12 @@ func (a *Authority) init() error {
 				}
 			}
 
-			// provide the current SCEP provisioner names, so that the provisioners
-			// can be validated when the CA is started.
-			options.SCEPProvisionerNames = a.getSCEPProvisionerNames()
-
 			a.scepOptions = options
 		}
+
+		// provide the current SCEP provisioner names, so that the provisioners
+		// can be validated when the CA is started.
+		a.scepOptions.SCEPProvisionerNames = a.getSCEPProvisionerNames()
 
 		// create a new SCEP authority
 		scepAuthority, err := scep.New(a, *a.scepOptions)
