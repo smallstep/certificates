@@ -678,7 +678,11 @@ func (a *Authority) init() error {
 		options.Roots = a.rootX509Certs
 		options.Intermediates = a.intermediateX509Certs
 		options.SignerCert = options.Intermediates[0]
-		if a.config.IntermediateKey != "" {
+		if a.scepSigner != nil {
+			options.Signer = a.scepSigner
+			options.Decrypter = a.scepDecrypter
+			options.DecrypterCert = a.scepCertificate
+		} else {
 			if options.Signer, err = a.keyManager.CreateSigner(&kmsapi.CreateSignerRequest{
 				SigningKey: a.config.IntermediateKey,
 				Password:   a.password,
@@ -705,10 +709,6 @@ func (a *Authority) init() error {
 					options.DecrypterCert = options.Intermediates[0]
 				}
 			}
-		} else {
-			options.Signer = a.scepSigner
-			options.Decrypter = a.scepDecrypter
-			options.DecrypterCert = a.scepCertificate
 		}
 
 		// provide the current SCEP provisioner names, so that the provisioners
