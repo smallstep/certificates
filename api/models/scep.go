@@ -25,10 +25,10 @@ type SCEP struct {
 	IncludeRoot                   bool                 `json:"includeRoot"`
 	ExcludeIntermediate           bool                 `json:"excludeIntermediate"`
 	MinimumPublicKeyLength        int                  `json:"minimumPublicKeyLength"`
-	DecrypterCertificate          string               `json:"decrypterCertificate"`
-	DecrypterKeyPEM               string               `json:"decrypterKeyPEM"`
+	DecrypterCertificate          []byte               `json:"decrypterCertificate"`
+	DecrypterKeyPEM               []byte               `json:"decrypterKeyPEM"`
 	DecrypterKeyURI               string               `json:"decrypterKey"`
-	DecrypterKeyPassword          string               `json:"decrypterKeyPassword"`
+	DecrypterKeyPassword          []byte               `json:"decrypterKeyPassword"`
 	EncryptionAlgorithmIdentifier int                  `json:"encryptionAlgorithmIdentifier"`
 	Options                       *provisioner.Options `json:"options,omitempty"`
 	Claims                        *provisioner.Claims  `json:"claims,omitempty"`
