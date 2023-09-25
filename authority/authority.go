@@ -62,7 +62,10 @@ type Authority struct {
 	x509Enforcers         []provisioner.CertificateEnforcer
 
 	// SCEP CA
-	scepAuthority *scep.Authority
+	scepAuthority   *scep.Authority
+	scepCertificate *x509.Certificate
+	scepSigner      crypto.Signer
+	scepDecrypter   crypto.Decrypter
 
 	// SSH CA
 	sshHostPassword         []byte
@@ -673,37 +676,39 @@ func (a *Authority) init() error {
 	case a.requiresSCEP() && a.GetSCEP() == nil:
 		var options scep.Options
 		options.Roots = a.rootX509Certs
-		options.Intermediates, err = pemutil.ReadCertificateBundle(a.config.IntermediateCert)
-		if err != nil {
-			return err
-		}
+		options.Intermediates = a.intermediateX509Certs
 		options.SignerCert = options.Intermediates[0]
-		if options.Signer, err = a.keyManager.CreateSigner(&kmsapi.CreateSignerRequest{
-			SigningKey: a.config.IntermediateKey,
-			Password:   a.password,
-		}); err != nil {
-			return err
-		}
-
-		// TODO(hs): instead of creating the decrypter here, pass the
-		// intermediate key + chain down to the SCEP authority,
-		// and only instantiate it when required there. Is that possible?
-		// Also with entering passwords?
-		// TODO(hs): if moving the logic, try improving the logic for the
-		// decrypter password too? Right now it needs to be entered multiple
-		// times; I've observed it to be three times maximum, every time
-		// the intermediate key is read.
-		_, isRSA := options.Signer.Public().(*rsa.PublicKey)
-		if km, ok := a.keyManager.(kmsapi.Decrypter); ok && isRSA {
-			if decrypter, err := km.CreateDecrypter(&kmsapi.CreateDecrypterRequest{
-				DecryptionKey: a.config.IntermediateKey,
-				Password:      a.password,
-			}); err == nil {
-				// only pass the decrypter down when it was successfully created,
-				// meaning it's an RSA key, and `CreateDecrypter` did not fail.
-				options.Decrypter = decrypter
-				options.DecrypterCert = options.Intermediates[0]
+		if a.config.IntermediateKey != "" {
+			if options.Signer, err = a.keyManager.CreateSigner(&kmsapi.CreateSignerRequest{
+				SigningKey: a.config.IntermediateKey,
+				Password:   a.password,
+			}); err != nil {
+				return err
 			}
+			// TODO(hs): instead of creating the decrypter here, pass the
+			// intermediate key + chain down to the SCEP authority,
+			// and only instantiate it when required there. Is that possible?
+			// Also with entering passwords?
+			// TODO(hs): if moving the logic, try improving the logic for the
+			// decrypter password too? Right now it needs to be entered multiple
+			// times; I've observed it to be three times maximum, every time
+			// the intermediate key is read.
+			_, isRSA := options.Signer.Public().(*rsa.PublicKey)
+			if km, ok := a.keyManager.(kmsapi.Decrypter); ok && isRSA {
+				if decrypter, err := km.CreateDecrypter(&kmsapi.CreateDecrypterRequest{
+					DecryptionKey: a.config.IntermediateKey,
+					Password:      a.password,
+				}); err == nil {
+					// only pass the decrypter down when it was successfully created,
+					// meaning it's an RSA key, and `CreateDecrypter` did not fail.
+					options.Decrypter = decrypter
+					options.DecrypterCert = options.Intermediates[0]
+				}
+			}
+		} else {
+			options.Signer = a.scepSigner
+			options.Decrypter = a.scepDecrypter
+			options.DecrypterCert = a.scepCertificate
 		}
 
 		// provide the current SCEP provisioner names, so that the provisioners
