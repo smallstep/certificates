@@ -62,6 +62,8 @@ type Authority struct {
 	x509Enforcers         []provisioner.CertificateEnforcer
 
 	// SCEP CA
+	scepOptions   *scep.Options
+	validateSCEP  bool
 	scepAuthority *scep.Authority
 
 	// SSH CA
@@ -123,6 +125,7 @@ func New(cfg *config.Config, opts ...Option) (*Authority, error) {
 	var a = &Authority{
 		config:       cfg,
 		certificates: new(sync.Map),
+		validateSCEP: true,
 	}
 
 	// Apply options.
@@ -671,54 +674,57 @@ func (a *Authority) init() error {
 	// update that.
 	switch {
 	case a.requiresSCEP() && a.GetSCEP() == nil:
-		var options scep.Options
-		options.Roots = a.rootX509Certs
-		options.Intermediates, err = pemutil.ReadCertificateBundle(a.config.IntermediateCert)
-		if err != nil {
-			return err
-		}
-		options.SignerCert = options.Intermediates[0]
-		if options.Signer, err = a.keyManager.CreateSigner(&kmsapi.CreateSignerRequest{
-			SigningKey: a.config.IntermediateKey,
-			Password:   a.password,
-		}); err != nil {
-			return err
-		}
-
-		// TODO(hs): instead of creating the decrypter here, pass the
-		// intermediate key + chain down to the SCEP authority,
-		// and only instantiate it when required there. Is that possible?
-		// Also with entering passwords?
-		// TODO(hs): if moving the logic, try improving the logic for the
-		// decrypter password too? Right now it needs to be entered multiple
-		// times; I've observed it to be three times maximum, every time
-		// the intermediate key is read.
-		_, isRSA := options.Signer.Public().(*rsa.PublicKey)
-		if km, ok := a.keyManager.(kmsapi.Decrypter); ok && isRSA {
-			if decrypter, err := km.CreateDecrypter(&kmsapi.CreateDecrypterRequest{
-				DecryptionKey: a.config.IntermediateKey,
-				Password:      a.password,
-			}); err == nil {
-				// only pass the decrypter down when it was successfully created,
-				// meaning it's an RSA key, and `CreateDecrypter` did not fail.
-				options.Decrypter = decrypter
-				options.DecrypterCert = options.Intermediates[0]
+		if a.scepOptions == nil {
+			options := &scep.Options{
+				Roots:         a.rootX509Certs,
+				Intermediates: a.intermediateX509Certs,
+				SignerCert:    a.intermediateX509Certs[0],
 			}
+			if options.Signer, err = a.keyManager.CreateSigner(&kmsapi.CreateSignerRequest{
+				SigningKey: a.config.IntermediateKey,
+				Password:   a.password,
+			}); err != nil {
+				return err
+			}
+			// TODO(hs): instead of creating the decrypter here, pass the
+			// intermediate key + chain down to the SCEP authority,
+			// and only instantiate it when required there. Is that possible?
+			// Also with entering passwords?
+			// TODO(hs): if moving the logic, try improving the logic for the
+			// decrypter password too? Right now it needs to be entered multiple
+			// times; I've observed it to be three times maximum, every time
+			// the intermediate key is read.
+			_, isRSA := options.Signer.Public().(*rsa.PublicKey)
+			if km, ok := a.keyManager.(kmsapi.Decrypter); ok && isRSA {
+				if decrypter, err := km.CreateDecrypter(&kmsapi.CreateDecrypterRequest{
+					DecryptionKey: a.config.IntermediateKey,
+					Password:      a.password,
+				}); err == nil {
+					// only pass the decrypter down when it was successfully created,
+					// meaning it's an RSA key, and `CreateDecrypter` did not fail.
+					options.Decrypter = decrypter
+					options.DecrypterCert = options.Intermediates[0]
+				}
+			}
+
+			a.scepOptions = options
 		}
 
 		// provide the current SCEP provisioner names, so that the provisioners
 		// can be validated when the CA is started.
-		options.SCEPProvisionerNames = a.getSCEPProvisionerNames()
+		a.scepOptions.SCEPProvisionerNames = a.getSCEPProvisionerNames()
 
 		// create a new SCEP authority
-		scepAuthority, err := scep.New(a, options)
+		scepAuthority, err := scep.New(a, *a.scepOptions)
 		if err != nil {
 			return err
 		}
 
-		// validate the SCEP authority
-		if err := scepAuthority.Validate(); err != nil {
-			a.initLogf("failed validating SCEP authority: %v", err)
+		if a.validateSCEP {
+			// validate the SCEP authority
+			if err := scepAuthority.Validate(); err != nil {
+				a.initLogf("failed validating SCEP authority: %v", err)
+			}
 		}
 
 		// set the SCEP authority
