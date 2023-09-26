@@ -25,6 +25,7 @@ import (
 	"golang.org/x/crypto/ssh"
 
 	"github.com/smallstep/certificates/api/log"
+	"github.com/smallstep/certificates/api/models"
 	"github.com/smallstep/certificates/api/render"
 	"github.com/smallstep/certificates/authority"
 	"github.com/smallstep/certificates/authority/config"
@@ -231,6 +232,29 @@ type ProvisionersResponse struct {
 	NextCursor   string
 }
 
+const redacted = "*** REDACTED ***"
+
+func scepFromProvisioner(p *provisioner.SCEP) *models.SCEP {
+	return &models.SCEP{
+		ID:                            p.ID,
+		Type:                          p.Type,
+		Name:                          p.Name,
+		ForceCN:                       p.ForceCN,
+		ChallengePassword:             redacted,
+		Capabilities:                  p.Capabilities,
+		IncludeRoot:                   p.IncludeRoot,
+		ExcludeIntermediate:           p.ExcludeIntermediate,
+		MinimumPublicKeyLength:        p.MinimumPublicKeyLength,
+		DecrypterCertificate:          []byte(redacted),
+		DecrypterKeyPEM:               []byte(redacted),
+		DecrypterKeyURI:               redacted,
+		DecrypterKeyPassword:          []byte(redacted),
+		EncryptionAlgorithmIdentifier: p.EncryptionAlgorithmIdentifier,
+		Options:                       p.Options,
+		Claims:                        p.Claims,
+	}
+}
+
 // MarshalJSON implements json.Marshaler. It marshals the ProvisionersResponse
 // into a byte slice.
 //
@@ -238,24 +262,22 @@ type ProvisionersResponse struct {
 // challenge secret that MUST NOT be leaked in (public) HTTP responses. The
 // challenge value is thus redacted in HTTP responses.
 func (p ProvisionersResponse) MarshalJSON() ([]byte, error) {
+	var responseProvisioners provisioner.List
 	for _, item := range p.Provisioners {
 		scepProv, ok := item.(*provisioner.SCEP)
 		if !ok {
+			responseProvisioners = append(responseProvisioners, item)
 			continue
 		}
 
-		old := scepProv.ChallengePassword
-		scepProv.ChallengePassword = "*** REDACTED ***"
-		defer func(p string) { //nolint:gocritic // defer in loop required to restore initial state of provisioners
-			scepProv.ChallengePassword = p
-		}(old)
+		responseProvisioners = append(responseProvisioners, scepFromProvisioner(scepProv))
 	}
 
 	var list = struct {
 		Provisioners []provisioner.Interface `json:"provisioners"`
 		NextCursor   string                  `json:"nextCursor"`
 	}{
-		Provisioners: []provisioner.Interface(p.Provisioners),
+		Provisioners: []provisioner.Interface(responseProvisioners),
 		NextCursor:   p.NextCursor,
 	}
 

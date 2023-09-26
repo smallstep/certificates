@@ -18,6 +18,7 @@ import (
 
 	"github.com/smallstep/certificates/api"
 	"github.com/smallstep/certificates/api/log"
+	"github.com/smallstep/certificates/authority"
 	"github.com/smallstep/certificates/authority/provisioner"
 	"github.com/smallstep/certificates/scep"
 )
@@ -208,7 +209,7 @@ func lookupProvisioner(next http.HandlerFunc) http.HandlerFunc {
 		}
 
 		ctx := r.Context()
-		auth := scep.MustFromContext(ctx)
+		auth := authority.MustFromContext(ctx)
 		p, err := auth.LoadProvisionerByName(provisionerName)
 		if err != nil {
 			fail(w, err)
@@ -221,7 +222,7 @@ func lookupProvisioner(next http.HandlerFunc) http.HandlerFunc {
 			return
 		}
 
-		ctx = context.WithValue(ctx, scep.ProvisionerContextKey, scep.Provisioner(prov))
+		ctx = scep.NewProvisionerContext(ctx, scep.Provisioner(prov))
 		next(w, r.WithContext(ctx))
 	}
 }
@@ -314,7 +315,7 @@ func PKIOperation(ctx context.Context, req request) (Response, error) {
 	// a certificate exists; then it will use RenewalReq. Adding the challenge check here may be a small breaking change for clients.
 	// We'll have to see how it works out.
 	if msg.MessageType == microscep.PKCSReq || msg.MessageType == microscep.RenewalReq {
-		if err := auth.ValidateChallenge(ctx, challengePassword, transactionID); err != nil {
+		if err := auth.ValidateChallenge(ctx, csr, challengePassword, transactionID); err != nil {
 			if errors.Is(err, provisioner.ErrSCEPChallengeInvalid) {
 				return createFailureResponse(ctx, csr, msg, microscep.BadRequest, err)
 			}
@@ -332,7 +333,16 @@ func PKIOperation(ctx context.Context, req request) (Response, error) {
 
 	certRep, err := auth.SignCSR(ctx, csr, msg)
 	if err != nil {
+		if notifyErr := auth.NotifyFailure(ctx, csr, transactionID, 0, err.Error()); notifyErr != nil {
+			// TODO(hs): ignore this error case? It's not critical if the notification fails; but logging it might be good
+			_ = notifyErr
+		}
 		return createFailureResponse(ctx, csr, msg, microscep.BadRequest, fmt.Errorf("error when signing new certificate: %w", err))
+	}
+
+	if notifyErr := auth.NotifySuccess(ctx, csr, certRep.Certificate, transactionID); notifyErr != nil {
+		// TODO(hs): ignore this error case? It's not critical if the notification fails; but logging it might be good
+		_ = notifyErr
 	}
 
 	res := Response{

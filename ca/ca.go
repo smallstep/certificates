@@ -250,19 +250,14 @@ func (ca *CA) Init(cfg *config.Config) (*CA, error) {
 
 	var scepAuthority *scep.Authority
 	if ca.shouldServeSCEPEndpoints() {
-		scepPrefix := "scep"
-		scepAuthority, err = scep.New(auth, scep.AuthorityOptions{
-			Service: auth.GetSCEPService(),
-			DNS:     dns,
-			Prefix:  scepPrefix,
-		})
-		if err != nil {
-			return nil, errors.Wrap(err, "error creating SCEP authority")
-		}
+		// get the SCEP authority configuration. Validation is
+		// performed within the authority instantiation process.
+		scepAuthority = auth.GetSCEP()
 
 		// According to the RFC (https://tools.ietf.org/html/rfc8894#section-7.10),
 		// SCEP operations are performed using HTTP, so that's why the API is mounted
 		// to the insecure mux.
+		scepPrefix := "scep"
 		insecureMux.Route("/"+scepPrefix, func(r chi.Router) {
 			scepAPI.Route(r)
 		})
@@ -584,10 +579,10 @@ func (ca *CA) getTLSConfig(auth *authority.Authority) (*tls.Config, *tls.Config,
 
 // shouldServeSCEPEndpoints returns if the CA should be
 // configured with endpoints for SCEP. This is assumed to be
-// true if a SCEPService exists, which is true in case a
-// SCEP provisioner was configured.
+// true if a SCEPService exists, which is true in case at
+// least one SCEP provisioner was configured.
 func (ca *CA) shouldServeSCEPEndpoints() bool {
-	return ca.auth.GetSCEPService() != nil
+	return ca.auth.GetSCEP() != nil
 }
 
 //nolint:unused // useful for debugging

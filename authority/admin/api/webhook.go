@@ -56,9 +56,7 @@ func validateWebhook(webhook *linkedca.Webhook) error {
 	}
 
 	// kind
-	switch webhook.Kind {
-	case linkedca.Webhook_ENRICHING, linkedca.Webhook_AUTHORIZING, linkedca.Webhook_SCEPCHALLENGE:
-	default:
+	if _, ok := linkedca.Webhook_Kind_name[int32(webhook.Kind)]; !ok || webhook.Kind == linkedca.Webhook_NO_KIND {
 		return admin.NewError(admin.ErrorBadRequestType, "webhook kind %q is invalid", webhook.Kind)
 	}
 
