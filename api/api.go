@@ -248,7 +248,7 @@ func scepFromProvisioner(p *provisioner.SCEP) *models.SCEP {
 		DecrypterCertificate:          []byte(redacted),
 		DecrypterKeyPEM:               []byte(redacted),
 		DecrypterKeyURI:               redacted,
-		DecrypterKeyPassword:          []byte(redacted),
+		DecrypterKeyPassword:          redacted,
 		EncryptionAlgorithmIdentifier: p.EncryptionAlgorithmIdentifier,
 		Options:                       p.Options,
 		Claims:                        p.Claims,

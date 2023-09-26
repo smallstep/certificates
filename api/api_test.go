@@ -1584,11 +1584,6 @@ func TestProvisionersResponse_MarshalJSON(t *testing.T) {
 	err = json.Unmarshal(b, &key)
 	require.NoError(t, err)
 
-	var encodedPassword bytes.Buffer
-	enc := base64.NewEncoder(base64.StdEncoding, &encodedPassword)
-	_, err = enc.Write([]byte("super-secret-password"))
-	require.NoError(t, err)
-
 	r := ProvisionersResponse{
 		Provisioners: provisioner.List{
 			&provisioner.SCEP{
@@ -1602,7 +1597,7 @@ func TestProvisionersResponse_MarshalJSON(t *testing.T) {
 				DecrypterCertificate:          []byte{1, 2, 3, 4},
 				DecrypterKeyPEM:               []byte{5, 6, 7, 8},
 				DecrypterKeyURI:               "softkms:path=/path/to/private.key",
-				DecrypterKeyPassword:          encodedPassword.Bytes(),
+				DecrypterKeyPassword:          "super-secret-password",
 			},
 			&provisioner.JWK{
 				EncryptedKey: "eyJhbGciOiJQQkVTMi1IUzI1NitBMTI4S1ciLCJlbmMiOiJBMTI4R0NNIiwicDJjIjoxMDAwMDAsInAycyI6IlhOdmYxQjgxSUlLMFA2NUkwcmtGTGcifQ.XaN9zcPQeWt49zchUDm34FECUTHfQTn_.tmNHPQDqR3ebsWfd.9WZr3YVdeOyJh36vvx0VlRtluhvYp4K7jJ1KGDr1qypwZ3ziBVSNbYYQ71du7fTtrnfG1wgGTVR39tWSzBU-zwQ5hdV3rpMAaEbod5zeW6SHd95H3Bvcb43YiiqJFNL5sGZzFb7FqzVmpsZ1efiv6sZaGDHtnCAL6r12UG5EZuqGfM0jGCZitUz2m9TUKXJL5DJ7MOYbFfkCEsUBPDm_TInliSVn2kMJhFa0VOe5wZk5YOuYM3lNYW64HGtbf-llN2Xk-4O9TfeSPizBx9ZqGpeu8pz13efUDT2WL9tWo6-0UE-CrG0bScm8lFTncTkHcu49_a5NaUBkYlBjEiw.thPcx3t1AUcWuEygXIY3Fg",
@@ -1626,7 +1621,7 @@ func TestProvisionersResponse_MarshalJSON(t *testing.T) {
 				"decrypterCertificate":          []byte("*** REDACTED ***"),
 				"decrypterKey":                  "*** REDACTED ***",
 				"decrypterKeyPEM":               []byte("*** REDACTED ***"),
-				"decrypterKeyPassword":          []byte("*** REDACTED ***"),
+				"decrypterKeyPassword":          "*** REDACTED ***",
 				"minimumPublicKeyLength":        2048,
 				"encryptionAlgorithmIdentifier": 2,
 			},
@@ -1668,7 +1663,7 @@ func TestProvisionersResponse_MarshalJSON(t *testing.T) {
 			DecrypterCertificate:          []byte{1, 2, 3, 4},
 			DecrypterKeyPEM:               []byte{5, 6, 7, 8},
 			DecrypterKeyURI:               "softkms:path=/path/to/private.key",
-			DecrypterKeyPassword:          encodedPassword.Bytes(),
+			DecrypterKeyPassword:          "super-secret-password",
 		},
 		&provisioner.JWK{
 			EncryptedKey: "eyJhbGciOiJQQkVTMi1IUzI1NitBMTI4S1ciLCJlbmMiOiJBMTI4R0NNIiwicDJjIjoxMDAwMDAsInAycyI6IlhOdmYxQjgxSUlLMFA2NUkwcmtGTGcifQ.XaN9zcPQeWt49zchUDm34FECUTHfQTn_.tmNHPQDqR3ebsWfd.9WZr3YVdeOyJh36vvx0VlRtluhvYp4K7jJ1KGDr1qypwZ3ziBVSNbYYQ71du7fTtrnfG1wgGTVR39tWSzBU-zwQ5hdV3rpMAaEbod5zeW6SHd95H3Bvcb43YiiqJFNL5sGZzFb7FqzVmpsZ1efiv6sZaGDHtnCAL6r12UG5EZuqGfM0jGCZitUz2m9TUKXJL5DJ7MOYbFfkCEsUBPDm_TInliSVn2kMJhFa0VOe5wZk5YOuYM3lNYW64HGtbf-llN2Xk-4O9TfeSPizBx9ZqGpeu8pz13efUDT2WL9tWo6-0UE-CrG0bScm8lFTncTkHcu49_a5NaUBkYlBjEiw.thPcx3t1AUcWuEygXIY3Fg",
