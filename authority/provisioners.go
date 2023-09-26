@@ -992,7 +992,7 @@ func ProvisionerToCertificates(p *linkedca.Provisioner) (provisioner.Interface, 
 			s.DecrypterCertificate = decrypter.Certificate
 			s.DecrypterKeyPEM = decrypter.Key
 			s.DecrypterKeyURI = decrypter.KeyUri
-			s.DecrypterKeyPassword = decrypter.KeyPassword
+			s.DecrypterKeyPassword = string(decrypter.KeyPassword)
 		}
 		return s, nil
 	case *linkedca.ProvisionerDetails_Nebula:
@@ -1255,7 +1255,7 @@ func ProvisionerToLinkedca(p provisioner.Interface) (*linkedca.Provisioner, erro
 							Certificate: p.DecrypterCertificate,
 							Key:         p.DecrypterKeyPEM,
 							KeyUri:      p.DecrypterKeyURI,
-							KeyPassword: p.DecrypterKeyPassword,
+							KeyPassword: []byte(p.DecrypterKeyPassword),
 						},
 					},
 				},

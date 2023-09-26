@@ -47,7 +47,7 @@ type SCEP struct {
 	DecrypterCertificate []byte `json:"decrypterCertificate,omitempty"`
 	DecrypterKeyPEM      []byte `json:"decrypterKeyPEM,omitempty"`
 	DecrypterKeyURI      string `json:"decrypterKey,omitempty"`
-	DecrypterKeyPassword []byte `json:"decrypterKeyPassword,omitempty"`
+	DecrypterKeyPassword string `json:"decrypterKeyPassword,omitempty"`
 
 	// Numerical identifier for the ContentEncryptionAlgorithm as defined in github.com/mozilla-services/pkcs7
 	// at https://github.com/mozilla-services/pkcs7/blob/33d05740a3526e382af6395d3513e73d4e66d1cb/encrypt.go#L63
@@ -289,14 +289,14 @@ func (s *SCEP) Init(config Config) (err error) {
 		}
 		if s.decrypter, err = kmsDecrypter.CreateDecrypter(&kmsapi.CreateDecrypterRequest{
 			DecryptionKeyPEM: decryptionKeyPEM,
-			Password:         s.DecrypterKeyPassword,
+			Password:         []byte(s.DecrypterKeyPassword),
 			PasswordPrompter: kmsapi.NonInteractivePasswordPrompter,
 		}); err != nil {
 			return fmt.Errorf("failed creating decrypter: %w", err)
 		}
 		if s.signer, err = s.keyManager.CreateSigner(&kmsapi.CreateSignerRequest{
 			SigningKeyPEM:    decryptionKeyPEM, // TODO(hs): support distinct signer key in the future?
-			Password:         s.DecrypterKeyPassword,
+			Password:         []byte(s.DecrypterKeyPassword),
 			PasswordPrompter: kmsapi.NonInteractivePasswordPrompter,
 		}); err != nil {
 			return fmt.Errorf("failed creating signer: %w", err)
@@ -331,14 +331,14 @@ func (s *SCEP) Init(config Config) (err error) {
 		}
 		if s.decrypter, err = kmsDecrypter.CreateDecrypter(&kmsapi.CreateDecrypterRequest{
 			DecryptionKey:    decryptionKeyURI,
-			Password:         s.DecrypterKeyPassword,
+			Password:         []byte(s.DecrypterKeyPassword),
 			PasswordPrompter: kmsapi.NonInteractivePasswordPrompter,
 		}); err != nil {
 			return fmt.Errorf("failed creating decrypter: %w", err)
 		}
 		if s.signer, err = s.keyManager.CreateSigner(&kmsapi.CreateSignerRequest{
 			SigningKey:       decryptionKeyURI, // TODO(hs): support distinct signer key in the future?
-			Password:         s.DecrypterKeyPassword,
+			Password:         []byte(s.DecrypterKeyPassword),
 			PasswordPrompter: kmsapi.NonInteractivePasswordPrompter,
 		}); err != nil {
 			return fmt.Errorf("failed creating signer: %w", err)
