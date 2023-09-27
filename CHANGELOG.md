@@ -44,7 +44,7 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
   (smallstep/certificates#1435)
 - Send X5C leaf certificate to webhooks (smallstep/certificates#1485)
 - Added support for disableSmallstepExtensions claim (smallstep/certificates#1484)
-- Added all AWS Identity Document Certificates (smallstep/certificates#1510)
+- Added all AWS Identity Document Certificates (smallstep/certificates#1404, smallstep/certificates#1510)
 - Added Winget release automation (smallstep/certificates#1519)
 - Added CSR to SCEPCHALLENGE webhook request body (smallstep/certificates#1523)
 - Added SCEP issuance notification webhook (smallstep/certificates#1544)
