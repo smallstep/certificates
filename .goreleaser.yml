@@ -298,7 +298,7 @@ winget:
       pull_request:
         # Whether to enable it or not.
         enabled: true
-        #check_boxes: true
+        check_boxes: true
         # Whether to open the PR as a draft or not.
         #
         # Default: false
@@ -327,6 +327,7 @@ scoops:
     repository:
       owner: smallstep
       name: scoop-bucket
+      branch: main
 
     # Git author used to commit to the repository.
     # Defaults are shown.
