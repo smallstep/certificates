@@ -29,6 +29,7 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
 
 ### Added
 
+- Added support for configuring SCEP decrypters in the provisioner (smallstep/certificates#1414)
 - Added support for TPM KMS (smallstep/crypto#253)
 - Added support for disableSmallstepExtensions provisioner claim
   (smallstep/certificates#1484)
@@ -39,7 +40,6 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
 - Added namespace field to VaultCAS JSON config (smallstep/certificates#1424)
 - Added AWS public certificates for me-central-1 and ap-southeast-3 
   (smallstep/certificates#1404)
-- Added support for configuring SCEP decrypters in the provisioner (smallstep/certificates#1414)
 - Added unversioned filenames to Github release assets 
   (smallstep/certificates#1435)
 - Send X5C leaf certificate to webhooks (smallstep/certificates#1485)
