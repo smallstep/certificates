@@ -164,11 +164,11 @@ release:
 
     ```
     cosign verify-blob \
-      --certificate ~/Downloads/step-ca_darwin_{{ .Version }}_amd64.tar.gz.sig.pem \
-      --signature ~/Downloads/step-ca_darwin_{{ .Version }}_amd64.tar.gz.sig \
-      --certificate-identity-regexp "https://github\.com/smallstep/certificates/.*" \
+      --certificate step-ca_darwin_{{ .Version }}_amd64.tar.gz.sig.pem \
+      --signature step-ca_darwin_{{ .Version }}_amd64.tar.gz.sig \
+      --certificate-identity-regexp "https://github\.com/smallstep/workflows/.*" \
       --certificate-oidc-issuer https://token.actions.githubusercontent.com \
-      ~/Downloads/step-ca_darwin_{{ .Version }}_amd64.tar.gz
+      step-ca_darwin_{{ .Version }}_amd64.tar.gz
     ```
 
     The `checksums.txt` file (in the `Assets` section below) contains a checksum for every artifact in the release.
