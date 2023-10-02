@@ -117,10 +117,10 @@ inject:
         federateRoots: []
         crt: {{ .Intermediate }}
         key: {{ .IntermediateKey }}
-	{{- if .Kms }}
-	kms:
-	  type: {{ lower (.Kms.Type | toString) }}
-	{{- end }}
+        {{- if .Kms }}
+        kms:
+          type: {{ lower (.Kms.Type | toString) }}
+        {{- end }}
         {{- if .EnableSSH }}
         ssh:
           hostKey: {{ .Ssh.HostKey }}

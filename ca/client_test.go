@@ -126,7 +126,7 @@ func parseCertificate(data string) *x509.Certificate {
 	return cert
 }
 
-func parseCertificateRequest(data string) *x509.CertificateRequest {
+func parseCertificateRequest(string) *x509.CertificateRequest {
 	block, _ := pem.Decode([]byte(csrPEM))
 	if block == nil {
 		panic("failed to parse certificate request PEM")

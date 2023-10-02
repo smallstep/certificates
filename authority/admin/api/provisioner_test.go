@@ -12,7 +12,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/go-chi/chi"
+	"github.com/go-chi/chi/v5"
 	"github.com/google/go-cmp/cmp"
 	"github.com/google/go-cmp/cmp/cmpopts"
 	"google.golang.org/protobuf/encoding/protojson"
@@ -37,7 +37,7 @@ func TestHandler_GetProvisioner(t *testing.T) {
 	}
 	var tests = map[string]func(t *testing.T) test{
 		"fail/auth.LoadProvisionerByID": func(t *testing.T) test {
-			req := httptest.NewRequest("GET", "/foo?id=provID", nil)
+			req := httptest.NewRequest("GET", "/foo?id=provID", http.NoBody)
 			chiCtx := chi.NewRouteContext()
 			ctx := context.WithValue(context.Background(), chi.RouteCtxKey, chiCtx)
 			auth := &mockAdminAuthority{
@@ -61,7 +61,7 @@ func TestHandler_GetProvisioner(t *testing.T) {
 			}
 		},
 		"fail/auth.LoadProvisionerByName": func(t *testing.T) test {
-			req := httptest.NewRequest("GET", "/foo", nil)
+			req := httptest.NewRequest("GET", "/foo", http.NoBody)
 			chiCtx := chi.NewRouteContext()
 			chiCtx.URLParams.Add("name", "provName")
 			ctx := context.WithValue(context.Background(), chi.RouteCtxKey, chiCtx)
@@ -86,7 +86,7 @@ func TestHandler_GetProvisioner(t *testing.T) {
 			}
 		},
 		"fail/db.GetProvisioner": func(t *testing.T) test {
-			req := httptest.NewRequest("GET", "/foo", nil)
+			req := httptest.NewRequest("GET", "/foo", http.NoBody)
 			chiCtx := chi.NewRouteContext()
 			chiCtx.URLParams.Add("name", "provName")
 			ctx := context.WithValue(context.Background(), chi.RouteCtxKey, chiCtx)
@@ -120,7 +120,7 @@ func TestHandler_GetProvisioner(t *testing.T) {
 			}
 		},
 		"ok": func(t *testing.T) test {
-			req := httptest.NewRequest("GET", "/foo", nil)
+			req := httptest.NewRequest("GET", "/foo", http.NoBody)
 			chiCtx := chi.NewRouteContext()
 			chiCtx.URLParams.Add("name", "provName")
 			ctx := context.WithValue(context.Background(), chi.RouteCtxKey, chiCtx)
@@ -208,7 +208,7 @@ func TestHandler_GetProvisioners(t *testing.T) {
 	}
 	var tests = map[string]func(t *testing.T) test{
 		"fail/parse-cursor": func(t *testing.T) test {
-			req := httptest.NewRequest("GET", "/foo?limit=X", nil)
+			req := httptest.NewRequest("GET", "/foo?limit=X", http.NoBody)
 			return test{
 				ctx:        context.Background(),
 				statusCode: 400,
@@ -222,7 +222,7 @@ func TestHandler_GetProvisioners(t *testing.T) {
 			}
 		},
 		"fail/auth.GetProvisioners": func(t *testing.T) test {
-			req := httptest.NewRequest("GET", "/foo", nil)
+			req := httptest.NewRequest("GET", "/foo", http.NoBody)
 			auth := &mockAdminAuthority{
 				MockGetProvisioners: func(cursor string, limit int) (provisioner.List, string, error) {
 					assert.Equals(t, "", cursor)
@@ -244,7 +244,7 @@ func TestHandler_GetProvisioners(t *testing.T) {
 			}
 		},
 		"ok": func(t *testing.T) test {
-			req := httptest.NewRequest("GET", "/foo", nil)
+			req := httptest.NewRequest("GET", "/foo", http.NoBody)
 			provisioners := provisioner.List{
 				&provisioner.OIDC{
 					Type: "OIDC",
@@ -481,7 +481,7 @@ func TestHandler_DeleteProvisioner(t *testing.T) {
 	}
 	var tests = map[string]func(t *testing.T) test{
 		"fail/auth.LoadProvisionerByID": func(t *testing.T) test {
-			req := httptest.NewRequest("DELETE", "/foo?id=provID", nil)
+			req := httptest.NewRequest("DELETE", "/foo?id=provID", http.NoBody)
 			chiCtx := chi.NewRouteContext()
 			ctx := context.WithValue(context.Background(), chi.RouteCtxKey, chiCtx)
 			auth := &mockAdminAuthority{
@@ -504,7 +504,7 @@ func TestHandler_DeleteProvisioner(t *testing.T) {
 			}
 		},
 		"fail/auth.LoadProvisionerByName": func(t *testing.T) test {
-			req := httptest.NewRequest("DELETE", "/foo", nil)
+			req := httptest.NewRequest("DELETE", "/foo", http.NoBody)
 			chiCtx := chi.NewRouteContext()
 			chiCtx.URLParams.Add("name", "provName")
 			ctx := context.WithValue(context.Background(), chi.RouteCtxKey, chiCtx)
@@ -528,7 +528,7 @@ func TestHandler_DeleteProvisioner(t *testing.T) {
 			}
 		},
 		"fail/auth.RemoveProvisioner": func(t *testing.T) test {
-			req := httptest.NewRequest("DELETE", "/foo", nil)
+			req := httptest.NewRequest("DELETE", "/foo", http.NoBody)
 			chiCtx := chi.NewRouteContext()
 			chiCtx.URLParams.Add("name", "provName")
 			ctx := context.WithValue(context.Background(), chi.RouteCtxKey, chiCtx)
@@ -560,7 +560,7 @@ func TestHandler_DeleteProvisioner(t *testing.T) {
 			}
 		},
 		"ok": func(t *testing.T) test {
-			req := httptest.NewRequest("DELETE", "/foo", nil)
+			req := httptest.NewRequest("DELETE", "/foo", http.NoBody)
 			chiCtx := chi.NewRouteContext()
 			chiCtx.URLParams.Add("name", "provName")
 			ctx := context.WithValue(context.Background(), chi.RouteCtxKey, chiCtx)

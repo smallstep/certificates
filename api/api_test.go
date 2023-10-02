@@ -4,7 +4,7 @@ import (
 	"bytes"
 	"context"
 	"crypto"
-	"crypto/dsa" //nolint
+	"crypto/dsa" //nolint:staticcheck // support legacy algorithms
 	"crypto/ecdsa"
 	"crypto/ed25519"
 	"crypto/elliptic"
@@ -26,14 +26,17 @@ import (
 	"testing"
 	"time"
 
-	"github.com/go-chi/chi"
+	"github.com/go-chi/chi/v5"
 	"github.com/pkg/errors"
-	"golang.org/x/crypto/ssh"
-
+	sassert "github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	"go.step.sm/crypto/jose"
 	"go.step.sm/crypto/x509util"
+	"golang.org/x/crypto/ssh"
+	squarejose "gopkg.in/square/go-jose.v2"
 
 	"github.com/smallstep/assert"
+
 	"github.com/smallstep/certificates/authority"
 	"github.com/smallstep/certificates/authority/provisioner"
 	"github.com/smallstep/certificates/errs"
@@ -800,7 +803,7 @@ func Test_CRLGeneration(t *testing.T) {
 	}
 
 	chiCtx := chi.NewRouteContext()
-	req := httptest.NewRequest("GET", "http://example.com/crl", nil)
+	req := httptest.NewRequest("GET", "http://example.com/crl", http.NoBody)
 	req = req.WithContext(context.WithValue(context.Background(), chi.RouteCtxKey, chiCtx))
 
 	for _, tt := range tests {
@@ -853,7 +856,7 @@ func Test_caHandler_Route(t *testing.T) {
 }
 
 func Test_Health(t *testing.T) {
-	req := httptest.NewRequest("GET", "http://example.com/health", nil)
+	req := httptest.NewRequest("GET", "http://example.com/health", http.NoBody)
 	w := httptest.NewRecorder()
 	Health(w, req)
 
@@ -887,7 +890,7 @@ func Test_Root(t *testing.T) {
 	// Request with chi context
 	chiCtx := chi.NewRouteContext()
 	chiCtx.URLParams.Add("sha", "efc7d6b475a56fe587650bcdb999a4a308f815ba44db4bf0371ea68a786ccd36")
-	req := httptest.NewRequest("GET", "http://example.com/root/efc7d6b475a56fe587650bcdb999a4a308f815ba44db4bf0371ea68a786ccd36", nil)
+	req := httptest.NewRequest("GET", "http://example.com/root/efc7d6b475a56fe587650bcdb999a4a308f815ba44db4bf0371ea68a786ccd36", http.NoBody)
 	req = req.WithContext(context.WithValue(context.Background(), chi.RouteCtxKey, chiCtx))
 
 	expected := []byte(`{"ca":"` + strings.ReplaceAll(rootPEM, "\n", `\n`) + `\n"}`)
@@ -1102,7 +1105,7 @@ func Test_Renew(t *testing.T) {
 					return nil
 				},
 			})
-			req := httptest.NewRequest("POST", "http://example.com/renew", nil)
+			req := httptest.NewRequest("POST", "http://example.com/renew", http.NoBody)
 			req.TLS = tt.tls
 			req.Header = tt.header
 			w := httptest.NewRecorder()
@@ -1310,7 +1313,7 @@ func Test_ProvisionerKey(t *testing.T) {
 	// Request with chi context
 	chiCtx := chi.NewRouteContext()
 	chiCtx.URLParams.Add("kid", "oV1p0MJeGQ7qBlK6B-oyfVdBRjh_e7VSK_YSEEqgW00")
-	req := httptest.NewRequest("GET", "http://example.com/provisioners/oV1p0MJeGQ7qBlK6B-oyfVdBRjh_e7VSK_YSEEqgW00/encrypted-key", nil)
+	req := httptest.NewRequest("GET", "http://example.com/provisioners/oV1p0MJeGQ7qBlK6B-oyfVdBRjh_e7VSK_YSEEqgW00/encrypted-key", http.NoBody)
 	req = req.WithContext(context.WithValue(context.Background(), chi.RouteCtxKey, chiCtx))
 
 	tests := []struct {
@@ -1378,7 +1381,7 @@ func Test_Roots(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			mockMustAuthority(t, &mockAuthority{ret1: []*x509.Certificate{tt.root}, err: tt.err})
-			req := httptest.NewRequest("GET", "http://example.com/roots", nil)
+			req := httptest.NewRequest("GET", "http://example.com/roots", http.NoBody)
 			req.TLS = tt.tls
 			w := httptest.NewRecorder()
 			Roots(w, req)
@@ -1419,7 +1422,7 @@ func Test_caHandler_RootsPEM(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			mockMustAuthority(t, &mockAuthority{ret1: tt.roots, err: tt.err})
-			req := httptest.NewRequest("GET", "https://example.com/roots", nil)
+			req := httptest.NewRequest("GET", "https://example.com/roots", http.NoBody)
 			w := httptest.NewRecorder()
 			RootsPEM(w, req)
 			res := w.Result()
@@ -1464,7 +1467,7 @@ func Test_Federation(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			mockMustAuthority(t, &mockAuthority{ret1: []*x509.Certificate{tt.root}, err: tt.err})
-			req := httptest.NewRequest("GET", "http://example.com/federation", nil)
+			req := httptest.NewRequest("GET", "http://example.com/federation", http.NoBody)
 			req.TLS = tt.tls
 			w := httptest.NewRecorder()
 			Federation(w, req)
@@ -1563,4 +1566,141 @@ func mustCertificate(t *testing.T, pub, priv interface{}) *x509.Certificate {
 		t.Fatal(err)
 	}
 	return cert
+}
+
+func TestProvisionersResponse_MarshalJSON(t *testing.T) {
+	k := map[string]any{
+		"use": "sig",
+		"kty": "EC",
+		"kid": "4UELJx8e0aS9m0CH3fZ0EB7D5aUPICb759zALHFejvc",
+		"crv": "P-256",
+		"alg": "ES256",
+		"x":   "7ZdAAMZCFU4XwgblI5RfZouBi8lYmF6DlZusNNnsbm8",
+		"y":   "sQr2JdzwD2fgyrymBEXWsxDxFNjjqN64qLLSbLdLZ9Y",
+	}
+	key := squarejose.JSONWebKey{}
+	b, err := json.Marshal(k)
+	require.NoError(t, err)
+	err = json.Unmarshal(b, &key)
+	require.NoError(t, err)
+
+	r := ProvisionersResponse{
+		Provisioners: provisioner.List{
+			&provisioner.SCEP{
+				Name:                          "scep",
+				Type:                          "scep",
+				ChallengePassword:             "not-so-secret",
+				MinimumPublicKeyLength:        2048,
+				EncryptionAlgorithmIdentifier: 2,
+				IncludeRoot:                   true,
+				ExcludeIntermediate:           true,
+				DecrypterCertificate:          []byte{1, 2, 3, 4},
+				DecrypterKeyPEM:               []byte{5, 6, 7, 8},
+				DecrypterKeyURI:               "softkms:path=/path/to/private.key",
+				DecrypterKeyPassword:          "super-secret-password",
+			},
+			&provisioner.JWK{
+				EncryptedKey: "eyJhbGciOiJQQkVTMi1IUzI1NitBMTI4S1ciLCJlbmMiOiJBMTI4R0NNIiwicDJjIjoxMDAwMDAsInAycyI6IlhOdmYxQjgxSUlLMFA2NUkwcmtGTGcifQ.XaN9zcPQeWt49zchUDm34FECUTHfQTn_.tmNHPQDqR3ebsWfd.9WZr3YVdeOyJh36vvx0VlRtluhvYp4K7jJ1KGDr1qypwZ3ziBVSNbYYQ71du7fTtrnfG1wgGTVR39tWSzBU-zwQ5hdV3rpMAaEbod5zeW6SHd95H3Bvcb43YiiqJFNL5sGZzFb7FqzVmpsZ1efiv6sZaGDHtnCAL6r12UG5EZuqGfM0jGCZitUz2m9TUKXJL5DJ7MOYbFfkCEsUBPDm_TInliSVn2kMJhFa0VOe5wZk5YOuYM3lNYW64HGtbf-llN2Xk-4O9TfeSPizBx9ZqGpeu8pz13efUDT2WL9tWo6-0UE-CrG0bScm8lFTncTkHcu49_a5NaUBkYlBjEiw.thPcx3t1AUcWuEygXIY3Fg",
+				Key:          &key,
+				Name:         "step-cli",
+				Type:         "JWK",
+			},
+		},
+		NextCursor: "next",
+	}
+
+	expected := map[string]any{
+		"provisioners": []map[string]any{
+			{
+				"type":                          "scep",
+				"name":                          "scep",
+				"forceCN":                       false,
+				"includeRoot":                   true,
+				"excludeIntermediate":           true,
+				"challenge":                     "*** REDACTED ***",
+				"decrypterCertificate":          []byte("*** REDACTED ***"),
+				"decrypterKey":                  "*** REDACTED ***",
+				"decrypterKeyPEM":               []byte("*** REDACTED ***"),
+				"decrypterKeyPassword":          "*** REDACTED ***",
+				"minimumPublicKeyLength":        2048,
+				"encryptionAlgorithmIdentifier": 2,
+			},
+			{
+				"type": "JWK",
+				"name": "step-cli",
+				"key": map[string]any{
+					"use": "sig",
+					"kty": "EC",
+					"kid": "4UELJx8e0aS9m0CH3fZ0EB7D5aUPICb759zALHFejvc",
+					"crv": "P-256",
+					"alg": "ES256",
+					"x":   "7ZdAAMZCFU4XwgblI5RfZouBi8lYmF6DlZusNNnsbm8",
+					"y":   "sQr2JdzwD2fgyrymBEXWsxDxFNjjqN64qLLSbLdLZ9Y",
+				},
+				"encryptedKey": "eyJhbGciOiJQQkVTMi1IUzI1NitBMTI4S1ciLCJlbmMiOiJBMTI4R0NNIiwicDJjIjoxMDAwMDAsInAycyI6IlhOdmYxQjgxSUlLMFA2NUkwcmtGTGcifQ.XaN9zcPQeWt49zchUDm34FECUTHfQTn_.tmNHPQDqR3ebsWfd.9WZr3YVdeOyJh36vvx0VlRtluhvYp4K7jJ1KGDr1qypwZ3ziBVSNbYYQ71du7fTtrnfG1wgGTVR39tWSzBU-zwQ5hdV3rpMAaEbod5zeW6SHd95H3Bvcb43YiiqJFNL5sGZzFb7FqzVmpsZ1efiv6sZaGDHtnCAL6r12UG5EZuqGfM0jGCZitUz2m9TUKXJL5DJ7MOYbFfkCEsUBPDm_TInliSVn2kMJhFa0VOe5wZk5YOuYM3lNYW64HGtbf-llN2Xk-4O9TfeSPizBx9ZqGpeu8pz13efUDT2WL9tWo6-0UE-CrG0bScm8lFTncTkHcu49_a5NaUBkYlBjEiw.thPcx3t1AUcWuEygXIY3Fg",
+			},
+		},
+		"nextCursor": "next",
+	}
+
+	expBytes, err := json.Marshal(expected)
+	sassert.NoError(t, err)
+
+	br, err := r.MarshalJSON()
+	sassert.NoError(t, err)
+	sassert.JSONEq(t, string(expBytes), string(br))
+
+	keyCopy := key
+	expList := provisioner.List{
+		&provisioner.SCEP{
+			Name:                          "scep",
+			Type:                          "scep",
+			ChallengePassword:             "not-so-secret",
+			MinimumPublicKeyLength:        2048,
+			EncryptionAlgorithmIdentifier: 2,
+			IncludeRoot:                   true,
+			ExcludeIntermediate:           true,
+			DecrypterCertificate:          []byte{1, 2, 3, 4},
+			DecrypterKeyPEM:               []byte{5, 6, 7, 8},
+			DecrypterKeyURI:               "softkms:path=/path/to/private.key",
+			DecrypterKeyPassword:          "super-secret-password",
+		},
+		&provisioner.JWK{
+			EncryptedKey: "eyJhbGciOiJQQkVTMi1IUzI1NitBMTI4S1ciLCJlbmMiOiJBMTI4R0NNIiwicDJjIjoxMDAwMDAsInAycyI6IlhOdmYxQjgxSUlLMFA2NUkwcmtGTGcifQ.XaN9zcPQeWt49zchUDm34FECUTHfQTn_.tmNHPQDqR3ebsWfd.9WZr3YVdeOyJh36vvx0VlRtluhvYp4K7jJ1KGDr1qypwZ3ziBVSNbYYQ71du7fTtrnfG1wgGTVR39tWSzBU-zwQ5hdV3rpMAaEbod5zeW6SHd95H3Bvcb43YiiqJFNL5sGZzFb7FqzVmpsZ1efiv6sZaGDHtnCAL6r12UG5EZuqGfM0jGCZitUz2m9TUKXJL5DJ7MOYbFfkCEsUBPDm_TInliSVn2kMJhFa0VOe5wZk5YOuYM3lNYW64HGtbf-llN2Xk-4O9TfeSPizBx9ZqGpeu8pz13efUDT2WL9tWo6-0UE-CrG0bScm8lFTncTkHcu49_a5NaUBkYlBjEiw.thPcx3t1AUcWuEygXIY3Fg",
+			Key:          &keyCopy,
+			Name:         "step-cli",
+			Type:         "JWK",
+		},
+	}
+
+	// MarshalJSON must not affect the struct properties itself
+	sassert.Equal(t, expList, r.Provisioners)
+}
+
+const (
+	fixtureECDSACertificate = `ecdsa-sha2-nistp256-cert-v01@openssh.com AAAAKGVjZHNhLXNoYTItbmlzdHAyNTYtY2VydC12MDFAb3BlbnNzaC5jb20AAAAgLnkvSk4odlo3b1R+RDw+LmorL3RkN354IilCIVFVen4AAAAIbmlzdHAyNTYAAABBBHjKHss8WM2ffMYlavisoLXR0I6UEIU+cidV1ogEH1U6+/SYaFPrlzQo0tGLM5CNkMbhInbyasQsrHzn8F1Rt7nHg5/tcSf9qwAAAAEAAAAGaGVybWFuAAAACgAAAAZoZXJtYW4AAAAAY8kvJwAAAABjyhBjAAAAAAAAAIIAAAAVcGVybWl0LVgxMS1mb3J3YXJkaW5nAAAAAAAAABdwZXJtaXQtYWdlbnQtZm9yd2FyZGluZwAAAAAAAAAWcGVybWl0LXBvcnQtZm9yd2FyZGluZwAAAAAAAAAKcGVybWl0LXB0eQAAAAAAAAAOcGVybWl0LXVzZXItcmMAAAAAAAAAAAAAAGgAAAATZWNkc2Etc2hhMi1uaXN0cDI1NgAAAAhuaXN0cDI1NgAAAEEE/ayqpPrZZF5uA1UlDt4FreTf15agztQIzpxnWq/XoxAHzagRSkFGkdgFpjgsfiRpP8URHH3BZScqc0ZDCTxhoQAAAGQAAAATZWNkc2Etc2hhMi1uaXN0cDI1NgAAAEkAAAAhAJuP1wCVwoyrKrEtHGfFXrVbRHySDjvXtS1tVTdHyqymAAAAIBa/CSSzfZb4D2NLP+eEmOOMJwSjYOiNM8fiOoAaqglI herman`
+)
+
+func TestLogSSHCertificate(t *testing.T) {
+
+	out, _, _, _, err := ssh.ParseAuthorizedKey([]byte(fixtureECDSACertificate))
+	require.NoError(t, err)
+
+	cert, ok := out.(*ssh.Certificate)
+	require.True(t, ok)
+
+	w := httptest.NewRecorder()
+	rl := logging.NewResponseLogger(w)
+	LogSSHCertificate(rl, cert)
+
+	sassert.Equal(t, 200, w.Result().StatusCode)
+
+	fields := rl.Fields()
+	sassert.Equal(t, uint64(14376510277651266987), fields["serial"])
+	sassert.Equal(t, []string{"herman"}, fields["principals"])
+	sassert.Equal(t, "ecdsa-sha2-nistp256-cert-v01@openssh.com user certificate", fields["certificate-type"])
+	sassert.Equal(t, time.Unix(1674129191, 0).Format(time.RFC3339), fields["valid-from"])
+	sassert.Equal(t, time.Unix(1674186851, 0).Format(time.RFC3339), fields["valid-to"])
+	sassert.Equal(t, "AAAAKGVjZHNhLXNoYTItbmlzdHAyNTYtY2VydC12MDFAb3BlbnNzaC5jb20AAAAgLnkvSk4odlo3b1R+RDw+LmorL3RkN354IilCIVFVen4AAAAIbmlzdHAyNTYAAABBBHjKHss8WM2ffMYlavisoLXR0I6UEIU+cidV1ogEH1U6+/SYaFPrlzQo0tGLM5CNkMbhInbyasQsrHzn8F1Rt7nHg5/tcSf9qwAAAAEAAAAGaGVybWFuAAAACgAAAAZoZXJtYW4AAAAAY8kvJwAAAABjyhBjAAAAAAAAAIIAAAAVcGVybWl0LVgxMS1mb3J3YXJkaW5nAAAAAAAAABdwZXJtaXQtYWdlbnQtZm9yd2FyZGluZwAAAAAAAAAWcGVybWl0LXBvcnQtZm9yd2FyZGluZwAAAAAAAAAKcGVybWl0LXB0eQAAAAAAAAAOcGVybWl0LXVzZXItcmMAAAAAAAAAAAAAAGgAAAATZWNkc2Etc2hhMi1uaXN0cDI1NgAAAAhuaXN0cDI1NgAAAEEE/ayqpPrZZF5uA1UlDt4FreTf15agztQIzpxnWq/XoxAHzagRSkFGkdgFpjgsfiRpP8URHH3BZScqc0ZDCTxhoQAAAGQAAAATZWNkc2Etc2hhMi1uaXN0cDI1NgAAAEkAAAAhAJuP1wCVwoyrKrEtHGfFXrVbRHySDjvXtS1tVTdHyqymAAAAIBa/CSSzfZb4D2NLP+eEmOOMJwSjYOiNM8fiOoAaqglI", fields["certificate"])
+	sassert.Equal(t, "SHA256:RvkDPGwl/G9d7LUFm1kmWhvOD9I/moPq4yxcb0STwr0 (ECDSA-CERT)", fields["public-key"])
 }

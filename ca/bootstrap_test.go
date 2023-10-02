@@ -35,7 +35,7 @@ func newLocalListener() net.Listener {
 	return l
 }
 
-func setMinCertDuration(d time.Duration) func() {
+func setMinCertDuration(time.Duration) func() {
 	tmp := minCertDuration
 	minCertDuration = 1 * time.Second
 	return func() {
@@ -606,7 +606,13 @@ func doReload(ca *CA) error {
 	}
 	// Use same address in new server
 	newCA.srv.Addr = ca.srv.Addr
-	return ca.srv.Reload(newCA.srv)
+	if err := ca.srv.Reload(newCA.srv); err != nil {
+		return err
+	}
+
+	// Wait a few ms until the http server calls listener.Accept()
+	time.Sleep(100 * time.Millisecond)
+	return nil
 }
 
 func TestBootstrapListener(t *testing.T) {

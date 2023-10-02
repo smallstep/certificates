@@ -478,7 +478,7 @@ func testScepAuthority(t *testing.T, opts ...Option) *Authority {
 	return a
 }
 
-func TestAuthority_GetSCEPService(t *testing.T) {
+func TestAuthority_GetSCEP(t *testing.T) {
 	_ = testScepAuthority(t)
 	p := provisioner.List{
 		&provisioner.SCEP{
@@ -542,7 +542,7 @@ func TestAuthority_GetSCEPService(t *testing.T) {
 				return
 			}
 			if tt.wantService {
-				if got := a.GetSCEPService(); (got != nil) != tt.wantService {
+				if got := a.GetSCEP(); (got != nil) != tt.wantService {
 					t.Errorf("Authority.GetSCEPService() = %v, wantService %v", got, tt.wantService)
 				}
 			}

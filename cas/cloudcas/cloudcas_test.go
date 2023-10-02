@@ -194,43 +194,43 @@ func (b *badSigner) Public() crypto.PublicKey {
 	return b.pub
 }
 
-func (b *badSigner) Sign(rnd io.Reader, digest []byte, opts crypto.SignerOpts) ([]byte, error) {
+func (b *badSigner) Sign(io.Reader, []byte, crypto.SignerOpts) ([]byte, error) {
 	return nil, fmt.Errorf("💥")
 }
 
-func (c *testClient) CreateCertificate(ctx context.Context, req *pb.CreateCertificateRequest, opts ...gax.CallOption) (*pb.Certificate, error) {
+func (c *testClient) CreateCertificate(context.Context, *pb.CreateCertificateRequest, ...gax.CallOption) (*pb.Certificate, error) {
 	return c.certificate, c.err
 }
 
-func (c *testClient) RevokeCertificate(ctx context.Context, req *pb.RevokeCertificateRequest, opts ...gax.CallOption) (*pb.Certificate, error) {
+func (c *testClient) RevokeCertificate(context.Context, *pb.RevokeCertificateRequest, ...gax.CallOption) (*pb.Certificate, error) {
 	return c.certificate, c.err
 }
 
-func (c *testClient) GetCertificateAuthority(ctx context.Context, req *pb.GetCertificateAuthorityRequest, opts ...gax.CallOption) (*pb.CertificateAuthority, error) {
+func (c *testClient) GetCertificateAuthority(context.Context, *pb.GetCertificateAuthorityRequest, ...gax.CallOption) (*pb.CertificateAuthority, error) {
 	return c.certificateAuthority, c.err
 }
 
-func (c *testClient) CreateCertificateAuthority(ctx context.Context, req *pb.CreateCertificateAuthorityRequest, opts ...gax.CallOption) (*privateca.CreateCertificateAuthorityOperation, error) {
+func (c *testClient) CreateCertificateAuthority(context.Context, *pb.CreateCertificateAuthorityRequest, ...gax.CallOption) (*privateca.CreateCertificateAuthorityOperation, error) {
 	return nil, errors.New("use NewMockCertificateAuthorityClient")
 }
 
-func (c *testClient) FetchCertificateAuthorityCsr(ctx context.Context, req *pb.FetchCertificateAuthorityCsrRequest, opts ...gax.CallOption) (*pb.FetchCertificateAuthorityCsrResponse, error) {
+func (c *testClient) FetchCertificateAuthorityCsr(context.Context, *pb.FetchCertificateAuthorityCsrRequest, ...gax.CallOption) (*pb.FetchCertificateAuthorityCsrResponse, error) {
 	return nil, errors.New("use NewMockCertificateAuthorityClient")
 }
 
-func (c *testClient) ActivateCertificateAuthority(ctx context.Context, req *pb.ActivateCertificateAuthorityRequest, opts ...gax.CallOption) (*privateca.ActivateCertificateAuthorityOperation, error) {
+func (c *testClient) ActivateCertificateAuthority(context.Context, *pb.ActivateCertificateAuthorityRequest, ...gax.CallOption) (*privateca.ActivateCertificateAuthorityOperation, error) {
 	return nil, errors.New("use NewMockCertificateAuthorityClient")
 }
 
-func (c *testClient) EnableCertificateAuthority(ctx context.Context, req *pb.EnableCertificateAuthorityRequest, opts ...gax.CallOption) (*privateca.EnableCertificateAuthorityOperation, error) {
+func (c *testClient) EnableCertificateAuthority(context.Context, *pb.EnableCertificateAuthorityRequest, ...gax.CallOption) (*privateca.EnableCertificateAuthorityOperation, error) {
 	return nil, errors.New("use NewMockCertificateAuthorityClient")
 }
 
-func (c *testClient) GetCaPool(ctx context.Context, req *pb.GetCaPoolRequest, opts ...gax.CallOption) (*pb.CaPool, error) {
+func (c *testClient) GetCaPool(context.Context, *pb.GetCaPoolRequest, ...gax.CallOption) (*pb.CaPool, error) {
 	return nil, errors.New("use NewMockCertificateAuthorityClient")
 }
 
-func (c *testClient) CreateCaPool(ctx context.Context, req *pb.CreateCaPoolRequest, opts ...gax.CallOption) (*privateca.CreateCaPoolOperation, error) {
+func (c *testClient) CreateCaPool(context.Context, *pb.CreateCaPoolRequest, ...gax.CallOption) (*privateca.CreateCaPoolOperation, error) {
 	return nil, errors.New("use NewMockCertificateAuthorityClient")
 }
 

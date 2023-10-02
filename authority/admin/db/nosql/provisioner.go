@@ -70,7 +70,7 @@ func (dbp *dbProvisioner) convert2linkedca() (*linkedca.Provisioner, error) {
 	}, nil
 }
 
-func (db *DB) getDBProvisionerBytes(ctx context.Context, id string) ([]byte, error) {
+func (db *DB) getDBProvisionerBytes(_ context.Context, id string) ([]byte, error) {
 	data, err := db.db.Get(provisionersTable, []byte(id))
 	if nosql.IsErrNotFound(err) {
 		return nil, admin.NewError(admin.ErrorNotFoundType, "provisioner %s not found", id)
@@ -132,7 +132,7 @@ func (db *DB) GetProvisioner(ctx context.Context, id string) (*linkedca.Provisio
 
 // GetProvisioners retrieves and unmarshals all active (not deleted) provisioners
 // from the database.
-func (db *DB) GetProvisioners(ctx context.Context) ([]*linkedca.Provisioner, error) {
+func (db *DB) GetProvisioners(_ context.Context) ([]*linkedca.Provisioner, error) {
 	dbEntries, err := db.db.List(provisionersTable)
 	if err != nil {
 		return nil, errors.Wrap(err, "error loading provisioners")
@@ -145,12 +145,10 @@ func (db *DB) GetProvisioners(ctx context.Context) ([]*linkedca.Provisioner, err
 			if errors.As(err, &ae) {
 				if ae.IsType(admin.ErrorDeletedType) || ae.IsType(admin.ErrorAuthorityMismatchType) {
 					continue
-				} else {
-					return nil, err
 				}
-			} else {
 				return nil, err
 			}
+			return nil, err
 		}
 		if prov.AuthorityId != db.authorityID {
 			continue

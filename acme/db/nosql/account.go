@@ -13,12 +13,14 @@ import (
 
 // dbAccount represents an ACME account.
 type dbAccount struct {
-	ID            string           `json:"id"`
-	Key           *jose.JSONWebKey `json:"key"`
-	Contact       []string         `json:"contact,omitempty"`
-	Status        acme.Status      `json:"status"`
-	CreatedAt     time.Time        `json:"createdAt"`
-	DeactivatedAt time.Time        `json:"deactivatedAt"`
+	ID              string           `json:"id"`
+	Key             *jose.JSONWebKey `json:"key"`
+	Contact         []string         `json:"contact,omitempty"`
+	Status          acme.Status      `json:"status"`
+	LocationPrefix  string           `json:"locationPrefix"`
+	ProvisionerName string           `json:"provisionerName"`
+	CreatedAt       time.Time        `json:"createdAt"`
+	DeactivatedAt   time.Time        `json:"deactivatedAt"`
 }
 
 func (dba *dbAccount) clone() *dbAccount {
@@ -26,7 +28,7 @@ func (dba *dbAccount) clone() *dbAccount {
 	return &nu
 }
 
-func (db *DB) getAccountIDByKeyID(ctx context.Context, kid string) (string, error) {
+func (db *DB) getAccountIDByKeyID(_ context.Context, kid string) (string, error) {
 	id, err := db.db.Get(accountByKeyIDTable, []byte(kid))
 	if err != nil {
 		if nosqlDB.IsErrNotFound(err) {
@@ -38,7 +40,7 @@ func (db *DB) getAccountIDByKeyID(ctx context.Context, kid string) (string, erro
 }
 
 // getDBAccount retrieves and unmarshals dbAccount.
-func (db *DB) getDBAccount(ctx context.Context, id string) (*dbAccount, error) {
+func (db *DB) getDBAccount(_ context.Context, id string) (*dbAccount, error) {
 	data, err := db.db.Get(accountTable, []byte(id))
 	if err != nil {
 		if nosqlDB.IsErrNotFound(err) {
@@ -62,10 +64,12 @@ func (db *DB) GetAccount(ctx context.Context, id string) (*acme.Account, error) 
 	}
 
 	return &acme.Account{
-		Status:  dbacc.Status,
-		Contact: dbacc.Contact,
-		Key:     dbacc.Key,
-		ID:      dbacc.ID,
+		Status:          dbacc.Status,
+		Contact:         dbacc.Contact,
+		Key:             dbacc.Key,
+		ID:              dbacc.ID,
+		LocationPrefix:  dbacc.LocationPrefix,
+		ProvisionerName: dbacc.ProvisionerName,
 	}, nil
 }
 
@@ -87,11 +91,13 @@ func (db *DB) CreateAccount(ctx context.Context, acc *acme.Account) error {
 	}
 
 	dba := &dbAccount{
-		ID:        acc.ID,
-		Key:       acc.Key,
-		Contact:   acc.Contact,
-		Status:    acc.Status,
-		CreatedAt: clock.Now(),
+		ID:              acc.ID,
+		Key:             acc.Key,
+		Contact:         acc.Contact,
+		Status:          acc.Status,
+		CreatedAt:       clock.Now(),
+		LocationPrefix:  acc.LocationPrefix,
+		ProvisionerName: acc.ProvisionerName,
 	}
 
 	kid, err := acme.KeyToID(dba.Key)

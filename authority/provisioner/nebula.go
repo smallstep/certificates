@@ -116,7 +116,7 @@ func (p *Nebula) GetEncryptedKey() (kid, key string, ok bool) {
 }
 
 // AuthorizeSign returns the list of SignOption for a Sign request.
-func (p *Nebula) AuthorizeSign(ctx context.Context, token string) ([]SignOption, error) {
+func (p *Nebula) AuthorizeSign(_ context.Context, token string) ([]SignOption, error) {
 	crt, claims, err := p.authorizeToken(token, p.ctl.Audiences.Sign)
 	if err != nil {
 		return nil, err
@@ -150,7 +150,7 @@ func (p *Nebula) AuthorizeSign(ctx context.Context, token string) ([]SignOption,
 		p,
 		templateOptions,
 		// modifiers / withOptions
-		newProvisionerExtensionOption(TypeNebula, p.Name, ""),
+		newProvisionerExtensionOption(TypeNebula, p.Name, "").WithControllerOptions(p.ctl),
 		profileLimitDuration{
 			def:       p.ctl.Claimer.DefaultTLSCertDuration(),
 			notBefore: crt.Details.NotBefore,
@@ -171,7 +171,7 @@ func (p *Nebula) AuthorizeSign(ctx context.Context, token string) ([]SignOption,
 
 // AuthorizeSSHSign returns the list of SignOption for a SignSSH request.
 // Currently the Nebula provisioner only grants host SSH certificates.
-func (p *Nebula) AuthorizeSSHSign(ctx context.Context, token string) ([]SignOption, error) {
+func (p *Nebula) AuthorizeSSHSign(_ context.Context, token string) ([]SignOption, error) {
 	if !p.ctl.Claimer.IsSSHCAEnabled() {
 		return nil, errs.Unauthorized("ssh is disabled for nebula provisioner '%s'", p.Name)
 	}
@@ -275,12 +275,12 @@ func (p *Nebula) AuthorizeRenew(ctx context.Context, crt *x509.Certificate) erro
 }
 
 // AuthorizeRevoke returns an error if the token is not valid.
-func (p *Nebula) AuthorizeRevoke(ctx context.Context, token string) error {
+func (p *Nebula) AuthorizeRevoke(_ context.Context, token string) error {
 	return p.validateToken(token, p.ctl.Audiences.Revoke)
 }
 
 // AuthorizeSSHRevoke returns an error if SSH is disabled or the token is invalid.
-func (p *Nebula) AuthorizeSSHRevoke(ctx context.Context, token string) error {
+func (p *Nebula) AuthorizeSSHRevoke(_ context.Context, token string) error {
 	if !p.ctl.Claimer.IsSSHCAEnabled() {
 		return errs.Unauthorized("ssh is disabled for nebula provisioner '%s'", p.Name)
 	}
@@ -291,12 +291,12 @@ func (p *Nebula) AuthorizeSSHRevoke(ctx context.Context, token string) error {
 }
 
 // AuthorizeSSHRenew returns an unauthorized error.
-func (p *Nebula) AuthorizeSSHRenew(ctx context.Context, token string) (*ssh.Certificate, error) {
+func (p *Nebula) AuthorizeSSHRenew(context.Context, string) (*ssh.Certificate, error) {
 	return nil, errs.Unauthorized("nebula provisioner does not support SSH renew")
 }
 
 // AuthorizeSSHRekey returns an unauthorized error.
-func (p *Nebula) AuthorizeSSHRekey(ctx context.Context, token string) (*ssh.Certificate, []SignOption, error) {
+func (p *Nebula) AuthorizeSSHRekey(context.Context, string) (*ssh.Certificate, []SignOption, error) {
 	return nil, nil, errs.Unauthorized("nebula provisioner does not support SSH rekey")
 }
 

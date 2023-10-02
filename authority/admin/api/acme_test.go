@@ -12,7 +12,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/go-chi/chi"
+	"github.com/go-chi/chi/v5"
 	"google.golang.org/protobuf/encoding/protojson"
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/types/known/timestamppb"
@@ -128,7 +128,7 @@ func TestHandler_requireEABEnabled(t *testing.T) {
 	for name, prep := range tests {
 		tc := prep(t)
 		t.Run(name, func(t *testing.T) {
-			req := httptest.NewRequest("GET", "/foo", nil).WithContext(tc.ctx)
+			req := httptest.NewRequest("GET", "/foo", http.NoBody).WithContext(tc.ctx)
 			w := httptest.NewRecorder()
 			requireEABEnabled(tc.next)(w, req)
 			res := w.Result()
@@ -223,7 +223,7 @@ func TestHandler_CreateExternalAccountKey(t *testing.T) {
 		tc := prep(t)
 		t.Run(name, func(t *testing.T) {
 
-			req := httptest.NewRequest("POST", "/foo", nil) // chi routing is prepared in test setup
+			req := httptest.NewRequest("POST", "/foo", http.NoBody) // chi routing is prepared in test setup
 			req = req.WithContext(tc.ctx)
 			w := httptest.NewRecorder()
 			acmeResponder := NewACMEAdminResponder()
@@ -276,7 +276,7 @@ func TestHandler_DeleteExternalAccountKey(t *testing.T) {
 		tc := prep(t)
 		t.Run(name, func(t *testing.T) {
 
-			req := httptest.NewRequest("DELETE", "/foo", nil) // chi routing is prepared in test setup
+			req := httptest.NewRequest("DELETE", "/foo", http.NoBody) // chi routing is prepared in test setup
 			req = req.WithContext(tc.ctx)
 			w := httptest.NewRecorder()
 			acmeResponder := NewACMEAdminResponder()
@@ -311,7 +311,7 @@ func TestHandler_GetExternalAccountKeys(t *testing.T) {
 		"ok": func(t *testing.T) test {
 			chiCtx := chi.NewRouteContext()
 			chiCtx.URLParams.Add("provisionerName", "provName")
-			req := httptest.NewRequest("GET", "/foo", nil)
+			req := httptest.NewRequest("GET", "/foo", http.NoBody)
 			ctx := context.WithValue(context.Background(), chi.RouteCtxKey, chiCtx)
 			return test{
 				ctx:        ctx,

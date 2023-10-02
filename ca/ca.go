@@ -15,8 +15,8 @@ import (
 	"sync"
 	"time"
 
-	"github.com/go-chi/chi"
-	"github.com/go-chi/chi/middleware"
+	"github.com/go-chi/chi/v5"
+	"github.com/go-chi/chi/v5/middleware"
 	"github.com/pkg/errors"
 	"github.com/smallstep/certificates/acme"
 	acmeAPI "github.com/smallstep/certificates/acme/api"
@@ -196,7 +196,11 @@ func (ca *CA) Init(cfg *config.Config) (*CA, error) {
 		api.Route(r)
 	})
 
-	//Add ACME api endpoints in /acme and /1.0/acme
+	// Mount the CRL to the insecure mux
+	insecureMux.Get("/crl", api.CRL)
+	insecureMux.Get("/1.0/crl", api.CRL)
+
+	// Add ACME api endpoints in /acme and /1.0/acme
 	dns := cfg.DNSNames[0]
 	u, err := url.Parse("https://" + cfg.Address)
 	if err != nil {
@@ -246,19 +250,14 @@ func (ca *CA) Init(cfg *config.Config) (*CA, error) {
 
 	var scepAuthority *scep.Authority
 	if ca.shouldServeSCEPEndpoints() {
-		scepPrefix := "scep"
-		scepAuthority, err = scep.New(auth, scep.AuthorityOptions{
-			Service: auth.GetSCEPService(),
-			DNS:     dns,
-			Prefix:  scepPrefix,
-		})
-		if err != nil {
-			return nil, errors.Wrap(err, "error creating SCEP authority")
-		}
+		// get the SCEP authority configuration. Validation is
+		// performed within the authority instantiation process.
+		scepAuthority = auth.GetSCEP()
 
 		// According to the RFC (https://tools.ietf.org/html/rfc8894#section-7.10),
 		// SCEP operations are performed using HTTP, so that's why the API is mounted
 		// to the insecure mux.
+		scepPrefix := "scep"
 		insecureMux.Route("/"+scepPrefix, func(r chi.Router) {
 			scepAPI.Route(r)
 		})
@@ -276,6 +275,7 @@ func (ca *CA) Init(cfg *config.Config) (*CA, error) {
 
 	// helpful routine for logging all routes
 	//dumpRoutes(mux)
+	//dumpRoutes(insecureMux)
 
 	// Add monitoring if configured
 	if len(cfg.Monitoring) > 0 {
@@ -307,7 +307,7 @@ func (ca *CA) Init(cfg *config.Config) (*CA, error) {
 
 	// only start the insecure server if the insecure address is configured
 	// and, currently, also only when it should serve SCEP endpoints.
-	if ca.shouldServeSCEPEndpoints() && cfg.InsecureAddress != "" {
+	if ca.shouldServeInsecureServer() {
 		// TODO: instead opt for having a single server.Server but two
 		// http.Servers handling the HTTP and HTTPS handler? The latter
 		// will probably introduce more complexity in terms of graceful
@@ -319,6 +319,23 @@ func (ca *CA) Init(cfg *config.Config) (*CA, error) {
 	}
 
 	return ca, nil
+}
+
+// shouldServeInsecureServer returns whether or not the insecure
+// server should also be started. This is (currently) only the case
+// if the insecure address has been configured AND when a SCEP
+// provisioner is configured or when a CRL is configured.
+func (ca *CA) shouldServeInsecureServer() bool {
+	switch {
+	case ca.config.InsecureAddress == "":
+		return false
+	case ca.shouldServeSCEPEndpoints():
+		return true
+	case ca.config.CRL.IsEnabled():
+		return true
+	default:
+		return false
+	}
 }
 
 // buildContext builds the server base context.
@@ -562,10 +579,10 @@ func (ca *CA) getTLSConfig(auth *authority.Authority) (*tls.Config, *tls.Config,
 
 // shouldServeSCEPEndpoints returns if the CA should be
 // configured with endpoints for SCEP. This is assumed to be
-// true if a SCEPService exists, which is true in case a
-// SCEP provisioner was configured.
+// true if a SCEPService exists, which is true in case at
+// least one SCEP provisioner was configured.
 func (ca *CA) shouldServeSCEPEndpoints() bool {
-	return ca.auth.GetSCEPService() != nil
+	return ca.auth.GetSCEP() != nil
 }
 
 //nolint:unused // useful for debugging

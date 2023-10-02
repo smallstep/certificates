@@ -1,11 +1,12 @@
 package api
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"net/http"
 
-	"github.com/go-chi/chi"
+	"github.com/go-chi/chi/v5"
 
 	"github.com/smallstep/certificates/acme"
 	"github.com/smallstep/certificates/api/render"
@@ -67,6 +68,12 @@ func (u *UpdateAccountRequest) Validate() error {
 	}
 }
 
+// getAccountLocationPath returns the current account URL location.
+// Returned location will be of the form: https://<ca-url>/acme/<provisioner>/account/<accID>
+func getAccountLocationPath(ctx context.Context, linker acme.Linker, accID string) string {
+	return linker.GetLink(ctx, acme.AccountLinkType, accID)
+}
+
 // NewAccount is the handler resource for creating new ACME accounts.
 func NewAccount(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
@@ -125,9 +132,11 @@ func NewAccount(w http.ResponseWriter, r *http.Request) {
 		}
 
 		acc = &acme.Account{
-			Key:     jwk,
-			Contact: nar.Contact,
-			Status:  acme.StatusValid,
+			Key:             jwk,
+			Contact:         nar.Contact,
+			Status:          acme.StatusValid,
+			LocationPrefix:  getAccountLocationPath(ctx, linker, ""),
+			ProvisionerName: prov.GetName(),
 		}
 		if err := db.CreateAccount(ctx, acc); err != nil {
 			render.Error(w, acme.WrapErrorISE(err, "error creating account"))
@@ -152,7 +161,7 @@ func NewAccount(w http.ResponseWriter, r *http.Request) {
 
 	linker.LinkAccount(ctx, acc)
 
-	w.Header().Set("Location", linker.GetLink(r.Context(), acme.AccountLinkType, acc.ID))
+	w.Header().Set("Location", getAccountLocationPath(ctx, linker, acc.ID))
 	render.JSONStatus(w, acc, httpStatus)
 }
 

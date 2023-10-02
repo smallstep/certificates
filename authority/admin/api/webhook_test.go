@@ -6,11 +6,12 @@ import (
 	"encoding/json"
 	"errors"
 	"io"
+	"net/http"
 	"net/http/httptest"
 	"strings"
 	"testing"
 
-	"github.com/go-chi/chi"
+	"github.com/go-chi/chi/v5"
 	"github.com/smallstep/certificates/authority"
 	"github.com/smallstep/certificates/authority/admin"
 	"github.com/stretchr/testify/assert"
@@ -172,6 +173,26 @@ func TestWebhookAdminResponder_CreateProvisionerWebhook(t *testing.T) {
 				"url": "https://example.com",
 				"kind": "ENRICHING",
 				"secret": "secret"
+			}`)
+			return test{
+				ctx:        ctx,
+				body:       body,
+				err:        adminErr,
+				statusCode: 400,
+			}
+		},
+		"fail/unsupported-webhook-kind": func(t *testing.T) test {
+			prov := &linkedca.Provisioner{
+				Name: "provName",
+			}
+			ctx := linkedca.NewContextWithProvisioner(context.Background(), prov)
+			adminErr := admin.NewError(admin.ErrorBadRequestType, `(line 5:13): invalid value for enum type: "UNSUPPORTED"`)
+			adminErr.Message = `(line 5:13): invalid value for enum type: "UNSUPPORTED"`
+			body := []byte(`
+			{
+				"name": "metadata",
+				"url": "https://example.com",
+				"kind": "UNSUPPORTED",
 			}`)
 			return test{
 				ctx:        ctx,
@@ -355,7 +376,7 @@ func TestWebhookAdminResponder_DeleteProvisionerWebhook(t *testing.T) {
 			}
 			ctx = linkedca.NewContextWithProvisioner(ctx, prov)
 			ctx = admin.NewContext(ctx, &admin.MockDB{})
-			req := httptest.NewRequest("DELETE", "/foo", nil).WithContext(ctx)
+			req := httptest.NewRequest("DELETE", "/foo", http.NoBody).WithContext(ctx)
 
 			war := NewWebhookAdminResponder()
 

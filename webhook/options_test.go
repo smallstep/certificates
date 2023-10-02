@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/smallstep/assert"
+	"go.step.sm/crypto/keyutil"
 	"go.step.sm/crypto/sshutil"
 	"go.step.sm/crypto/x509util"
 	"golang.org/x/crypto/ssh"
@@ -15,6 +16,15 @@ import (
 func TestNewRequestBody(t *testing.T) {
 	t1 := time.Now()
 	t2 := t1.Add(time.Hour)
+
+	key, err := keyutil.GenerateDefaultSigner()
+	if err != nil {
+		t.Fatal(err)
+	}
+	keyBytes, err := x509.MarshalPKIXPublicKey(key.Public())
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	type test struct {
 		options []RequestBodyOption
@@ -102,6 +112,40 @@ func TestNewRequestBody(t *testing.T) {
 				},
 			},
 			wantErr: false,
+		},
+		"X5C Certificate": {
+			options: []RequestBodyOption{
+				WithX5CCertificate(&x509.Certificate{
+					Raw:                []byte("some raw data"),
+					NotBefore:          t1,
+					NotAfter:           t2,
+					PublicKeyAlgorithm: x509.ECDSA,
+					PublicKey:          key.Public(),
+				}),
+			},
+			want: &RequestBody{
+				X5CCertificate: &X5CCertificate{
+					Raw:                []byte("some raw data"),
+					PublicKeyAlgorithm: "ECDSA",
+					NotBefore:          t1,
+					NotAfter:           t2,
+					PublicKey:          keyBytes,
+				},
+			},
+			wantErr: false,
+		},
+		"fail/X5C Certificate": {
+			options: []RequestBodyOption{
+				WithX5CCertificate(&x509.Certificate{
+					Raw:                []byte("some raw data"),
+					NotBefore:          t1,
+					NotAfter:           t2,
+					PublicKeyAlgorithm: x509.ECDSA,
+					PublicKey:          []byte("fail"),
+				}),
+			},
+			want:    nil,
+			wantErr: true,
 		},
 	}
 	for name, test := range tests {

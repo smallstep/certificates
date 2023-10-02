@@ -30,6 +30,7 @@ type WebhookController struct {
 	client       *http.Client
 	webhooks     []*Webhook
 	certType     linkedca.Webhook_CertType
+	options      []webhook.RequestBodyOption
 	TemplateData WebhookSetter
 }
 
@@ -39,6 +40,14 @@ func (wc *WebhookController) Enrich(req *webhook.RequestBody) error {
 	if wc == nil {
 		return nil
 	}
+
+	// Apply extra options in the webhook controller
+	for _, fn := range wc.options {
+		if err := fn(req); err != nil {
+			return err
+		}
+	}
+
 	for _, wh := range wc.webhooks {
 		if wh.Kind != linkedca.Webhook_ENRICHING.String() {
 			continue
@@ -63,6 +72,14 @@ func (wc *WebhookController) Authorize(req *webhook.RequestBody) error {
 	if wc == nil {
 		return nil
 	}
+
+	// Apply extra options in the webhook controller
+	for _, fn := range wc.options {
+		if err := fn(req); err != nil {
+			return err
+		}
+	}
+
 	for _, wh := range wc.webhooks {
 		if wh.Kind != linkedca.Webhook_AUTHORIZING.String() {
 			continue
@@ -107,6 +124,13 @@ type Webhook struct {
 }
 
 func (w *Webhook) Do(client *http.Client, reqBody *webhook.RequestBody, data any) (*webhook.ResponseBody, error) {
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second*10)
+	defer cancel()
+
+	return w.DoWithContext(ctx, client, reqBody, data)
+}
+
+func (w *Webhook) DoWithContext(ctx context.Context, client *http.Client, reqBody *webhook.RequestBody, data any) (*webhook.ResponseBody, error) {
 	tmpl, err := template.New("url").Funcs(templates.StepFuncMap()).Parse(w.URL)
 	if err != nil {
 		return nil, err
@@ -129,8 +153,6 @@ func (w *Webhook) Do(client *http.Client, reqBody *webhook.RequestBody, data any
 			reqBody.Token = tmpl[sshutil.TokenKey]
 		}
 	*/
-	ctx, cancel := context.WithTimeout(context.Background(), time.Second*10)
-	defer cancel()
 
 	reqBody.Timestamp = time.Now()
 
@@ -151,7 +173,9 @@ retry:
 	if err != nil {
 		return nil, err
 	}
-	sig := hmac.New(sha256.New, secret).Sum(reqBytes)
+	h := hmac.New(sha256.New, secret)
+	h.Write(reqBytes)
+	sig := h.Sum(nil)
 	req.Header.Set("X-Smallstep-Signature", hex.EncodeToString(sig))
 	req.Header.Set("X-Smallstep-Webhook-ID", w.ID)
 

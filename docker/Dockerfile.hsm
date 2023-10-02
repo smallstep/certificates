@@ -6,7 +6,7 @@ COPY . .
 RUN apt-get update
 RUN apt-get install -y --no-install-recommends \
         gcc pkgconf libpcsclite-dev libcap2-bin
-RUN make V=1 GOFLAGS="" bin/step-ca
+RUN make V=1 GO_ENVS="CGO_ENABLED=1" bin/step-ca
 RUN setcap CAP_NET_BIND_SERVICE=+eip bin/step-ca
 
 FROM smallstep/step-kms-plugin:bullseye AS kms

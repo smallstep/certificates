@@ -37,6 +37,7 @@ type VaultOptions struct {
 	PKIRoleEd25519 string          `json:"pkiRoleEd25519,omitempty"`
 	AuthType       string          `json:"authType,omitempty"`
 	AuthMountPath  string          `json:"authMountPath,omitempty"`
+	Namespace      string          `json:"namespace,omitempty"`
 	AuthOptions    json.RawMessage `json:"authOptions,omitempty"`
 }
 
@@ -90,6 +91,10 @@ func New(ctx context.Context, opts apiv1.Options) (*VaultCAS, error) {
 		return nil, fmt.Errorf("unable to configure %s auth method: %w", vc.AuthType, err)
 	}
 
+	if vc.Namespace != "" {
+		client.SetNamespace(vc.Namespace)
+	}
+
 	authInfo, err := client.Auth().Login(ctx, method)
 	if err != nil {
 		return nil, fmt.Errorf("unable to login to %s auth method: %w", vc.AuthType, err)
@@ -127,7 +132,7 @@ func (v *VaultCAS) CreateCertificate(req *apiv1.CreateCertificateRequest) (*apiv
 
 // GetCertificateAuthority returns the root certificate of the certificate
 // authority using the configured fingerprint.
-func (v *VaultCAS) GetCertificateAuthority(req *apiv1.GetCertificateAuthorityRequest) (*apiv1.GetCertificateAuthorityResponse, error) {
+func (v *VaultCAS) GetCertificateAuthority(*apiv1.GetCertificateAuthorityRequest) (*apiv1.GetCertificateAuthorityResponse, error) {
 	secret, err := v.client.Logical().Read(v.config.PKIMountPath + "/cert/ca_chain")
 	if err != nil {
 		return nil, fmt.Errorf("error reading ca chain: %w", err)
@@ -161,7 +166,7 @@ func (v *VaultCAS) GetCertificateAuthority(req *apiv1.GetCertificateAuthorityReq
 
 // RenewCertificate will always return a non-implemented error as renewals
 // are not supported yet.
-func (v *VaultCAS) RenewCertificate(req *apiv1.RenewCertificateRequest) (*apiv1.RenewCertificateResponse, error) {
+func (v *VaultCAS) RenewCertificate(*apiv1.RenewCertificateRequest) (*apiv1.RenewCertificateResponse, error) {
 	return nil, apiv1.NotImplementedError{Message: "vaultCAS does not support renewals"}
 }
 
@@ -215,7 +220,7 @@ func (v *VaultCAS) createCertificate(cr *x509.CertificateRequest, lifetime time.
 			Bytes: cr.Raw,
 		})),
 		"format": "pem_bundle",
-		"ttl":    lifetime.Seconds(),
+		"ttl":    lifetime.String(),
 	}
 
 	secret, err := v.client.Logical().Write(v.config.PKIMountPath+"/sign/"+vaultPKIRole, vaultReq)

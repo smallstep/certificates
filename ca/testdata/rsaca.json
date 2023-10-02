@@ -1,0 +1,47 @@
+{
+    "root": "../ca/testdata/secrets/rsa_root_ca.crt",
+    "federatedRoots": [],
+    "crt": "../ca/testdata/secrets/rsa_intermediate_ca.crt",
+    "key": "../ca/testdata/secrets/rsa_intermediate_ca_key",
+    "password": "1234",
+    "address": "127.0.0.1:0",
+    "dnsNames": ["127.0.0.1"],
+    "_logger": {"format": "text"},
+    "tls": {
+        "minVersion": 1.2,
+        "maxVersion": 1.3,
+        "renegotiation": false,
+        "cipherSuites": [
+            "TLS_ECDHE_ECDSA_WITH_CHACHA20_POLY1305_SHA256",
+			"TLS_ECDHE_ECDSA_WITH_AES_128_GCM_SHA256"
+        ]
+    },
+    "authority": {
+        "backdate": "0s",
+        "provisioners": [
+            {
+                "name": "scep",
+                "type": "scep",
+                "challenge": "not-so-secret"
+            }, {
+                "name": "step-cli",
+                "type": "jwk",
+                "encryptedKey": "eyJhbGciOiJQQkVTMi1IUzI1NitBMTI4S1ciLCJlbmMiOiJBMTI4R0NNIiwicDJjIjoxMDAwMDAsInAycyI6IlhOdmYxQjgxSUlLMFA2NUkwcmtGTGcifQ.XaN9zcPQeWt49zchUDm34FECUTHfQTn_.tmNHPQDqR3ebsWfd.9WZr3YVdeOyJh36vvx0VlRtluhvYp4K7jJ1KGDr1qypwZ3ziBVSNbYYQ71du7fTtrnfG1wgGTVR39tWSzBU-zwQ5hdV3rpMAaEbod5zeW6SHd95H3Bvcb43YiiqJFNL5sGZzFb7FqzVmpsZ1efiv6sZaGDHtnCAL6r12UG5EZuqGfM0jGCZitUz2m9TUKXJL5DJ7MOYbFfkCEsUBPDm_TInliSVn2kMJhFa0VOe5wZk5YOuYM3lNYW64HGtbf-llN2Xk-4O9TfeSPizBx9ZqGpeu8pz13efUDT2WL9tWo6-0UE-CrG0bScm8lFTncTkHcu49_a5NaUBkYlBjEiw.thPcx3t1AUcWuEygXIY3Fg",
+                "key": {
+                    "use": "sig",
+                    "kty": "EC",
+                    "kid": "4UELJx8e0aS9m0CH3fZ0EB7D5aUPICb759zALHFejvc",
+                    "crv": "P-256",
+                    "alg": "ES256",
+                    "x": "7ZdAAMZCFU4XwgblI5RfZouBi8lYmF6DlZusNNnsbm8",
+                    "y": "sQr2JdzwD2fgyrymBEXWsxDxFNjjqN64qLLSbLdLZ9Y"
+                }
+            }
+        ],
+        "template": {
+            "country": "US",
+            "locality": "San Francisco",
+            "organization": "Smallstep"
+        }
+    }
+}

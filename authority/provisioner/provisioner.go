@@ -10,8 +10,9 @@ import (
 	"strings"
 
 	"github.com/pkg/errors"
-	"github.com/smallstep/certificates/errs"
 	"golang.org/x/crypto/ssh"
+
+	"github.com/smallstep/certificates/errs"
 )
 
 // Interface is the interface that all provisioner types must implement.
@@ -297,43 +298,43 @@ type base struct{}
 
 // AuthorizeSign returns an unimplemented error. Provisioners should overwrite
 // this method if they will support authorizing tokens for signing x509 Certificates.
-func (b *base) AuthorizeSign(ctx context.Context, token string) ([]SignOption, error) {
+func (b *base) AuthorizeSign(context.Context, string) ([]SignOption, error) {
 	return nil, errs.Unauthorized("provisioner.AuthorizeSign not implemented")
 }
 
 // AuthorizeRevoke returns an unimplemented error. Provisioners should overwrite
 // this method if they will support authorizing tokens for revoking x509 Certificates.
-func (b *base) AuthorizeRevoke(ctx context.Context, token string) error {
+func (b *base) AuthorizeRevoke(context.Context, string) error {
 	return errs.Unauthorized("provisioner.AuthorizeRevoke not implemented")
 }
 
 // AuthorizeRenew returns an unimplemented error. Provisioners should overwrite
 // this method if they will support authorizing tokens for renewing x509 Certificates.
-func (b *base) AuthorizeRenew(ctx context.Context, cert *x509.Certificate) error {
+func (b *base) AuthorizeRenew(context.Context, *x509.Certificate) error {
 	return errs.Unauthorized("provisioner.AuthorizeRenew not implemented")
 }
 
 // AuthorizeSSHSign returns an unimplemented error. Provisioners should overwrite
 // this method if they will support authorizing tokens for signing SSH Certificates.
-func (b *base) AuthorizeSSHSign(ctx context.Context, token string) ([]SignOption, error) {
+func (b *base) AuthorizeSSHSign(context.Context, string) ([]SignOption, error) {
 	return nil, errs.Unauthorized("provisioner.AuthorizeSSHSign not implemented")
 }
 
 // AuthorizeRevoke returns an unimplemented error. Provisioners should overwrite
 // this method if they will support authorizing tokens for revoking SSH Certificates.
-func (b *base) AuthorizeSSHRevoke(ctx context.Context, token string) error {
+func (b *base) AuthorizeSSHRevoke(context.Context, string) error {
 	return errs.Unauthorized("provisioner.AuthorizeSSHRevoke not implemented")
 }
 
 // AuthorizeSSHRenew returns an unimplemented error. Provisioners should overwrite
 // this method if they will support authorizing tokens for renewing SSH Certificates.
-func (b *base) AuthorizeSSHRenew(ctx context.Context, token string) (*ssh.Certificate, error) {
+func (b *base) AuthorizeSSHRenew(context.Context, string) (*ssh.Certificate, error) {
 	return nil, errs.Unauthorized("provisioner.AuthorizeSSHRenew not implemented")
 }
 
 // AuthorizeSSHRekey returns an unimplemented error. Provisioners should overwrite
 // this method if they will support authorizing tokens for rekeying SSH Certificates.
-func (b *base) AuthorizeSSHRekey(ctx context.Context, token string) (*ssh.Certificate, []SignOption, error) {
+func (b *base) AuthorizeSSHRekey(context.Context, string) (*ssh.Certificate, []SignOption, error) {
 	return nil, nil, errs.Unauthorized("provisioner.AuthorizeSSHRekey not implemented")
 }
 

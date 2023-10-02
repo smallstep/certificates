@@ -31,12 +31,11 @@ builds:
       - -w -X main.Version={{.Version}} -X main.BuildTime={{.Date}}
 
 archives:
-  -
+  - &ARCHIVE
     # Can be used to change the archive formats for specific GOOSs.
     # Most common use case is to archive as zip on Windows.
     # Default is empty.
     name_template: "{{ .ProjectName }}_{{ .Os }}_{{ .Version }}_{{ .Arch }}{{ if .Arm }}v{{ .Arm }}{{ end }}{{ if .Mips }}_{{ .Mips }}{{ end }}"
-    rlcp: true
     format_overrides:
       - goos: windows
         format: zip
@@ -45,6 +44,11 @@ archives:
       - README.md
       - LICENSE
     allow_different_binary_count: true
+  -
+    << : *ARCHIVE
+    id: unversioned
+    name_template: "{{ .ProjectName }}_{{ .Os }}_{{ .Arch }}{{ if .Arm }}v{{ .Arm }}{{ end }}{{ if .Mips }}_{{ .Mips }}{{ end }}"
+
 
 nfpms:
   # Configure nFPM for .deb and .rpm releases
@@ -56,7 +60,7 @@ nfpms:
   # List file contents: dpkg -c dist/step_...deb
   # Package metadata: dpkg --info dist/step_....deb
   #
-  -
+  - &NFPM
     builds:
       - step-ca
     package_name: step-ca
@@ -76,10 +80,13 @@ nfpms:
     contents:
       - src: debian/copyright
         dst: /usr/share/doc/step-ca/copyright
+  -
+    << : *NFPM
+    id: unversioned
+    file_name_template: "{{ .PackageName }}_{{ .Arch }}{{ if .Arm }}v{{ .Arm }}{{ end }}{{ if .Mips }}_{{ .Mips }}{{ end }}"
 
 source:
   enabled: true
-  rlcp: true
   name_template: '{{ .ProjectName }}_{{ .Version }}'
 
 checksum:
@@ -132,17 +139,17 @@ release:
 
     #### Linux
 
-    - 📦 [step-ca_linux_{{ .Version }}_amd64.tar.gz](https://dl.step.sm/gh-release/certificates/gh-release-header/{{ .Tag }}/step-ca_linux_{{ .Version }}_amd64.tar.gz)
-    - 📦 [step-ca_{{ .Version }}_amd64.deb](https://dl.step.sm/gh-release/certificates/gh-release-header/{{ .Tag }}/step-ca_{{ .Version }}_amd64.deb)
+    - 📦 [step-ca_linux_{{ .Version }}_amd64.tar.gz](https://dl.smallstep.com/gh-release/certificates/gh-release-header/{{ .Tag }}/step-ca_linux_{{ .Version }}_amd64.tar.gz)
+    - 📦 [step-ca_{{ .Version }}_amd64.deb](https://dl.smallstep.com/gh-release/certificates/gh-release-header/{{ .Tag }}/step-ca_{{ .Version }}_amd64.deb)
 
     #### OSX Darwin
 
-    - 📦 [step-ca_darwin_{{ .Version }}_amd64.tar.gz](https://dl.step.sm/gh-release/certificates/gh-release-header/{{ .Tag }}/step-ca_darwin_{{ .Version }}_amd64.tar.gz)
-    - 📦 [step-ca_darwin_{{ .Version }}_arm64.tar.gz](https://dl.step.sm/gh-release/certificates/gh-release-header/{{ .Tag }}/step-ca_darwin_{{ .Version }}_arm64.tar.gz)
+    - 📦 [step-ca_darwin_{{ .Version }}_amd64.tar.gz](https://dl.smallstep.com/gh-release/certificates/gh-release-header/{{ .Tag }}/step-ca_darwin_{{ .Version }}_amd64.tar.gz)
+    - 📦 [step-ca_darwin_{{ .Version }}_arm64.tar.gz](https://dl.smallstep.com/gh-release/certificates/gh-release-header/{{ .Tag }}/step-ca_darwin_{{ .Version }}_arm64.tar.gz)
 
     #### Windows
 
-    - 📦 [step-ca_windows_{{ .Version }}_amd64.zip](https://dl.step.sm/gh-release/certificates/gh-release-header/{{ .Tag }}/step-ca_windows_{{ .Version }}_amd64.zip)
+    - 📦 [step-ca_windows_{{ .Version }}_amd64.zip](https://dl.smallstep.com/gh-release/certificates/gh-release-header/{{ .Tag }}/step-ca_windows_{{ .Version }}_amd64.zip)
 
     For more builds across platforms and architectures, see the `Assets` section below.
     And for packaged versions (Docker, k8s, Homebrew), see our [installation docs](https://smallstep.com/docs/step-ca/installation).
@@ -157,11 +164,11 @@ release:
 
     ```
     cosign verify-blob \
-      --certificate ~/Downloads/step-ca_darwin_{{ .Version }}_amd64.tar.gz.sig.pem \
-      --signature ~/Downloads/step-ca_darwin_{{ .Version }}_amd64.tar.gz.sig \
-      --certificate-identity-regexp "https://github\.com/smallstep/certificates/.*" \
+      --certificate step-ca_darwin_{{ .Version }}_amd64.tar.gz.sig.pem \
+      --signature step-ca_darwin_{{ .Version }}_amd64.tar.gz.sig \
+      --certificate-identity-regexp "https://github\.com/smallstep/workflows/.*" \
       --certificate-oidc-issuer https://token.actions.githubusercontent.com \
-      ~/Downloads/step-ca_darwin_{{ .Version }}_amd64.tar.gz
+      step-ca_darwin_{{ .Version }}_amd64.tar.gz
     ```
 
     The `checksums.txt` file (in the `Assets` section below) contains a checksum for every artifact in the release.
@@ -190,39 +197,159 @@ release:
   #  - glob: ./glob/**/to/**/file/**/*
   #  - glob: ./glob/foo/to/bar/file/foobar/override_from_previous
 
-scoop:
-  # Template for the url which is determined by the given Token (github or gitlab)
-  # Default for github is "https://github.com/<repo_owner>/<repo_name>/releases/download/{{ .Tag }}/{{ .ArtifactName }}"
-  # Default for gitlab is "https://gitlab.com/<repo_owner>/<repo_name>/uploads/{{ .ArtifactUploadHash }}/{{ .ArtifactName }}"
-  # Default for gitea is "https://gitea.com/<repo_owner>/<repo_name>/releases/download/{{ .Tag }}/{{ .ArtifactName }}"
-  url_template: "http://github.com/smallstep/certificates/releases/download/{{ .Tag }}/{{ .ArtifactName }}"
+winget:
+  - 
+    # IDs of the archives to use.
+    # Empty means all IDs.
+    ids: [ default ]
 
-  # Repository to push the app manifest to.
-  bucket:
-    owner: smallstep
-    name: scoop-bucket
+    #
+    # Default: ProjectName
+    # Templates: allowed
+    name: step-ca
 
-  # Git author used to commit to the repository.
-  # Defaults are shown.
-  commit_author:
-    name: goreleaserbot
-    email: goreleaser@smallstep.com
+    # Publisher name.
+    #
+    # Templates: allowed
+    # Required.
+    publisher: Smallstep
 
-  # The project name and current git tag are used in the format string.
-  commit_msg_template: "Scoop update for {{ .ProjectName }} version {{ .Tag }}"
+    # Your app's description.
+    #
+    # Templates: allowed
+    # Required.
+    short_description: "A private certificate authority (X.509 & SSH) & ACME server for secure automated certificate management."
 
-  # Your app's homepage.
-  # Default is empty.
-  homepage: "https://smallstep.com/docs/step-ca"
+    # License name.
+    #
+    # Templates: allowed
+    # Required.
+    license: "Apache-2.0"
 
-  # Skip uploads for prerelease.
-  skip_upload: auto
+    # Publisher URL.
+    #
+    # Templates: allowed
+    publisher_url: "https://smallstep.com"
 
-  # Your app's description.
-  # Default is empty.
-  description: "A private certificate authority (X.509 & SSH) & ACME server for secure automated certificate management, so you can use TLS everywhere & SSO for SSH."
+    # Publisher support URL.
+    #
+    # Templates: allowed
+    publisher_support_url: "https://github.com/smallstep/certificates/discussions"
 
-  # Your app's license
-  # Default is empty.
-  license: "Apache-2.0"
+    # URL which is determined by the given Token (github, gitlab or gitea).
+    #
+    # Default depends on the client.
+    # Templates: allowed
+    url_template: "https://github.com/smallstep/certificates/releases/download/{{ .Tag }}/{{ .ArtifactName }}"
+
+    # Git author used to commit to the repository.
+    commit_author:
+      name: goreleaserbot
+      email: goreleaser@smallstep.com
+
+    # The project name and current git tag are used in the format string.
+    #
+    # Templates: allowed
+    commit_msg_template: "{{ .PackageIdentifier }}: {{ .Tag }}"
+
+    # Your app's homepage.
+    homepage: "https://github.com/smallstep/certificates"
+
+    # Your app's long description.
+    #
+    # Templates: allowed
+    description: ""
+
+    # License URL.
+    #
+    # Templates: allowed
+    license_url: "https://github.com/smallstep/certificates/blob/master/LICENSE"
+
+    # Release notes URL.
+    #
+    # Templates: allowed
+    release_notes_url: "https://github.com/smallstep/certificates/releases/tag/{{.Version}}"
+
+    # Create the PR - for testing
+    skip_upload: auto
+
+    # Tags.
+    tags:
+      - certificates
+      - smallstep
+      - tls
+
+    # Repository to push the generated files to.
+    repository:
+      owner: smallstep
+      name: winget-pkgs
+      branch: step
+
+      # Optionally a token can be provided, if it differs from the token
+      # provided to GoReleaser
+      # Templates: allowed
+      #token: "{{ .Env.GITHUB_PERSONAL_AUTH_TOKEN }}"
+
+      # Sets up pull request creation instead of just pushing to the given branch.
+      # Make sure the 'branch' property is different from base before enabling
+      # it.
+      #
+      # Since: v1.17
+      pull_request:
+        # Whether to enable it or not.
+        enabled: true
+        check_boxes: true
+        # Whether to open the PR as a draft or not.
+        #
+        # Default: false
+        # Since: v1.19
+        # draft: true
+
+        # Base can also be another repository, in which case the owner and name
+        # above will be used as HEAD, allowing cross-repository pull requests.
+        #
+        # Since: v1.19
+        base:
+          owner: microsoft
+          name: winget-pkgs
+          branch: master
+
+
+scoops:
+  -
+    ids: [ default ]
+    # Template for the url which is determined by the given Token (github or gitlab)
+    # Default for github is "https://github.com/<repo_owner>/<repo_name>/releases/download/{{ .Tag }}/{{ .ArtifactName }}"
+    # Default for gitlab is "https://gitlab.com/<repo_owner>/<repo_name>/uploads/{{ .ArtifactUploadHash }}/{{ .ArtifactName }}"
+    # Default for gitea is "https://gitea.com/<repo_owner>/<repo_name>/releases/download/{{ .Tag }}/{{ .ArtifactName }}"
+    url_template: "http://github.com/smallstep/certificates/releases/download/{{ .Tag }}/{{ .ArtifactName }}"
+    # Repository to push the app manifest to.
+    repository:
+      owner: smallstep
+      name: scoop-bucket
+      branch: main
+
+    # Git author used to commit to the repository.
+    # Defaults are shown.
+    commit_author:
+      name: goreleaserbot
+      email: goreleaser@smallstep.com
+
+    # The project name and current git tag are used in the format string.
+    commit_msg_template: "Scoop update for {{ .ProjectName }} version {{ .Tag }}"
+
+    # Your app's homepage.
+    # Default is empty.
+    homepage: "https://smallstep.com/docs/step-ca"
+
+    # Skip uploads for prerelease.
+    skip_upload: auto
+
+    # Your app's description.
+    # Default is empty.
+    description: "A private certificate authority (X.509 & SSH) & ACME server for secure automated certificate management, so you can use TLS everywhere & SSO for SSH."
+
+    # Your app's license
+    # Default is empty.
+    license: "Apache-2.0"
 

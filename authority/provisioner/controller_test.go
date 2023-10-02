@@ -4,15 +4,18 @@ import (
 	"context"
 	"crypto/x509"
 	"fmt"
+	"net/http"
 	"reflect"
 	"testing"
 	"time"
 
+	"go.step.sm/crypto/pemutil"
 	"go.step.sm/crypto/x509util"
 	"go.step.sm/linkedca"
 	"golang.org/x/crypto/ssh"
 
 	"github.com/smallstep/certificates/authority/policy"
+	"github.com/smallstep/certificates/webhook"
 )
 
 var trueValue = true
@@ -166,6 +169,12 @@ func TestController_GetIdentity(t *testing.T) {
 			return &Identity{Usernames: []string{"jane"}}, nil
 		}}, args{ctx, "jane@doe.org"}, &Identity{
 			Usernames: []string{"jane"},
+		}, false},
+		{"ok badname", fields{&OIDC{}, nil}, args{ctx, "1000@doe.org"}, &Identity{
+			Usernames: []string{"1000", "1000@doe.org"},
+		}, false},
+		{"ok sanitized badname", fields{&OIDC{}, nil}, args{ctx, "1000+10@doe.org"}, &Identity{
+			Usernames: []string{"1000_10", "1000+10", "1000+10@doe.org"},
 		}, false},
 		{"fail provisioner", fields{&JWK{}, nil}, args{ctx, "jane@doe.org"}, nil, true},
 		{"fail custom", fields{&OIDC{}, func(ctx context.Context, p Interface, email string) (*Identity, error) {
@@ -449,16 +458,39 @@ func TestDefaultAuthorizeSSHRenew(t *testing.T) {
 }
 
 func Test_newWebhookController(t *testing.T) {
-	c := &Controller{}
-	data := x509util.TemplateData{"foo": "bar"}
-	ctl := c.newWebhookController(data, linkedca.Webhook_X509)
-	if !reflect.DeepEqual(ctl.TemplateData, data) {
-		t.Error("Failed to set templateData")
+	cert, err := pemutil.ReadCertificate("testdata/certs/x5c-leaf.crt", pemutil.WithFirstBlock())
+	if err != nil {
+		t.Fatal(err)
 	}
-	if ctl.certType != linkedca.Webhook_X509 {
-		t.Error("Failed to set certType")
+	opts := []webhook.RequestBodyOption{webhook.WithX5CCertificate(cert)}
+
+	type args struct {
+		templateData WebhookSetter
+		certType     linkedca.Webhook_CertType
+		opts         []webhook.RequestBodyOption
 	}
-	if ctl.client == nil {
-		t.Error("Failed to set client")
+	tests := []struct {
+		name string
+		args args
+		want *WebhookController
+	}{
+		{"ok", args{x509util.TemplateData{"foo": "bar"}, linkedca.Webhook_X509, nil}, &WebhookController{
+			TemplateData: x509util.TemplateData{"foo": "bar"},
+			certType:     linkedca.Webhook_X509,
+			client:       http.DefaultClient,
+		}},
+		{"ok with options", args{x509util.TemplateData{"foo": "bar"}, linkedca.Webhook_SSH, opts}, &WebhookController{
+			TemplateData: x509util.TemplateData{"foo": "bar"},
+			certType:     linkedca.Webhook_SSH,
+			client:       http.DefaultClient,
+			options:      opts,
+		}},
+	}
+	for _, tt := range tests {
+		c := &Controller{}
+		got := c.newWebhookController(tt.args.templateData, tt.args.certType, tt.args.opts...)
+		if !reflect.DeepEqual(got, tt.want) {
+			t.Errorf("newWebhookController() = %v, want %v", got, tt.want)
+		}
 	}
 }

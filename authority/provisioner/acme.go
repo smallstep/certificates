@@ -133,7 +133,7 @@ func (p *ACME) GetIDForToken() string {
 }
 
 // GetTokenID returns the identifier of the token.
-func (p *ACME) GetTokenID(ott string) (string, error) {
+func (p *ACME) GetTokenID(string) (string, error) {
 	return "", errors.New("acme provisioner does not implement GetTokenID")
 }
 
@@ -228,7 +228,7 @@ type ACMEIdentifier struct {
 
 // AuthorizeOrderIdentifier verifies the provisioner is allowed to issue a
 // certificate for an ACME Order Identifier.
-func (p *ACME) AuthorizeOrderIdentifier(ctx context.Context, identifier ACMEIdentifier) error {
+func (p *ACME) AuthorizeOrderIdentifier(_ context.Context, identifier ACMEIdentifier) error {
 	x509Policy := p.ctl.getPolicy().getX509()
 
 	// identifier is allowed if no policy is configured
@@ -253,11 +253,11 @@ func (p *ACME) AuthorizeOrderIdentifier(ctx context.Context, identifier ACMEIden
 // AuthorizeSign does not do any validation, because all validation is handled
 // in the ACME protocol. This method returns a list of modifiers / constraints
 // on the resulting certificate.
-func (p *ACME) AuthorizeSign(ctx context.Context, token string) ([]SignOption, error) {
+func (p *ACME) AuthorizeSign(context.Context, string) ([]SignOption, error) {
 	opts := []SignOption{
 		p,
 		// modifiers / withOptions
-		newProvisionerExtensionOption(TypeACME, p.Name, ""),
+		newProvisionerExtensionOption(TypeACME, p.Name, "").WithControllerOptions(p.ctl),
 		newForceCNOption(p.ForceCN),
 		profileDefaultDuration(p.ctl.Claimer.DefaultTLSCertDuration()),
 		// validators
@@ -274,7 +274,7 @@ func (p *ACME) AuthorizeSign(ctx context.Context, token string) ([]SignOption, e
 // the CA. It can be used to authorize revocation of a certificate. With the
 // ACME protocol, revocation authorization is specified and performed as part
 // of the client/server interaction, so this is a no-op.
-func (p *ACME) AuthorizeRevoke(ctx context.Context, token string) error {
+func (p *ACME) AuthorizeRevoke(context.Context, string) error {
 	return nil
 }
 
@@ -289,7 +289,7 @@ func (p *ACME) AuthorizeRenew(ctx context.Context, cert *x509.Certificate) error
 // IsChallengeEnabled checks if the given challenge is enabled. By default
 // http-01, dns-01 and tls-alpn-01 are enabled, to disable any of them the
 // Challenge provisioner property should have at least one element.
-func (p *ACME) IsChallengeEnabled(ctx context.Context, challenge ACMEChallenge) bool {
+func (p *ACME) IsChallengeEnabled(_ context.Context, challenge ACMEChallenge) bool {
 	enabledChallenges := []ACMEChallenge{
 		HTTP_01, DNS_01, TLS_ALPN_01,
 	}
@@ -307,7 +307,7 @@ func (p *ACME) IsChallengeEnabled(ctx context.Context, challenge ACMEChallenge) 
 // IsAttestationFormatEnabled checks if the given attestation format is enabled.
 // By default apple, step and tpm are enabled, to disable any of them the
 // AttestationFormat provisioner property should have at least one element.
-func (p *ACME) IsAttestationFormatEnabled(ctx context.Context, format ACMEAttestationFormat) bool {
+func (p *ACME) IsAttestationFormatEnabled(_ context.Context, format ACMEAttestationFormat) bool {
 	enabledFormats := []ACMEAttestationFormat{
 		APPLE, STEP, TPM,
 	}

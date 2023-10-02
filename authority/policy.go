@@ -154,7 +154,7 @@ func (a *Authority) checkProvisionerPolicy(ctx context.Context, provName string,
 
 // checkPolicy checks if a new or updated policy configuration results in the user
 // locking themselves or other admins out of the CA.
-func (a *Authority) checkPolicy(ctx context.Context, currentAdmin *linkedca.Admin, otherAdmins []*linkedca.Admin, p *linkedca.Policy) error {
+func (a *Authority) checkPolicy(_ context.Context, currentAdmin *linkedca.Admin, otherAdmins []*linkedca.Admin, p *linkedca.Policy) error {
 	// convert the policy; return early if nil
 	policyOptions := authPolicy.LinkedToCertificates(p)
 	if policyOptions == nil {

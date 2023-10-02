@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"crypto"
+	"crypto/rsa"
 	"crypto/sha256"
 	"crypto/x509"
 	"encoding/hex"
@@ -61,7 +62,9 @@ type Authority struct {
 	x509Enforcers         []provisioner.CertificateEnforcer
 
 	// SCEP CA
-	scepService *scep.Service
+	scepOptions   *scep.Options
+	validateSCEP  bool
+	scepAuthority *scep.Authority
 
 	// SSH CA
 	sshHostPassword         []byte
@@ -122,6 +125,7 @@ func New(cfg *config.Config, opts ...Option) (*Authority, error) {
 	var a = &Authority{
 		config:       cfg,
 		certificates: new(sync.Map),
+		validateSCEP: true,
 	}
 
 	// Apply options.
@@ -260,6 +264,24 @@ func (a *Authority) ReloadAdminResources(ctx context.Context) error {
 	a.provisioners = provClxn
 	a.config.AuthorityConfig.Admins = adminList
 	a.admins = adminClxn
+
+	switch {
+	case a.requiresSCEP() && a.GetSCEP() == nil:
+		// TODO(hs): try to initialize SCEP here too? It's a bit
+		// problematic if this method is called as part of an update
+		// via Admin API and a password needs to be provided.
+	case a.requiresSCEP() && a.GetSCEP() != nil:
+		// update the SCEP Authority with the currently active SCEP
+		// provisioner names and revalidate the configuration.
+		a.scepAuthority.UpdateProvisioners(a.getSCEPProvisionerNames())
+		if err := a.scepAuthority.Validate(); err != nil {
+			log.Printf("failed validating SCEP authority: %v\n", err)
+		}
+	case !a.requiresSCEP() && a.GetSCEP() != nil:
+		// TODO(hs): don't remove the authority if we can't also
+		// reload it.
+		//a.scepAuthority = nil
+	}
 
 	return nil
 }
@@ -545,50 +567,6 @@ func (a *Authority) init() error {
 		tmplVars.SSH.UserFederatedKeys = append(tmplVars.SSH.UserFederatedKeys, a.sshCAUserFederatedCerts...)
 	}
 
-	// Check if a KMS with decryption capability is required and available
-	if a.requiresDecrypter() {
-		if _, ok := a.keyManager.(kmsapi.Decrypter); !ok {
-			return errors.New("keymanager doesn't provide crypto.Decrypter")
-		}
-	}
-
-	// TODO: decide if this is a good approach for providing the SCEP functionality
-	// It currently mirrors the logic for the x509CAService
-	if a.requiresSCEPService() && a.scepService == nil {
-		var options scep.Options
-
-		// Read intermediate and create X509 signer and decrypter for default CAS.
-		options.CertificateChain, err = pemutil.ReadCertificateBundle(a.config.IntermediateCert)
-		if err != nil {
-			return err
-		}
-		options.CertificateChain = append(options.CertificateChain, a.rootX509Certs...)
-		options.Signer, err = a.keyManager.CreateSigner(&kmsapi.CreateSignerRequest{
-			SigningKey: a.config.IntermediateKey,
-			Password:   a.password,
-		})
-		if err != nil {
-			return err
-		}
-
-		if km, ok := a.keyManager.(kmsapi.Decrypter); ok {
-			options.Decrypter, err = km.CreateDecrypter(&kmsapi.CreateDecrypterRequest{
-				DecryptionKey: a.config.IntermediateKey,
-				Password:      a.password,
-			})
-			if err != nil {
-				return err
-			}
-		}
-
-		a.scepService, err = scep.NewService(ctx, options)
-		if err != nil {
-			return err
-		}
-
-		// TODO: mimick the x509CAService GetCertificateAuthority here too?
-	}
-
 	if a.config.AuthorityConfig.EnableAdmin {
 		// Initialize step-ca Admin Database if it's not already initialized using
 		// WithAdminDB.
@@ -682,6 +660,85 @@ func (a *Authority) init() error {
 	// Load Provisioners and Admins
 	if err := a.ReloadAdminResources(ctx); err != nil {
 		return err
+	}
+
+	// The SCEP functionality is provided through an instance of
+	// scep.Authority. It is initialized when the CA is started and
+	// if it doesn't exist yet. It gets refreshed if it already
+	// exists. If the SCEP authority is no longer required on reload,
+	// it gets removed.
+	// TODO(hs): reloading through SIGHUP doesn't hit these cases. This
+	// is because an entirely new authority.Authority is created, including
+	// a new scep.Authority. Look into this to see if we want this to
+	// keep working like that, or want to reuse a single instance and
+	// update that.
+	switch {
+	case a.requiresSCEP() && a.GetSCEP() == nil:
+		if a.scepOptions == nil {
+			options := &scep.Options{
+				Roots:         a.rootX509Certs,
+				Intermediates: a.intermediateX509Certs,
+				SignerCert:    a.intermediateX509Certs[0],
+			}
+			if options.Signer, err = a.keyManager.CreateSigner(&kmsapi.CreateSignerRequest{
+				SigningKey: a.config.IntermediateKey,
+				Password:   a.password,
+			}); err != nil {
+				return err
+			}
+			// TODO(hs): instead of creating the decrypter here, pass the
+			// intermediate key + chain down to the SCEP authority,
+			// and only instantiate it when required there. Is that possible?
+			// Also with entering passwords?
+			// TODO(hs): if moving the logic, try improving the logic for the
+			// decrypter password too? Right now it needs to be entered multiple
+			// times; I've observed it to be three times maximum, every time
+			// the intermediate key is read.
+			_, isRSA := options.Signer.Public().(*rsa.PublicKey)
+			if km, ok := a.keyManager.(kmsapi.Decrypter); ok && isRSA {
+				if decrypter, err := km.CreateDecrypter(&kmsapi.CreateDecrypterRequest{
+					DecryptionKey: a.config.IntermediateKey,
+					Password:      a.password,
+				}); err == nil {
+					// only pass the decrypter down when it was successfully created,
+					// meaning it's an RSA key, and `CreateDecrypter` did not fail.
+					options.Decrypter = decrypter
+					options.DecrypterCert = options.Intermediates[0]
+				}
+			}
+
+			a.scepOptions = options
+		}
+
+		// provide the current SCEP provisioner names, so that the provisioners
+		// can be validated when the CA is started.
+		a.scepOptions.SCEPProvisionerNames = a.getSCEPProvisionerNames()
+
+		// create a new SCEP authority
+		scepAuthority, err := scep.New(a, *a.scepOptions)
+		if err != nil {
+			return err
+		}
+
+		if a.validateSCEP {
+			// validate the SCEP authority
+			if err := scepAuthority.Validate(); err != nil {
+				a.initLogf("failed validating SCEP authority: %v", err)
+			}
+		}
+
+		// set the SCEP authority
+		a.scepAuthority = scepAuthority
+	case !a.requiresSCEP() && a.GetSCEP() != nil:
+		// clear the SCEP authority if it's no longer required
+		a.scepAuthority = nil
+	case a.requiresSCEP() && a.GetSCEP() != nil:
+		// update the SCEP Authority with the currently active SCEP
+		// provisioner names and revalidate the configuration.
+		a.scepAuthority.UpdateProvisioners(a.getSCEPProvisionerNames())
+		if err := a.scepAuthority.Validate(); err != nil {
+			log.Printf("failed validating SCEP authority: %v\n", err)
+		}
 	}
 
 	// Load X509 constraints engine.
@@ -833,17 +890,9 @@ func (a *Authority) IsRevoked(sn string) (bool, error) {
 	return a.db.IsRevoked(sn)
 }
 
-// requiresDecrypter returns whether the Authority
-// requires a KMS that provides a crypto.Decrypter
-// Currently this is only required when SCEP is
-// enabled.
-func (a *Authority) requiresDecrypter() bool {
-	return a.requiresSCEPService()
-}
-
-// requiresSCEPService iterates over the configured provisioners
-// and determines if one of them is a SCEP provisioner.
-func (a *Authority) requiresSCEPService() bool {
+// requiresSCEP iterates over the configured provisioners
+// and determines if at least one of them is a SCEP provisioner.
+func (a *Authority) requiresSCEP() bool {
 	for _, p := range a.config.AuthorityConfig.Provisioners {
 		if p.GetType() == provisioner.TypeSCEP {
 			return true
@@ -852,13 +901,21 @@ func (a *Authority) requiresSCEPService() bool {
 	return false
 }
 
-// GetSCEPService returns the configured SCEP Service.
-//
-// TODO: this function is intended to exist temporarily in order to make SCEP
-// work more easily. It can be made more correct by using the right
-// interfaces/abstractions after it works as expected.
-func (a *Authority) GetSCEPService() *scep.Service {
-	return a.scepService
+// getSCEPProvisionerNames returns the names of the SCEP provisioners
+// that are currently available in the CA.
+func (a *Authority) getSCEPProvisionerNames() (names []string) {
+	for _, p := range a.config.AuthorityConfig.Provisioners {
+		if p.GetType() == provisioner.TypeSCEP {
+			names = append(names, p.GetName())
+		}
+	}
+
+	return
+}
+
+// GetSCEP returns the configured SCEP Authority
+func (a *Authority) GetSCEP() *scep.Authority {
+	return a.scepAuthority
 }
 
 func (a *Authority) startCRLGenerator() error {

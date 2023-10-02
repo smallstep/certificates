@@ -210,7 +210,7 @@ func setKeyPair(t *testing.T, p *PKI) {
 }
 
 // setCertificates sets some static, gibberish intermediate and root CA certificate and key bytes.
-func setCertificates(t *testing.T, p *PKI) {
+func setCertificates(_ *testing.T, p *PKI) {
 	raw := []byte("these are just some fake root CA cert bytes")
 	p.Files[p.Root[0]] = encodeCertificate(&x509.Certificate{Raw: raw})
 	p.Files[p.RootKey[0]] = pem.EncodeToMemory(&pem.Block{
@@ -227,8 +227,7 @@ func setCertificates(t *testing.T, p *PKI) {
 }
 
 // setSSHSigningKeys sets some static, gibberish ssh user and host CA certificate and key bytes.
-func setSSHSigningKeys(t *testing.T, p *PKI) {
-
+func setSSHSigningKeys(_ *testing.T, p *PKI) {
 	if !p.options.enableSSH {
 		return
 	}

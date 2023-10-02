@@ -21,7 +21,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/go-chi/chi"
+	"github.com/go-chi/chi/v5"
 	"github.com/google/go-cmp/cmp"
 	"github.com/pkg/errors"
 	"golang.org/x/crypto/ocsp"
@@ -258,7 +258,7 @@ func jwkEncode(pub crypto.PublicKey) (string, error) {
 // jwsFinal constructs the final JWS object.
 // Implementation taken from github.com/mholt/acmez, which seems to be based on
 // https://github.com/golang/crypto/blob/master/acme/jws.go.
-func jwsFinal(sha crypto.Hash, sig []byte, phead, payload string) ([]byte, error) {
+func jwsFinal(_ crypto.Hash, sig []byte, phead, payload string) ([]byte, error) {
 	enc := struct {
 		Protected string `json:"protected"`
 		Payload   string `json:"payload"`
@@ -281,7 +281,7 @@ type mockCA struct {
 	MockAreSANsallowed func(ctx context.Context, sans []string) error
 }
 
-func (m *mockCA) Sign(cr *x509.CertificateRequest, opts provisioner.SignOptions, signOpts ...provisioner.SignOption) ([]*x509.Certificate, error) {
+func (m *mockCA) Sign(*x509.CertificateRequest, provisioner.SignOptions, ...provisioner.SignOption) ([]*x509.Certificate, error) {
 	return nil, nil
 }
 
@@ -1072,7 +1072,7 @@ func TestHandler_RevokeCert(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			ctx := newBaseContext(tc.ctx, tc.db, acme.NewLinker("test.ca.smallstep.com", "acme"))
 			mockMustAuthority(t, tc.ca)
-			req := httptest.NewRequest("POST", revokeURL, nil)
+			req := httptest.NewRequest("POST", revokeURL, http.NoBody)
 			req = req.WithContext(ctx)
 			w := httptest.NewRecorder()
 			RevokeCert(w, req)
@@ -1094,7 +1094,7 @@ func TestHandler_RevokeCert(t *testing.T) {
 				assert.Equals(t, res.Header["Content-Type"], []string{"application/problem+json"})
 			} else {
 				assert.True(t, bytes.Equal(bytes.TrimSpace(body), []byte{}))
-				assert.Equals(t, int64(0), req.ContentLength)
+				assert.Equals(t, int64(-1), req.ContentLength)
 				assert.Equals(t, []string{fmt.Sprintf("<%s/acme/%s/directory>;rel=\"index\"", baseURL.String(), escProvName)}, res.Header["Link"])
 			}
 		})

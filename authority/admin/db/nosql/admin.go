@@ -40,7 +40,7 @@ func (dba *dbAdmin) clone() *dbAdmin {
 	return &u
 }
 
-func (db *DB) getDBAdminBytes(ctx context.Context, id string) ([]byte, error) {
+func (db *DB) getDBAdminBytes(_ context.Context, id string) ([]byte, error) {
 	data, err := db.db.Get(adminsTable, []byte(id))
 	if nosql.IsErrNotFound(err) {
 		return nil, admin.NewError(admin.ErrorNotFoundType, "admin %s not found", id)
@@ -102,7 +102,7 @@ func (db *DB) GetAdmin(ctx context.Context, id string) (*linkedca.Admin, error) 
 // GetAdmins retrieves and unmarshals all active (not deleted) admins
 // from the database.
 // TODO should we be paginating?
-func (db *DB) GetAdmins(ctx context.Context) ([]*linkedca.Admin, error) {
+func (db *DB) GetAdmins(context.Context) ([]*linkedca.Admin, error) {
 	dbEntries, err := db.db.List(adminsTable)
 	if err != nil {
 		return nil, errors.Wrap(err, "error loading admins")
@@ -115,12 +115,10 @@ func (db *DB) GetAdmins(ctx context.Context) ([]*linkedca.Admin, error) {
 			if errors.As(err, &ae) {
 				if ae.IsType(admin.ErrorDeletedType) || ae.IsType(admin.ErrorAuthorityMismatchType) {
 					continue
-				} else {
-					return nil, err
 				}
-			} else {
 				return nil, err
 			}
+			return nil, err
 		}
 		if adm.AuthorityId != db.authorityID {
 			continue

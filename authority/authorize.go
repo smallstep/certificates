@@ -177,7 +177,7 @@ func (a *Authority) AuthorizeAdminToken(r *http.Request, token string) (*linkedc
 	if !adminFound {
 		return nil, admin.NewError(admin.ErrorUnauthorizedType,
 			"adminHandler.authorizeToken; unable to load admin with subject(s) %s and provisioner '%s'",
-			adminSANs, claims.Issuer)
+			adminSANs, prov.GetName())
 	}
 
 	if strings.HasPrefix(r.URL.Path, "/admin/admins") && (r.Method != "GET") && adm.Type != linkedca.Admin_SUPER_ADMIN {
@@ -315,7 +315,7 @@ func (a *Authority) authorizeRenew(ctx context.Context, cert *x509.Certificate) 
 }
 
 // authorizeSSHCertificate returns an error if the given certificate is revoked.
-func (a *Authority) authorizeSSHCertificate(ctx context.Context, cert *ssh.Certificate) error {
+func (a *Authority) authorizeSSHCertificate(_ context.Context, cert *ssh.Certificate) error {
 	var err error
 	var isRevoked bool
 
@@ -394,7 +394,7 @@ func (a *Authority) authorizeSSHRevoke(ctx context.Context, token string) error 
 
 // AuthorizeRenewToken validates the renew token and returns the leaf
 // certificate in the x5cInsecure header.
-func (a *Authority) AuthorizeRenewToken(ctx context.Context, ott string) (*x509.Certificate, error) {
+func (a *Authority) AuthorizeRenewToken(_ context.Context, ott string) (*x509.Certificate, error) {
 	var claims jose.Claims
 	jwt, chain, err := jose.ParseX5cInsecure(ott, a.rootX509Certs)
 	if err != nil {

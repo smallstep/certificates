@@ -20,6 +20,7 @@ import (
 	"go.step.sm/linkedca"
 
 	"github.com/smallstep/certificates/errs"
+	"github.com/smallstep/certificates/webhook"
 )
 
 // azureOIDCBaseURL is the base discovery url for Microsoft Azure tokens.
@@ -182,6 +183,8 @@ func (p *Azure) GetEncryptedKey() (kid, key string, ok bool) {
 // GetIdentityToken retrieves from the metadata service the identity token and
 // returns it.
 func (p *Azure) GetIdentityToken(subject, caURL string) (string, error) {
+	_, _ = subject, caURL // unused input
+
 	// Initialize the config if this method is used from the cli.
 	p.assertConfig()
 
@@ -313,7 +316,7 @@ func (p *Azure) authorizeToken(token string) (*azurePayload, string, string, str
 
 // AuthorizeSign validates the given token and returns the sign options that
 // will be used on certificate creation.
-func (p *Azure) AuthorizeSign(ctx context.Context, token string) ([]SignOption, error) {
+func (p *Azure) AuthorizeSign(_ context.Context, token string) ([]SignOption, error) {
 	_, name, group, subscription, identityObjectID, err := p.authorizeToken(token)
 	if err != nil {
 		return nil, errs.Wrap(http.StatusInternalServerError, err, "azure.AuthorizeSign")
@@ -395,13 +398,17 @@ func (p *Azure) AuthorizeSign(ctx context.Context, token string) ([]SignOption, 
 		p,
 		templateOptions,
 		// modifiers / withOptions
-		newProvisionerExtensionOption(TypeAzure, p.Name, p.TenantID),
+		newProvisionerExtensionOption(TypeAzure, p.Name, p.TenantID).WithControllerOptions(p.ctl),
 		profileDefaultDuration(p.ctl.Claimer.DefaultTLSCertDuration()),
 		// validators
 		defaultPublicKeyValidator{},
 		newValidityValidator(p.ctl.Claimer.MinTLSCertDuration(), p.ctl.Claimer.MaxTLSCertDuration()),
 		newX509NamePolicyValidator(p.ctl.getPolicy().getX509()),
-		p.ctl.newWebhookController(data, linkedca.Webhook_X509),
+		p.ctl.newWebhookController(
+			data,
+			linkedca.Webhook_X509,
+			webhook.WithAuthorizationPrincipal(identityObjectID),
+		),
 	), nil
 }
 
@@ -414,12 +421,12 @@ func (p *Azure) AuthorizeRenew(ctx context.Context, cert *x509.Certificate) erro
 }
 
 // AuthorizeSSHSign returns the list of SignOption for a SignSSH request.
-func (p *Azure) AuthorizeSSHSign(ctx context.Context, token string) ([]SignOption, error) {
+func (p *Azure) AuthorizeSSHSign(_ context.Context, token string) ([]SignOption, error) {
 	if !p.ctl.Claimer.IsSSHCAEnabled() {
 		return nil, errs.Unauthorized("azure.AuthorizeSSHSign; sshCA is disabled for provisioner '%s'", p.GetName())
 	}
 
-	_, name, _, _, _, err := p.authorizeToken(token)
+	_, name, _, _, identityObjectID, err := p.authorizeToken(token)
 	if err != nil {
 		return nil, errs.Wrap(http.StatusInternalServerError, err, "azure.AuthorizeSSHSign")
 	}
@@ -471,7 +478,11 @@ func (p *Azure) AuthorizeSSHSign(ctx context.Context, token string) ([]SignOptio
 		// Ensure that all principal names are allowed
 		newSSHNamePolicyValidator(p.ctl.getPolicy().getSSHHost(), nil),
 		// Call webhooks
-		p.ctl.newWebhookController(data, linkedca.Webhook_SSH),
+		p.ctl.newWebhookController(
+			data,
+			linkedca.Webhook_SSH,
+			webhook.WithAuthorizationPrincipal(identityObjectID),
+		),
 	), nil
 }
 

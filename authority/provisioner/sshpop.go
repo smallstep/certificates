@@ -187,7 +187,7 @@ func (p *SSHPOP) authorizeToken(token string, audiences []string, checkValidity 
 
 // AuthorizeSSHRevoke validates the authorization token and extracts/validates
 // the SSH certificate from the ssh-pop header.
-func (p *SSHPOP) AuthorizeSSHRevoke(ctx context.Context, token string) error {
+func (p *SSHPOP) AuthorizeSSHRevoke(_ context.Context, token string) error {
 	claims, err := p.authorizeToken(token, p.ctl.Audiences.SSHRevoke, true)
 	if err != nil {
 		return errs.Wrap(http.StatusInternalServerError, err, "sshpop.AuthorizeSSHRevoke")
@@ -213,7 +213,7 @@ func (p *SSHPOP) AuthorizeSSHRenew(ctx context.Context, token string) (*ssh.Cert
 
 // AuthorizeSSHRekey validates the authorization token and extracts/validates
 // the SSH certificate from the ssh-pop header.
-func (p *SSHPOP) AuthorizeSSHRekey(ctx context.Context, token string) (*ssh.Certificate, []SignOption, error) {
+func (p *SSHPOP) AuthorizeSSHRekey(_ context.Context, token string) (*ssh.Certificate, []SignOption, error) {
 	claims, err := p.authorizeToken(token, p.ctl.Audiences.SSHRekey, true)
 	if err != nil {
 		return nil, nil, errs.Wrap(http.StatusInternalServerError, err, "sshpop.AuthorizeSSHRekey")

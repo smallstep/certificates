@@ -26,6 +26,9 @@ type Claims struct {
 	// Renewal properties
 	DisableRenewal          *bool `json:"disableRenewal,omitempty"`
 	AllowRenewalAfterExpiry *bool `json:"allowRenewalAfterExpiry,omitempty"`
+
+	// Other properties
+	DisableSmallstepExtensions *bool `json:"disableSmallstepExtensions,omitempty"`
 }
 
 // Claimer is the type that controls claims. It provides an interface around the
@@ -47,20 +50,22 @@ func (c *Claimer) Claims() Claims {
 	disableRenewal := c.IsDisableRenewal()
 	allowRenewalAfterExpiry := c.AllowRenewalAfterExpiry()
 	enableSSHCA := c.IsSSHCAEnabled()
+	disableSmallstepExtensions := c.IsDisableSmallstepExtensions()
 
 	return Claims{
-		MinTLSDur:               &Duration{c.MinTLSCertDuration()},
-		MaxTLSDur:               &Duration{c.MaxTLSCertDuration()},
-		DefaultTLSDur:           &Duration{c.DefaultTLSCertDuration()},
-		MinUserSSHDur:           &Duration{c.MinUserSSHCertDuration()},
-		MaxUserSSHDur:           &Duration{c.MaxUserSSHCertDuration()},
-		DefaultUserSSHDur:       &Duration{c.DefaultUserSSHCertDuration()},
-		MinHostSSHDur:           &Duration{c.MinHostSSHCertDuration()},
-		MaxHostSSHDur:           &Duration{c.MaxHostSSHCertDuration()},
-		DefaultHostSSHDur:       &Duration{c.DefaultHostSSHCertDuration()},
-		EnableSSHCA:             &enableSSHCA,
-		DisableRenewal:          &disableRenewal,
-		AllowRenewalAfterExpiry: &allowRenewalAfterExpiry,
+		MinTLSDur:                  &Duration{c.MinTLSCertDuration()},
+		MaxTLSDur:                  &Duration{c.MaxTLSCertDuration()},
+		DefaultTLSDur:              &Duration{c.DefaultTLSCertDuration()},
+		MinUserSSHDur:              &Duration{c.MinUserSSHCertDuration()},
+		MaxUserSSHDur:              &Duration{c.MaxUserSSHCertDuration()},
+		DefaultUserSSHDur:          &Duration{c.DefaultUserSSHCertDuration()},
+		MinHostSSHDur:              &Duration{c.MinHostSSHCertDuration()},
+		MaxHostSSHDur:              &Duration{c.MaxHostSSHCertDuration()},
+		DefaultHostSSHDur:          &Duration{c.DefaultHostSSHCertDuration()},
+		EnableSSHCA:                &enableSSHCA,
+		DisableRenewal:             &disableRenewal,
+		AllowRenewalAfterExpiry:    &allowRenewalAfterExpiry,
+		DisableSmallstepExtensions: &disableSmallstepExtensions,
 	}
 }
 
@@ -108,6 +113,15 @@ func (c *Claimer) IsDisableRenewal() bool {
 		return *c.global.DisableRenewal
 	}
 	return *c.claims.DisableRenewal
+}
+
+// IsDisableSmallstepExtensions returns whether Smallstep extensions, such as
+// the provisioner extension, should be excluded from the certificate.
+func (c *Claimer) IsDisableSmallstepExtensions() bool {
+	if c.claims == nil || c.claims.DisableSmallstepExtensions == nil {
+		return *c.global.DisableSmallstepExtensions
+	}
+	return *c.claims.DisableSmallstepExtensions
 }
 
 // AllowRenewalAfterExpiry returns if the renewal flow is authorized if the

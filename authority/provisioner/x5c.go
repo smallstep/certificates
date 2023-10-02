@@ -15,6 +15,7 @@ import (
 	"go.step.sm/linkedca"
 
 	"github.com/smallstep/certificates/errs"
+	"github.com/smallstep/certificates/webhook"
 )
 
 // x5cPayload extends jwt.Claims with step attributes.
@@ -187,13 +188,13 @@ func (p *X5C) authorizeToken(token string, audiences []string) (*x5cPayload, err
 
 // AuthorizeRevoke returns an error if the provisioner does not have rights to
 // revoke the certificate with serial number in the `sub` property.
-func (p *X5C) AuthorizeRevoke(ctx context.Context, token string) error {
+func (p *X5C) AuthorizeRevoke(_ context.Context, token string) error {
 	_, err := p.authorizeToken(token, p.ctl.Audiences.Revoke)
 	return errs.Wrap(http.StatusInternalServerError, err, "x5c.AuthorizeRevoke")
 }
 
 // AuthorizeSign validates the given token.
-func (p *X5C) AuthorizeSign(ctx context.Context, token string) ([]SignOption, error) {
+func (p *X5C) AuthorizeSign(_ context.Context, token string) ([]SignOption, error) {
 	claims, err := p.authorizeToken(token, p.ctl.Audiences.Sign)
 	if err != nil {
 		return nil, errs.Wrap(http.StatusInternalServerError, err, "x5c.AuthorizeSign")
@@ -215,7 +216,8 @@ func (p *X5C) AuthorizeSign(ctx context.Context, token string) ([]SignOption, er
 	// The X509 certificate will be available using the template variable
 	// AuthorizationCrt. For example {{ .AuthorizationCrt.DNSNames }} can be
 	// used to get all the domains.
-	data.SetAuthorizationCertificate(claims.chains[0][0])
+	x5cLeaf := claims.chains[0][0]
+	data.SetAuthorizationCertificate(x5cLeaf)
 
 	templateOptions, err := TemplateOptions(p.Options, data)
 	if err != nil {
@@ -235,10 +237,10 @@ func (p *X5C) AuthorizeSign(ctx context.Context, token string) ([]SignOption, er
 		self,
 		templateOptions,
 		// modifiers / withOptions
-		newProvisionerExtensionOption(TypeX5C, p.Name, ""),
+		newProvisionerExtensionOption(TypeX5C, p.Name, "").WithControllerOptions(p.ctl),
 		profileLimitDuration{
 			p.ctl.Claimer.DefaultTLSCertDuration(),
-			claims.chains[0][0].NotBefore, claims.chains[0][0].NotAfter,
+			x5cLeaf.NotBefore, x5cLeaf.NotAfter,
 		},
 		// validators
 		commonNameValidator(claims.Subject),
@@ -246,7 +248,12 @@ func (p *X5C) AuthorizeSign(ctx context.Context, token string) ([]SignOption, er
 		defaultPublicKeyValidator{},
 		newValidityValidator(p.ctl.Claimer.MinTLSCertDuration(), p.ctl.Claimer.MaxTLSCertDuration()),
 		newX509NamePolicyValidator(p.ctl.getPolicy().getX509()),
-		p.ctl.newWebhookController(data, linkedca.Webhook_X509),
+		p.ctl.newWebhookController(
+			data,
+			linkedca.Webhook_X509,
+			webhook.WithX5CCertificate(x5cLeaf),
+			webhook.WithAuthorizationPrincipal(x5cLeaf.Subject.CommonName),
+		),
 	}, nil
 }
 
@@ -256,7 +263,7 @@ func (p *X5C) AuthorizeRenew(ctx context.Context, cert *x509.Certificate) error 
 }
 
 // AuthorizeSSHSign returns the list of SignOption for a SignSSH request.
-func (p *X5C) AuthorizeSSHSign(ctx context.Context, token string) ([]SignOption, error) {
+func (p *X5C) AuthorizeSSHSign(_ context.Context, token string) ([]SignOption, error) {
 	if !p.ctl.Claimer.IsSSHCAEnabled() {
 		return nil, errs.Unauthorized("x5c.AuthorizeSSHSign; sshCA is disabled for x5c provisioner '%s'", p.GetName())
 	}
@@ -305,7 +312,8 @@ func (p *X5C) AuthorizeSSHSign(ctx context.Context, token string) ([]SignOption,
 	// The X509 certificate will be available using the template variable
 	// AuthorizationCrt. For example {{ .AuthorizationCrt.DNSNames }} can be
 	// used to get all the domains.
-	data.SetAuthorizationCertificate(claims.chains[0][0])
+	x5cLeaf := claims.chains[0][0]
+	data.SetAuthorizationCertificate(x5cLeaf)
 
 	templateOptions, err := TemplateSSHOptions(p.Options, data)
 	if err != nil {
@@ -325,7 +333,7 @@ func (p *X5C) AuthorizeSSHSign(ctx context.Context, token string) ([]SignOption,
 	return append(signOptions,
 		p,
 		// Checks the validity bounds, and set the validity if has not been set.
-		&sshLimitDuration{p.ctl.Claimer, claims.chains[0][0].NotAfter},
+		&sshLimitDuration{p.ctl.Claimer, x5cLeaf.NotAfter},
 		// Validate public key.
 		&sshDefaultPublicKeyValidator{},
 		// Validate the validity period.
@@ -335,6 +343,11 @@ func (p *X5C) AuthorizeSSHSign(ctx context.Context, token string) ([]SignOption,
 		// Ensure that all principal names are allowed
 		newSSHNamePolicyValidator(p.ctl.getPolicy().getSSHHost(), p.ctl.getPolicy().getSSHUser()),
 		// Call webhooks
-		p.ctl.newWebhookController(data, linkedca.Webhook_SSH),
+		p.ctl.newWebhookController(
+			data,
+			linkedca.Webhook_SSH,
+			webhook.WithX5CCertificate(x5cLeaf),
+			webhook.WithAuthorizationPrincipal(x5cLeaf.Subject.CommonName),
+		),
 	), nil
 }

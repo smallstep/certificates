@@ -7,12 +7,13 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"net/http"
 	"net/http/httptest"
 	"net/url"
 	"testing"
 	"time"
 
-	"github.com/go-chi/chi"
+	"github.com/go-chi/chi/v5"
 	"github.com/pkg/errors"
 
 	"go.step.sm/crypto/jose"
@@ -34,31 +35,24 @@ var (
 
 type fakeProvisioner struct{}
 
-func (*fakeProvisioner) AuthorizeOrderIdentifier(ctx context.Context, identifier provisioner.ACMEIdentifier) error {
+func (*fakeProvisioner) AuthorizeOrderIdentifier(context.Context, provisioner.ACMEIdentifier) error {
 	return nil
 }
-
-func (*fakeProvisioner) AuthorizeSign(ctx context.Context, token string) ([]provisioner.SignOption, error) {
+func (*fakeProvisioner) AuthorizeSign(context.Context, string) ([]provisioner.SignOption, error) {
 	return nil, nil
 }
-
-func (*fakeProvisioner) IsChallengeEnabled(ctx context.Context, challenge provisioner.ACMEChallenge) bool {
+func (*fakeProvisioner) IsChallengeEnabled(context.Context, provisioner.ACMEChallenge) bool {
 	return true
 }
-
-func (*fakeProvisioner) IsAttestationFormatEnabled(ctx context.Context, format provisioner.ACMEAttestationFormat) bool {
+func (*fakeProvisioner) IsAttestationFormatEnabled(context.Context, provisioner.ACMEAttestationFormat) bool {
 	return true
 }
-
-func (*fakeProvisioner) GetAttestationRoots() (*x509.CertPool, bool) {
-	return nil, false
-}
-
-func (*fakeProvisioner) AuthorizeRevoke(ctx context.Context, token string) error { return nil }
-func (*fakeProvisioner) GetID() string                                           { return "" }
-func (*fakeProvisioner) GetName() string                                         { return "" }
-func (*fakeProvisioner) DefaultTLSCertDuration() time.Duration                   { return 0 }
-func (*fakeProvisioner) GetOptions() *provisioner.Options                        { return nil }
+func (*fakeProvisioner) GetAttestationRoots() (*x509.CertPool, bool)   { return nil, false }
+func (*fakeProvisioner) AuthorizeRevoke(context.Context, string) error { return nil }
+func (*fakeProvisioner) GetID() string                                 { return "" }
+func (*fakeProvisioner) GetName() string                               { return "" }
+func (*fakeProvisioner) DefaultTLSCertDuration() time.Duration         { return 0 }
+func (*fakeProvisioner) GetOptions() *provisioner.Options              { return nil }
 
 func newProv() acme.Provisioner {
 	// Initialize provisioners
@@ -320,7 +314,7 @@ func TestHandler_GetOrdersByAccountID(t *testing.T) {
 		"fail/nil-account": func(t *testing.T) test {
 			return test{
 				db:         &acme.MockDB{},
-				ctx:        context.WithValue(context.Background(), accContextKey, nil),
+				ctx:        context.WithValue(context.Background(), accContextKey, http.NoBody),
 				statusCode: 400,
 				err:        acme.NewError(acme.ErrorAccountDoesNotExistType, "account does not exist"),
 			}
@@ -370,7 +364,7 @@ func TestHandler_GetOrdersByAccountID(t *testing.T) {
 		tc := run(t)
 		t.Run(name, func(t *testing.T) {
 			ctx := acme.NewContext(tc.ctx, tc.db, nil, acme.NewLinker("test.ca.smallstep.com", "acme"), nil)
-			req := httptest.NewRequest("GET", u, nil)
+			req := httptest.NewRequest("GET", u, http.NoBody)
 			req = req.WithContext(ctx)
 			w := httptest.NewRecorder()
 			GetOrdersByAccountID(w, req)
@@ -809,7 +803,7 @@ func TestHandler_NewAccount(t *testing.T) {
 		tc := run(t)
 		t.Run(name, func(t *testing.T) {
 			ctx := acme.NewContext(tc.ctx, tc.db, nil, acme.NewLinker("test.ca.smallstep.com", "acme"), nil)
-			req := httptest.NewRequest("GET", "/foo/bar", nil)
+			req := httptest.NewRequest("GET", "/foo/bar", http.NoBody)
 			req = req.WithContext(ctx)
 			w := httptest.NewRecorder()
 			NewAccount(w, req)
@@ -1012,7 +1006,7 @@ func TestHandler_GetOrUpdateAccount(t *testing.T) {
 		tc := run(t)
 		t.Run(name, func(t *testing.T) {
 			ctx := acme.NewContext(tc.ctx, tc.db, nil, acme.NewLinker("test.ca.smallstep.com", "acme"), nil)
-			req := httptest.NewRequest("GET", "/foo/bar", nil)
+			req := httptest.NewRequest("GET", "/foo/bar", http.NoBody)
 			req = req.WithContext(ctx)
 			w := httptest.NewRecorder()
 			GetOrUpdateAccount(w, req)

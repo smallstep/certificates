@@ -11,7 +11,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/go-chi/chi"
+	"github.com/go-chi/chi/v5"
 	"github.com/google/go-cmp/cmp"
 	"github.com/google/go-cmp/cmp/cmpopts"
 	"google.golang.org/protobuf/types/known/timestamppb"
@@ -357,7 +357,7 @@ func TestHandler_GetAdmin(t *testing.T) {
 		tc := prep(t)
 		t.Run(name, func(t *testing.T) {
 			mockMustAuthority(t, tc.auth)
-			req := httptest.NewRequest("GET", "/foo", nil) // chi routing is prepared in test setup
+			req := httptest.NewRequest("GET", "/foo", http.NoBody) // chi routing is prepared in test setup
 			req = req.WithContext(tc.ctx)
 			w := httptest.NewRecorder()
 			GetAdmin(w, req)
@@ -406,7 +406,7 @@ func TestHandler_GetAdmins(t *testing.T) {
 	}
 	var tests = map[string]func(t *testing.T) test{
 		"fail/parse-cursor": func(t *testing.T) test {
-			req := httptest.NewRequest("GET", "/foo?limit=A", nil)
+			req := httptest.NewRequest("GET", "/foo?limit=A", http.NoBody)
 			return test{
 				ctx:        context.Background(),
 				req:        req,
@@ -420,7 +420,7 @@ func TestHandler_GetAdmins(t *testing.T) {
 			}
 		},
 		"fail/auth.GetAdmins": func(t *testing.T) test {
-			req := httptest.NewRequest("GET", "/foo", nil)
+			req := httptest.NewRequest("GET", "/foo", http.NoBody)
 			auth := &mockAdminAuthority{
 				MockGetAdmins: func(cursor string, limit int) ([]*linkedca.Admin, string, error) {
 					assert.Equals(t, "", cursor)
@@ -442,7 +442,7 @@ func TestHandler_GetAdmins(t *testing.T) {
 			}
 		},
 		"ok": func(t *testing.T) test {
-			req := httptest.NewRequest("GET", "/foo", nil)
+			req := httptest.NewRequest("GET", "/foo", http.NoBody)
 			createdAt := time.Now()
 			var deletedAt time.Time
 			adm1 := &linkedca.Admin{
@@ -764,7 +764,7 @@ func TestHandler_DeleteAdmin(t *testing.T) {
 		tc := prep(t)
 		t.Run(name, func(t *testing.T) {
 			mockMustAuthority(t, tc.auth)
-			req := httptest.NewRequest("DELETE", "/foo", nil) // chi routing is prepared in test setup
+			req := httptest.NewRequest("DELETE", "/foo", http.NoBody) // chi routing is prepared in test setup
 			req = req.WithContext(tc.ctx)
 			w := httptest.NewRecorder()
 			DeleteAdmin(w, req)

@@ -66,6 +66,23 @@ func TestKeyToID(t *testing.T) {
 	}
 }
 
+func TestAccount_GetLocation(t *testing.T) {
+	locationPrefix := "https://test.ca.smallstep.com/acme/foo/account/"
+	type test struct {
+		acc *Account
+		exp string
+	}
+	tests := map[string]test{
+		"empty":     {acc: &Account{LocationPrefix: ""}, exp: ""},
+		"not-empty": {acc: &Account{ID: "bar", LocationPrefix: locationPrefix}, exp: locationPrefix + "bar"},
+	}
+	for name, tc := range tests {
+		t.Run(name, func(t *testing.T) {
+			assert.Equals(t, tc.acc.GetLocation(), tc.exp)
+		})
+	}
+}
+
 func TestAccount_IsValid(t *testing.T) {
 	type test struct {
 		acc *Account
