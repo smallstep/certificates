@@ -850,9 +850,16 @@ func (p *PKI) GenerateConfig(opt ...ConfigOption) (*authconfig.Config, error) {
 
 		// Add default ACME provisioner if enabled
 		if p.options.enableACME {
+			// To prevent name clashes for the default ACME provisioner, we append "-1" to
+			// the name if it already exists. See https://github.com/smallstep/cli/issues/1018
+			// for the reason.
+			acmeProvisionerName := "acme"
+			if p.options.provisioner == acmeProvisionerName {
+				acmeProvisionerName = fmt.Sprintf("%s-1", acmeProvisionerName)
+			}
 			provisioners = append(provisioners, &provisioner.ACME{
 				Type: "ACME",
-				Name: "acme",
+				Name: acmeProvisionerName,
 			})
 		}
 
@@ -867,10 +874,16 @@ func (p *PKI) GenerateConfig(opt ...ConfigOption) (*authconfig.Config, error) {
 				EnableSSHCA: &enableSSHCA,
 			}
 
-			// Add default SSHPOP provisioner
+			// Add default SSHPOP provisioner. To prevent name clashes for the default
+			// SSHPOP provisioner, we append "-1" to the name if it already exists.
+			// See https://github.com/smallstep/cli/issues/1018 for the reason.
+			sshProvisionerName := "sshpop"
+			if p.options.provisioner == sshProvisionerName {
+				sshProvisionerName = fmt.Sprintf("%s-1", sshProvisionerName)
+			}
 			provisioners = append(provisioners, &provisioner.SSHPOP{
 				Type: "SSHPOP",
-				Name: "sshpop",
+				Name: sshProvisionerName,
 				Claims: &provisioner.Claims{
 					EnableSSHCA: &enableSSHCA,
 				},
