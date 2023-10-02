@@ -319,7 +319,10 @@ type PKI struct {
 func New(o apiv1.Options, opts ...Option) (*PKI, error) {
 	// TODO(hs): invoking `New` with a context active will use values from
 	// that CA context while generating the context. Thay may or may not
-	// be fully expected and/or what we want. Check that.
+	// be fully expected and/or what we want. This specific behavior was
+	// changed after not relying on the `init` inside of `step`, resulting in
+	// the default context being active if `step.Init` isn't called explicitly.
+	// It can still result in surprising results, though.
 	currentCtx := step.Contexts().GetCurrent()
 	caService, err := cas.New(context.Background(), o)
 	if err != nil {
@@ -330,7 +333,7 @@ func New(o apiv1.Options, opts ...Option) (*PKI, error) {
 	if o.IsCreator {
 		creator, ok := caService.(apiv1.CertificateAuthorityCreator)
 		if !ok {
-			return nil, errors.Errorf("cas type '%s' does not implements CertificateAuthorityCreator", o.Type)
+			return nil, errors.Errorf("cas type %q does not implement CertificateAuthorityCreator", o.Type)
 		}
 		caCreator = creator
 	}
@@ -923,10 +926,13 @@ func (p *PKI) GenerateConfig(opt ...ConfigOption) (*authconfig.Config, error) {
 			if err != nil {
 				return nil, err
 			}
+			defer _db.Shutdown() // free DB resources; unlock BadgerDB file
+
 			adminDB, err := admindb.New(_db.(nosql.DB), admin.DefaultAuthorityID)
 			if err != nil {
 				return nil, err
 			}
+
 			// Add all the provisioners to the db.
 			var adminID string
 			for i, p := range provisioners {
