@@ -3,15 +3,23 @@ package api
 
 import (
 	"bytes"
+	"encoding/base64"
 	"errors"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
-	"reflect"
+	"net/url"
 	"testing"
 	"testing/iotest"
+
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func Test_decodeRequest(t *testing.T) {
+	randomB64 := "wx/1mQ49TpdLRfvVjQhXNSe8RB3hjZEarqYp5XVIxpSbvOhQSs8hP2TgucID1IputbA8JC6CbsUpcVae3+8hRNqs5pTsSHP2aNxsw8AHGSX9dZVymSclkUV8irk+ztfEfs7aLA=="
+	expectedRandom, err := base64.StdEncoding.DecodeString(randomB64)
+	require.NoError(t, err)
 	type args struct {
 		r *http.Request
 	}
@@ -21,6 +29,22 @@ func Test_decodeRequest(t *testing.T) {
 		want    request
 		wantErr bool
 	}{
+		{
+			name: "fail/invalid-query",
+			args: args{
+				r: httptest.NewRequest(http.MethodGet, "http://scep:8080/?operation=bla;message=invalid-separator", http.NoBody),
+			},
+			want:    request{},
+			wantErr: true,
+		},
+		{
+			name: "fail/empty-operation",
+			args: args{
+				r: httptest.NewRequest(http.MethodGet, "http://scep:8080/?operation=", http.NoBody),
+			},
+			want:    request{},
+			wantErr: true,
+		},
 		{
 			name: "fail/unsupported-method",
 			args: args{
@@ -38,9 +62,25 @@ func Test_decodeRequest(t *testing.T) {
 			wantErr: true,
 		},
 		{
+			name: "fail/get-PKIOperation-empty-message",
+			args: args{
+				r: httptest.NewRequest(http.MethodGet, "http://scep:8080/?operation=PKIOperation&message=", http.NoBody),
+			},
+			want:    request{},
+			wantErr: true,
+		},
+		{
 			name: "fail/get-PKIOperation",
 			args: args{
 				r: httptest.NewRequest(http.MethodGet, "http://scep:8080/?operation=PKIOperation&message='somewronginput'", http.NoBody),
+			},
+			want:    request{},
+			wantErr: true,
+		},
+		{
+			name: "fail/get-PKIOperation-not-escaped",
+			args: args{
+				r: httptest.NewRequest(http.MethodGet, fmt.Sprintf("http://scep:8080/?operation=PKIOperation&message=%s", randomB64), http.NoBody),
 			},
 			want:    request{},
 			wantErr: true,
@@ -87,6 +127,17 @@ func Test_decodeRequest(t *testing.T) {
 			wantErr: false,
 		},
 		{
+			name: "ok/get-PKIOperation-escaped",
+			args: args{
+				r: httptest.NewRequest(http.MethodGet, fmt.Sprintf("http://scep:8080/?operation=PKIOperation&message=%s", url.QueryEscape(randomB64)), http.NoBody),
+			},
+			want: request{
+				Operation: "PKIOperation",
+				Message:   expectedRandom,
+			},
+			wantErr: false,
+		},
+		{
 			name: "ok/post-PKIOperation",
 			args: args{
 				r: httptest.NewRequest(http.MethodPost, "http://scep:8080/?operation=PKIOperation", bytes.NewBufferString("1234")),
@@ -101,13 +152,14 @@ func Test_decodeRequest(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			got, err := decodeRequest(tt.args.r)
-			if (err != nil) != tt.wantErr {
-				t.Errorf("decodeRequest() error = %v, wantErr %v", err, tt.wantErr)
+			if tt.wantErr {
+				assert.Error(t, err)
+				assert.Equal(t, tt.want, got)
 				return
 			}
-			if !reflect.DeepEqual(got, tt.want) {
-				t.Errorf("decodeRequest() = %v, want %v", got, tt.want)
-			}
+
+			assert.NoError(t, err)
+			assert.Equal(t, tt.want, got)
 		})
 	}
 }

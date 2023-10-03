@@ -151,11 +151,14 @@ func decodeRequest(r *http.Request) (request, error) {
 	defer r.Body.Close()
 
 	method := r.Method
-	query := r.URL.Query()
+	query, err := url.ParseQuery(r.URL.RawQuery)
+	if err != nil {
+		return request{}, fmt.Errorf("failed parsing URL query: %w", err)
+	}
 
-	var operation string
-	if _, ok := query["operation"]; ok {
-		operation = query.Get("operation")
+	operation := query.Get("operation")
+	if operation == "" {
+		return request{}, errors.New("no operation provided")
 	}
 
 	switch method {
@@ -167,14 +170,13 @@ func decodeRequest(r *http.Request) (request, error) {
 				Message:   []byte{},
 			}, nil
 		case opnPKIOperation:
-			var message string
-			if _, ok := query["message"]; ok {
-				message = query.Get("message")
+			message := query.Get("message")
+			if message == "" {
+				return request{}, errors.New("message must not be empty")
 			}
-			// TODO: verify this; right type of encoding? Needs additional transformations?
 			decodedMessage, err := base64.StdEncoding.DecodeString(message)
 			if err != nil {
-				return request{}, err
+				return request{}, fmt.Errorf("failed decoding message: %w", err)
 			}
 			return request{
 				Operation: operation,
@@ -186,7 +188,7 @@ func decodeRequest(r *http.Request) (request, error) {
 	case http.MethodPost:
 		body, err := io.ReadAll(io.LimitReader(r.Body, maxPayloadSize))
 		if err != nil {
-			return request{}, err
+			return request{}, fmt.Errorf("failed reading request body: %w", err)
 		}
 		return request{
 			Operation: operation,
