@@ -9,6 +9,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"net/url"
+	"strings"
 	"testing"
 	"testing/iotest"
 
@@ -19,6 +20,9 @@ import (
 func Test_decodeRequest(t *testing.T) {
 	randomB64 := "wx/1mQ49TpdLRfvVjQhXNSe8RB3hjZEarqYp5XVIxpSbvOhQSs8hP2TgucID1IputbA8JC6CbsUpcVae3+8hRNqs5pTsSHP2aNxsw8AHGSX9dZVymSclkUV8irk+ztfEfs7aLA=="
 	expectedRandom, err := base64.StdEncoding.DecodeString(randomB64)
+	require.NoError(t, err)
+	weirdMacOSCase := "wx/1mQ49TpdLRfvVjQhXNSe8RB3hjZEarqYp5XVIxpSbvOhQSs8hP2TgucID1IputbA8JC6CbsUpcVae3+8hRNqs5pTsSHP2aNxsw8AHGSX9dZVymSclkUV8irk+ztfEfs7aLA%3D%3D"
+	expectedWeirdMacOSCase, err := base64.StdEncoding.DecodeString(strings.ReplaceAll(weirdMacOSCase, "%3D", "="))
 	require.NoError(t, err)
 	type args struct {
 		r *http.Request
@@ -78,14 +82,6 @@ func Test_decodeRequest(t *testing.T) {
 			wantErr: true,
 		},
 		{
-			name: "fail/get-PKIOperation-not-escaped",
-			args: args{
-				r: httptest.NewRequest(http.MethodGet, fmt.Sprintf("http://scep:8080/?operation=PKIOperation&message=%s", randomB64), http.NoBody),
-			},
-			want:    request{},
-			wantErr: true,
-		},
-		{
 			name: "fail/post-PKIOperation",
 			args: args{
 				r: httptest.NewRequest(http.MethodPost, "http://scep:8080/?operation=PKIOperation", iotest.ErrReader(errors.New("a read error"))),
@@ -134,6 +130,28 @@ func Test_decodeRequest(t *testing.T) {
 			want: request{
 				Operation: "PKIOperation",
 				Message:   expectedRandom,
+			},
+			wantErr: false,
+		},
+		{
+			name: "ok/get-PKIOperation-not-escaped", // bit of a special case, but this is supported because of the macOS case now
+			args: args{
+				r: httptest.NewRequest(http.MethodGet, fmt.Sprintf("http://scep:8080/?operation=PKIOperation&message=%s", randomB64), http.NoBody),
+			},
+			want: request{
+				Operation: "PKIOperation",
+				Message:   expectedRandom,
+			},
+			wantErr: false,
+		},
+		{
+			name: "ok/get-PKIOperation-weird-macos-case", // a special case for macOS, which seems to result in the message not arriving fully percent-encoded
+			args: args{
+				r: httptest.NewRequest(http.MethodGet, fmt.Sprintf("http://scep:8080/?operation=PKIOperation&message=%s", weirdMacOSCase), http.NoBody),
+			},
+			want: request{
+				Operation: "PKIOperation",
+				Message:   expectedWeirdMacOSCase,
 			},
 			wantErr: false,
 		},

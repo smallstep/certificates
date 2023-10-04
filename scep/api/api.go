@@ -171,10 +171,7 @@ func decodeRequest(r *http.Request) (request, error) {
 			}, nil
 		case opnPKIOperation:
 			message := query.Get("message")
-			if message == "" {
-				return request{}, errors.New("message must not be empty")
-			}
-			decodedMessage, err := base64.StdEncoding.DecodeString(message)
+			decodedMessage, err := decodeMessage(message, r)
 			if err != nil {
 				return request{}, fmt.Errorf("failed decoding message: %w", err)
 			}
@@ -197,6 +194,76 @@ func decodeRequest(r *http.Request) (request, error) {
 	default:
 		return request{}, fmt.Errorf("unsupported method: %s", method)
 	}
+}
+
+func decodeMessage(message string, r *http.Request) ([]byte, error) {
+	if message == "" {
+		return nil, errors.New("message must not be empty")
+	}
+
+	// decode the message, which should be base64 standard encoded. Any characters that
+	// were escaped in the original query, were unescaped as part of url.ParseQuery, so
+	// that doesn't need to be performed here. Return early if successfull.
+	decodedMessage, err := base64.StdEncoding.DecodeString(message)
+	if err == nil {
+		return decodedMessage, nil
+	}
+
+	// only interested in corrupt input errors below this. This type of error is the
+	// most likely to return, but better safe than sorry.
+	if _, ok := err.(base64.CorruptInputError); !ok {
+		return nil, fmt.Errorf("failed base64 decoding message: %w", err)
+	}
+
+	// the below code is a workaround for macOS when it sends a GET PKIOperation, which seems to result
+	// in a query with the '+' and '/' not being percent encoded; only the padding ('=') is encoded.
+	// When that is unescaped in the code before this, this results in invalid base64. The workaround
+	// is to obtain the original query, extract the message, apply transformation(s) to make it valid
+	// base64 and try decoding it again. If it succeeds, the happy path can be followed with the patched
+	// message. Otherwise we still return an error.
+	rawQuery, err := parseRawQuery(r.URL.RawQuery)
+	if err != nil {
+		return nil, fmt.Errorf("failed to parse raw query: %w", err)
+	}
+
+	rawMessage := rawQuery.Get("message")
+	if rawMessage == "" {
+		return nil, errors.New("no message in raw query")
+	}
+
+	rawMessage = strings.ReplaceAll(rawMessage, "%3D", "=") // apparently the padding arrives encoded; the others (+, /) not?
+	decodedMessage, err = base64.StdEncoding.DecodeString(rawMessage)
+	if err != nil {
+		return nil, fmt.Errorf("failed decoding raw message: %w", err)
+	}
+
+	return decodedMessage, nil
+}
+
+// parseRawQuery parses a URL query into url.Values. It skips
+// unescaping keys and values. This code is based on url.ParseQuery.
+func parseRawQuery(query string) (url.Values, error) {
+	m := make(url.Values)
+	err := parseRawQueryWithoutUnescaping(m, query)
+	return m, err
+}
+
+// parseRawQueryWithoutUnescaping parses the raw query into url.Values, skipping
+// unescaping of the parts. This code is based on url.parseQuery.
+func parseRawQueryWithoutUnescaping(m url.Values, query string) (err error) {
+	for query != "" {
+		var key string
+		key, query, _ = strings.Cut(query, "&")
+		if strings.Contains(key, ";") {
+			return errors.New("invalid semicolon separator in query")
+		}
+		if key == "" {
+			continue
+		}
+		key, value, _ := strings.Cut(key, "=")
+		m[key] = append(m[key], value)
+	}
+	return err
 }
 
 // lookupProvisioner loads the provisioner associated with the request.
