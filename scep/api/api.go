@@ -203,7 +203,7 @@ func decodeMessage(message string, r *http.Request) ([]byte, error) {
 
 	// decode the message, which should be base64 standard encoded. Any characters that
 	// were escaped in the original query, were unescaped as part of url.ParseQuery, so
-	// that doesn't need to be performed here. Return early if successfull.
+	// that doesn't need to be performed here. Return early if successful.
 	decodedMessage, err := base64.StdEncoding.DecodeString(message)
 	if err == nil {
 		return decodedMessage, nil
@@ -211,7 +211,8 @@ func decodeMessage(message string, r *http.Request) ([]byte, error) {
 
 	// only interested in corrupt input errors below this. This type of error is the
 	// most likely to return, but better safe than sorry.
-	if _, ok := err.(base64.CorruptInputError); !ok {
+	var cie base64.CorruptInputError
+	if !errors.As(err, &cie) {
 		return nil, fmt.Errorf("failed base64 decoding message: %w", err)
 	}
 
