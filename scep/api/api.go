@@ -235,7 +235,7 @@ func decodeMessage(message string, r *http.Request) ([]byte, error) {
 	rawMessage = strings.ReplaceAll(rawMessage, "%3D", "=") // apparently the padding arrives encoded; the others (+, /) not?
 	decodedMessage, err = base64.StdEncoding.DecodeString(rawMessage)
 	if err != nil {
-		return nil, fmt.Errorf("failed decoding raw message: %w", err)
+		return nil, fmt.Errorf("failed base64 decoding raw message: %w", err)
 	}
 
 	return decodedMessage, nil
