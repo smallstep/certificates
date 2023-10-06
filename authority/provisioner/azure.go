@@ -316,7 +316,7 @@ func (p *Azure) authorizeToken(token string) (*azurePayload, string, string, str
 
 // AuthorizeSign validates the given token and returns the sign options that
 // will be used on certificate creation.
-func (p *Azure) AuthorizeSign(_ context.Context, token string) ([]SignOption, error) {
+func (p *Azure) AuthorizeSign(ctx context.Context, token string) ([]SignOption, error) {
 	_, name, group, subscription, identityObjectID, err := p.authorizeToken(token)
 	if err != nil {
 		return nil, errs.Wrap(http.StatusInternalServerError, err, "azure.AuthorizeSign")
@@ -382,7 +382,7 @@ func (p *Azure) AuthorizeSign(_ context.Context, token string) ([]SignOption, er
 			dnsNamesValidator([]string{name}),
 			ipAddressesValidator(nil),
 			emailAddressesValidator(nil),
-			urisValidator(nil),
+			newURIsValidator(ctx, nil),
 		)
 
 		// Enforce SANs in the template.

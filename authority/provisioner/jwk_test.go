@@ -315,8 +315,9 @@ func TestJWK_AuthorizeSign(t *testing.T) {
 						case *validityValidator:
 							assert.Equals(t, v.min, tt.prov.ctl.Claimer.MinTLSCertDuration())
 							assert.Equals(t, v.max, tt.prov.ctl.Claimer.MaxTLSCertDuration())
-						case defaultSANsValidator:
-							assert.Equals(t, []string(v), tt.sans)
+						case *defaultSANsValidator:
+							assert.Equals(t, v.sans, tt.sans)
+							assert.Equals(t, MethodFromContext(v.ctx), SignMethod)
 						case *x509NamePolicyValidator:
 							assert.Equals(t, nil, v.policyEngine)
 						case *WebhookController:

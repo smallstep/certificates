@@ -1,6 +1,7 @@
 package provisioner
 
 import (
+	"context"
 	"crypto/x509"
 	"crypto/x509/pkix"
 	"encoding/asn1"
@@ -227,23 +228,26 @@ func Test_urisValidator_Valid(t *testing.T) {
 	fu, err := url.Parse("https://unexpected.com")
 	assert.FatalError(t, err)
 
+	signContext := NewContextWithMethod(context.Background(), SignMethod)
+	signIdentityContext := NewContextWithMethod(context.Background(), SignIdentityMethod)
+
 	type args struct {
 		req *x509.CertificateRequest
 	}
 	tests := []struct {
 		name    string
-		v       urisValidator
+		v       *urisValidator
 		args    args
 		wantErr bool
 	}{
-		{"ok0", []*url.URL{}, args{&x509.CertificateRequest{URIs: []*url.URL{}}}, false},
-		{"ok1", []*url.URL{u1}, args{&x509.CertificateRequest{URIs: []*url.URL{u1}}}, false},
-		{"ok2", []*url.URL{u1, u2}, args{&x509.CertificateRequest{URIs: []*url.URL{u2, u1}}}, false},
-		{"ok3", []*url.URL{u2, u1, u3}, args{&x509.CertificateRequest{URIs: []*url.URL{u3, u2, u1}}}, false},
-		{"ok3", []*url.URL{u2, u1, u3}, args{&x509.CertificateRequest{}}, false},
-		{"fail1", []*url.URL{u1}, args{&x509.CertificateRequest{URIs: []*url.URL{u2}}}, true},
-		{"fail2", []*url.URL{u1}, args{&x509.CertificateRequest{URIs: []*url.URL{u2, u1}}}, true},
-		{"fail3", []*url.URL{u1, u2}, args{&x509.CertificateRequest{URIs: []*url.URL{u1, fu}}}, true},
+		{"ok0", newURIsValidator(signContext, []*url.URL{}), args{&x509.CertificateRequest{URIs: []*url.URL{}}}, false},
+		{"ok1", newURIsValidator(signContext, []*url.URL{u1}), args{&x509.CertificateRequest{URIs: []*url.URL{u1}}}, false},
+		{"ok2", newURIsValidator(signContext, []*url.URL{u1, u2}), args{&x509.CertificateRequest{URIs: []*url.URL{u2, u1}}}, false},
+		{"ok3", newURIsValidator(signContext, []*url.URL{u2, u1, u3}), args{&x509.CertificateRequest{URIs: []*url.URL{u3, u2, u1}}}, false},
+		{"ok4", newURIsValidator(signIdentityContext, []*url.URL{u1, u2}), args{&x509.CertificateRequest{URIs: []*url.URL{u1, fu}}}, false},
+		{"fail1", newURIsValidator(signContext, []*url.URL{u1}), args{&x509.CertificateRequest{URIs: []*url.URL{u2}}}, true},
+		{"fail2", newURIsValidator(signContext, []*url.URL{u1}), args{&x509.CertificateRequest{URIs: []*url.URL{u2, u1}}}, true},
+		{"fail3", newURIsValidator(signContext, []*url.URL{u1, u2}), args{&x509.CertificateRequest{URIs: []*url.URL{u1, fu}}}, true},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -257,13 +261,19 @@ func Test_urisValidator_Valid(t *testing.T) {
 func Test_defaultSANsValidator_Valid(t *testing.T) {
 	type test struct {
 		csr          *x509.CertificateRequest
+		ctx          context.Context
 		expectedSANs []string
 		err          error
 	}
+
+	signContext := NewContextWithMethod(context.Background(), SignMethod)
+	signIdentityContext := NewContextWithMethod(context.Background(), SignIdentityMethod)
+
 	tests := map[string]func() test{
 		"fail/dnsNamesValidator": func() test {
 			return test{
 				csr:          &x509.CertificateRequest{DNSNames: []string{"foo", "bar"}},
+				ctx:          signContext,
 				expectedSANs: []string{"foo"},
 				err:          errors.New("certificate request does not contain the valid DNS names"),
 			}
@@ -271,6 +281,7 @@ func Test_defaultSANsValidator_Valid(t *testing.T) {
 		"fail/emailAddressesValidator": func() test {
 			return test{
 				csr:          &x509.CertificateRequest{EmailAddresses: []string{"max@fx.com", "mariano@fx.com"}},
+				ctx:          signContext,
 				expectedSANs: []string{"dcow@fx.com"},
 				err:          errors.New("certificate request does not contain the valid email addresses"),
 			}
@@ -278,6 +289,7 @@ func Test_defaultSANsValidator_Valid(t *testing.T) {
 		"fail/ipAddressesValidator": func() test {
 			return test{
 				csr:          &x509.CertificateRequest{IPAddresses: []net.IP{net.ParseIP("1.1.1.1"), net.ParseIP("127.0.0.1")}},
+				ctx:          signContext,
 				expectedSANs: []string{"127.0.0.1"},
 				err:          errors.New("certificate request does not contain the valid IP addresses"),
 			}
@@ -289,8 +301,20 @@ func Test_defaultSANsValidator_Valid(t *testing.T) {
 			assert.FatalError(t, err)
 			return test{
 				csr:          &x509.CertificateRequest{URIs: []*url.URL{u1, u2}},
+				ctx:          signContext,
 				expectedSANs: []string{"urn:uuid:ddfe62ba-7e99-4bc1-83b3-8f57fe3e9959"},
 				err:          errors.New("certificate request does not contain the valid URIs"),
+			}
+		},
+		"ok/urisBadValidator-SignIdentity": func() test {
+			u1, err := url.Parse("https://google.com")
+			assert.FatalError(t, err)
+			u2, err := url.Parse("urn:uuid:ddfe62ba-7e99-4bc1-83b3-8f57fe3e9959")
+			assert.FatalError(t, err)
+			return test{
+				csr:          &x509.CertificateRequest{URIs: []*url.URL{u1, u2}},
+				ctx:          signIdentityContext,
+				expectedSANs: []string{"urn:uuid:ddfe62ba-7e99-4bc1-83b3-8f57fe3e9959"},
 			}
 		},
 		"ok": func() test {
@@ -299,6 +323,7 @@ func Test_defaultSANsValidator_Valid(t *testing.T) {
 			u2, err := url.Parse("urn:uuid:ddfe62ba-7e99-4bc1-83b3-8f57fe3e9959")
 			assert.FatalError(t, err)
 			return test{
+				ctx: signContext,
 				csr: &x509.CertificateRequest{
 					DNSNames:       []string{"foo", "bar"},
 					EmailAddresses: []string{"max@fx.com", "mariano@fx.com"},
@@ -312,7 +337,7 @@ func Test_defaultSANsValidator_Valid(t *testing.T) {
 	for name, run := range tests {
 		t.Run(name, func(t *testing.T) {
 			tt := run()
-			if err := defaultSANsValidator(tt.expectedSANs).Valid(tt.csr); err != nil {
+			if err := newDefaultSANsValidator(tt.ctx, tt.expectedSANs).Valid(tt.csr); err != nil {
 				if assert.NotNil(t, tt.err, fmt.Sprintf("expected no error, but got err = %s", err.Error())) {
 					assert.True(t, strings.Contains(err.Error(), tt.err.Error()),
 						fmt.Sprintf("want err = %s, but got err = %s", tt.err.Error(), err.Error()))

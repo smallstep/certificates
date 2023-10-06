@@ -214,7 +214,7 @@ func (a *Authority) Authorize(ctx context.Context, token string) ([]provisioner.
 	var opts = []interface{}{errs.WithKeyVal("token", token)}
 
 	switch m := provisioner.MethodFromContext(ctx); m {
-	case provisioner.SignMethod:
+	case provisioner.SignMethod, provisioner.SignIdentityMethod:
 		signOpts, err := a.authorizeSign(ctx, token)
 		return signOpts, errs.Wrap(http.StatusInternalServerError, err, "authority.Authorize", opts...)
 	case provisioner.RevokeMethod:

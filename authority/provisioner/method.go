@@ -14,6 +14,8 @@ type methodKey struct{}
 const (
 	// SignMethod is the method used to sign X.509 certificates.
 	SignMethod Method = iota
+	// SignIdentityMethod is the method used to sign X.509 identity certificates.
+	SignIdentityMethod
 	// RevokeMethod is the method used to revoke X.509 certificates.
 	RevokeMethod
 	// RenewMethod is the method used to renew X.509 certificates.
@@ -33,6 +35,8 @@ func (m Method) String() string {
 	switch m {
 	case SignMethod:
 		return "sign-method"
+	case SignIdentityMethod:
+		return "sign-identity-method"
 	case RevokeMethod:
 		return "revoke-method"
 	case RenewMethod:
