@@ -695,8 +695,9 @@ func TestAWS_AuthorizeSign(t *testing.T) {
 						assert.Equals(t, []net.IP(v), []net.IP{net.ParseIP("127.0.0.1")})
 					case emailAddressesValidator:
 						assert.Equals(t, v, nil)
-					case urisValidator:
-						assert.Equals(t, v, nil)
+					case *urisValidator:
+						assert.Equals(t, v.uris, nil)
+						assert.Equals(t, MethodFromContext(v.ctx), SignMethod)
 					case dnsNamesValidator:
 						assert.Equals(t, []string(v), []string{"ip-127-0-0-1.us-west-1.compute.internal"})
 					case *x509NamePolicyValidator:

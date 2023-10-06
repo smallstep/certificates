@@ -194,7 +194,7 @@ func (p *X5C) AuthorizeRevoke(_ context.Context, token string) error {
 }
 
 // AuthorizeSign validates the given token.
-func (p *X5C) AuthorizeSign(_ context.Context, token string) ([]SignOption, error) {
+func (p *X5C) AuthorizeSign(ctx context.Context, token string) ([]SignOption, error) {
 	claims, err := p.authorizeToken(token, p.ctl.Audiences.Sign)
 	if err != nil {
 		return nil, errs.Wrap(http.StatusInternalServerError, err, "x5c.AuthorizeSign")
@@ -244,7 +244,7 @@ func (p *X5C) AuthorizeSign(_ context.Context, token string) ([]SignOption, erro
 		},
 		// validators
 		commonNameValidator(claims.Subject),
-		defaultSANsValidator(claims.SANs),
+		newDefaultSANsValidator(ctx, claims.SANs),
 		defaultPublicKeyValidator{},
 		newValidityValidator(p.ctl.Claimer.MinTLSCertDuration(), p.ctl.Claimer.MaxTLSCertDuration()),
 		newX509NamePolicyValidator(p.ctl.getPolicy().getX509()),
