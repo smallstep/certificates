@@ -39,7 +39,6 @@ archives:
     format_overrides:
       - goos: windows
         format: zip
-    wrap_in_directory: "{{ .ProjectName }}_{{ .Version }}"
     files:
       - README.md
       - LICENSE
@@ -48,6 +47,7 @@ archives:
     << : *ARCHIVE
     id: unversioned
     name_template: "{{ .ProjectName }}_{{ .Os }}_{{ .Arch }}{{ if .Arm }}v{{ .Arm }}{{ end }}{{ if .Mips }}_{{ .Mips }}{{ end }}"
+    wrap_in_directory: "{{ .ProjectName }}"
 
 
 nfpms:
