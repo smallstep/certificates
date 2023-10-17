@@ -11,7 +11,7 @@ require (
 	github.com/fxamacker/cbor/v2 v2.5.0
 	github.com/go-chi/chi/v5 v5.0.10
 	github.com/golang/mock v1.6.0
-	github.com/google/go-cmp v0.5.9
+	github.com/google/go-cmp v0.6.0
 	github.com/google/go-tpm v0.9.0
 	github.com/google/uuid v1.3.1
 	github.com/googleapis/gax-go/v2 v2.12.0
