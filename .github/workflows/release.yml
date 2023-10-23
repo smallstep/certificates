@@ -30,19 +30,19 @@ jobs:
           echo ${{ github.ref }} | grep "\-rc.*"
           OUT=$?
           if [ $OUT -eq 0 ]; then IS_PRERELEASE=true; else IS_PRERELEASE=false; fi
-          echo "IS_PRERELEASE=${IS_PRERELEASE}" >> ${GITHUB_OUTPUT}
+          echo "IS_PRERELEASE=${IS_PRERELEASE}" >> "${GITHUB_OUTPUT}"
       - name: Extract Tag Names
         id: extract-tag
         run: |
           VERSION=${GITHUB_REF#refs/tags/v}
-          echo "VERSION=${VERSION}" >> ${GITHUB_OUTPUT}
-          echo "DOCKER_TAGS=${{ env.DOCKER_IMAGE }}:${VERSION}" >> ${GITHUB_ENV}
-          echo "DOCKER_TAGS_HSM=${{ env.DOCKER_IMAGE }}:${VERSION}-hsm" >> ${GITHUB_ENV}
+          echo "VERSION=${VERSION}" >> "${GITHUB_OUTPUT}"
+          echo "DOCKER_TAGS=${{ env.DOCKER_IMAGE }}:${VERSION}" >> "${GITHUB_ENV}"
+          echo "DOCKER_TAGS_HSM=${{ env.DOCKER_IMAGE }}:${VERSION}-hsm" >> "${GITHUB_ENV}"
       - name: Add Latest Tag
         if: steps.is_prerelease.outputs.IS_PRERELEASE == 'false'
         run: |
-          echo "DOCKER_TAGS=${{ env.DOCKER_TAGS }},${{ env.DOCKER_IMAGE }}:latest" >> ${GITHUB_ENV}
-          echo "DOCKER_TAGS_HSM=${{ env.DOCKER_TAGS_HSM }},${{ env.DOCKER_IMAGE }}:hsm" >> ${GITHUB_ENV}
+          echo "DOCKER_TAGS=${{ env.DOCKER_TAGS }},${{ env.DOCKER_IMAGE }}:latest" >> "${GITHUB_ENV}"
+          echo "DOCKER_TAGS_HSM=${{ env.DOCKER_TAGS_HSM }},${{ env.DOCKER_IMAGE }}:hsm" >> "${GITHUB_ENV}"
       - name: Create Release
         id: create_release
         uses: actions/create-release@v1
