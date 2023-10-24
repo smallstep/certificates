@@ -6,11 +6,11 @@ import (
 	"encoding/asn1"
 
 	"github.com/smallstep/pkcs7"
-	microscep "github.com/smallstep/scep"
+	smallscep "github.com/smallstep/scep"
 )
 
 // FailInfoName models the name/value of failInfo
-type FailInfoName microscep.FailInfo
+type FailInfoName smallscep.FailInfo
 
 // FailInfo models a failInfo object consisting of a
 // name/identifier and a failInfoText, the latter of
@@ -35,10 +35,10 @@ var (
 
 // PKIMessage defines the possible SCEP message types
 type PKIMessage struct {
-	microscep.TransactionID
-	microscep.MessageType
-	microscep.SenderNonce
-	*microscep.CSRReqMessage
+	smallscep.TransactionID
+	smallscep.MessageType
+	smallscep.SenderNonce
+	*smallscep.CSRReqMessage
 
 	*CertRepMessage
 
@@ -57,9 +57,9 @@ type PKIMessage struct {
 
 // CertRepMessage is a type of PKIMessage
 type CertRepMessage struct {
-	microscep.PKIStatus
-	microscep.RecipientNonce
-	microscep.FailInfo
+	smallscep.PKIStatus
+	smallscep.RecipientNonce
+	smallscep.FailInfo
 
 	Certificate *x509.Certificate
 
