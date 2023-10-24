@@ -8,9 +8,9 @@ import (
 	"fmt"
 	"sync"
 
-	microx509util "github.com/micromdm/scep/v2/cryptoutil/x509util"
-	microscep "github.com/micromdm/scep/v2/scep"
-	"go.mozilla.org/pkcs7"
+	"github.com/smallstep/pkcs7"
+	microscep "github.com/smallstep/scep"
+	microx509util "github.com/smallstep/scep/x509util"
 
 	"go.step.sm/crypto/x509util"
 

@@ -5,8 +5,8 @@ import (
 	"crypto/x509"
 	"encoding/asn1"
 
-	microscep "github.com/micromdm/scep/v2/scep"
-	"go.mozilla.org/pkcs7"
+	"github.com/smallstep/pkcs7"
+	microscep "github.com/smallstep/scep"
 )
 
 // FailInfoName models the name/value of failInfo

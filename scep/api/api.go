@@ -13,8 +13,8 @@ import (
 	"strings"
 
 	"github.com/go-chi/chi/v5"
-	microscep "github.com/micromdm/scep/v2/scep"
-	"go.mozilla.org/pkcs7"
+	"github.com/smallstep/pkcs7"
+	microscep "github.com/smallstep/scep"
 
 	"github.com/smallstep/certificates/api"
 	"github.com/smallstep/certificates/api/log"
