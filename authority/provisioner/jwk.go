@@ -190,7 +190,7 @@ func (p *JWK) AuthorizeSign(ctx context.Context, token string) ([]SignOption, er
 		newProvisionerExtensionOption(TypeJWK, p.Name, p.Key.KeyID).WithControllerOptions(p.ctl),
 		profileDefaultDuration(p.ctl.Claimer.DefaultTLSCertDuration()),
 		// validators
-		commonNameValidator(claims.Subject),
+		commonNameSliceValidator(append([]string{claims.Subject}, claims.SANs...)),
 		defaultPublicKeyValidator{},
 		newDefaultSANsValidator(ctx, claims.SANs),
 		newValidityValidator(p.ctl.Claimer.MinTLSCertDuration(), p.ctl.Claimer.MaxTLSCertDuration()),
