@@ -309,8 +309,8 @@ func TestJWK_AuthorizeSign(t *testing.T) {
 							assert.Len(t, 0, v.KeyValuePairs)
 						case profileDefaultDuration:
 							assert.Equals(t, time.Duration(v), tt.prov.ctl.Claimer.DefaultTLSCertDuration())
-						case commonNameValidator:
-							assert.Equals(t, string(v), "subject")
+						case commonNameSliceValidator:
+							assert.Equals(t, []string(v), append([]string{"subject"}, tt.sans...))
 						case defaultPublicKeyValidator:
 						case *validityValidator:
 							assert.Equals(t, v.min, tt.prov.ctl.Claimer.MinTLSCertDuration())
