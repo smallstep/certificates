@@ -23,6 +23,7 @@ import (
 	"github.com/smallstep/certificates/authority/provisioner"
 	"github.com/smallstep/certificates/ca"
 	"github.com/smallstep/certificates/cas/apiv1"
+	"github.com/stretchr/testify/require"
 	"go.step.sm/crypto/jose"
 	"go.step.sm/crypto/pemutil"
 	"go.step.sm/crypto/randutil"
@@ -631,6 +632,17 @@ func TestStepCAS_CreateCertificate(t *testing.T) {
 	jwkEnc := testJWKIssuer(t, caURL, testPassword)
 	x5cBad := testX5CIssuer(t, caURL, "bad-password")
 
+	testTemplate := &x509.Certificate{
+		Subject:        testCR.Subject,
+		DNSNames:       testCR.DNSNames,
+		EmailAddresses: testCR.EmailAddresses,
+		IPAddresses:    testCR.IPAddresses,
+		URIs:           testCR.URIs,
+	}
+
+	testOtherCR, err := x509util.CreateCertificateRequest("Test Certificate", []string{"test.example.com"}, testKey)
+	require.NoError(t, err)
+
 	type fields struct {
 		iss         stepIssuer
 		client      *ca.Client
@@ -648,6 +660,15 @@ func TestStepCAS_CreateCertificate(t *testing.T) {
 	}{
 		{"ok", fields{x5c, client, testRootFingerprint}, args{&apiv1.CreateCertificateRequest{
 			CSR:      testCR,
+			Template: testTemplate,
+			Lifetime: time.Hour,
+		}}, &apiv1.CreateCertificateResponse{
+			Certificate:      testCrt,
+			CertificateChain: []*x509.Certificate{testIssCrt},
+		}, false},
+		{"ok with different CSR", fields{x5c, client, testRootFingerprint}, args{&apiv1.CreateCertificateRequest{
+			CSR:      testOtherCR,
+			Template: testTemplate,
 			Lifetime: time.Hour,
 		}}, &apiv1.CreateCertificateResponse{
 			Certificate:      testCrt,
@@ -655,6 +676,7 @@ func TestStepCAS_CreateCertificate(t *testing.T) {
 		}, false},
 		{"ok with password", fields{x5cEnc, client, testRootFingerprint}, args{&apiv1.CreateCertificateRequest{
 			CSR:      testCR,
+			Template: testTemplate,
 			Lifetime: time.Hour,
 		}}, &apiv1.CreateCertificateResponse{
 			Certificate:      testCrt,
@@ -662,6 +684,7 @@ func TestStepCAS_CreateCertificate(t *testing.T) {
 		}, false},
 		{"ok jwk", fields{jwk, client, testRootFingerprint}, args{&apiv1.CreateCertificateRequest{
 			CSR:      testCR,
+			Template: testTemplate,
 			Lifetime: time.Hour,
 		}}, &apiv1.CreateCertificateResponse{
 			Certificate:      testCrt,
@@ -669,6 +692,7 @@ func TestStepCAS_CreateCertificate(t *testing.T) {
 		}, false},
 		{"ok jwk with password", fields{jwkEnc, client, testRootFingerprint}, args{&apiv1.CreateCertificateRequest{
 			CSR:      testCR,
+			Template: testTemplate,
 			Lifetime: time.Hour,
 		}}, &apiv1.CreateCertificateResponse{
 			Certificate:      testCrt,
@@ -676,6 +700,7 @@ func TestStepCAS_CreateCertificate(t *testing.T) {
 		}, false},
 		{"ok with provisioner", fields{jwk, client, testRootFingerprint}, args{&apiv1.CreateCertificateRequest{
 			CSR:         testCR,
+			Template:    testTemplate,
 			Lifetime:    time.Hour,
 			Provisioner: &apiv1.ProvisionerInfo{ID: "provisioner-id", Type: "ACME"},
 		}}, &apiv1.CreateCertificateResponse{
@@ -684,6 +709,7 @@ func TestStepCAS_CreateCertificate(t *testing.T) {
 		}, false},
 		{"ok with server cert", fields{jwk, client, testRootFingerprint}, args{&apiv1.CreateCertificateRequest{
 			CSR:            testCR,
+			Template:       testTemplate,
 			Lifetime:       time.Hour,
 			IsCAServerCert: true,
 		}}, &apiv1.CreateCertificateResponse{
@@ -692,6 +718,12 @@ func TestStepCAS_CreateCertificate(t *testing.T) {
 		}, false},
 		{"fail CSR", fields{x5c, client, testRootFingerprint}, args{&apiv1.CreateCertificateRequest{
 			CSR:      nil,
+			Template: testTemplate,
+			Lifetime: time.Hour,
+		}}, nil, true},
+		{"fail Template", fields{x5c, client, testRootFingerprint}, args{&apiv1.CreateCertificateRequest{
+			CSR:      testCR,
+			Template: nil,
 			Lifetime: time.Hour,
 		}}, nil, true},
 		{"fail lifetime", fields{x5c, client, testRootFingerprint}, args{&apiv1.CreateCertificateRequest{
