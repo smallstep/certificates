@@ -146,12 +146,13 @@ var (
 // that case, the other webhooks will be skipped. If none of
 // the webhooks indicates the value of the challenge was accepted,
 // an error is returned.
-func (c *challengeValidationController) Validate(ctx context.Context, csr *x509.CertificateRequest, challenge, transactionID string) error {
+func (c *challengeValidationController) Validate(ctx context.Context, csr *x509.CertificateRequest, provisionerName, challenge, transactionID string) error {
 	for _, wh := range c.webhooks {
 		req, err := webhook.NewRequestBody(webhook.WithX509CertificateRequest(csr))
 		if err != nil {
 			return fmt.Errorf("failed creating new webhook request: %w", err)
 		}
+		req.ProvisionerName = provisionerName
 		req.SCEPChallenge = challenge
 		req.SCEPTransactionID = transactionID
 		resp, err := wh.DoWithContext(ctx, c.client, req, nil) // TODO(hs): support templated URL? Requires some refactoring
@@ -439,7 +440,7 @@ func (s *SCEP) ValidateChallenge(ctx context.Context, csr *x509.CertificateReque
 	}
 	switch s.selectValidationMethod() {
 	case validationMethodWebhook:
-		return s.challengeValidationController.Validate(ctx, csr, challenge, transactionID)
+		return s.challengeValidationController.Validate(ctx, csr, s.Name, challenge, transactionID)
 	default:
 		if subtle.ConstantTimeCompare([]byte(s.ChallengePassword), []byte(challenge)) == 0 {
 			return errors.New("invalid challenge password provided")

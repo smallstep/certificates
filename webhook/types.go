@@ -70,7 +70,8 @@ type X5CCertificate struct {
 
 // RequestBody is the body sent to webhook servers.
 type RequestBody struct {
-	Timestamp time.Time `json:"timestamp"`
+	Timestamp       time.Time `json:"timestamp"`
+	ProvisionerName string    `json:"provisionerName,omitempty"`
 	// Only set after successfully completing acme device-attest-01 challenge
 	AttestationData *AttestationData `json:"attestationData,omitempty"`
 	// Set for most provisioners, but not acme or scep
