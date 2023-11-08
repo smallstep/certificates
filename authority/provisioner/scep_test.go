@@ -22,9 +22,10 @@ func Test_challengeValidationController_Validate(t *testing.T) {
 		Raw: []byte{1},
 	}
 	type request struct {
-		Request       *webhook.X509CertificateRequest `json:"x509CertificateRequest,omitempty"`
-		Challenge     string                          `json:"scepChallenge"`
-		TransactionID string                          `json:"scepTransactionID"`
+		ProvisionerName string                          `json:"provisionerName,omitempty"`
+		Request         *webhook.X509CertificateRequest `json:"x509CertificateRequest,omitempty"`
+		Challenge       string                          `json:"scepChallenge"`
+		TransactionID   string                          `json:"scepTransactionID"`
 	}
 	type response struct {
 		Allow bool `json:"allow"`
@@ -33,6 +34,7 @@ func Test_challengeValidationController_Validate(t *testing.T) {
 		req := &request{}
 		err := json.NewDecoder(r.Body).Decode(req)
 		require.NoError(t, err)
+		assert.Equal(t, "my-scep-provisioner", req.ProvisionerName)
 		assert.Equal(t, "not-allowed", req.Challenge)
 		assert.Equal(t, "transaction-1", req.TransactionID)
 		b, err := json.Marshal(response{Allow: false})
@@ -44,6 +46,7 @@ func Test_challengeValidationController_Validate(t *testing.T) {
 		req := &request{}
 		err := json.NewDecoder(r.Body).Decode(req)
 		require.NoError(t, err)
+		assert.Equal(t, "my-scep-provisioner", req.ProvisionerName)
 		assert.Equal(t, "challenge", req.Challenge)
 		assert.Equal(t, "transaction-1", req.TransactionID)
 		if assert.NotNil(t, req.Request) {
