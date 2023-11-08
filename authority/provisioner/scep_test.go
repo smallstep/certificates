@@ -254,7 +254,7 @@ func TestSCEP_ValidateChallenge(t *testing.T) {
 		req := &request{}
 		err := json.NewDecoder(r.Body).Decode(req)
 		require.NoError(t, err)
-		assert.Equal(t, "scep", req.ProvisionerName)
+		assert.Equal(t, "SCEP", req.ProvisionerName)
 		assert.Equal(t, "webhook-challenge", req.Challenge)
 		assert.Equal(t, "webhook-transaction-1", req.TransactionID)
 		if assert.NotNil(t, req.Request) {
