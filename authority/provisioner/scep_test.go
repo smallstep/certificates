@@ -242,9 +242,10 @@ func TestSCEP_ValidateChallenge(t *testing.T) {
 		Raw: []byte{1},
 	}
 	type request struct {
-		Request       *webhook.X509CertificateRequest `json:"x509CertificateRequest,omitempty"`
-		Challenge     string                          `json:"scepChallenge"`
-		TransactionID string                          `json:"scepTransactionID"`
+		ProvisionerName string                          `json:"provisionerName,omitempty"`
+		Request         *webhook.X509CertificateRequest `json:"x509CertificateRequest,omitempty"`
+		Challenge       string                          `json:"scepChallenge"`
+		TransactionID   string                          `json:"scepTransactionID"`
 	}
 	type response struct {
 		Allow bool `json:"allow"`
@@ -253,6 +254,7 @@ func TestSCEP_ValidateChallenge(t *testing.T) {
 		req := &request{}
 		err := json.NewDecoder(r.Body).Decode(req)
 		require.NoError(t, err)
+		assert.Equal(t, "scep", req.ProvisionerName)
 		assert.Equal(t, "webhook-challenge", req.Challenge)
 		assert.Equal(t, "webhook-transaction-1", req.TransactionID)
 		if assert.NotNil(t, req.Request) {

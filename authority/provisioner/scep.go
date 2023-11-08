@@ -9,6 +9,7 @@ import (
 	"encoding/pem"
 	"fmt"
 	"net/http"
+	"strings"
 	"time"
 
 	"github.com/pkg/errors"
@@ -152,7 +153,7 @@ func (c *challengeValidationController) Validate(ctx context.Context, csr *x509.
 		if err != nil {
 			return fmt.Errorf("failed creating new webhook request: %w", err)
 		}
-		req.ProvisionerName = provisionerName
+		req.ProvisionerName = strings.ToLower(provisionerName)
 		req.SCEPChallenge = challenge
 		req.SCEPTransactionID = transactionID
 		resp, err := wh.DoWithContext(ctx, c.client, req, nil) // TODO(hs): support templated URL? Requires some refactoring
