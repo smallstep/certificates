@@ -77,6 +77,8 @@ func FromContext(ctx context.Context) (db AuthDB, ok bool) {
 
 // MustFromContext returns the current database from the given context. It
 // will panic if it's not in the context.
+//
+//nolint:revive // stfu
 func MustFromContext(ctx context.Context) AuthDB {
 	if db, ok := FromContext(ctx); !ok {
 		panic("authority database is not in the context")

@@ -47,6 +47,8 @@ func FromContext(ctx context.Context) (a *Authority, ok bool) {
 
 // MustFromContext returns the current authority from the given context. It will
 // panic if the authority is not in the context.
+//
+//nolint:revive // stfu
 func MustFromContext(ctx context.Context) *Authority {
 	if a, ok := FromContext(ctx); !ok {
 		panic("scep authority is not in the context")

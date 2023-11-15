@@ -107,8 +107,8 @@ func (l *LoggerHandler) writeEntry(w ResponseLogger, r *http.Request, t time.Tim
 
 	switch {
 	case status < http.StatusBadRequest:
-		if l.options.onlyTraceHealthEndpoint && uri == "/health" {
-			l.logger.WithFields(fields).Trace()
+		if uri == "/health" {
+			break
 		} else {
 			l.logger.WithFields(fields).Info()
 		}

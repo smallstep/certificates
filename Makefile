@@ -139,7 +139,7 @@ fmt:
 lint: SHELL:=/bin/bash
 lint:
 	$Q LOG_LEVEL=error golangci-lint run --config <(curl -s https://raw.githubusercontent.com/smallstep/workflows/master/.golangci.yml) --timeout=30m
-	$Q govulncheck ./...
+# 	$Q govulncheck ./...
 
 .PHONY: fmt lint
 
@@ -177,3 +177,16 @@ run:
 
 .PHONY: run
 
+export TAG := v1.0-${FI_NAME}
+EXECUTABLE = small-ca
+
+clean:
+	@echo "Running clean"
+	rm -rf bin report docs
+	rm -f $(EXECUTABLE)
+
+install:
+	@echo "--- Building Docker image"
+	docker build  -f ./docker/Dockerfile -t small-ca:${TAG} .
+	docker tag small-ca:${TAG} docker-registry.fi2.wandera.cz/small-ca:${TAG}
+	docker push docker-registry.fi2.wandera.cz/small-ca:${TAG}

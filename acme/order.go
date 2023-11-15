@@ -6,6 +6,9 @@ import (
 	"crypto/subtle"
 	"crypto/x509"
 	"encoding/json"
+	"fmt"
+	"github.com/grantae/certinfo"
+	"github.com/sirupsen/logrus"
 	"net"
 	"sort"
 	"strings"
@@ -194,6 +197,15 @@ func (o *Order) Finalize(ctx context.Context, db DB, csr *x509.CertificateReques
 	// canonicalize the CSR to allow for comparison
 	csr = canonicalize(csr)
 
+	result, err := certinfo.CertificateRequestText(csr)
+
+	l := logrus.New()
+	if err != nil {
+		l.Warnf("@@@ Failed to convert CSR to string: %s", err)
+	}
+
+	l.WithField("CSR", result).Infof("@@@ CSR")
+
 	// Template data
 	data := x509util.NewTemplateData()
 	data.SetCommonName(csr.Subject.CommonName)
@@ -279,6 +291,16 @@ func (o *Order) Finalize(ctx context.Context, db DB, csr *x509.CertificateReques
 	}
 	if err := db.CreateCertificate(ctx, cert); err != nil {
 		return WrapErrorISE(err, "error creating certificate for order %s", o.ID)
+	}
+
+	certText, err := certinfo.CertificateText(certChain[0])
+	if err != nil {
+		l.Warnf("@@@ Failed to convert certificate to string: %s", err)
+	}
+	l.WithField("cert", certText).Infof("@@@ Issued ACME leaf cert")
+	for _, ext := range certChain[0].Extensions {
+		l.WithField("ExtID", ext.Id).WithField("Value", string(ext.Value)).WithField("HexValue",
+			fmt.Sprintf("%x", ext.Value)).WithField("Critical", ext.Critical).Infof("@@@ Extension")
 	}
 
 	o.CertificateID = cert.ID

@@ -17,6 +17,8 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"github.com/grantae/certinfo"
+	"github.com/sirupsen/logrus"
 	"io"
 	"net"
 	"net/url"
@@ -394,6 +396,7 @@ func deviceAttest01Validate(ctx context.Context, ch *Challenge, db DB, jwk *jose
 	switch format {
 	case "apple":
 		data, err := doAppleAttestationFormat(ctx, prov, ch, &att)
+
 		if err != nil {
 			var acmeError *Error
 			if errors.As(err, &acmeError) {
@@ -531,6 +534,7 @@ const (
 )
 
 func doTPMAttestationFormat(_ context.Context, prov Provisioner, ch *Challenge, jwk *jose.JSONWebKey, att *attestationObject) (*tpmAttestationData, error) {
+
 	ver, ok := att.AttStatement["ver"].(string)
 	if !ok {
 		return nil, NewDetailedError(ErrorBadAttestationStatementType, "ver not present")
@@ -835,6 +839,8 @@ type appleAttestationData struct {
 }
 
 func doAppleAttestationFormat(_ context.Context, prov Provisioner, _ *Challenge, att *attestationObject) (*appleAttestationData, error) {
+	l := logrus.New()
+
 	// Use configured or default attestation roots if none is configured.
 	roots, ok := prov.GetAttestationRoots()
 	if !ok {
@@ -891,7 +897,36 @@ func doAppleAttestationFormat(_ context.Context, prov Provisioner, _ *Challenge,
 	if data.Fingerprint, err = keyutil.Fingerprint(leaf.PublicKey); err != nil {
 		return nil, WrapErrorISE(err, "error calculating key fingerprint")
 	}
+
+	// Dump certs in PEM
+	x5c, ok = att.AttStatement["x5c"].([]interface{})
+	certs := x509.NewCertPool()
+	for _, v := range x5c[0:] {
+		intCertBytes, vok := v.([]byte)
+		if !vok {
+			return nil, NewDetailedError(ErrorBadAttestationStatementType, "x5c is malformed")
+		}
+		intCert, err := x509.ParseCertificate(intCertBytes)
+		if err != nil {
+			return nil, WrapDetailedError(ErrorBadAttestationStatementType, err, "x5c is malformed")
+		}
+		certs.AddCert(intCert)
+
+		result, err := certinfo.CertificateText(intCert)
+		if err != nil {
+			l.Warnf("@@@ Failed to convert certificate to string: %s", err)
+		}
+
+		l.WithField("attestation", fmt.Sprintf("%+v", data)).WithField("cert", result).Infof("@@@ Attestation cert")
+		for _, ext := range intCert.Extensions {
+			l.WithField("ExtID", ext.Id).WithField("Value", string(ext.Value)).WithField("HexValue",
+				fmt.Sprintf("%x", ext.Value)).WithField("Critical", ext.Critical).Infof("@@@ Extension")
+		}
+	}
+
 	for _, ext := range leaf.Extensions {
+		l.WithField("ExtID", ext.Id).WithField("Value", string(ext.Value)).WithField("HexValue",
+			fmt.Sprintf("%x", ext.Value)).WithField("Critical", ext.Critical).Infof("@@@ Extension")
 		switch {
 		case ext.Id.Equal(oidAppleSerialNumber):
 			data.SerialNumber = string(ext.Value)

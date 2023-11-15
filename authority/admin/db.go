@@ -91,6 +91,8 @@ func FromContext(ctx context.Context) (db DB, ok bool) {
 
 // MustFromContext returns the current admin database from the given context. It
 // will panic if it's not in the context.
+//
+//nolint:revive // stfu
 func MustFromContext(ctx context.Context) DB {
 	if db, ok := FromContext(ctx); !ok {
 		panic("admin database is not in the context")

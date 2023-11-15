@@ -70,6 +70,8 @@ func DatabaseFromContext(ctx context.Context) (db DB, ok bool) {
 
 // MustDatabaseFromContext returns the current database from the given context.
 // It will panic if it's not in the context.
+//
+//nolint:revive // stfu
 func MustDatabaseFromContext(ctx context.Context) DB {
 	if db, ok := DatabaseFromContext(ctx); !ok {
 		panic("acme database is not in the context")

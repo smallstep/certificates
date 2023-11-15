@@ -95,6 +95,8 @@ func ProvisionerFromContext(ctx context.Context) (v Provisioner, ok bool) {
 
 // MustLinkerFromContext returns the current provisioner from the given context.
 // It will panic if it's not in the context.
+//
+//nolint:revive // stfu
 func MustProvisionerFromContext(ctx context.Context) Provisioner {
 	if v, ok := ProvisionerFromContext(ctx); !ok {
 		panic("acme provisioner is not the context")

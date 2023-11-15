@@ -45,9 +45,9 @@ func (n *NewOrderRequest) Validate() error {
 				return acme.NewError(acme.ErrorMalformedType, "invalid DNS name: %s", id.Value)
 			}
 		case acme.PermanentIdentifier:
-			if id.Value == "" {
-				return acme.NewError(acme.ErrorMalformedType, "permanent identifier cannot be empty")
-			}
+			//if id.Value == "" {
+			//	return acme.NewError(acme.ErrorMalformedType, "permanent identifier cannot be empty")
+			//}
 		default:
 			return acme.NewError(acme.ErrorMalformedType, "identifier type unsupported: %s", id.Type)
 		}
