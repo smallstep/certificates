@@ -411,17 +411,8 @@ func wireOIDC01Validate(ctx context.Context, ch *Challenge, db DB, jwk *jose.JSO
 			"keyAuthorization does not match; expected %s, but got %s", expectedKeyAuth, wireChallengePayload.KeyAuth))
 	}
 
-	if claims.Issuer == "https://accounts.google.com" {
-		// for internal demo purpose only
-		var handle = fmt.Sprintf("im:wireapp=%s_wire", strings.ToLower(claims.GivenName))
-		var displayName = claims.Handle
-		if challengeValues.Name != displayName || challengeValues.Handle != handle {
-			return storeError(ctx, db, ch, false, NewError(ErrorRejectedIdentifierType, "OIDC claims don't match"))
-		}
-	} else {
-		if challengeValues.Name != claims.Name || challengeValues.Handle != claims.Handle {
-			return storeError(ctx, db, ch, false, NewError(ErrorRejectedIdentifierType, "OIDC claims don't match"))
-		}
+	if challengeValues.Name != claims.Name || challengeValues.Handle != claims.Handle {
+		return storeError(ctx, db, ch, false, NewError(ErrorRejectedIdentifierType, "OIDC claims don't match"))
 	}
 
 	// Update and store the challenge.
