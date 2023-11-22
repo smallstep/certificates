@@ -516,6 +516,8 @@ func wireDPOP01Validate(ctx context.Context, ch *Challenge, db DB, jwk *jose.JSO
 		"verify-access",
 		"--client-id",
 		challengeValues.ClientID,
+		"--handle",
+		challengeValues.Handle,
 		"--challenge",
 		ch.Token,
 		"--leeway",
