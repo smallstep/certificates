@@ -474,7 +474,7 @@ func patchSignatures(jws *jose.JSONWebSignature) {
 		case jose.ES512:
 			expectedSize = 132
 		default:
-			// other cases are (currently) ignored; TODO(hs): need other cases too?
+			// other cases are (currently) ignored
 			continue
 		}
 		if diff := expectedSize - len(s.Signature); diff > 0 {
