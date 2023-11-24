@@ -6,6 +6,7 @@ import (
 	"crypto"
 	"encoding/base64"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -14,9 +15,10 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/pkg/errors"
 	"github.com/smallstep/assert"
 	"github.com/smallstep/certificates/acme"
+	tassert "github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	"go.step.sm/crypto/jose"
 	"go.step.sm/crypto/keyutil"
 )
@@ -572,6 +574,38 @@ func TestHandler_verifyAndExtractJWSPayload(t *testing.T) {
 						assert.Equals(t, p.value, []byte("{}"))
 						assert.False(t, p.isPostAsGet)
 						assert.True(t, p.isEmptyJSON)
+					}
+					w.Write(testBody)
+				},
+			}
+		},
+		"ok/apple-acmeclient-omitting-leading-null-bytes-in-signature": func(t *testing.T) test {
+			appleNullByteCaseKey := []byte(`{
+				"kid": "2eIRaNCmST4CwcOHyRSrGO-7k4TAr9fdNk0_2qw4-ps",
+				"crv": "P-256",
+				"alg": "ES256",
+				"kty": "EC",
+				"x": "v_Twh1khKHS32OJF7Bhzr3DVExbC54bRokOE9wdweRY",
+				"y": "-IWh-AXzmzh1Mg9OMuWfzje24wLPJmU6AwERo86zk3k"
+			}`)
+			appleNullByteCaseJWK := &jose.JSONWebKey{}
+			err = json.Unmarshal(appleNullByteCaseKey, appleNullByteCaseJWK)
+			require.NoError(t, err)
+			appleNullByteCaseBody := `{"protected":"eyJhbGciOiJFUzI1NiIsImp3ayI6eyJjcnYiOiJQLTI1NiIsImt0eSI6IkVDIiwieCI6InZfVHdoMWtoS0hTMzJPSkY3Qmh6cjNEVkV4YkM1NGJSb2tPRTl3ZHdlUlkiLCJ5IjoiLUlXaC1BWHptemgxTWc5T011V2Z6amUyNHdMUEptVTZBd0VSbzg2emszayJ9LCJub25jZSI6ImVERTRjMnhPVDIxQ1lUWnNjMjl4ZFhjNVNFcEdVM0ZRVkc5SGEzRjBSMVEiLCJ1cmwiOiJodHRwczovL2FhZTItMTYzLTE1OC00NS00OS5uZ3Jvay1mcmVlLmFwcC9hY21lL21kYS9uZXctYWNjb3VudCJ9","payload":"eyJ0ZXJtc09mU2VydmljZUFncmVlZCI6dHJ1ZX0","signature":"57RgynZOnBrkx8UIrXZD80Lfql1IitFjBqFoiz2YOew2_oCb8JLx2C2RFp1AGQmP-3p6KP8e3GKb4anZVrdf"}`
+			appleNullByteCaseJWS, err := jose.ParseJWS(appleNullByteCaseBody)
+			require.NoError(t, err)
+			ctx := context.WithValue(context.Background(), jwsContextKey, appleNullByteCaseJWS)
+			ctx = context.WithValue(ctx, jwkContextKey, appleNullByteCaseJWK)
+			return test{
+				ctx:        ctx,
+				statusCode: 200,
+				next: func(w http.ResponseWriter, r *http.Request) {
+					p, err := payloadFromContext(r.Context())
+					tassert.NoError(t, err)
+					if tassert.NotNil(t, p) {
+						tassert.Equal(t, []byte(`{"termsOfServiceAgreed":true}`), p.value)
+						tassert.False(t, p.isPostAsGet)
+						tassert.False(t, p.isEmptyJSON)
 					}
 					w.Write(testBody)
 				},
@@ -1692,6 +1726,40 @@ func TestHandler_checkPrerequisites(t *testing.T) {
 			} else {
 				assert.Equals(t, bytes.TrimSpace(body), testBody)
 			}
+		})
+	}
+}
+
+func Test_patchSignatures(t *testing.T) {
+	key := []byte(`{
+		"kid": "2eIRaNCmST4CwcOHyRSrGO-7k4TAr9fdNk0_2qw4-ps",
+		"crv": "P-256",
+		"alg": "ES256",
+		"kty": "EC",
+		"x": "v_Twh1khKHS32OJF7Bhzr3DVExbC54bRokOE9wdweRY",
+		"y": "-IWh-AXzmzh1Mg9OMuWfzje24wLPJmU6AwERo86zk3k"
+	}`)
+	jwk := &jose.JSONWebKey{}
+	err := json.Unmarshal(key, jwk)
+	require.NoError(t, err)
+	body := `{"protected":"eyJhbGciOiJFUzI1NiIsImp3ayI6eyJjcnYiOiJQLTI1NiIsImt0eSI6IkVDIiwieCI6InZfVHdoMWtoS0hTMzJPSkY3Qmh6cjNEVkV4YkM1NGJSb2tPRTl3ZHdlUlkiLCJ5IjoiLUlXaC1BWHptemgxTWc5T011V2Z6amUyNHdMUEptVTZBd0VSbzg2emszayJ9LCJub25jZSI6ImVERTRjMnhPVDIxQ1lUWnNjMjl4ZFhjNVNFcEdVM0ZRVkc5SGEzRjBSMVEiLCJ1cmwiOiJodHRwczovL2FhZTItMTYzLTE1OC00NS00OS5uZ3Jvay1mcmVlLmFwcC9hY21lL21kYS9uZXctYWNjb3VudCJ9","payload":"eyJ0ZXJtc09mU2VydmljZUFncmVlZCI6dHJ1ZX0","signature":"57RgynZOnBrkx8UIrXZD80Lfql1IitFjBqFoiz2YOew2_oCb8JLx2C2RFp1AGQmP-3p6KP8e3GKb4anZVrdf"}`
+	jws, err := jose.ParseJWS(body)
+	require.NoError(t, err)
+	tests := []struct {
+		name string
+		jws  *jose.JSONWebSignature
+		jwk  *jose.JSONWebKey
+	}{
+		{"ok/patched", jws, jwk},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			patchSignatures(tt.jws)
+			tassert.Len(t, tt.jws.Signatures[0].Signature, 64)
+
+			data, err := tt.jws.Verify(tt.jwk)
+			tassert.NoError(t, err)
+			tassert.Equal(t, []byte(`{"termsOfServiceAgreed":true}`), data)
 		})
 	}
 }

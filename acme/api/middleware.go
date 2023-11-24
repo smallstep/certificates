@@ -1,6 +1,7 @@
 package api
 
 import (
+	"bytes"
 	"context"
 	"crypto/rsa"
 	"errors"
@@ -422,17 +423,64 @@ func verifyAndExtractJWSPayload(next nextHTTP) nextHTTP {
 			render.Error(w, acme.NewError(acme.ErrorMalformedType, "verifier and signature algorithm do not match"))
 			return
 		}
+
 		payload, err := jws.Verify(jwk)
-		if err != nil {
+		switch {
+		case errors.Is(err, jose.ErrCryptoFailure):
+			payload, err = retryVerificationWithPatchedSignatures(jws, jwk)
+			if err != nil {
+				render.Error(w, acme.WrapError(acme.ErrorMalformedType, err, "error verifying jws with patched signature(s)"))
+				return
+			}
+		case err != nil:
 			render.Error(w, acme.WrapError(acme.ErrorMalformedType, err, "error verifying jws"))
 			return
 		}
+
 		ctx = context.WithValue(ctx, payloadContextKey, &payloadInfo{
 			value:       payload,
 			isPostAsGet: len(payload) == 0,
 			isEmptyJSON: string(payload) == "{}",
 		})
 		next(w, r.WithContext(ctx))
+	}
+}
+
+// retryVerificationWithPatchedSignatures retries verification of the JWS using
+// the JWK by patching the JWS signatures if they're determined to be too short.
+//
+// Generally this shouldn't happen, but we've observed this to be the case with
+// the macOS ACME client, which seems to omit (at least one) leading null byte(s).
+// The error returned is `square/go-jose: error in cryptographic primitive`, which
+// is a sential error that hides the details of the actual underlying error, which
+// is as follows: `square/go-jose: invalid signature size, have 63 bytes, wanted 64`,
+// for ES256.
+func retryVerificationWithPatchedSignatures(jws *jose.JSONWebSignature, jwk *jose.JSONWebKey) ([]byte, error) {
+	patchSignatures(jws)
+	return jws.Verify(jwk)
+}
+
+// patchSignatures patches the signatures in a JWS if it finds signatures that
+// are too short for the signature algorithm.
+func patchSignatures(jws *jose.JSONWebSignature) {
+	for i, s := range jws.Signatures {
+		var expectedSize int
+		alg := strings.ToUpper(s.Header.Algorithm)
+		switch alg {
+		case jose.ES256:
+			expectedSize = 64
+		case jose.ES384:
+			expectedSize = 96
+		case jose.ES512:
+			expectedSize = 132
+		default:
+			// other cases are (currently) ignored; TODO(hs): need other cases too?
+			continue
+		}
+		if diff := expectedSize - len(s.Signature); diff > 0 {
+			s.Signature = append(bytes.Repeat([]byte{0x00}, diff), s.Signature...)
+			jws.Signatures[i] = s
+		}
 	}
 }
 
