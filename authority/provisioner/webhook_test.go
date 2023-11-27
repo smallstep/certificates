@@ -482,7 +482,9 @@ func TestWebhook_Do(t *testing.T) {
 
 				secret, err := base64.StdEncoding.DecodeString(tc.webhook.Secret)
 				assert.FatalError(t, err)
-				mac := hmac.New(sha256.New, secret).Sum(body)
+				h := hmac.New(sha256.New, secret)
+				h.Write(body)
+				mac := h.Sum(nil)
 				assert.True(t, hmac.Equal(sig, mac))
 
 				switch {

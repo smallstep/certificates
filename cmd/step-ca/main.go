@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"html"
 	"log"
-	"math/rand"
 	"net/http"
 	"os"
 	"reflect"
@@ -52,7 +51,6 @@ var (
 func init() {
 	step.Set("Smallstep CA", Version, BuildTime)
 	authority.GlobalVersion.Version = Version
-	rand.Seed(time.Now().UnixNano())
 	// Add support for asking passwords
 	pemutil.PromptPassword = func(msg string) ([]byte, error) {
 		return ui.PromptPassword(msg)

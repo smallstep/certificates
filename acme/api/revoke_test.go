@@ -21,7 +21,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/go-chi/chi"
+	"github.com/go-chi/chi/v5"
 	"github.com/google/go-cmp/cmp"
 	"github.com/pkg/errors"
 	"golang.org/x/crypto/ocsp"
@@ -1072,7 +1072,7 @@ func TestHandler_RevokeCert(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			ctx := newBaseContext(tc.ctx, tc.db, acme.NewLinker("test.ca.smallstep.com", "acme"))
 			mockMustAuthority(t, tc.ca)
-			req := httptest.NewRequest("POST", revokeURL, nil)
+			req := httptest.NewRequest("POST", revokeURL, http.NoBody)
 			req = req.WithContext(ctx)
 			w := httptest.NewRecorder()
 			RevokeCert(w, req)
@@ -1094,7 +1094,7 @@ func TestHandler_RevokeCert(t *testing.T) {
 				assert.Equals(t, res.Header["Content-Type"], []string{"application/problem+json"})
 			} else {
 				assert.True(t, bytes.Equal(bytes.TrimSpace(body), []byte{}))
-				assert.Equals(t, int64(0), req.ContentLength)
+				assert.Equals(t, int64(-1), req.ContentLength)
 				assert.Equals(t, []string{fmt.Sprintf("<%s/acme/%s/directory>;rel=\"index\"", baseURL.String(), escProvName)}, res.Header["Link"])
 			}
 		})

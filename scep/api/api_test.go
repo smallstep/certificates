@@ -3,15 +3,27 @@ package api
 
 import (
 	"bytes"
+	"encoding/base64"
 	"errors"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
-	"reflect"
+	"net/url"
+	"strings"
 	"testing"
 	"testing/iotest"
+
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func Test_decodeRequest(t *testing.T) {
+	randomB64 := "wx/1mQ49TpdLRfvVjQhXNSe8RB3hjZEarqYp5XVIxpSbvOhQSs8hP2TgucID1IputbA8JC6CbsUpcVae3+8hRNqs5pTsSHP2aNxsw8AHGSX9dZVymSclkUV8irk+ztfEfs7aLA=="
+	expectedRandom, err := base64.StdEncoding.DecodeString(randomB64)
+	require.NoError(t, err)
+	weirdMacOSCase := "wx/1mQ49TpdLRfvVjQhXNSe8RB3hjZEarqYp5XVIxpSbvOhQSs8hP2TgucID1IputbA8JC6CbsUpcVae3+8hRNqs5pTsSHP2aNxsw8AHGSX9dZVymSclkUV8irk+ztfEfs7aLA%3D%3D"
+	expectedWeirdMacOSCase, err := base64.StdEncoding.DecodeString(strings.ReplaceAll(weirdMacOSCase, "%3D", "="))
+	require.NoError(t, err)
 	type args struct {
 		r *http.Request
 	}
@@ -22,9 +34,25 @@ func Test_decodeRequest(t *testing.T) {
 		wantErr bool
 	}{
 		{
+			name: "fail/invalid-query",
+			args: args{
+				r: httptest.NewRequest(http.MethodGet, "http://scep:8080/?operation=bla;message=invalid-separator", http.NoBody),
+			},
+			want:    request{},
+			wantErr: true,
+		},
+		{
+			name: "fail/empty-operation",
+			args: args{
+				r: httptest.NewRequest(http.MethodGet, "http://scep:8080/?operation=", http.NoBody),
+			},
+			want:    request{},
+			wantErr: true,
+		},
+		{
 			name: "fail/unsupported-method",
 			args: args{
-				r: httptest.NewRequest(http.MethodPatch, "http://scep:8080/?operation=AnUnsupportOperation", nil),
+				r: httptest.NewRequest(http.MethodPatch, "http://scep:8080/?operation=AnUnsupportOperation", http.NoBody),
 			},
 			want:    request{},
 			wantErr: true,
@@ -32,7 +60,15 @@ func Test_decodeRequest(t *testing.T) {
 		{
 			name: "fail/get-unsupported-operation",
 			args: args{
-				r: httptest.NewRequest(http.MethodGet, "http://scep:8080/?operation=AnUnsupportOperation", nil),
+				r: httptest.NewRequest(http.MethodGet, "http://scep:8080/?operation=AnUnsupportOperation", http.NoBody),
+			},
+			want:    request{},
+			wantErr: true,
+		},
+		{
+			name: "fail/get-PKIOperation-empty-message",
+			args: args{
+				r: httptest.NewRequest(http.MethodGet, "http://scep:8080/?operation=PKIOperation&message=", http.NoBody),
 			},
 			want:    request{},
 			wantErr: true,
@@ -40,7 +76,7 @@ func Test_decodeRequest(t *testing.T) {
 		{
 			name: "fail/get-PKIOperation",
 			args: args{
-				r: httptest.NewRequest(http.MethodGet, "http://scep:8080/?operation=PKIOperation&message='somewronginput'", nil),
+				r: httptest.NewRequest(http.MethodGet, "http://scep:8080/?operation=PKIOperation&message='somewronginput'", http.NoBody),
 			},
 			want:    request{},
 			wantErr: true,
@@ -56,7 +92,7 @@ func Test_decodeRequest(t *testing.T) {
 		{
 			name: "ok/get-GetCACert",
 			args: args{
-				r: httptest.NewRequest(http.MethodGet, "http://scep:8080/?operation=GetCACert", nil),
+				r: httptest.NewRequest(http.MethodGet, "http://scep:8080/?operation=GetCACert", http.NoBody),
 			},
 			want: request{
 				Operation: "GetCACert",
@@ -67,7 +103,7 @@ func Test_decodeRequest(t *testing.T) {
 		{
 			name: "ok/get-GetCACaps",
 			args: args{
-				r: httptest.NewRequest(http.MethodGet, "http://scep:8080/?operation=GetCACaps", nil),
+				r: httptest.NewRequest(http.MethodGet, "http://scep:8080/?operation=GetCACaps", http.NoBody),
 			},
 			want: request{
 				Operation: "GetCACaps",
@@ -78,11 +114,44 @@ func Test_decodeRequest(t *testing.T) {
 		{
 			name: "ok/get-PKIOperation",
 			args: args{
-				r: httptest.NewRequest(http.MethodGet, "http://scep:8080/?operation=PKIOperation&message=MTIzNA==", nil),
+				r: httptest.NewRequest(http.MethodGet, "http://scep:8080/?operation=PKIOperation&message=MTIzNA==", http.NoBody),
 			},
 			want: request{
 				Operation: "PKIOperation",
 				Message:   []byte("1234"),
+			},
+			wantErr: false,
+		},
+		{
+			name: "ok/get-PKIOperation-escaped",
+			args: args{
+				r: httptest.NewRequest(http.MethodGet, fmt.Sprintf("http://scep:8080/?operation=PKIOperation&message=%s", url.QueryEscape(randomB64)), http.NoBody),
+			},
+			want: request{
+				Operation: "PKIOperation",
+				Message:   expectedRandom,
+			},
+			wantErr: false,
+		},
+		{
+			name: "ok/get-PKIOperation-not-escaped", // bit of a special case, but this is supported because of the macOS case now
+			args: args{
+				r: httptest.NewRequest(http.MethodGet, fmt.Sprintf("http://scep:8080/?operation=PKIOperation&message=%s", randomB64), http.NoBody),
+			},
+			want: request{
+				Operation: "PKIOperation",
+				Message:   expectedRandom,
+			},
+			wantErr: false,
+		},
+		{
+			name: "ok/get-PKIOperation-weird-macos-case", // a special case for macOS, which seems to result in the message not arriving fully percent-encoded
+			args: args{
+				r: httptest.NewRequest(http.MethodGet, fmt.Sprintf("http://scep:8080/?operation=PKIOperation&message=%s", weirdMacOSCase), http.NoBody),
+			},
+			want: request{
+				Operation: "PKIOperation",
+				Message:   expectedWeirdMacOSCase,
 			},
 			wantErr: false,
 		},
@@ -101,13 +170,14 @@ func Test_decodeRequest(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			got, err := decodeRequest(tt.args.r)
-			if (err != nil) != tt.wantErr {
-				t.Errorf("decodeRequest() error = %v, wantErr %v", err, tt.wantErr)
+			if tt.wantErr {
+				assert.Error(t, err)
+				assert.Equal(t, tt.want, got)
 				return
 			}
-			if !reflect.DeepEqual(got, tt.want) {
-				t.Errorf("decodeRequest() = %v, want %v", got, tt.want)
-			}
+
+			assert.NoError(t, err)
+			assert.Equal(t, tt.want, got)
 		})
 	}
 }

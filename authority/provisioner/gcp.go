@@ -223,7 +223,7 @@ func (p *GCP) Init(config Config) (err error) {
 
 // AuthorizeSign validates the given token and returns the sign options that
 // will be used on certificate creation.
-func (p *GCP) AuthorizeSign(_ context.Context, token string) ([]SignOption, error) {
+func (p *GCP) AuthorizeSign(ctx context.Context, token string) ([]SignOption, error) {
 	claims, err := p.authorizeToken(token)
 	if err != nil {
 		return nil, errs.Wrap(http.StatusInternalServerError, err, "gcp.AuthorizeSign")
@@ -254,7 +254,7 @@ func (p *GCP) AuthorizeSign(_ context.Context, token string) ([]SignOption, erro
 			}),
 			ipAddressesValidator(nil),
 			emailAddressesValidator(nil),
-			urisValidator(nil),
+			newURIsValidator(ctx, nil),
 		)
 
 		// Template SANs
@@ -270,7 +270,7 @@ func (p *GCP) AuthorizeSign(_ context.Context, token string) ([]SignOption, erro
 		p,
 		templateOptions,
 		// modifiers / withOptions
-		newProvisionerExtensionOption(TypeGCP, p.Name, claims.Subject, "InstanceID", ce.InstanceID, "InstanceName", ce.InstanceName),
+		newProvisionerExtensionOption(TypeGCP, p.Name, claims.Subject, "InstanceID", ce.InstanceID, "InstanceName", ce.InstanceName).WithControllerOptions(p.ctl),
 		profileDefaultDuration(p.ctl.Claimer.DefaultTLSCertDuration()),
 		// validators
 		defaultPublicKeyValidator{},

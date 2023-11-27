@@ -150,7 +150,7 @@ func (p *JWK) AuthorizeRevoke(_ context.Context, token string) error {
 }
 
 // AuthorizeSign validates the given token.
-func (p *JWK) AuthorizeSign(_ context.Context, token string) ([]SignOption, error) {
+func (p *JWK) AuthorizeSign(ctx context.Context, token string) ([]SignOption, error) {
 	claims, err := p.authorizeToken(token, p.ctl.Audiences.Sign)
 	if err != nil {
 		return nil, errs.Wrap(http.StatusInternalServerError, err, "jwk.AuthorizeSign")
@@ -187,12 +187,12 @@ func (p *JWK) AuthorizeSign(_ context.Context, token string) ([]SignOption, erro
 		self,
 		templateOptions,
 		// modifiers / withOptions
-		newProvisionerExtensionOption(TypeJWK, p.Name, p.Key.KeyID),
+		newProvisionerExtensionOption(TypeJWK, p.Name, p.Key.KeyID).WithControllerOptions(p.ctl),
 		profileDefaultDuration(p.ctl.Claimer.DefaultTLSCertDuration()),
 		// validators
-		commonNameValidator(claims.Subject),
+		commonNameSliceValidator(append([]string{claims.Subject}, claims.SANs...)),
 		defaultPublicKeyValidator{},
-		defaultSANsValidator(claims.SANs),
+		newDefaultSANsValidator(ctx, claims.SANs),
 		newValidityValidator(p.ctl.Claimer.MinTLSCertDuration(), p.ctl.Claimer.MaxTLSCertDuration()),
 		newX509NamePolicyValidator(p.ctl.getPolicy().getX509()),
 		p.ctl.newWebhookController(data, linkedca.Webhook_X509),

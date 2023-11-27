@@ -26,7 +26,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/go-chi/chi"
+	"github.com/go-chi/chi/v5"
 	"github.com/pkg/errors"
 	sassert "github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -803,7 +803,7 @@ func Test_CRLGeneration(t *testing.T) {
 	}
 
 	chiCtx := chi.NewRouteContext()
-	req := httptest.NewRequest("GET", "http://example.com/crl", nil)
+	req := httptest.NewRequest("GET", "http://example.com/crl", http.NoBody)
 	req = req.WithContext(context.WithValue(context.Background(), chi.RouteCtxKey, chiCtx))
 
 	for _, tt := range tests {
@@ -856,7 +856,7 @@ func Test_caHandler_Route(t *testing.T) {
 }
 
 func Test_Health(t *testing.T) {
-	req := httptest.NewRequest("GET", "http://example.com/health", nil)
+	req := httptest.NewRequest("GET", "http://example.com/health", http.NoBody)
 	w := httptest.NewRecorder()
 	Health(w, req)
 
@@ -890,7 +890,7 @@ func Test_Root(t *testing.T) {
 	// Request with chi context
 	chiCtx := chi.NewRouteContext()
 	chiCtx.URLParams.Add("sha", "efc7d6b475a56fe587650bcdb999a4a308f815ba44db4bf0371ea68a786ccd36")
-	req := httptest.NewRequest("GET", "http://example.com/root/efc7d6b475a56fe587650bcdb999a4a308f815ba44db4bf0371ea68a786ccd36", nil)
+	req := httptest.NewRequest("GET", "http://example.com/root/efc7d6b475a56fe587650bcdb999a4a308f815ba44db4bf0371ea68a786ccd36", http.NoBody)
 	req = req.WithContext(context.WithValue(context.Background(), chi.RouteCtxKey, chiCtx))
 
 	expected := []byte(`{"ca":"` + strings.ReplaceAll(rootPEM, "\n", `\n`) + `\n"}`)
@@ -1105,7 +1105,7 @@ func Test_Renew(t *testing.T) {
 					return nil
 				},
 			})
-			req := httptest.NewRequest("POST", "http://example.com/renew", nil)
+			req := httptest.NewRequest("POST", "http://example.com/renew", http.NoBody)
 			req.TLS = tt.tls
 			req.Header = tt.header
 			w := httptest.NewRecorder()
@@ -1313,7 +1313,7 @@ func Test_ProvisionerKey(t *testing.T) {
 	// Request with chi context
 	chiCtx := chi.NewRouteContext()
 	chiCtx.URLParams.Add("kid", "oV1p0MJeGQ7qBlK6B-oyfVdBRjh_e7VSK_YSEEqgW00")
-	req := httptest.NewRequest("GET", "http://example.com/provisioners/oV1p0MJeGQ7qBlK6B-oyfVdBRjh_e7VSK_YSEEqgW00/encrypted-key", nil)
+	req := httptest.NewRequest("GET", "http://example.com/provisioners/oV1p0MJeGQ7qBlK6B-oyfVdBRjh_e7VSK_YSEEqgW00/encrypted-key", http.NoBody)
 	req = req.WithContext(context.WithValue(context.Background(), chi.RouteCtxKey, chiCtx))
 
 	tests := []struct {
@@ -1381,7 +1381,7 @@ func Test_Roots(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			mockMustAuthority(t, &mockAuthority{ret1: []*x509.Certificate{tt.root}, err: tt.err})
-			req := httptest.NewRequest("GET", "http://example.com/roots", nil)
+			req := httptest.NewRequest("GET", "http://example.com/roots", http.NoBody)
 			req.TLS = tt.tls
 			w := httptest.NewRecorder()
 			Roots(w, req)
@@ -1422,7 +1422,7 @@ func Test_caHandler_RootsPEM(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			mockMustAuthority(t, &mockAuthority{ret1: tt.roots, err: tt.err})
-			req := httptest.NewRequest("GET", "https://example.com/roots", nil)
+			req := httptest.NewRequest("GET", "https://example.com/roots", http.NoBody)
 			w := httptest.NewRecorder()
 			RootsPEM(w, req)
 			res := w.Result()
@@ -1467,7 +1467,7 @@ func Test_Federation(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			mockMustAuthority(t, &mockAuthority{ret1: []*x509.Certificate{tt.root}, err: tt.err})
-			req := httptest.NewRequest("GET", "http://example.com/federation", nil)
+			req := httptest.NewRequest("GET", "http://example.com/federation", http.NoBody)
 			req.TLS = tt.tls
 			w := httptest.NewRecorder()
 			Federation(w, req)
@@ -1569,7 +1569,6 @@ func mustCertificate(t *testing.T, pub, priv interface{}) *x509.Certificate {
 }
 
 func TestProvisionersResponse_MarshalJSON(t *testing.T) {
-
 	k := map[string]any{
 		"use": "sig",
 		"kty": "EC",
@@ -1581,9 +1580,9 @@ func TestProvisionersResponse_MarshalJSON(t *testing.T) {
 	}
 	key := squarejose.JSONWebKey{}
 	b, err := json.Marshal(k)
-	assert.FatalError(t, err)
+	require.NoError(t, err)
 	err = json.Unmarshal(b, &key)
-	assert.FatalError(t, err)
+	require.NoError(t, err)
 
 	r := ProvisionersResponse{
 		Provisioners: provisioner.List{
@@ -1593,6 +1592,12 @@ func TestProvisionersResponse_MarshalJSON(t *testing.T) {
 				ChallengePassword:             "not-so-secret",
 				MinimumPublicKeyLength:        2048,
 				EncryptionAlgorithmIdentifier: 2,
+				IncludeRoot:                   true,
+				ExcludeIntermediate:           true,
+				DecrypterCertificate:          []byte{1, 2, 3, 4},
+				DecrypterKeyPEM:               []byte{5, 6, 7, 8},
+				DecrypterKeyURI:               "softkms:path=/path/to/private.key",
+				DecrypterKeyPassword:          "super-secret-password",
 			},
 			&provisioner.JWK{
 				EncryptedKey: "eyJhbGciOiJQQkVTMi1IUzI1NitBMTI4S1ciLCJlbmMiOiJBMTI4R0NNIiwicDJjIjoxMDAwMDAsInAycyI6IlhOdmYxQjgxSUlLMFA2NUkwcmtGTGcifQ.XaN9zcPQeWt49zchUDm34FECUTHfQTn_.tmNHPQDqR3ebsWfd.9WZr3YVdeOyJh36vvx0VlRtluhvYp4K7jJ1KGDr1qypwZ3ziBVSNbYYQ71du7fTtrnfG1wgGTVR39tWSzBU-zwQ5hdV3rpMAaEbod5zeW6SHd95H3Bvcb43YiiqJFNL5sGZzFb7FqzVmpsZ1efiv6sZaGDHtnCAL6r12UG5EZuqGfM0jGCZitUz2m9TUKXJL5DJ7MOYbFfkCEsUBPDm_TInliSVn2kMJhFa0VOe5wZk5YOuYM3lNYW64HGtbf-llN2Xk-4O9TfeSPizBx9ZqGpeu8pz13efUDT2WL9tWo6-0UE-CrG0bScm8lFTncTkHcu49_a5NaUBkYlBjEiw.thPcx3t1AUcWuEygXIY3Fg",
@@ -1609,7 +1614,14 @@ func TestProvisionersResponse_MarshalJSON(t *testing.T) {
 			{
 				"type":                          "scep",
 				"name":                          "scep",
+				"forceCN":                       false,
+				"includeRoot":                   true,
+				"excludeIntermediate":           true,
 				"challenge":                     "*** REDACTED ***",
+				"decrypterCertificate":          []byte("*** REDACTED ***"),
+				"decrypterKey":                  "*** REDACTED ***",
+				"decrypterKeyPEM":               []byte("*** REDACTED ***"),
+				"decrypterKeyPassword":          "*** REDACTED ***",
 				"minimumPublicKeyLength":        2048,
 				"encryptionAlgorithmIdentifier": 2,
 			},
@@ -1646,6 +1658,12 @@ func TestProvisionersResponse_MarshalJSON(t *testing.T) {
 			ChallengePassword:             "not-so-secret",
 			MinimumPublicKeyLength:        2048,
 			EncryptionAlgorithmIdentifier: 2,
+			IncludeRoot:                   true,
+			ExcludeIntermediate:           true,
+			DecrypterCertificate:          []byte{1, 2, 3, 4},
+			DecrypterKeyPEM:               []byte{5, 6, 7, 8},
+			DecrypterKeyURI:               "softkms:path=/path/to/private.key",
+			DecrypterKeyPassword:          "super-secret-password",
 		},
 		&provisioner.JWK{
 			EncryptedKey: "eyJhbGciOiJQQkVTMi1IUzI1NitBMTI4S1ciLCJlbmMiOiJBMTI4R0NNIiwicDJjIjoxMDAwMDAsInAycyI6IlhOdmYxQjgxSUlLMFA2NUkwcmtGTGcifQ.XaN9zcPQeWt49zchUDm34FECUTHfQTn_.tmNHPQDqR3ebsWfd.9WZr3YVdeOyJh36vvx0VlRtluhvYp4K7jJ1KGDr1qypwZ3ziBVSNbYYQ71du7fTtrnfG1wgGTVR39tWSzBU-zwQ5hdV3rpMAaEbod5zeW6SHd95H3Bvcb43YiiqJFNL5sGZzFb7FqzVmpsZ1efiv6sZaGDHtnCAL6r12UG5EZuqGfM0jGCZitUz2m9TUKXJL5DJ7MOYbFfkCEsUBPDm_TInliSVn2kMJhFa0VOe5wZk5YOuYM3lNYW64HGtbf-llN2Xk-4O9TfeSPizBx9ZqGpeu8pz13efUDT2WL9tWo6-0UE-CrG0bScm8lFTncTkHcu49_a5NaUBkYlBjEiw.thPcx3t1AUcWuEygXIY3Fg",

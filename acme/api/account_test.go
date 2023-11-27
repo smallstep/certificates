@@ -7,12 +7,13 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"net/http"
 	"net/http/httptest"
 	"net/url"
 	"testing"
 	"time"
 
-	"github.com/go-chi/chi"
+	"github.com/go-chi/chi/v5"
 	"github.com/pkg/errors"
 
 	"go.step.sm/crypto/jose"
@@ -313,7 +314,7 @@ func TestHandler_GetOrdersByAccountID(t *testing.T) {
 		"fail/nil-account": func(t *testing.T) test {
 			return test{
 				db:         &acme.MockDB{},
-				ctx:        context.WithValue(context.Background(), accContextKey, nil),
+				ctx:        context.WithValue(context.Background(), accContextKey, http.NoBody),
 				statusCode: 400,
 				err:        acme.NewError(acme.ErrorAccountDoesNotExistType, "account does not exist"),
 			}
@@ -363,7 +364,7 @@ func TestHandler_GetOrdersByAccountID(t *testing.T) {
 		tc := run(t)
 		t.Run(name, func(t *testing.T) {
 			ctx := acme.NewContext(tc.ctx, tc.db, nil, acme.NewLinker("test.ca.smallstep.com", "acme"), nil)
-			req := httptest.NewRequest("GET", u, nil)
+			req := httptest.NewRequest("GET", u, http.NoBody)
 			req = req.WithContext(ctx)
 			w := httptest.NewRecorder()
 			GetOrdersByAccountID(w, req)
@@ -802,7 +803,7 @@ func TestHandler_NewAccount(t *testing.T) {
 		tc := run(t)
 		t.Run(name, func(t *testing.T) {
 			ctx := acme.NewContext(tc.ctx, tc.db, nil, acme.NewLinker("test.ca.smallstep.com", "acme"), nil)
-			req := httptest.NewRequest("GET", "/foo/bar", nil)
+			req := httptest.NewRequest("GET", "/foo/bar", http.NoBody)
 			req = req.WithContext(ctx)
 			w := httptest.NewRecorder()
 			NewAccount(w, req)
@@ -1005,7 +1006,7 @@ func TestHandler_GetOrUpdateAccount(t *testing.T) {
 		tc := run(t)
 		t.Run(name, func(t *testing.T) {
 			ctx := acme.NewContext(tc.ctx, tc.db, nil, acme.NewLinker("test.ca.smallstep.com", "acme"), nil)
-			req := httptest.NewRequest("GET", "/foo/bar", nil)
+			req := httptest.NewRequest("GET", "/foo/bar", http.NoBody)
 			req = req.WithContext(ctx)
 			w := httptest.NewRecorder()
 			GetOrUpdateAccount(w, req)

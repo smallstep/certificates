@@ -235,7 +235,7 @@ func (a *Authority) StoreProvisioner(ctx context.Context, prov *linkedca.Provisi
 	}
 
 	if err := certProv.Init(provisionerConfig); err != nil {
-		return admin.WrapError(admin.ErrorBadRequestType, err, "error validating configuration for provisioner %s", prov.Name)
+		return admin.WrapError(admin.ErrorBadRequestType, err, "error validating configuration for provisioner %q", prov.Name)
 	}
 
 	// Store to database -- this will set the ID.
@@ -646,8 +646,9 @@ func claimsToCertificates(c *linkedca.Claims) (*provisioner.Claims, error) {
 	}
 
 	pc := &provisioner.Claims{
-		DisableRenewal:          &c.DisableRenewal,
-		AllowRenewalAfterExpiry: &c.AllowRenewalAfterExpiry,
+		DisableRenewal:             &c.DisableRenewal,
+		AllowRenewalAfterExpiry:    &c.AllowRenewalAfterExpiry,
+		DisableSmallstepExtensions: &c.DisableSmallstepExtensions,
 	}
 
 	var err error
@@ -686,6 +687,7 @@ func claimsToLinkedca(c *provisioner.Claims) *linkedca.Claims {
 
 	disableRenewal := config.DefaultDisableRenewal
 	allowRenewalAfterExpiry := config.DefaultAllowRenewalAfterExpiry
+	disableSmallstepExtensions := config.DefaultDisableSmallstepExtensions
 
 	if c.DisableRenewal != nil {
 		disableRenewal = *c.DisableRenewal
@@ -693,10 +695,14 @@ func claimsToLinkedca(c *provisioner.Claims) *linkedca.Claims {
 	if c.AllowRenewalAfterExpiry != nil {
 		allowRenewalAfterExpiry = *c.AllowRenewalAfterExpiry
 	}
+	if c.DisableSmallstepExtensions != nil {
+		disableSmallstepExtensions = *c.DisableSmallstepExtensions
+	}
 
 	lc := &linkedca.Claims{
-		DisableRenewal:          disableRenewal,
-		AllowRenewalAfterExpiry: allowRenewalAfterExpiry,
+		DisableRenewal:             disableRenewal,
+		AllowRenewalAfterExpiry:    allowRenewalAfterExpiry,
+		DisableSmallstepExtensions: disableSmallstepExtensions,
 	}
 
 	if c.DefaultTLSDur != nil || c.MinTLSDur != nil || c.MaxTLSDur != nil {
@@ -748,12 +754,16 @@ func provisionerOptionsToLinkedca(p *provisioner.Options) (*linkedca.Template, *
 		}
 
 		if p.X509.Template != "" {
-			x509Template.Template = []byte(p.SSH.Template)
+			x509Template.Template = []byte(p.X509.Template)
 		} else if p.X509.TemplateFile != "" {
 			filename := step.Abs(p.X509.TemplateFile)
 			if x509Template.Template, err = os.ReadFile(filename); err != nil {
 				return nil, nil, nil, errors.Wrap(err, "error reading x509 template")
 			}
+		}
+
+		if p.X509.TemplateData != nil {
+			x509Template.Data = p.X509.TemplateData
 		}
 	}
 
@@ -770,6 +780,10 @@ func provisionerOptionsToLinkedca(p *provisioner.Options) (*linkedca.Template, *
 			if sshTemplate.Template, err = os.ReadFile(filename); err != nil {
 				return nil, nil, nil, errors.Wrap(err, "error reading ssh template")
 			}
+		}
+
+		if p.SSH.TemplateData != nil {
+			sshTemplate.Data = p.SSH.TemplateData
 		}
 	}
 
@@ -960,7 +974,7 @@ func ProvisionerToCertificates(p *linkedca.Provisioner) (provisioner.Interface, 
 		}, nil
 	case *linkedca.ProvisionerDetails_SCEP:
 		cfg := d.SCEP
-		return &provisioner.SCEP{
+		s := &provisioner.SCEP{
 			ID:                            p.Id,
 			Type:                          p.Type.String(),
 			Name:                          p.Name,
@@ -968,11 +982,19 @@ func ProvisionerToCertificates(p *linkedca.Provisioner) (provisioner.Interface, 
 			ChallengePassword:             cfg.Challenge,
 			Capabilities:                  cfg.Capabilities,
 			IncludeRoot:                   cfg.IncludeRoot,
+			ExcludeIntermediate:           cfg.ExcludeIntermediate,
 			MinimumPublicKeyLength:        int(cfg.MinimumPublicKeyLength),
 			EncryptionAlgorithmIdentifier: int(cfg.EncryptionAlgorithmIdentifier),
 			Claims:                        claims,
 			Options:                       options,
-		}, nil
+		}
+		if decrypter := cfg.GetDecrypter(); decrypter != nil {
+			s.DecrypterCertificate = decrypter.Certificate
+			s.DecrypterKeyPEM = decrypter.Key
+			s.DecrypterKeyURI = decrypter.KeyUri
+			s.DecrypterKeyPassword = string(decrypter.KeyPassword)
+		}
+		return s, nil
 	case *linkedca.ProvisionerDetails_Nebula:
 		var roots []byte
 		for i, root := range d.Nebula.GetRoots() {
@@ -1227,7 +1249,14 @@ func ProvisionerToLinkedca(p provisioner.Interface) (*linkedca.Provisioner, erro
 						Capabilities:                  p.Capabilities,
 						MinimumPublicKeyLength:        int32(p.MinimumPublicKeyLength),
 						IncludeRoot:                   p.IncludeRoot,
+						ExcludeIntermediate:           p.ExcludeIntermediate,
 						EncryptionAlgorithmIdentifier: int32(p.EncryptionAlgorithmIdentifier),
+						Decrypter: &linkedca.SCEPDecrypter{
+							Certificate: p.DecrypterCertificate,
+							Key:         p.DecrypterKeyPEM,
+							KeyUri:      p.DecrypterKeyURI,
+							KeyPassword: []byte(p.DecrypterKeyPassword),
+						},
 					},
 				},
 			},

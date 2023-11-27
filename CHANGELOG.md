@@ -25,13 +25,63 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
 
 ---
 
-## [Unreleased]
+## [0.25.0] - 2023-09-26
+
+### Added
+
+- Added support for configuring SCEP decrypters in the provisioner (smallstep/certificates#1414)
+- Added support for TPM KMS (smallstep/crypto#253)
+- Added support for disableSmallstepExtensions provisioner claim
+  (smallstep/certificates#1484)
+- Added script to migrate a badger DB to MySQL or PostgreSQL
+  (smallstep/certificates#1477)
+- Added AWS public certificates for me-central-1 and ap-southeast-3
+  (smallstep/certificates#1404)
+- Added namespace field to VaultCAS JSON config (smallstep/certificates#1424)
+- Added AWS public certificates for me-central-1 and ap-southeast-3 
+  (smallstep/certificates#1404)
+- Added unversioned filenames to Github release assets 
+  (smallstep/certificates#1435)
+- Send X5C leaf certificate to webhooks (smallstep/certificates#1485)
+- Added support for disableSmallstepExtensions claim (smallstep/certificates#1484)
+- Added all AWS Identity Document Certificates (smallstep/certificates#1404, smallstep/certificates#1510)
+- Added Winget release automation (smallstep/certificates#1519)
+- Added CSR to SCEPCHALLENGE webhook request body (smallstep/certificates#1523)
+- Added SCEP issuance notification webhook (smallstep/certificates#1544)
+- Added ability to disable color in the log text formatter 
+  (smallstep/certificates(#1559)
+
+### Changed
+
+- Changed the Makefile to produce cgo-enabled builds running
+  `make build GO_ENVS="CGO_ENABLED=1"` (smallstep/certificates#1446)
+- Return more detailed errors to ACME clients using device-attest-01
+  (smallstep/certificates#1495)
+- Change SCEP password type to string (smallstep/certificates#1555)
+
+### Removed
+
+- Removed OIDC user regexp check (smallstep/certificates#1481)
+- Removed automatic initialization of $STEPPATH (smallstep/certificates#1493)
+- Removed db datasource from error msg to prevent leaking of secrets to logs
+  (smallstep/certificates#1528)
 
 ### Fixed
 
 - Improved authentication for ACME requests using kid and provisioner name
   (smallstep/certificates#1386).
-
+- Fixed indentation of KMS configuration in helm charts
+  (smallstep/certificates#1405)
+- Fixed simultaneous sign or decrypt operation on a YubiKey
+  (smallstep/certificates#1476, smallstep/crypto#288)
+- Fixed adding certificate templates with ASN.1 functions
+  (smallstep/certificates#1500, smallstep/crypto#302)
+- Fixed a problem when the ca.json is truncated if the encoding of the 
+  configuration fails (e.g., new provisioner with bad template data)
+  (smallstep/cli#994, smallstep/certificates#1501)
+- Fixed provisionerOptionsToLinkedCA missing template and templateData
+  (smallstep/certificates#1520)
+- Fix calculation of webhook signature (smallstep/certificates#1546)
 
 ## [v0.24.2] - 2023-05-11
 

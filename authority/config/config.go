@@ -1,6 +1,7 @@
 package config
 
 import (
+	"bytes"
 	"encoding/json"
 	"fmt"
 	"net"
@@ -35,6 +36,9 @@ var (
 	// DefaultEnableSSHCA enable SSH CA features per provisioner or globally
 	// for all provisioners.
 	DefaultEnableSSHCA = false
+	// DefaultDisableSmallstepExtensions is the default value for the
+	// DisableSmallstepExtensions provisioner claim.
+	DefaultDisableSmallstepExtensions = false
 	// DefaultCRLCacheDuration is the default cache duration for the CRL.
 	DefaultCRLCacheDuration = &provisioner.Duration{Duration: 24 * time.Hour}
 	// DefaultCRLExpiredDuration is the default duration in which expired
@@ -43,18 +47,19 @@ var (
 	// GlobalProvisionerClaims is the default duration that expired certificates
 	// remain in the CRL after expiration.
 	GlobalProvisionerClaims = provisioner.Claims{
-		MinTLSDur:               &provisioner.Duration{Duration: 5 * time.Minute}, // TLS certs
-		MaxTLSDur:               &provisioner.Duration{Duration: 24 * time.Hour},
-		DefaultTLSDur:           &provisioner.Duration{Duration: 24 * time.Hour},
-		MinUserSSHDur:           &provisioner.Duration{Duration: 5 * time.Minute}, // User SSH certs
-		MaxUserSSHDur:           &provisioner.Duration{Duration: 24 * time.Hour},
-		DefaultUserSSHDur:       &provisioner.Duration{Duration: 16 * time.Hour},
-		MinHostSSHDur:           &provisioner.Duration{Duration: 5 * time.Minute}, // Host SSH certs
-		MaxHostSSHDur:           &provisioner.Duration{Duration: 30 * 24 * time.Hour},
-		DefaultHostSSHDur:       &provisioner.Duration{Duration: 30 * 24 * time.Hour},
-		EnableSSHCA:             &DefaultEnableSSHCA,
-		DisableRenewal:          &DefaultDisableRenewal,
-		AllowRenewalAfterExpiry: &DefaultAllowRenewalAfterExpiry,
+		MinTLSDur:                  &provisioner.Duration{Duration: 5 * time.Minute}, // TLS certs
+		MaxTLSDur:                  &provisioner.Duration{Duration: 24 * time.Hour},
+		DefaultTLSDur:              &provisioner.Duration{Duration: 24 * time.Hour},
+		MinUserSSHDur:              &provisioner.Duration{Duration: 5 * time.Minute}, // User SSH certs
+		MaxUserSSHDur:              &provisioner.Duration{Duration: 24 * time.Hour},
+		DefaultUserSSHDur:          &provisioner.Duration{Duration: 16 * time.Hour},
+		MinHostSSHDur:              &provisioner.Duration{Duration: 5 * time.Minute}, // Host SSH certs
+		MaxHostSSHDur:              &provisioner.Duration{Duration: 30 * 24 * time.Hour},
+		DefaultHostSSHDur:          &provisioner.Duration{Duration: 30 * 24 * time.Hour},
+		EnableSSHCA:                &DefaultEnableSSHCA,
+		DisableRenewal:             &DefaultDisableRenewal,
+		AllowRenewalAfterExpiry:    &DefaultAllowRenewalAfterExpiry,
+		DisableSmallstepExtensions: &DefaultDisableSmallstepExtensions,
 	}
 )
 
@@ -254,15 +259,16 @@ func (c *Config) Init() {
 
 // Save saves the configuration to the given filename.
 func (c *Config) Save(filename string) error {
-	f, err := os.OpenFile(filename, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0600)
-	if err != nil {
-		return errors.Wrapf(err, "error opening %s", filename)
-	}
-	defer f.Close()
-
-	enc := json.NewEncoder(f)
+	var b bytes.Buffer
+	enc := json.NewEncoder(&b)
 	enc.SetIndent("", "\t")
-	return errors.Wrapf(enc.Encode(c), "error writing %s", filename)
+	if err := enc.Encode(c); err != nil {
+		return fmt.Errorf("error encoding configuration: %w", err)
+	}
+	if err := os.WriteFile(filename, b.Bytes(), 0600); err != nil {
+		return fmt.Errorf("error writing %q: %w", filename, err)
+	}
+	return nil
 }
 
 // Commit saves the current configuration to the same

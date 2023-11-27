@@ -75,7 +75,7 @@ func TestHandler_addNonce(t *testing.T) {
 		tc := run(t)
 		t.Run(name, func(t *testing.T) {
 			ctx := newBaseContext(context.Background(), tc.db)
-			req := httptest.NewRequest("GET", u, nil).WithContext(ctx)
+			req := httptest.NewRequest("GET", u, http.NoBody).WithContext(ctx)
 			w := httptest.NewRecorder()
 			addNonce(testNext)(w, req)
 			res := w.Result()
@@ -127,7 +127,7 @@ func TestHandler_addDirLink(t *testing.T) {
 	for name, run := range tests {
 		tc := run(t)
 		t.Run(name, func(t *testing.T) {
-			req := httptest.NewRequest("GET", "/foo", nil)
+			req := httptest.NewRequest("GET", "/foo", http.NoBody)
 			req = req.WithContext(tc.ctx)
 			w := httptest.NewRecorder()
 			addDirLink(testNext)(w, req)
@@ -230,7 +230,7 @@ func TestHandler_verifyContentType(t *testing.T) {
 			if tc.url != "" {
 				_u = tc.url
 			}
-			req := httptest.NewRequest("GET", _u, nil)
+			req := httptest.NewRequest("GET", _u, http.NoBody)
 			req = req.WithContext(tc.ctx)
 			req.Header.Add("Content-Type", tc.contentType)
 			w := httptest.NewRecorder()
@@ -298,7 +298,7 @@ func TestHandler_isPostAsGet(t *testing.T) {
 		tc := run(t)
 		t.Run(name, func(t *testing.T) {
 			// h := &Handler{}
-			req := httptest.NewRequest("GET", u, nil)
+			req := httptest.NewRequest("GET", u, http.NoBody)
 			req = req.WithContext(tc.ctx)
 			w := httptest.NewRecorder()
 			isPostAsGet(testNext)(w, req)
@@ -582,7 +582,7 @@ func TestHandler_verifyAndExtractJWSPayload(t *testing.T) {
 		tc := run(t)
 		t.Run(name, func(t *testing.T) {
 			// h := &Handler{}
-			req := httptest.NewRequest("GET", u, nil)
+			req := httptest.NewRequest("GET", u, http.NoBody)
 			req = req.WithContext(tc.ctx)
 			w := httptest.NewRecorder()
 			verifyAndExtractJWSPayload(tc.next)(w, req)
@@ -829,7 +829,7 @@ func TestHandler_lookupJWK(t *testing.T) {
 		tc := run(t)
 		t.Run(name, func(t *testing.T) {
 			ctx := newBaseContext(tc.ctx, tc.db, tc.linker)
-			req := httptest.NewRequest("GET", u, nil)
+			req := httptest.NewRequest("GET", u, http.NoBody)
 			req = req.WithContext(ctx)
 			w := httptest.NewRecorder()
 			lookupJWK(tc.next)(w, req)
@@ -1028,7 +1028,7 @@ func TestHandler_extractJWK(t *testing.T) {
 		tc := run(t)
 		t.Run(name, func(t *testing.T) {
 			ctx := newBaseContext(tc.ctx, tc.db)
-			req := httptest.NewRequest("GET", u, nil)
+			req := httptest.NewRequest("GET", u, http.NoBody)
 			req = req.WithContext(ctx)
 			w := httptest.NewRecorder()
 			extractJWK(tc.next)(w, req)
@@ -1403,7 +1403,7 @@ func TestHandler_validateJWS(t *testing.T) {
 		tc := run(t)
 		t.Run(name, func(t *testing.T) {
 			ctx := newBaseContext(tc.ctx, tc.db)
-			req := httptest.NewRequest("GET", u, nil)
+			req := httptest.NewRequest("GET", u, http.NoBody)
 			req = req.WithContext(ctx)
 			w := httptest.NewRecorder()
 			validateJWS(tc.next)(w, req)
@@ -1585,7 +1585,7 @@ func TestHandler_extractOrLookupJWK(t *testing.T) {
 		tc := prep(t)
 		t.Run(name, func(t *testing.T) {
 			ctx := newBaseContext(tc.ctx, tc.db, tc.linker)
-			req := httptest.NewRequest("GET", u, nil)
+			req := httptest.NewRequest("GET", u, http.NoBody)
 			req = req.WithContext(ctx)
 			w := httptest.NewRecorder()
 			extractOrLookupJWK(tc.next)(w, req)
@@ -1670,7 +1670,7 @@ func TestHandler_checkPrerequisites(t *testing.T) {
 		tc := run(t)
 		t.Run(name, func(t *testing.T) {
 			ctx := acme.NewPrerequisitesCheckerContext(tc.ctx, tc.prerequisitesChecker)
-			req := httptest.NewRequest("GET", u, nil)
+			req := httptest.NewRequest("GET", u, http.NoBody)
 			req = req.WithContext(ctx)
 			w := httptest.NewRecorder()
 			checkPrerequisites(tc.next)(w, req)

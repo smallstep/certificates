@@ -317,7 +317,7 @@ func SSHSign(w http.ResponseWriter, r *http.Request) {
 	var identityCertificate []Certificate
 	if cr := body.IdentityCSR.CertificateRequest; cr != nil {
 		ctx := authority.NewContextWithSkipTokenReuse(r.Context())
-		ctx = provisioner.NewContextWithMethod(ctx, provisioner.SignMethod)
+		ctx = provisioner.NewContextWithMethod(ctx, provisioner.SignIdentityMethod)
 		signOpts, err := a.Authorize(ctx, body.OTT)
 		if err != nil {
 			render.Error(w, errs.UnauthorizedErr(err))

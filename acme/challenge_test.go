@@ -3444,7 +3444,7 @@ func Test_deviceAttest01Validate(t *testing.T) {
 					},
 					payload: errorCBORPayload,
 				},
-				wantErr: NewErrorISE("error unmarshalling CBOR: cbor: cannot unmarshal positive integer into Go value of type acme.attestationObject"),
+				wantErr: NewErrorISE("error unmarshalling CBOR: cbor:"),
 			}
 		},
 		"ok/prov.IsAttestationFormatEnabled": func(t *testing.T) test {
@@ -3532,7 +3532,7 @@ func Test_deviceAttest01Validate(t *testing.T) {
 							assert.Equal(t, ChallengeType("device-attest-01"), updch.Type)
 							assert.Equal(t, "12345678", updch.Value)
 
-							err := NewError(ErrorBadAttestationStatementType, "x5c not present").WithAdditionalErrorDetail()
+							err := NewDetailedError(ErrorBadAttestationStatementType, "x5c not present")
 
 							assert.EqualError(t, updch.Error.Err, err.Err.Error())
 							assert.Equal(t, err.Type, updch.Error.Type)
@@ -3579,7 +3579,7 @@ func Test_deviceAttest01Validate(t *testing.T) {
 							assert.Equal(t, ChallengeType("device-attest-01"), updch.Type)
 							assert.Equal(t, "serial-number", updch.Value)
 
-							err := NewError(ErrorBadAttestationStatementType, "challenge token does not match")
+							err := NewDetailedError(ErrorBadAttestationStatementType, "challenge token does not match")
 
 							assert.EqualError(t, updch.Error.Err, err.Err.Error())
 							assert.Equal(t, err.Type, updch.Error.Type)
@@ -3628,9 +3628,9 @@ func Test_deviceAttest01Validate(t *testing.T) {
 							subproblem := NewSubproblemWithIdentifier(
 								ErrorRejectedIdentifierType,
 								Identifier{Type: "permanent-identifier", Value: "non-matching-value"},
-								`challenge identifier "non-matching-value" doesn't match any of the attested hardware identifiers [udid serial-number]`,
+								`challenge identifier "non-matching-value" doesn't match any of the attested hardware identifiers ["udid" "serial-number"]`,
 							)
-							err := NewError(ErrorBadAttestationStatementType, "permanent identifier does not match").WithAdditionalErrorDetail().AddSubproblems(subproblem)
+							err := NewDetailedError(ErrorBadAttestationStatementType, "permanent identifier does not match").AddSubproblems(subproblem)
 
 							assert.EqualError(t, updch.Error.Err, err.Err.Error())
 							assert.Equal(t, err.Type, updch.Error.Type)
@@ -3703,7 +3703,7 @@ func Test_deviceAttest01Validate(t *testing.T) {
 							assert.Equal(t, ChallengeType("device-attest-01"), updch.Type)
 							assert.Equal(t, "12345678", updch.Value)
 
-							err := NewError(ErrorBadAttestationStatementType, "x5c not present").WithAdditionalErrorDetail()
+							err := NewDetailedError(ErrorBadAttestationStatementType, "x5c not present")
 
 							assert.EqualError(t, updch.Error.Err, err.Err.Error())
 							assert.Equal(t, err.Type, updch.Error.Type)
@@ -3757,8 +3757,7 @@ func Test_deviceAttest01Validate(t *testing.T) {
 							assert.Equal(t, ChallengeType("device-attest-01"), updch.Type)
 							assert.Equal(t, "12345678", updch.Value)
 
-							err := NewError(ErrorBadAttestationStatementType, "permanent identifier does not match").
-								WithAdditionalErrorDetail().
+							err := NewDetailedError(ErrorBadAttestationStatementType, "permanent identifier does not match").
 								AddSubproblems(NewSubproblemWithIdentifier(
 									ErrorRejectedIdentifierType,
 									Identifier{Type: "permanent-identifier", Value: "12345678"},
@@ -3853,7 +3852,7 @@ func Test_deviceAttest01Validate(t *testing.T) {
 							assert.Equal(t, ChallengeType("device-attest-01"), updch.Type)
 							assert.Equal(t, "12345678", updch.Value)
 
-							err := NewError(ErrorBadAttestationStatementType, `unsupported attestation object format "bogus-format"`).WithAdditionalErrorDetail()
+							err := NewDetailedError(ErrorBadAttestationStatementType, `unsupported attestation object format "bogus-format"`)
 
 							assert.EqualError(t, updch.Error.Err, err.Err.Error())
 							assert.Equal(t, err.Type, updch.Error.Type)
@@ -4004,8 +4003,9 @@ func Test_deviceAttest01Validate(t *testing.T) {
 			tc := run(t)
 
 			if err := deviceAttest01Validate(tc.args.ctx, tc.args.ch, tc.args.db, tc.args.jwk, tc.args.payload); err != nil {
-				assert.Error(t, tc.wantErr)
-				assert.EqualError(t, err, tc.wantErr.Error())
+				if assert.Error(t, tc.wantErr) {
+					assert.ErrorContains(t, err, tc.wantErr.Error())
+				}
 				return
 			}
 

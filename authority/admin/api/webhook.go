@@ -6,7 +6,7 @@ import (
 	"net/http"
 	"net/url"
 
-	"github.com/go-chi/chi"
+	"github.com/go-chi/chi/v5"
 	"github.com/smallstep/certificates/api/read"
 	"github.com/smallstep/certificates/api/render"
 	"github.com/smallstep/certificates/authority/admin"
@@ -56,9 +56,7 @@ func validateWebhook(webhook *linkedca.Webhook) error {
 	}
 
 	// kind
-	switch webhook.Kind {
-	case linkedca.Webhook_ENRICHING, linkedca.Webhook_AUTHORIZING, linkedca.Webhook_SCEPCHALLENGE:
-	default:
+	if _, ok := linkedca.Webhook_Kind_name[int32(webhook.Kind)]; !ok || webhook.Kind == linkedca.Webhook_NO_KIND {
 		return admin.NewError(admin.ErrorBadRequestType, "webhook kind %q is invalid", webhook.Kind)
 	}
 

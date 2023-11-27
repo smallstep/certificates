@@ -150,7 +150,7 @@ func (p *Nebula) AuthorizeSign(_ context.Context, token string) ([]SignOption, e
 		p,
 		templateOptions,
 		// modifiers / withOptions
-		newProvisionerExtensionOption(TypeNebula, p.Name, ""),
+		newProvisionerExtensionOption(TypeNebula, p.Name, "").WithControllerOptions(p.ctl),
 		profileLimitDuration{
 			def:       p.ctl.Claimer.DefaultTLSCertDuration(),
 			notBefore: crt.Details.NotBefore,
@@ -389,7 +389,7 @@ func (v nebulaSANsValidator) Valid(req *x509.CertificateRequest) error {
 		}
 	}
 	if len(req.URIs) > 0 {
-		if err := urisValidator(uris).Valid(req); err != nil {
+		if err := newURIsValidator(context.Background(), uris).Valid(req); err != nil {
 			return err
 		}
 	}

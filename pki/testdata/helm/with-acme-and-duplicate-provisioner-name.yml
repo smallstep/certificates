@@ -9,9 +9,6 @@ inject:
         federateRoots: []
         crt: /home/step/certs/intermediate_ca.crt
         key: /home/step/secrets/intermediate_ca_key
-        ssh:
-          hostKey: /home/step/secrets/ssh_host_ca_key
-          userKey: /home/step/secrets/ssh_user_ca_key
         address: 127.0.0.1:9000
         dnsNames:
           - 127.0.0.1
@@ -23,9 +20,8 @@ inject:
         authority:
           enableAdmin: false
           provisioners:
-            - {"type":"JWK","name":"step-cli","key":{"use":"sig","kty":"EC","kid":"zsUmysmDVoGJ71YoPHyZ-68tNihDaDaO5Mu7xX3M-_I","crv":"P-256","alg":"ES256","x":"Pqnua4CzqKz6ua41J3yeWZ1sRkGt0UlCkbHv8H2DGuY","y":"UhoZ_2ItDen9KQTcjay-ph-SBXH0mwqhHyvrrqIFDOI"},"encryptedKey":"eyJhbGciOiJQQkVTMi1IUzI1NitBMTI4S1ciLCJjdHkiOiJqd2sranNvbiIsImVuYyI6IkEyNTZHQ00iLCJwMmMiOjEwMDAwMCwicDJzIjoiZjVvdGVRS2hvOXl4MmQtSGlMZi05QSJ9.eYA6tt3fNuUpoxKWDT7P0Lbn2juxhEbTxEnwEMbjlYLLQ3sxL-dYTA.ven-FhmdjlC9itH0.a2jRTarN9vPd6F_mWnNBlOn6KbfMjCApmci2t65XbAsLzYFzhI_79Ykm5ueMYTupWLTjBJctl-g51ZHmsSB55pStbpoyyLNAsUX2E1fTmHe-Ni8bRrspwLv15FoN1Xo1g0mpR-ufWIFxOsW-QIfnMmMIIkygVuHFXmg2tFpzTNNG5aS29K3dN2nyk0WJrdIq79hZSTqVkkBU25Yu3A46sgjcM86XcIJJ2XUEih_KWEa6T1YrkixGu96pebjVqbO0R6dbDckfPF7FqNnwPHVtb1ACFpEYoOJVIbUCMaARBpWsxYhjJZlEM__XA46l8snFQDkNY3CdN0p1_gF3ckA.JLmq9nmu1h9oUi1S8ZxYjA","claims":{"enableSSHCA":true,"disableRenewal":false,"allowRenewalAfterExpiry":false,"disableSmallstepExtensions":false},"options":{"x509":{},"ssh":{}}}
-            - {"type":"ACME","name":"acme"}
-            - {"type":"SSHPOP","name":"sshpop","claims":{"enableSSHCA":true}}
+            - {"type":"JWK","name":"acme","key":{"use":"sig","kty":"EC","kid":"zsUmysmDVoGJ71YoPHyZ-68tNihDaDaO5Mu7xX3M-_I","crv":"P-256","alg":"ES256","x":"Pqnua4CzqKz6ua41J3yeWZ1sRkGt0UlCkbHv8H2DGuY","y":"UhoZ_2ItDen9KQTcjay-ph-SBXH0mwqhHyvrrqIFDOI"},"encryptedKey":"eyJhbGciOiJQQkVTMi1IUzI1NitBMTI4S1ciLCJjdHkiOiJqd2sranNvbiIsImVuYyI6IkEyNTZHQ00iLCJwMmMiOjEwMDAwMCwicDJzIjoiZjVvdGVRS2hvOXl4MmQtSGlMZi05QSJ9.eYA6tt3fNuUpoxKWDT7P0Lbn2juxhEbTxEnwEMbjlYLLQ3sxL-dYTA.ven-FhmdjlC9itH0.a2jRTarN9vPd6F_mWnNBlOn6KbfMjCApmci2t65XbAsLzYFzhI_79Ykm5ueMYTupWLTjBJctl-g51ZHmsSB55pStbpoyyLNAsUX2E1fTmHe-Ni8bRrspwLv15FoN1Xo1g0mpR-ufWIFxOsW-QIfnMmMIIkygVuHFXmg2tFpzTNNG5aS29K3dN2nyk0WJrdIq79hZSTqVkkBU25Yu3A46sgjcM86XcIJJ2XUEih_KWEa6T1YrkixGu96pebjVqbO0R6dbDckfPF7FqNnwPHVtb1ACFpEYoOJVIbUCMaARBpWsxYhjJZlEM__XA46l8snFQDkNY3CdN0p1_gF3ckA.JLmq9nmu1h9oUi1S8ZxYjA","options":{"x509":{},"ssh":{}}}
+            - {"type":"ACME","name":"acme-1"}
         tls:
           cipherSuites:
             - TLS_ECDHE_ECDSA_WITH_CHACHA20_POLY1305_SHA256
@@ -57,11 +53,6 @@ inject:
       dGhlc2UgYXJlIGp1c3Qgc29tZSBmYWtlIHJvb3QgQ0EgY2VydCBieXRlcw==
       -----END CERTIFICATE-----
       
-    # ssh_host_ca contains the text of the public ssh key for the SSH root CA
-    ssh_host_ca: ecdsa-sha2-nistp256 AAAAE2VjZHNhLXNoYTItbmlzdHAyNTYAAAAIbmlzdHAyNTYAAABBBJ0IdS5sZm6KITBMZLEJD6b5ROVraYHcAOr3feFel8r1Wp4DRPR1oU0W00J/zjNBRBbANlJoYN4x/8WNNVZ49Ms=
-
-    # ssh_user_ca contains the text of the public ssh key for the SSH root CA
-    ssh_user_ca: ecdsa-sha2-nistp256 AAAAE2VjZHNhLXNoYTItbmlzdHAyNTYAAAAIbmlzdHAyNTYAAABBBEWA1qUxaGwVNErsvEOGe2d6TvLMF+aiVpuOiIEvpMJ3JeJmecLQctjWqeIbpSvy6/gRa7c82Ge5rLlapYmOChs=
 
   # Secrets contains the root and intermediate keys and optionally the SSH
   # private keys
@@ -87,19 +78,5 @@ inject:
       root_ca_key: |
         -----BEGIN EC PRIVATE KEY-----
         dGhlc2UgYXJlIGp1c3Qgc29tZSBmYWtlIHJvb3QgQ0Ega2V5IGJ5dGVz
-        -----END EC PRIVATE KEY-----
-        
-    ssh:
-      # ssh_host_ca_key contains the contents of your encrypted SSH Host CA key
-      host_ca_key: |
-        -----BEGIN EC PRIVATE KEY-----
-        ZmFrZSBzc2ggaG9zdCBrZXkgYnl0ZXM=
-        -----END EC PRIVATE KEY-----
-        
-
-      # ssh_user_ca_key contains the contents of your encrypted SSH User CA key
-      user_ca_key: |
-        -----BEGIN EC PRIVATE KEY-----
-        ZmFrZSBzc2ggdXNlciBrZXkgYnl0ZXM=
         -----END EC PRIVATE KEY-----
         

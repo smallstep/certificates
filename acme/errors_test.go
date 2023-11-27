@@ -22,8 +22,7 @@ func TestError_WithAdditionalErrorDetail(t *testing.T) {
 		"detail": "The server experienced an internal error",
 		"type":   "urn:ietf:params:acme:error:serverInternal",
 	})
-	malformedErr := NewError(ErrorMalformedType, "malformed error")
-	malformedErr.Err = nil
+	malformedErr := NewError(ErrorMalformedType, "malformed error") // will result in Err == nil behavior
 	malformedJSON := mustJSON(t, map[string]interface{}{
 		"detail": "The request message was malformed",
 		"type":   "urn:ietf:params:acme:error:malformed",
@@ -37,9 +36,9 @@ func TestError_WithAdditionalErrorDetail(t *testing.T) {
 		err  *Error
 		want string
 	}{
-		{"internal", NewError(ErrorServerInternalType, "").WithAdditionalErrorDetail(), internalJSON},
-		{"nil err", malformedErr.WithAdditionalErrorDetail(), malformedJSON},
-		{"detailed", NewError(ErrorBadAttestationStatementType, "invalid property").WithAdditionalErrorDetail(), withDetailJSON},
+		{"internal", NewDetailedError(ErrorServerInternalType, ""), internalJSON},
+		{"nil err", malformedErr, malformedJSON},
+		{"detailed", NewDetailedError(ErrorBadAttestationStatementType, "invalid property"), withDetailJSON},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {

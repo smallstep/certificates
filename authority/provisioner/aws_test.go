@@ -695,8 +695,9 @@ func TestAWS_AuthorizeSign(t *testing.T) {
 						assert.Equals(t, []net.IP(v), []net.IP{net.ParseIP("127.0.0.1")})
 					case emailAddressesValidator:
 						assert.Equals(t, v, nil)
-					case urisValidator:
-						assert.Equals(t, v, nil)
+					case *urisValidator:
+						assert.Equals(t, v.uris, nil)
+						assert.Equals(t, MethodFromContext(v.ctx), SignMethod)
 					case dnsNamesValidator:
 						assert.Equals(t, []string(v), []string{"ip-127-0-0-1.us-west-1.compute.internal"})
 					case *x509NamePolicyValidator:
@@ -872,4 +873,28 @@ func TestAWS_AuthorizeRenew(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestAWS_HardcodedCertificates(t *testing.T) {
+	certBytes := []byte(awsCertificate)
+
+	var certs []*x509.Certificate
+	for len(certBytes) > 0 {
+		var block *pem.Block
+		block, certBytes = pem.Decode(certBytes)
+		if block == nil {
+			break
+		}
+		if block.Type != "CERTIFICATE" || len(block.Headers) != 0 {
+			continue
+		}
+
+		cert, err := x509.ParseCertificate(block.Bytes)
+		assert.FatalError(t, err)
+
+		// check that the certificate is not expired
+		assert.True(t, cert.NotAfter.After(time.Now()))
+		certs = append(certs, cert)
+	}
+	assert.Len(t, 14, certs, "expected 14 certificates in aws_certificates.pem")
 }
