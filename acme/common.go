@@ -93,14 +93,17 @@ func ProvisionerFromContext(ctx context.Context) (v Provisioner, ok bool) {
 	return
 }
 
-// MustLinkerFromContext returns the current provisioner from the given context.
+// MustProvisionerFromContext returns the current provisioner from the given context.
 // It will panic if it's not in the context.
 func MustProvisionerFromContext(ctx context.Context) Provisioner {
-	if v, ok := ProvisionerFromContext(ctx); !ok {
+	var (
+		v  Provisioner
+		ok bool
+	)
+	if v, ok = ProvisionerFromContext(ctx); !ok {
 		panic("acme provisioner is not the context")
-	} else {
-		return v
 	}
+	return v
 }
 
 // MockProvisioner for testing
