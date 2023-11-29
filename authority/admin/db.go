@@ -92,11 +92,14 @@ func FromContext(ctx context.Context) (db DB, ok bool) {
 // MustFromContext returns the current admin database from the given context. It
 // will panic if it's not in the context.
 func MustFromContext(ctx context.Context) DB {
-	if db, ok := FromContext(ctx); !ok {
+	var (
+		db DB
+		ok bool
+	)
+	if db, ok = FromContext(ctx); !ok {
 		panic("admin database is not in the context")
-	} else {
-		return db
 	}
+	return db
 }
 
 // MockDB is an implementation of the DB interface that should only be used as

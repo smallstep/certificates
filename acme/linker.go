@@ -142,11 +142,14 @@ func LinkerFromContext(ctx context.Context) (v Linker, ok bool) {
 // MustLinkerFromContext returns the current linker from the given context. It
 // will panic if it's not in the context.
 func MustLinkerFromContext(ctx context.Context) Linker {
-	if v, ok := LinkerFromContext(ctx); !ok {
+	var (
+		v  Linker
+		ok bool
+	)
+	if v, ok = LinkerFromContext(ctx); !ok {
 		panic("acme linker is not the context")
-	} else {
-		return v
 	}
+	return v
 }
 
 type baseURLKey struct{}
