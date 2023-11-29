@@ -1,7 +1,6 @@
 package api
 
 import (
-	"bytes"
 	"context"
 	"crypto/rsa"
 	"errors"
@@ -452,20 +451,23 @@ func verifyAndExtractJWSPayload(next nextHTTP) nextHTTP {
 // Generally this shouldn't happen, but we've observed this to be the case with
 // the macOS ACME client, which seems to omit (at least one) leading null byte(s).
 // The error returned is `square/go-jose: error in cryptographic primitive`, which
-// is a sential error that hides the details of the actual underlying error, which
+// is a sentinel error that hides the details of the actual underlying error, which
 // is as follows: `square/go-jose: invalid signature size, have 63 bytes, wanted 64`,
 // for ES256.
-func retryVerificationWithPatchedSignatures(jws *jose.JSONWebSignature, jwk *jose.JSONWebKey) ([]byte, error) {
-	patchSignatures(jws)
-	return jws.Verify(jwk)
-}
-
-// patchSignatures patches the signatures in a JWS if it finds signatures that
-// are too short for the signature algorithm.
-func patchSignatures(jws *jose.JSONWebSignature) {
-	for i, s := range jws.Signatures {
+func retryVerificationWithPatchedSignatures(jws *jose.JSONWebSignature, jwk *jose.JSONWebKey) (data []byte, err error) {
+	originalSignatureValues := make([][]byte, len(jws.Signatures))
+	patched := false
+	defer func() {
+		if patched && err != nil {
+			for i, sig := range jws.Signatures {
+				sig.Signature = originalSignatureValues[i]
+				jws.Signatures[i] = sig
+			}
+		}
+	}()
+	for i, sig := range jws.Signatures {
 		var expectedSize int
-		alg := strings.ToUpper(s.Header.Algorithm)
+		alg := strings.ToUpper(sig.Header.Algorithm)
 		switch alg {
 		case jose.ES256:
 			expectedSize = 64
@@ -477,11 +479,73 @@ func patchSignatures(jws *jose.JSONWebSignature) {
 			// other cases are (currently) ignored
 			continue
 		}
-		if diff := expectedSize - len(s.Signature); diff > 0 {
-			s.Signature = append(bytes.Repeat([]byte{0x00}, diff), s.Signature...)
-			jws.Signatures[i] = s
+
+		switch diff := expectedSize - len(sig.Signature); diff {
+		case 0:
+			// expected length; nothing to do; will result in just doing the
+			// same verification (as done before calling this function) again,
+			// and thus an error will be returned.
+			continue
+		case 1:
+			patched = true
+			original := make([]byte, expectedSize-diff)
+			copy(original, sig.Signature)
+			originalSignatureValues[i] = original
+
+			patchedR := make([]byte, expectedSize)
+			copy(patchedR[0:1], []byte{0x00})
+			copy(patchedR[1:], original[0:expectedSize-diff])
+			sig.Signature = patchedR
+			jws.Signatures[i] = sig
+
+			// verify it with a patched R; return early if successful; continue
+			// with patching S if not.
+			data, err = jws.Verify(jwk)
+			if err == nil {
+				return
+			}
+
+			patchedS := make([]byte, expectedSize)
+			halfSize := expectedSize / 2
+			copy(patchedS[:halfSize], original[:halfSize])
+			copy(patchedS[halfSize:expectedSize/2+1], []byte{0x00})
+			copy(patchedS[halfSize+1:], original[halfSize:])
+			sig.Signature = patchedS
+			jws.Signatures[i] = sig
+		case 2:
+			// assumption is currently the Apple case, in which only the
+			// first null byte of R and/or S are removed, and thus not a case in
+			// which two first bytes of either R or S are removed.
+			patched = true
+			original := make([]byte, expectedSize-diff)
+			copy(original, sig.Signature)
+			originalSignatureValues[i] = original
+
+			patchedRS := make([]byte, expectedSize)
+			halfSize := expectedSize / 2
+			copy(patchedRS[0:1], []byte{0x00})
+			copy(patchedRS[1:halfSize], original[0:halfSize-1])
+			copy(patchedRS[halfSize:halfSize+1], []byte{0x00})
+			copy(patchedRS[halfSize+1:], original[halfSize-1:expectedSize-2])
+			sig.Signature = patchedRS
+			jws.Signatures[i] = sig
+		default:
+			// Technically, there can be multiple null bytes in either R or S,
+			// so when the difference is larger than 2, there is more than one
+			// option to pick. Apple's ACME client seems to only cut off the
+			// first null byte of either R or S, so we don't do anything in this
+			// case. Will result in just doing the same verification (as done
+			// before calling this function) again, and thus an error will be
+			// returned.
+			// TODO(hs): log this specific case? It might mean some other ACME
+			// client is doing weird things.
+			continue
 		}
 	}
+
+	data, err = jws.Verify(jwk)
+
+	return
 }
 
 // isPostAsGet asserts that the request is a PostAsGet (empty JWS payload).
