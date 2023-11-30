@@ -493,8 +493,7 @@ func retryVerificationWithPatchedSignatures(jws *jose.JSONWebSignature, jwk *jos
 			originalSignatureValues[i] = original
 
 			patchedR := make([]byte, expectedSize)
-			copy(patchedR[0:1], []byte{0x00})
-			copy(patchedR[1:], original[0:expectedSize-diff])
+			copy(patchedR[1:], original) // [0x00, R.0:31, S.0:32], for expectedSize 64
 			sig.Signature = patchedR
 			jws.Signatures[i] = sig
 
@@ -507,9 +506,8 @@ func retryVerificationWithPatchedSignatures(jws *jose.JSONWebSignature, jwk *jos
 
 			patchedS := make([]byte, expectedSize)
 			halfSize := expectedSize / 2
-			copy(patchedS[:halfSize], original[:halfSize])
-			copy(patchedS[halfSize:expectedSize/2+1], []byte{0x00})
-			copy(patchedS[halfSize+1:], original[halfSize:])
+			copy(patchedS, original[:halfSize])              // [R.0:32], for expectedSize 64
+			copy(patchedS[halfSize+1:], original[halfSize:]) // [R.0:32, 0x00, S.0:31]
 			sig.Signature = patchedS
 			jws.Signatures[i] = sig
 		case 2:
@@ -523,10 +521,8 @@ func retryVerificationWithPatchedSignatures(jws *jose.JSONWebSignature, jwk *jos
 
 			patchedRS := make([]byte, expectedSize)
 			halfSize := expectedSize / 2
-			copy(patchedRS[0:1], []byte{0x00})
-			copy(patchedRS[1:halfSize], original[0:halfSize-1])
-			copy(patchedRS[halfSize:halfSize+1], []byte{0x00})
-			copy(patchedRS[halfSize+1:], original[halfSize-1:expectedSize-2])
+			copy(patchedRS[1:], original[:halfSize-1])          // [0x00, R.0:31], for expectedSize 64
+			copy(patchedRS[halfSize+1:], original[halfSize-1:]) // [0x00, R.0:31, 0x00, S.0:31]
 			sig.Signature = patchedRS
 			jws.Signatures[i] = sig
 		default:
