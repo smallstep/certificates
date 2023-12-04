@@ -85,9 +85,16 @@ download:
 build: $(PREFIX)bin/$(BINNAME)
 	@echo "Build Complete!"
 
+build-fips: $(PREFIX)bin/$(BINNAME).fips
+	@echo "Build Complete!"
+
 $(PREFIX)bin/$(BINNAME): download $(call rwildcard,*.go)
 	$Q mkdir -p $(@D)
 	$Q $(GOOS_OVERRIDE) GOFLAGS="$(GOFLAGS)" $(GO_ENVS) go build -v -o $(PREFIX)bin/$(BINNAME) $(LDFLAGS) $(PKG)
+
+$(PREFIX)bin/$(BINNAME).fips: download $(call rwildcard,*.go)
+	$Q mkdir -p $(@D)
+	$Q $(GOOS_OVERRIDE) GOFLAGS="$(GOFLAGS)" $(GO_ENVS) GOEXPERIMENT="boringcrypto" go build -v -o $(PREFIX)bin/$(BINNAME).fips $(LDFLAGS) $(PKG)
 
 # Target to force a build of step-ca without running tests
 simple: build
