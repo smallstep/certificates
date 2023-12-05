@@ -18,7 +18,7 @@ require (
 	github.com/hashicorp/vault/api v1.10.0
 	github.com/hashicorp/vault/api/auth/approle v0.5.0
 	github.com/hashicorp/vault/api/auth/kubernetes v0.5.0
-	github.com/newrelic/go-agent/v3 v3.28.0
+	github.com/newrelic/go-agent/v3 v3.28.1
 	github.com/pkg/errors v0.9.1
 	github.com/rs/xid v1.5.0
 	github.com/sirupsen/logrus v1.9.3
