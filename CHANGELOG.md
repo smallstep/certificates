@@ -25,6 +25,26 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
 
 ---
 
+## [0.25.1] - 2023-11-28
+
+### Added
+
+- Provisioner name in SCEP webhook request body in (smallstep/certificates#1617)
+- Support for ASN1 boolean encoding in (smallstep/certificates#1590)
+
+### Changed
+
+- Generation of first provisioner name on `step ca init` in (smallstep/certificates#1566)
+- Processing of SCEP Get PKIOperation requests in (smallstep/certificates#1570)
+- Support for signing identity certificate during SSH sign by skipping URI validation in  (smallstep/certificates#1572)
+- Dependency on `micromdm/scep` and `go.mozilla.org/pkcs7` to use Smallstep forks in (smallstep/certificates#1600)
+- Make the Common Name validator for JWK provisioners accept values from SANs too in (smallstep/certificates#1609)
+
+### Fixed
+
+- Registration Authority token creation relied on values from CSR. Fixed to rely on template in (smallstep/certificates#1608)
+- Use same glibc version for running the CA when built using CGo in (smallstep/certificates#1616)
+
 ## [0.25.0] - 2023-09-26
 
 ### Added

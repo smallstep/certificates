@@ -6,6 +6,7 @@ import (
 	"crypto"
 	"encoding/base64"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -14,9 +15,10 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/pkg/errors"
 	"github.com/smallstep/assert"
 	"github.com/smallstep/certificates/acme"
+	tassert "github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	"go.step.sm/crypto/jose"
 	"go.step.sm/crypto/keyutil"
 )
@@ -469,11 +471,38 @@ func TestHandler_verifyAndExtractJWSPayload(t *testing.T) {
 				err:        acme.NewErrorISE("jwk expected in request context"),
 			}
 		},
-		"fail/verify-jws-failure": func(t *testing.T) test {
+		"fail/verify-jws-failure-wrong-jwk": func(t *testing.T) test {
 			_jwk, err := jose.GenerateJWK("EC", "P-256", "ES256", "sig", "", 0)
 			assert.FatalError(t, err)
 			_pub := _jwk.Public()
 			ctx := context.WithValue(context.Background(), jwsContextKey, parsedJWS)
+			ctx = context.WithValue(ctx, jwkContextKey, &_pub)
+			return test{
+				ctx:        ctx,
+				statusCode: 400,
+				err:        acme.NewError(acme.ErrorMalformedType, "error verifying jws: square/go-jose: error in cryptographic primitive"),
+			}
+		},
+		"fail/verify-jws-failure-too-many-signatures": func(t *testing.T) test {
+			newParsedJWS, err := jose.ParseJWS(raw)
+			assert.FatalError(t, err)
+			newParsedJWS.Signatures = append(newParsedJWS.Signatures, newParsedJWS.Signatures...)
+			ctx := context.WithValue(context.Background(), jwsContextKey, newParsedJWS)
+			ctx = context.WithValue(ctx, jwkContextKey, pub)
+			return test{
+				ctx:        ctx,
+				statusCode: 400,
+				err:        acme.NewError(acme.ErrorMalformedType, "error verifying jws: square/go-jose: too many signatures in payload; expecting only one"),
+			}
+		},
+		"fail/apple-acmeclient-omitting-leading-null-byte-in-signature-with-wrong-jwk": func(t *testing.T) test {
+			_jwk, err := jose.GenerateJWK("EC", "P-256", "ES256", "sig", "", 0)
+			assert.FatalError(t, err)
+			_pub := _jwk.Public()
+			appleNullByteCaseBody := `{"payload":"dGVzdC0xMTA1","protected":"eyJhbGciOiJFUzI1NiJ9","signature":"rQPYKYflfKnlgBKqDeWsJH2TJ6iHAnou7sFzXlmYD4ArXqLfYuqotWERKrna2wfzh0pu7USWO2gzlOqRK9qq"}`
+			appleNullByteCaseJWS, err := jose.ParseJWS(appleNullByteCaseBody)
+			require.NoError(t, err)
+			ctx := context.WithValue(context.Background(), jwsContextKey, appleNullByteCaseJWS)
 			ctx = context.WithValue(ctx, jwkContextKey, &_pub)
 			return test{
 				ctx:        ctx,
@@ -572,6 +601,38 @@ func TestHandler_verifyAndExtractJWSPayload(t *testing.T) {
 						assert.Equals(t, p.value, []byte("{}"))
 						assert.False(t, p.isPostAsGet)
 						assert.True(t, p.isEmptyJSON)
+					}
+					w.Write(testBody)
+				},
+			}
+		},
+		"ok/apple-acmeclient-omitting-leading-null-byte-in-signature": func(t *testing.T) test {
+			appleNullByteCaseKey := []byte(`{
+				"kid": "uioinbiTlJICL0MYsb6ar1totfRA2tiPqWgntF8xUdo",
+				"crv": "P-256",
+				"alg": "ES256",
+				"kty": "EC",
+				"x": "wlz-Kv9X0h32fzLq-cogls9HxoZQqV-GuWxdb2MCeUY",
+				"y": "xzP6zRrg_jynYljZTxfJuql_QWtdQR6lpJ52q_6Vavg"
+			}`)
+			appleNullByteCaseJWK := &jose.JSONWebKey{}
+			err = json.Unmarshal(appleNullByteCaseKey, appleNullByteCaseJWK)
+			require.NoError(t, err)
+			appleNullByteCaseBody := `{"payload":"dGVzdC0xMTA1","protected":"eyJhbGciOiJFUzI1NiJ9","signature":"rQPYKYflfKnlgBKqDeWsJH2TJ6iHAnou7sFzXlmYD4ArXqLfYuqotWERKrna2wfzh0pu7USWO2gzlOqRK9qq"}`
+			appleNullByteCaseJWS, err := jose.ParseJWS(appleNullByteCaseBody)
+			require.NoError(t, err)
+			ctx := context.WithValue(context.Background(), jwsContextKey, appleNullByteCaseJWS)
+			ctx = context.WithValue(ctx, jwkContextKey, appleNullByteCaseJWK)
+			return test{
+				ctx:        ctx,
+				statusCode: 200,
+				next: func(w http.ResponseWriter, r *http.Request) {
+					p, err := payloadFromContext(r.Context())
+					tassert.NoError(t, err)
+					if tassert.NotNil(t, p) {
+						tassert.Equal(t, []byte(`test-1105`), p.value)
+						tassert.False(t, p.isPostAsGet)
+						tassert.False(t, p.isEmptyJSON)
 					}
 					w.Write(testBody)
 				},
@@ -1692,6 +1753,89 @@ func TestHandler_checkPrerequisites(t *testing.T) {
 			} else {
 				assert.Equals(t, bytes.TrimSpace(body), testBody)
 			}
+		})
+	}
+}
+
+func Test_retryVerificationWithPatchedSignatures(t *testing.T) {
+	patchedRKey := []byte(`{
+		"kid": "uioinbiTlJICL0MYsb6ar1totfRA2tiPqWgntF8xUdo",
+		"crv": "P-256",
+		"alg": "ES256",
+		"kty": "EC",
+		"x": "wlz-Kv9X0h32fzLq-cogls9HxoZQqV-GuWxdb2MCeUY",
+		"y": "xzP6zRrg_jynYljZTxfJuql_QWtdQR6lpJ52q_6Vavg"
+	}`)
+	patchedRJWK := &jose.JSONWebKey{}
+	err := json.Unmarshal(patchedRKey, patchedRJWK)
+	require.NoError(t, err)
+	patchedRBody := `{"payload":"dGVzdC0xMTA1","protected":"eyJhbGciOiJFUzI1NiJ9","signature":"rQPYKYflfKnlgBKqDeWsJH2TJ6iHAnou7sFzXlmYD4ArXqLfYuqotWERKrna2wfzh0pu7USWO2gzlOqRK9qq"}`
+	patchedR, err := jose.ParseJWS(patchedRBody)
+	require.NoError(t, err)
+
+	patchedSKey := []byte(`{
+		"kid": "PblXsnK59uTiF5k3mmAN2B6HDPPxqBL_4UGhEG8ZO6g",
+		"crv": "P-256",
+		"alg": "ES256",
+		"kty": "EC",
+		"x": "T5aM_TOSattXNeUkH1VHZXh8URzdjZTI2zLvVgI0cy0",
+		"y": "Lf8h8qZnURXIxm6OnQ69kxGC91YtTZRD2GAroEf1UA8"
+	}`)
+	patchedSJWK := &jose.JSONWebKey{}
+	err = json.Unmarshal(patchedSKey, patchedSJWK)
+	require.NoError(t, err)
+	patchedSBody := `{"payload":"dGVzdC02Ng","protected":"eyJhbGciOiJFUzI1NiJ9","signature":"krtSKSgVB04oqx6i9QLeal_wZSnjV1_PSIM3AubT0WRIxnhl_yYbVpa3i53p3dUW56TtP6_SUZboH6SvLHMz"}`
+	patchedS, err := jose.ParseJWS(patchedSBody)
+	require.NoError(t, err)
+
+	patchedRSKey := []byte(`{
+		"kid": "U8BmBVbZsNUawvhOomJQPa6uYj1rdxCPQWF_nOLVsc4",
+		"crv": "P-256",
+		"alg": "ES256",
+		"kty": "EC",
+		"x": "Ym0l3GMS6aHBLo-xe73Kub4kafnOBu_QAfOsx5y-bV0",
+		"y": "wKijX9Cu67HbK94StPcI18WulgRfIMbP2ZU7gQuf3-M"
+	}`)
+	patchedRSJWK := &jose.JSONWebKey{}
+	err = json.Unmarshal(patchedRSKey, patchedRSJWK)
+	require.NoError(t, err)
+	patchedRSBody := `{"payload":"dGVzdC05MDY3","protected":"eyJhbGciOiJFUzI1NiJ9","signature":"2r_My19oRg7mWf9I5JTkNYp8otfEMz-yXRA8ltZTAKZxyJLurpVEgicmNItu7lfcCrGrTgI3Obye_gSaIyc"}`
+	patchedRS, err := jose.ParseJWS(patchedRSBody)
+	require.NoError(t, err)
+
+	patchedRWithWrongJWK, err := jose.ParseJWS(patchedRBody)
+	require.NoError(t, err)
+
+	tests := []struct {
+		name              string
+		jws               *jose.JSONWebSignature
+		jwk               *jose.JSONWebKey
+		expectedData      []byte
+		expectedSignature string
+		expectedError     error
+	}{
+		{"ok/patched-r", patchedR, patchedRJWK, []byte(`test-1105`), `AK0D2CmH5Xyp5YASqg3lrCR9kyeohwJ6Lu7Bc15ZmA-AK16i32LqqLVhESq52tsH84dKbu1EljtoM5TqkSvaqg`, nil},
+		{"ok/patched-s", patchedS, patchedSJWK, []byte(`test-66`), `krtSKSgVB04oqx6i9QLeal_wZSnjV1_PSIM3AubT0WQASMZ4Zf8mG1aWt4ud6d3VFuek7T-v0lGW6B-kryxzMw`, nil},
+		{"ok/patched-rs", patchedRS, patchedRSJWK, []byte(`test-9067`), `ANq_zMtfaEYO5ln_SOSU5DWKfKLXxDM_sl0QPJbWUwAApnHIku6ulUSCJyY0i27uV9wKsatOAjc5vJ7-BJojJw`, nil},
+		{"fail/patched-r-wrong-jwk", patchedRWithWrongJWK, patchedRSJWK, nil, `rQPYKYflfKnlgBKqDeWsJH2TJ6iHAnou7sFzXlmYD4ArXqLfYuqotWERKrna2wfzh0pu7USWO2gzlOqRK9qq`, errors.New("square/go-jose: error in cryptographic primitive")},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			expectedSignature, decodeErr := base64.RawURLEncoding.DecodeString(tt.expectedSignature)
+			require.NoError(t, decodeErr)
+
+			data, err := retryVerificationWithPatchedSignatures(tt.jws, tt.jwk)
+			if tt.expectedError != nil {
+				tassert.EqualError(t, err, tt.expectedError.Error())
+				tassert.Equal(t, expectedSignature, tt.jws.Signatures[0].Signature)
+				tassert.Empty(t, data)
+				return
+			}
+
+			tassert.NoError(t, err)
+			tassert.Len(t, tt.jws.Signatures[0].Signature, 64)
+			tassert.Equal(t, expectedSignature, tt.jws.Signatures[0].Signature)
+			tassert.Equal(t, tt.expectedData, data)
 		})
 	}
 }

@@ -13,8 +13,8 @@ import (
 	"strings"
 
 	"github.com/go-chi/chi/v5"
-	microscep "github.com/micromdm/scep/v2/scep"
-	"go.mozilla.org/pkcs7"
+	"github.com/smallstep/pkcs7"
+	smallscep "github.com/smallstep/scep"
 
 	"github.com/smallstep/certificates/api"
 	"github.com/smallstep/certificates/api/log"
@@ -320,7 +320,7 @@ func GetCACert(ctx context.Context) (Response, error) {
 		// create degenerate pkcs7 certificate structure, according to
 		// https://tools.ietf.org/html/rfc8894#section-4.2.1.2, because
 		// not signed or encrypted data has to be returned.
-		data, err := microscep.DegenerateCertificates(certs)
+		data, err := smallscep.DegenerateCertificates(certs)
 		if err != nil {
 			return Response{}, err
 		}
@@ -345,16 +345,16 @@ func GetCACaps(ctx context.Context) (Response, error) {
 
 // PKIOperation performs PKI operations and returns a SCEP response
 func PKIOperation(ctx context.Context, req request) (Response, error) {
-	// parse the message using microscep implementation
-	microMsg, err := microscep.ParsePKIMessage(req.Message)
+	// parse the message using smallscep implementation
+	microMsg, err := smallscep.ParsePKIMessage(req.Message)
 	if err != nil {
 		// return the error, because we can't use the msg for creating a CertRep
 		return Response{}, err
 	}
 
-	// this is essentially doing the same as microscep.ParsePKIMessage, but
+	// this is essentially doing the same as smallscep.ParsePKIMessage, but
 	// gives us access to the p7 itself in scep.PKIMessage. Essentially a small
-	// wrapper for the microscep implementation.
+	// wrapper for the smallscep implementation.
 	p7, err := pkcs7.Parse(microMsg.Raw)
 	if err != nil {
 		return Response{}, err
@@ -384,12 +384,12 @@ func PKIOperation(ctx context.Context, req request) (Response, error) {
 	// even if using the renewal flow as described in the README.md. MicroMDM SCEP client also only does PKCSreq by default, unless
 	// a certificate exists; then it will use RenewalReq. Adding the challenge check here may be a small breaking change for clients.
 	// We'll have to see how it works out.
-	if msg.MessageType == microscep.PKCSReq || msg.MessageType == microscep.RenewalReq {
+	if msg.MessageType == smallscep.PKCSReq || msg.MessageType == smallscep.RenewalReq {
 		if err := auth.ValidateChallenge(ctx, csr, challengePassword, transactionID); err != nil {
 			if errors.Is(err, provisioner.ErrSCEPChallengeInvalid) {
-				return createFailureResponse(ctx, csr, msg, microscep.BadRequest, err)
+				return createFailureResponse(ctx, csr, msg, smallscep.BadRequest, err)
 			}
-			return createFailureResponse(ctx, csr, msg, microscep.BadRequest, errors.New("failed validating challenge password"))
+			return createFailureResponse(ctx, csr, msg, smallscep.BadRequest, errors.New("failed validating challenge password"))
 		}
 	}
 
@@ -407,7 +407,7 @@ func PKIOperation(ctx context.Context, req request) (Response, error) {
 			// TODO(hs): ignore this error case? It's not critical if the notification fails; but logging it might be good
 			_ = notifyErr
 		}
-		return createFailureResponse(ctx, csr, msg, microscep.BadRequest, fmt.Errorf("error when signing new certificate: %w", err))
+		return createFailureResponse(ctx, csr, msg, smallscep.BadRequest, fmt.Errorf("error when signing new certificate: %w", err))
 	}
 
 	if notifyErr := auth.NotifySuccess(ctx, csr, certRep.Certificate, transactionID); notifyErr != nil {
@@ -448,7 +448,7 @@ func fail(w http.ResponseWriter, err error) {
 	http.Error(w, err.Error(), http.StatusInternalServerError)
 }
 
-func createFailureResponse(ctx context.Context, csr *x509.CertificateRequest, msg *scep.PKIMessage, info microscep.FailInfo, failError error) (Response, error) {
+func createFailureResponse(ctx context.Context, csr *x509.CertificateRequest, msg *scep.PKIMessage, info smallscep.FailInfo, failError error) (Response, error) {
 	auth := scep.MustFromContext(ctx)
 	certRepMsg, err := auth.CreateFailureResponse(ctx, csr, msg, scep.FailInfoName(info), failError.Error())
 	if err != nil {

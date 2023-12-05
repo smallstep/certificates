@@ -8,9 +8,9 @@ import (
 	"fmt"
 	"sync"
 
-	microx509util "github.com/micromdm/scep/v2/cryptoutil/x509util"
-	microscep "github.com/micromdm/scep/v2/scep"
-	"go.mozilla.org/pkcs7"
+	"github.com/smallstep/pkcs7"
+	smallscep "github.com/smallstep/scep"
+	smallscepx509util "github.com/smallstep/scep/x509util"
 
 	"go.step.sm/crypto/x509util"
 
@@ -48,11 +48,14 @@ func FromContext(ctx context.Context) (a *Authority, ok bool) {
 // MustFromContext returns the current authority from the given context. It will
 // panic if the authority is not in the context.
 func MustFromContext(ctx context.Context) *Authority {
-	if a, ok := FromContext(ctx); !ok {
+	var (
+		a  *Authority
+		ok bool
+	)
+	if a, ok = FromContext(ctx); !ok {
 		panic("scep authority is not in the context")
-	} else {
-		return a
 	}
+	return a
 }
 
 // SignAuthority is the interface for a signing authority
@@ -203,14 +206,14 @@ func (a *Authority) DecryptPKIEnvelope(ctx context.Context, msg *PKIMessage) err
 	msg.pkiEnvelope = envelope
 
 	switch msg.MessageType {
-	case microscep.CertRep:
-		certs, err := microscep.CACerts(msg.pkiEnvelope)
+	case smallscep.CertRep:
+		certs, err := smallscep.CACerts(msg.pkiEnvelope)
 		if err != nil {
 			return fmt.Errorf("error extracting CA certs from pkcs7 degenerate data: %w", err)
 		}
 		msg.CertRepMessage.Certificate = certs[0]
 		return nil
-	case microscep.PKCSReq, microscep.UpdateReq, microscep.RenewalReq:
+	case smallscep.PKCSReq, smallscep.UpdateReq, smallscep.RenewalReq:
 		csr, err := x509.ParseCertificateRequest(msg.pkiEnvelope)
 		if err != nil {
 			return fmt.Errorf("parse CSR from pkiEnvelope: %w", err)
@@ -219,17 +222,17 @@ func (a *Authority) DecryptPKIEnvelope(ctx context.Context, msg *PKIMessage) err
 			return fmt.Errorf("invalid CSR signature; %w", err)
 		}
 		// extract the challenge password
-		cp, err := microx509util.ParseChallengePassword(msg.pkiEnvelope)
+		cp, err := smallscepx509util.ParseChallengePassword(msg.pkiEnvelope)
 		if err != nil {
 			return fmt.Errorf("parse challenge password in pkiEnvelope: %w", err)
 		}
-		msg.CSRReqMessage = &microscep.CSRReqMessage{
+		msg.CSRReqMessage = &smallscep.CSRReqMessage{
 			RawDecrypted:      msg.pkiEnvelope,
 			CSR:               csr,
 			ChallengePassword: cp,
 		}
 		return nil
-	case microscep.GetCRL, microscep.GetCert, microscep.CertPoll:
+	case smallscep.GetCRL, smallscep.GetCert, smallscep.CertPoll:
 		return errors.New("not implemented")
 	}
 
@@ -312,7 +315,7 @@ func (a *Authority) SignCSR(ctx context.Context, csr *x509.CertificateRequest, m
 	cert := certChain[0]
 
 	// and create a degenerate cert structure
-	deg, err := microscep.DegenerateCertificates([]*x509.Certificate{cert})
+	deg, err := smallscep.DegenerateCertificates([]*x509.Certificate{cert})
 	if err != nil {
 		return nil, fmt.Errorf("failed generating degenerate certificate: %w", err)
 	}
@@ -331,11 +334,11 @@ func (a *Authority) SignCSR(ctx context.Context, csr *x509.CertificateRequest, m
 			},
 			{
 				Type:  oidSCEPpkiStatus,
-				Value: microscep.SUCCESS,
+				Value: smallscep.SUCCESS,
 			},
 			{
 				Type:  oidSCEPmessageType,
-				Value: microscep.CertRep,
+				Value: smallscep.CertRep,
 			},
 			{
 				Type:  oidSCEPrecipientNonce,
@@ -374,8 +377,8 @@ func (a *Authority) SignCSR(ctx context.Context, csr *x509.CertificateRequest, m
 	}
 
 	cr := &CertRepMessage{
-		PKIStatus:      microscep.SUCCESS,
-		RecipientNonce: microscep.RecipientNonce(msg.SenderNonce),
+		PKIStatus:      smallscep.SUCCESS,
+		RecipientNonce: smallscep.RecipientNonce(msg.SenderNonce),
 		Certificate:    cert,
 		degenerate:     deg,
 	}
@@ -384,7 +387,7 @@ func (a *Authority) SignCSR(ctx context.Context, csr *x509.CertificateRequest, m
 	crepMsg := &PKIMessage{
 		Raw:            certRepBytes,
 		TransactionID:  msg.TransactionID,
-		MessageType:    microscep.CertRep,
+		MessageType:    smallscep.CertRep,
 		CertRepMessage: cr,
 	}
 
@@ -423,7 +426,7 @@ func (a *Authority) CreateFailureResponse(ctx context.Context, _ *x509.Certifica
 			},
 			{
 				Type:  oidSCEPpkiStatus,
-				Value: microscep.FAILURE,
+				Value: smallscep.FAILURE,
 			},
 			{
 				Type:  oidSCEPfailInfo,
@@ -435,7 +438,7 @@ func (a *Authority) CreateFailureResponse(ctx context.Context, _ *x509.Certifica
 			},
 			{
 				Type:  oidSCEPmessageType,
-				Value: microscep.CertRep,
+				Value: smallscep.CertRep,
 			},
 			{
 				Type:  oidSCEPsenderNonce,
@@ -469,16 +472,16 @@ func (a *Authority) CreateFailureResponse(ctx context.Context, _ *x509.Certifica
 	}
 
 	cr := &CertRepMessage{
-		PKIStatus:      microscep.FAILURE,
-		FailInfo:       microscep.FailInfo(info),
-		RecipientNonce: microscep.RecipientNonce(msg.SenderNonce),
+		PKIStatus:      smallscep.FAILURE,
+		FailInfo:       smallscep.FailInfo(info),
+		RecipientNonce: smallscep.RecipientNonce(msg.SenderNonce),
 	}
 
 	// create a CertRep message from the original
 	crepMsg := &PKIMessage{
 		Raw:            certRepBytes,
 		TransactionID:  msg.TransactionID,
-		MessageType:    microscep.CertRep,
+		MessageType:    smallscep.CertRep,
 		CertRepMessage: cr,
 	}
 

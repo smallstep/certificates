@@ -201,11 +201,14 @@ func FromContext(ctx context.Context) (a *Authority, ok bool) {
 // MustFromContext returns the current authority from the given context. It will
 // panic if the authority is not in the context.
 func MustFromContext(ctx context.Context) *Authority {
-	if a, ok := FromContext(ctx); !ok {
+	var (
+		a  *Authority
+		ok bool
+	)
+	if a, ok = FromContext(ctx); !ok {
 		panic("authority is not in the context")
-	} else {
-		return a
 	}
+	return a
 }
 
 // ReloadAdminResources reloads admins and provisioners from the DB.
