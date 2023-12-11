@@ -31,7 +31,7 @@ require (
 	github.com/stretchr/testify v1.8.4
 	github.com/urfave/cli v1.22.14
 	go.step.sm/cli-utils v0.8.0
-	go.step.sm/crypto v0.38.0
+	go.step.sm/crypto v0.39.0
 	go.step.sm/linkedca v0.20.1
 	golang.org/x/crypto v0.16.0
 	golang.org/x/exp v0.0.0-20230310171629-522b1b587ee0
@@ -59,7 +59,7 @@ require (
 	github.com/Masterminds/goutils v1.1.1 // indirect
 	github.com/Masterminds/semver/v3 v3.2.0 // indirect
 	github.com/ThalesIgnite/crypto11 v1.2.5 // indirect
-	github.com/aws/aws-sdk-go v1.48.7 // indirect
+	github.com/aws/aws-sdk-go v1.48.12 // indirect
 	github.com/cenkalti/backoff/v3 v3.0.0 // indirect
 	github.com/cespare/xxhash v1.1.0 // indirect
 	github.com/cespare/xxhash/v2 v2.2.0 // indirect
