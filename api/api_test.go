@@ -28,14 +28,11 @@ import (
 
 	"github.com/go-chi/chi/v5"
 	"github.com/pkg/errors"
-	sassert "github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"go.step.sm/crypto/jose"
 	"go.step.sm/crypto/x509util"
 	"golang.org/x/crypto/ssh"
-	squarejose "gopkg.in/square/go-jose.v2"
-
-	"github.com/smallstep/assert"
 
 	"github.com/smallstep/certificates/authority"
 	"github.com/smallstep/certificates/authority/provisioner"
@@ -658,7 +655,7 @@ func TestSignRequest_Validate(t *testing.T) {
 			}
 			if err := s.Validate(); err != nil {
 				if assert.NotNil(t, tt.err) {
-					assert.HasPrefix(t, err.Error(), tt.err.Error())
+					assert.True(t, strings.HasPrefix(err.Error(), tt.err.Error()))
 				}
 			} else {
 				assert.Nil(t, tt.err)
@@ -1259,10 +1256,10 @@ func Test_Provisioners(t *testing.T) {
 
 	expectedError400 := errs.BadRequest("limit 'abc' is not an integer")
 	expectedError400Bytes, err := json.Marshal(expectedError400)
-	assert.FatalError(t, err)
+	require.NoError(t, err)
 	expectedError500 := errs.InternalServer("force")
 	expectedError500Bytes, err := json.Marshal(expectedError500)
-	assert.FatalError(t, err)
+	require.NoError(t, err)
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			mockMustAuthority(t, tt.fields.Authority)
@@ -1329,7 +1326,7 @@ func Test_ProvisionerKey(t *testing.T) {
 	expected := []byte(`{"key":"` + privKey + `"}`)
 	expectedError404 := errs.NotFound("force")
 	expectedError404Bytes, err := json.Marshal(expectedError404)
-	assert.FatalError(t, err)
+	require.NoError(t, err)
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -1578,7 +1575,7 @@ func TestProvisionersResponse_MarshalJSON(t *testing.T) {
 		"x":   "7ZdAAMZCFU4XwgblI5RfZouBi8lYmF6DlZusNNnsbm8",
 		"y":   "sQr2JdzwD2fgyrymBEXWsxDxFNjjqN64qLLSbLdLZ9Y",
 	}
-	key := squarejose.JSONWebKey{}
+	key := jose.JSONWebKey{}
 	b, err := json.Marshal(k)
 	require.NoError(t, err)
 	err = json.Unmarshal(b, &key)
@@ -1644,11 +1641,11 @@ func TestProvisionersResponse_MarshalJSON(t *testing.T) {
 	}
 
 	expBytes, err := json.Marshal(expected)
-	sassert.NoError(t, err)
+	assert.NoError(t, err)
 
 	br, err := r.MarshalJSON()
-	sassert.NoError(t, err)
-	sassert.JSONEq(t, string(expBytes), string(br))
+	assert.NoError(t, err)
+	assert.JSONEq(t, string(expBytes), string(br))
 
 	keyCopy := key
 	expList := provisioner.List{
@@ -1674,7 +1671,7 @@ func TestProvisionersResponse_MarshalJSON(t *testing.T) {
 	}
 
 	// MarshalJSON must not affect the struct properties itself
-	sassert.Equal(t, expList, r.Provisioners)
+	assert.Equal(t, expList, r.Provisioners)
 }
 
 const (
@@ -1693,14 +1690,14 @@ func TestLogSSHCertificate(t *testing.T) {
 	rl := logging.NewResponseLogger(w)
 	LogSSHCertificate(rl, cert)
 
-	sassert.Equal(t, 200, w.Result().StatusCode)
+	assert.Equal(t, 200, w.Result().StatusCode)
 
 	fields := rl.Fields()
-	sassert.Equal(t, uint64(14376510277651266987), fields["serial"])
-	sassert.Equal(t, []string{"herman"}, fields["principals"])
-	sassert.Equal(t, "ecdsa-sha2-nistp256-cert-v01@openssh.com user certificate", fields["certificate-type"])
-	sassert.Equal(t, time.Unix(1674129191, 0).Format(time.RFC3339), fields["valid-from"])
-	sassert.Equal(t, time.Unix(1674186851, 0).Format(time.RFC3339), fields["valid-to"])
-	sassert.Equal(t, "AAAAKGVjZHNhLXNoYTItbmlzdHAyNTYtY2VydC12MDFAb3BlbnNzaC5jb20AAAAgLnkvSk4odlo3b1R+RDw+LmorL3RkN354IilCIVFVen4AAAAIbmlzdHAyNTYAAABBBHjKHss8WM2ffMYlavisoLXR0I6UEIU+cidV1ogEH1U6+/SYaFPrlzQo0tGLM5CNkMbhInbyasQsrHzn8F1Rt7nHg5/tcSf9qwAAAAEAAAAGaGVybWFuAAAACgAAAAZoZXJtYW4AAAAAY8kvJwAAAABjyhBjAAAAAAAAAIIAAAAVcGVybWl0LVgxMS1mb3J3YXJkaW5nAAAAAAAAABdwZXJtaXQtYWdlbnQtZm9yd2FyZGluZwAAAAAAAAAWcGVybWl0LXBvcnQtZm9yd2FyZGluZwAAAAAAAAAKcGVybWl0LXB0eQAAAAAAAAAOcGVybWl0LXVzZXItcmMAAAAAAAAAAAAAAGgAAAATZWNkc2Etc2hhMi1uaXN0cDI1NgAAAAhuaXN0cDI1NgAAAEEE/ayqpPrZZF5uA1UlDt4FreTf15agztQIzpxnWq/XoxAHzagRSkFGkdgFpjgsfiRpP8URHH3BZScqc0ZDCTxhoQAAAGQAAAATZWNkc2Etc2hhMi1uaXN0cDI1NgAAAEkAAAAhAJuP1wCVwoyrKrEtHGfFXrVbRHySDjvXtS1tVTdHyqymAAAAIBa/CSSzfZb4D2NLP+eEmOOMJwSjYOiNM8fiOoAaqglI", fields["certificate"])
-	sassert.Equal(t, "SHA256:RvkDPGwl/G9d7LUFm1kmWhvOD9I/moPq4yxcb0STwr0 (ECDSA-CERT)", fields["public-key"])
+	assert.Equal(t, uint64(14376510277651266987), fields["serial"])
+	assert.Equal(t, []string{"herman"}, fields["principals"])
+	assert.Equal(t, "ecdsa-sha2-nistp256-cert-v01@openssh.com user certificate", fields["certificate-type"])
+	assert.Equal(t, time.Unix(1674129191, 0).Format(time.RFC3339), fields["valid-from"])
+	assert.Equal(t, time.Unix(1674186851, 0).Format(time.RFC3339), fields["valid-to"])
+	assert.Equal(t, "AAAAKGVjZHNhLXNoYTItbmlzdHAyNTYtY2VydC12MDFAb3BlbnNzaC5jb20AAAAgLnkvSk4odlo3b1R+RDw+LmorL3RkN354IilCIVFVen4AAAAIbmlzdHAyNTYAAABBBHjKHss8WM2ffMYlavisoLXR0I6UEIU+cidV1ogEH1U6+/SYaFPrlzQo0tGLM5CNkMbhInbyasQsrHzn8F1Rt7nHg5/tcSf9qwAAAAEAAAAGaGVybWFuAAAACgAAAAZoZXJtYW4AAAAAY8kvJwAAAABjyhBjAAAAAAAAAIIAAAAVcGVybWl0LVgxMS1mb3J3YXJkaW5nAAAAAAAAABdwZXJtaXQtYWdlbnQtZm9yd2FyZGluZwAAAAAAAAAWcGVybWl0LXBvcnQtZm9yd2FyZGluZwAAAAAAAAAKcGVybWl0LXB0eQAAAAAAAAAOcGVybWl0LXVzZXItcmMAAAAAAAAAAAAAAGgAAAATZWNkc2Etc2hhMi1uaXN0cDI1NgAAAAhuaXN0cDI1NgAAAEEE/ayqpPrZZF5uA1UlDt4FreTf15agztQIzpxnWq/XoxAHzagRSkFGkdgFpjgsfiRpP8URHH3BZScqc0ZDCTxhoQAAAGQAAAATZWNkc2Etc2hhMi1uaXN0cDI1NgAAAEkAAAAhAJuP1wCVwoyrKrEtHGfFXrVbRHySDjvXtS1tVTdHyqymAAAAIBa/CSSzfZb4D2NLP+eEmOOMJwSjYOiNM8fiOoAaqglI", fields["certificate"])
+	assert.Equal(t, "SHA256:RvkDPGwl/G9d7LUFm1kmWhvOD9I/moPq4yxcb0STwr0 (ECDSA-CERT)", fields["public-key"])
 }

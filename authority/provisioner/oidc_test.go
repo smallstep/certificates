@@ -233,11 +233,11 @@ func TestOIDC_authorizeToken(t *testing.T) {
 		{"fail-key", p1, args{failKey}, http.StatusUnauthorized, "", errors.New(`oidc.AuthorizeToken; cannot validate oidc token`)},
 		{"fail-token", p1, args{failTok}, http.StatusUnauthorized, "", errors.New(`oidc.AuthorizeToken; error parsing oidc token: invalid character '~' looking for beginning of value`)},
 		{"fail-claims", p1, args{failClaims}, http.StatusUnauthorized, "", errors.New(`oidc.AuthorizeToken; error parsing oidc token claims: invalid character '~' looking for beginning of value`)},
-		{"fail-issuer", p1, args{failIss}, http.StatusUnauthorized, "", errors.New(`oidc.AuthorizeToken: validatePayload: failed to validate oidc token payload: square/go-jose/jwt: validation failed, invalid issuer claim (iss)`)},
-		{"fail-audience", p1, args{failAud}, http.StatusUnauthorized, "", errors.New(`oidc.AuthorizeToken: validatePayload: failed to validate oidc token payload: square/go-jose/jwt: validation failed, invalid audience claim (aud)`)},
+		{"fail-issuer", p1, args{failIss}, http.StatusUnauthorized, "", errors.New(`oidc.AuthorizeToken: validatePayload: failed to validate oidc token payload: go-jose/go-jose/jwt: validation failed, invalid issuer claim (iss)`)},
+		{"fail-audience", p1, args{failAud}, http.StatusUnauthorized, "", errors.New(`oidc.AuthorizeToken: validatePayload: failed to validate oidc token payload: go-jose/go-jose/jwt: validation failed, invalid audience claim (aud)`)},
 		{"fail-signature", p1, args{failSig}, http.StatusUnauthorized, "", errors.New(`oidc.AuthorizeToken; cannot validate oidc token`)},
-		{"fail-expired", p1, args{failExp}, http.StatusUnauthorized, "", errors.New(`oidc.AuthorizeToken: validatePayload: failed to validate oidc token payload: square/go-jose/jwt: validation failed, token is expired (exp)`)},
-		{"fail-not-before", p1, args{failNbf}, http.StatusUnauthorized, "", errors.New(`oidc.AuthorizeToken: validatePayload: failed to validate oidc token payload: square/go-jose/jwt: validation failed, token not valid yet (nbf)`)},
+		{"fail-expired", p1, args{failExp}, http.StatusUnauthorized, "", errors.New(`oidc.AuthorizeToken: validatePayload: failed to validate oidc token payload: go-jose/go-jose/jwt: validation failed, token is expired (exp)`)},
+		{"fail-not-before", p1, args{failNbf}, http.StatusUnauthorized, "", errors.New(`oidc.AuthorizeToken: validatePayload: failed to validate oidc token payload: go-jose/go-jose/jwt: validation failed, token not valid yet (nbf)`)},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {

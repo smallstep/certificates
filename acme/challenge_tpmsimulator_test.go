@@ -817,7 +817,7 @@ func Test_doTPMAttestationFormat(t *testing.T) {
 				"certInfo": params.CreateAttestation,
 				"pubArea":  params.Public,
 			},
-		}}, nil, newInternalServerError("failed creating key auth digest: error generating JWK thumbprint: square/go-jose: unknown key type '[]uint8'")},
+		}}, nil, newInternalServerError("failed creating key auth digest: error generating JWK thumbprint: go-jose/go-jose: unknown key type '[]uint8'")},
 		{"fail different keyAuthorization", args{ctx, mustAttestationProvisioner(t, acaRoot), &Challenge{Token: "aDifferentToken"}, jwk, &attestationObject{
 			Format: "tpm",
 			AttStatement: map[string]interface{}{

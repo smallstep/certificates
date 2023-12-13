@@ -449,11 +449,11 @@ func verifyAndExtractJWSPayload(next nextHTTP) nextHTTP {
 // the JWK by patching the JWS signatures if they're determined to be too short.
 //
 // Generally this shouldn't happen, but we've observed this to be the case with
-// the macOS ACME client, which seems to omit (at least one) leading null byte(s).
-// The error returned is `square/go-jose: error in cryptographic primitive`, which
-// is a sentinel error that hides the details of the actual underlying error, which
-// is as follows: `square/go-jose: invalid signature size, have 63 bytes, wanted 64`,
-// for ES256.
+// the macOS ACME client, which seems to omit (at least one) leading null
+// byte(s). The error returned is `go-jose/go-jose: error in cryptographic
+// primitive`, which is a sentinel error that hides the details of the actual
+// underlying error, which is as follows: `go-jose/go-jose: invalid signature
+// size, have 63 bytes, wanted 64`, for ES256.
 func retryVerificationWithPatchedSignatures(jws *jose.JSONWebSignature, jwk *jose.JSONWebKey) (data []byte, err error) {
 	originalSignatureValues := make([][]byte, len(jws.Signatures))
 	patched := false

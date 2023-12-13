@@ -356,7 +356,7 @@ func TestHandler_parseJWS(t *testing.T) {
 			return test{
 				body:       strings.NewReader("foo"),
 				statusCode: 400,
-				err:        acme.NewError(acme.ErrorMalformedType, "failed to parse JWS from request body: square/go-jose: compact JWS format must have three parts"),
+				err:        acme.NewError(acme.ErrorMalformedType, "failed to parse JWS from request body: go-jose/go-jose: compact JWS format must have three parts"),
 			}
 		},
 		"ok": func(t *testing.T) test {
@@ -480,7 +480,7 @@ func TestHandler_verifyAndExtractJWSPayload(t *testing.T) {
 			return test{
 				ctx:        ctx,
 				statusCode: 400,
-				err:        acme.NewError(acme.ErrorMalformedType, "error verifying jws: square/go-jose: error in cryptographic primitive"),
+				err:        acme.NewError(acme.ErrorMalformedType, "error verifying jws: go-jose/go-jose: error in cryptographic primitive"),
 			}
 		},
 		"fail/verify-jws-failure-too-many-signatures": func(t *testing.T) test {
@@ -492,7 +492,7 @@ func TestHandler_verifyAndExtractJWSPayload(t *testing.T) {
 			return test{
 				ctx:        ctx,
 				statusCode: 400,
-				err:        acme.NewError(acme.ErrorMalformedType, "error verifying jws: square/go-jose: too many signatures in payload; expecting only one"),
+				err:        acme.NewError(acme.ErrorMalformedType, "error verifying jws: go-jose/go-jose: too many signatures in payload; expecting only one"),
 			}
 		},
 		"fail/apple-acmeclient-omitting-leading-null-byte-in-signature-with-wrong-jwk": func(t *testing.T) test {
@@ -507,7 +507,7 @@ func TestHandler_verifyAndExtractJWSPayload(t *testing.T) {
 			return test{
 				ctx:        ctx,
 				statusCode: 400,
-				err:        acme.NewError(acme.ErrorMalformedType, "error verifying jws: square/go-jose: error in cryptographic primitive"),
+				err:        acme.NewError(acme.ErrorMalformedType, "error verifying jws: go-jose/go-jose: error in cryptographic primitive"),
 			}
 		},
 		"fail/algorithm-mismatch": func(t *testing.T) test {
@@ -1817,7 +1817,7 @@ func Test_retryVerificationWithPatchedSignatures(t *testing.T) {
 		{"ok/patched-r", patchedR, patchedRJWK, []byte(`test-1105`), `AK0D2CmH5Xyp5YASqg3lrCR9kyeohwJ6Lu7Bc15ZmA-AK16i32LqqLVhESq52tsH84dKbu1EljtoM5TqkSvaqg`, nil},
 		{"ok/patched-s", patchedS, patchedSJWK, []byte(`test-66`), `krtSKSgVB04oqx6i9QLeal_wZSnjV1_PSIM3AubT0WQASMZ4Zf8mG1aWt4ud6d3VFuek7T-v0lGW6B-kryxzMw`, nil},
 		{"ok/patched-rs", patchedRS, patchedRSJWK, []byte(`test-9067`), `ANq_zMtfaEYO5ln_SOSU5DWKfKLXxDM_sl0QPJbWUwAApnHIku6ulUSCJyY0i27uV9wKsatOAjc5vJ7-BJojJw`, nil},
-		{"fail/patched-r-wrong-jwk", patchedRWithWrongJWK, patchedRSJWK, nil, `rQPYKYflfKnlgBKqDeWsJH2TJ6iHAnou7sFzXlmYD4ArXqLfYuqotWERKrna2wfzh0pu7USWO2gzlOqRK9qq`, errors.New("square/go-jose: error in cryptographic primitive")},
+		{"fail/patched-r-wrong-jwk", patchedRWithWrongJWK, patchedRSJWK, nil, `rQPYKYflfKnlgBKqDeWsJH2TJ6iHAnou7sFzXlmYD4ArXqLfYuqotWERKrna2wfzh0pu7USWO2gzlOqRK9qq`, errors.New("go-jose/go-jose: error in cryptographic primitive")},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
