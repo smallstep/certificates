@@ -10,7 +10,6 @@ import (
 	"os"
 
 	"github.com/pkg/errors"
-	"gopkg.in/square/go-jose.v2/jwt"
 
 	"go.step.sm/cli-utils/step"
 	"go.step.sm/cli-utils/ui"
@@ -146,7 +145,7 @@ func (a *Authority) unsafeLoadProvisionerFromDatabase(crt *x509.Certificate) (pr
 
 // LoadProvisionerByToken returns an interface to the provisioner that
 // provisioned the token.
-func (a *Authority) LoadProvisionerByToken(token *jwt.JSONWebToken, claims *jwt.Claims) (provisioner.Interface, error) {
+func (a *Authority) LoadProvisionerByToken(token *jose.JSONWebToken, claims *jose.Claims) (provisioner.Interface, error) {
 	a.adminMutex.RLock()
 	defer a.adminMutex.RUnlock()
 	p, ok := a.provisioners.LoadByToken(token, claims)

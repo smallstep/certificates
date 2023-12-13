@@ -33,10 +33,10 @@ func Test_jwkIssuer_SignToken(t *testing.T) {
 		RA *raInfo `json:"ra"`
 	}
 	type claims struct {
-		Aud  []string   `json:"aud"`
-		Sub  string     `json:"sub"`
-		Sans []string   `json:"sans"`
-		Step stepClaims `json:"step"`
+		Aud  jose.Audience `json:"aud"`
+		Sub  string        `json:"sub"`
+		Sans []string      `json:"sans"`
+		Step stepClaims    `json:"step"`
 	}
 	tests := []struct {
 		name    string
@@ -72,7 +72,7 @@ func Test_jwkIssuer_SignToken(t *testing.T) {
 				}
 				var c claims
 				want := claims{
-					Aud:  []string{tt.fields.caURL.String() + "/1.0/sign"},
+					Aud:  jose.Audience{tt.fields.caURL.String() + "/1.0/sign"},
 					Sub:  tt.args.subject,
 					Sans: tt.args.sans,
 				}
@@ -80,6 +80,7 @@ func Test_jwkIssuer_SignToken(t *testing.T) {
 					want.Step.RA = tt.args.info
 				}
 				if err := jwt.Claims(testX5CKey.Public(), &c); err != nil {
+					t.Log(got)
 					t.Errorf("jwt.Claims() error = %v", err)
 				}
 				if !reflect.DeepEqual(c, want) {
@@ -109,9 +110,9 @@ func Test_jwkIssuer_RevokeToken(t *testing.T) {
 		subject string
 	}
 	type claims struct {
-		Aud  []string `json:"aud"`
-		Sub  string   `json:"sub"`
-		Sans []string `json:"sans"`
+		Aud  jose.Audience `json:"aud"`
+		Sub  string        `json:"sub"`
+		Sans []string      `json:"sans"`
 	}
 	tests := []struct {
 		name    string
