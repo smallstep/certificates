@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"fmt"
+	"net/url"
 	"text/template"
 	"time"
 
@@ -61,8 +62,19 @@ func (o *OIDCOptions) GetTarget(deviceID string) (string, error) {
 }
 
 func toProviderConfig(in ProviderJSON) *oidc.ProviderConfig {
+	issuerUrl, err := url.Parse(in.IssuerURL)
+	if err != nil {
+		panic(err) // config error, it's ok to panic here
+	}
+	// Removes query params from the URL because we use it as a way to notify client about the actual OAuth ClientId
+	// for this provisioner.
+	// This URL is going to look like: "https://idp:5556/dex?clientid=foo"
+	// If we don't trim the query params here i.e. 'clientid' then the idToken verification is going to fail because
+	// the 'iss' claim of the idToken will be "https://idp:5556/dex"
+	issuerUrl.RawQuery = ""
+	issuerUrl.Fragment = ""
 	return &oidc.ProviderConfig{
-		IssuerURL:   in.IssuerURL,
+		IssuerURL:   issuerUrl.String(),
 		AuthURL:     in.AuthURL,
 		TokenURL:    in.TokenURL,
 		UserInfoURL: in.UserInfoURL,
