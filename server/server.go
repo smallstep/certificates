@@ -65,17 +65,25 @@ func (srv *Server) ListenAndServe() error {
 // Serve runs Serve or ServeTLS on the underlying http.Server and listen to
 // channels to reload or shutdown the server.
 func (srv *Server) Serve(ln net.Listener) error {
-	var err error
+	var (
+		listener = ln
+		err      error
+	)
 
-	switch l := ln.(type) {
-	case *net.TCPListener:
-		// Store the current listener.
-		// In reloads we'll create a copy of the underlying os.File so the close of the server one does not affect the copy.
-		srv.listener = l
+	// Attempt to unwrap the listener if it's a [Listener].
+	wl, isWrapped := listener.(*Listener)
+	if isWrapped {
+		listener = wl.listener.Unwrap()
+	}
+
+	// Store the current listener. When the server is reloaded a copy of the
+	// underlying os.File is created, so when the server is closed, it does
+	// not affect the copy.
+	if ll, ok := listener.(*net.TCPListener); ok {
+		srv.listener = ll
 	}
 
 	for {
-		wl, isWrapped := ln.(*WrappedListener)
 		switch {
 		case srv.TLSConfig == nil || (len(srv.TLSConfig.Certificates) == 0 && srv.TLSConfig.GetCertificate == nil):
 			log.Printf("Serving HTTP on %s ...", srv.Addr)
@@ -102,34 +110,43 @@ func (srv *Server) Serve(ln net.Listener) error {
 	}
 }
 
-// NewWrappedListener wraps the inner [net.Listener].
-func NewWrappedListener(inner net.Listener, proto string) *WrappedListener {
-	return &WrappedListener{
-		inner: inner,
-		proto: strings.ToUpper(proto),
+// UnwrappableListener indicates a [net.Listener] that can
+// be unwrapped to obtain the underlying [net.Listener]. It
+// is used by the [Server] to obtain a [*net.TCPListener]
+// implementing the [net.Listener] interface.
+type UnwrappableListener interface {
+	net.Listener
+	Unwrap() net.Listener
+}
+
+// NewListener wraps the inner [net.Listener].
+func NewListener(listener UnwrappableListener, proto string) *Listener {
+	return &Listener{
+		listener: listener,
+		proto:    strings.ToUpper(proto),
 	}
 }
 
-// WrappedListener wraps a [net.Listener].
-type WrappedListener struct {
-	inner net.Listener
-	proto string
+// Listener wraps a [net.Listener].
+type Listener struct {
+	listener UnwrappableListener
+	proto    string
 }
 
 // Accept waits for and returns the next connection to the listener.
-func (w *WrappedListener) Accept() (net.Conn, error) {
-	return w.inner.Accept()
+func (w *Listener) Accept() (net.Conn, error) {
+	return w.listener.Accept()
 }
 
 // Close closes the listener.
 // Any blocked Accept operations will be unblocked and return errors.
-func (w *WrappedListener) Close() error {
-	return w.inner.Close()
+func (w *Listener) Close() error {
+	return w.listener.Close()
 }
 
 // Addr returns the listener's network address.
-func (w *WrappedListener) Addr() net.Addr {
-	return w.inner.Addr()
+func (w *Listener) Addr() net.Addr {
+	return w.listener.Addr()
 }
 
 // Shutdown gracefully shuts down the server without interrupting any active
