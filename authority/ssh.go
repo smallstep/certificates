@@ -148,12 +148,16 @@ func (a *Authority) GetSSHBastion(ctx context.Context, user, hostname string) (*
 // SignSSH creates a signed SSH certificate with the given public key and options.
 func (a *Authority) SignSSH(_ context.Context, key ssh.PublicKey, opts provisioner.SignSSHOptions, signOpts ...provisioner.SignOption) (*ssh.Certificate, error) {
 	var (
-		certOptions []sshutil.Option
-		mods        []provisioner.SSHCertModifier
-		validators  []provisioner.SSHCertValidator
+		certOptions   []sshutil.Option
+		mods          []provisioner.SSHCertModifier
+		validators    []provisioner.SSHCertValidator
+		keyValidators []provisioner.SSHPublicKeyValidator
 	)
 
-	// Validate given options.
+	// Validate given key and options
+	if key == nil {
+		return nil, errs.BadRequest("ssh public key cannot be nil")
+	}
 	if err := opts.Validate(); err != nil {
 		return nil, err
 	}
@@ -177,6 +181,10 @@ func (a *Authority) SignSSH(_ context.Context, key ssh.PublicKey, opts provision
 		case provisioner.SSHCertModifier:
 			mods = append(mods, o)
 
+		// validate the ssh public key
+		case provisioner.SSHPublicKeyValidator:
+			keyValidators = append(keyValidators, o)
+
 		// validate the ssh.Certificate
 		case provisioner.SSHCertValidator:
 			validators = append(validators, o)
@@ -193,6 +201,16 @@ func (a *Authority) SignSSH(_ context.Context, key ssh.PublicKey, opts provision
 
 		default:
 			return nil, errs.InternalServer("authority.SignSSH: invalid extra option type %T", o)
+		}
+	}
+
+	// Validate public key
+	for _, v := range keyValidators {
+		if err := v.Valid(key); err != nil {
+			return nil, errs.ApplyOptions(
+				errs.ForbiddenErr(err, err.Error()),
+				errs.WithKeyVal("signOptions", signOpts),
+			)
 		}
 	}
 

@@ -51,6 +51,7 @@ func signSSHCertificate(key crypto.PublicKey, opts SignSSHOptions, signOpts []Si
 	var mods []SSHCertModifier
 	var certOptions []sshutil.Option
 	var validators []SSHCertValidator
+	var keyValidators []SSHPublicKeyValidator
 
 	for _, op := range signOpts {
 		switch o := op.(type) {
@@ -71,8 +72,16 @@ func signSSHCertificate(key crypto.PublicKey, opts SignSSHOptions, signOpts []Si
 			}
 		// call webhooks
 		case *WebhookController:
+		case sshFingerprintValidator:
+			keyValidators = append(keyValidators, o)
 		default:
 			return nil, fmt.Errorf("signSSH: invalid extra option type %T", o)
+		}
+	}
+
+	for _, v := range keyValidators {
+		if err := v.Valid(pub); err != nil {
+			return nil, err
 		}
 	}
 

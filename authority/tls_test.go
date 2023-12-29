@@ -18,6 +18,7 @@ import (
 	"testing"
 	"time"
 
+	"go.step.sm/crypto/fingerprint"
 	"go.step.sm/crypto/jose"
 	"go.step.sm/crypto/keyutil"
 	"go.step.sm/crypto/minica"
@@ -593,6 +594,43 @@ ZYtQ9Ot36qc=
 				code:     http.StatusForbidden,
 			}
 		},
+		"fail with cnf": func(t *testing.T) *signTest {
+			csr := getCSR(t, priv)
+
+			auth := testAuthority(t)
+			auth.config.AuthorityConfig.Template = a.config.AuthorityConfig.Template
+			auth.db = &db.MockAuthDB{
+				MUseToken: func(id, tok string) (bool, error) {
+					return true, nil
+				},
+				MStoreCertificate: func(crt *x509.Certificate) error {
+					assert.Equals(t, crt.Subject.CommonName, "smallstep test")
+					assert.Equals(t, crt.DNSNames, []string{"test.smallstep.com"})
+					return nil
+				},
+			}
+
+			// Create a token with cnf
+			tok, err := generateCustomToken("smallstep test", "step-cli", testAudiences.Sign[0], key, nil, map[string]any{
+				"sans": []string{"test.smallstep.com"},
+				"cnf":  map[string]any{"kid": "bad-fingerprint"},
+			})
+			assert.FatalError(t, err)
+
+			opts, err := auth.Authorize(ctx, tok)
+			assert.FatalError(t, err)
+
+			return &signTest{
+				auth:      auth,
+				csr:       csr,
+				extraOpts: opts,
+				signOpts:  signOpts,
+				notBefore: signOpts.NotBefore.Time().Truncate(time.Second),
+				notAfter:  signOpts.NotAfter.Time().Truncate(time.Second),
+				err:       errors.New(`certificate request fingerprint does not match "bad-fingerprint"`),
+				code:      http.StatusForbidden,
+			}
+		},
 		"ok": func(t *testing.T) *signTest {
 			csr := getCSR(t, priv)
 			_a := testAuthority(t)
@@ -834,6 +872,44 @@ ZYtQ9Ot36qc=
 				extraOpts: append(extraOpts, provisioner.AttestationData{
 					PermanentIdentifier: "1234567890",
 				}),
+				signOpts:        signOpts,
+				notBefore:       signOpts.NotBefore.Time().Truncate(time.Second),
+				notAfter:        signOpts.NotAfter.Time().Truncate(time.Second),
+				extensionsCount: 6,
+			}
+		},
+		"ok with cnf": func(t *testing.T) *signTest {
+			csr := getCSR(t, priv)
+			fingerprint, err := fingerprint.New(csr.Raw, crypto.SHA256, fingerprint.Base64RawURLFingerprint)
+			assert.FatalError(t, err)
+
+			auth := testAuthority(t)
+			auth.config.AuthorityConfig.Template = a.config.AuthorityConfig.Template
+			auth.db = &db.MockAuthDB{
+				MUseToken: func(id, tok string) (bool, error) {
+					return true, nil
+				},
+				MStoreCertificate: func(crt *x509.Certificate) error {
+					assert.Equals(t, crt.Subject.CommonName, "smallstep test")
+					assert.Equals(t, crt.DNSNames, []string{"test.smallstep.com"})
+					return nil
+				},
+			}
+
+			// Create a token with cnf
+			tok, err := generateCustomToken("smallstep test", "step-cli", testAudiences.Sign[0], key, nil, map[string]any{
+				"sans": []string{"test.smallstep.com"},
+				"cnf":  map[string]any{"kid": fingerprint},
+			})
+			assert.FatalError(t, err)
+
+			opts, err := auth.Authorize(ctx, tok)
+			assert.FatalError(t, err)
+
+			return &signTest{
+				auth:            auth,
+				csr:             csr,
+				extraOpts:       opts,
 				signOpts:        signOpts,
 				notBefore:       signOpts.NotBefore.Time().Truncate(time.Second),
 				notAfter:        signOpts.NotAfter.Time().Truncate(time.Second),

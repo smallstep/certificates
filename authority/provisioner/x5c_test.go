@@ -3,6 +3,7 @@ package provisioner
 import (
 	"context"
 	"crypto/x509"
+	"encoding/base64"
 	"errors"
 	"fmt"
 	"net/http"
@@ -413,11 +414,12 @@ func TestX5C_AuthorizeSign(t *testing.T) {
 	assert.FatalError(t, err)
 
 	type test struct {
-		p     *X5C
-		token string
-		code  int
-		err   error
-		sans  []string
+		p           *X5C
+		token       string
+		code        int
+		err         error
+		sans        []string
+		fingerprint string
 	}
 	tests := map[string]func(*testing.T) test{
 		"fail/invalid-token": func(t *testing.T) test {
@@ -456,13 +458,36 @@ func TestX5C_AuthorizeSign(t *testing.T) {
 				sans:  []string{"127.0.0.1", "foo", "max@smallstep.com"},
 			}
 		},
+		"ok/cnf": func(t *testing.T) test {
+			p, err := generateX5C(nil)
+			assert.FatalError(t, err)
+
+			x5c := make([]string, len(certs))
+			for i, cert := range certs {
+				x5c[i] = base64.StdEncoding.EncodeToString(cert.Raw)
+			}
+			extraHeaders := map[string]any{"x5c": x5c}
+			extraClaims := map[string]any{
+				"sans": []string{"127.0.0.1", "foo", "max@smallstep.com"},
+				"cnf":  map[string]any{"kid": "fingerprint"},
+			}
+
+			tok, err := generateCustomToken("foo", p.GetName(), testAudiences.Sign[0], jwk, extraHeaders, extraClaims)
+			assert.FatalError(t, err)
+			return test{
+				p:           p,
+				token:       tok,
+				sans:        []string{"127.0.0.1", "foo", "max@smallstep.com"},
+				fingerprint: "fingerprint",
+			}
+		},
 	}
 	for name, tt := range tests {
 		t.Run(name, func(t *testing.T) {
 			tc := tt(t)
 			ctx := NewContextWithMethod(context.Background(), SignIdentityMethod)
 			if opts, err := tc.p.AuthorizeSign(ctx, tc.token); err != nil {
-				if assert.NotNil(t, tc.err) {
+				if assert.NotNil(t, tc.err, err.Error()) {
 					var sc render.StatusCodedError
 					if assert.True(t, errors.As(err, &sc), "error does not implement StatusCodedError interface") {
 						assert.Equals(t, sc.StatusCode(), tc.code)
@@ -472,7 +497,7 @@ func TestX5C_AuthorizeSign(t *testing.T) {
 			} else {
 				if assert.Nil(t, tc.err) {
 					if assert.NotNil(t, opts) {
-						assert.Equals(t, 10, len(opts))
+						assert.Equals(t, 11, len(opts))
 						for _, o := range opts {
 							switch v := o.(type) {
 							case *X5C:
@@ -502,6 +527,8 @@ func TestX5C_AuthorizeSign(t *testing.T) {
 								assert.Len(t, 0, v.webhooks)
 								assert.Equals(t, linkedca.Webhook_X509, v.certType)
 								assert.Len(t, 2, v.options)
+							case fingerprintValidator:
+								assert.Equals(t, tc.fingerprint, string(v))
 							default:
 								assert.FatalError(t, fmt.Errorf("unexpected sign option of type %T", v))
 							}
@@ -627,11 +654,13 @@ func TestX5C_AuthorizeSSHSign(t *testing.T) {
 	_, fn := mockNow()
 	defer fn()
 	type test struct {
-		p      *X5C
-		token  string
-		claims *x5cPayload
-		code   int
-		err    error
+		p           *X5C
+		token       string
+		claims      *x5cPayload
+		fingerprint string
+		count       int
+		code        int
+		err         error
 	}
 	tests := map[string]func(*testing.T) test{
 		"fail/sshCA-disabled": func(t *testing.T) test {
@@ -719,7 +748,7 @@ func TestX5C_AuthorizeSSHSign(t *testing.T) {
 					Audience:  []string{testAudiences.SSHSign[0]},
 				},
 				Step: &stepPayload{SSH: &SignSSHOptions{
-					CertType:    SSHHostCert,
+					CertType:    SSHUserCert,
 					KeyID:       "foo",
 					Principals:  []string{"max", "mariano", "alan"},
 					ValidAfter:  TimeDuration{d: 5 * time.Minute},
@@ -732,6 +761,7 @@ func TestX5C_AuthorizeSSHSign(t *testing.T) {
 				p:      p,
 				claims: claims,
 				token:  tok,
+				count:  12,
 			}
 		},
 		"ok/without-claims": func(t *testing.T) test {
@@ -759,6 +789,42 @@ func TestX5C_AuthorizeSSHSign(t *testing.T) {
 				p:      p,
 				claims: claims,
 				token:  tok,
+				count:  10,
+			}
+		},
+		"ok/cnf": func(t *testing.T) test {
+			p, err := generateX5C(nil)
+			assert.FatalError(t, err)
+
+			id, err := randutil.ASCII(64)
+			assert.FatalError(t, err)
+			now := time.Now()
+			claims := &x5cPayload{
+				Claims: jose.Claims{
+					ID:        id,
+					Subject:   "foo",
+					Issuer:    p.GetName(),
+					IssuedAt:  jose.NewNumericDate(now),
+					NotBefore: jose.NewNumericDate(now),
+					Expiry:    jose.NewNumericDate(now.Add(5 * time.Minute)),
+					Audience:  []string{testAudiences.SSHSign[0]},
+				},
+				Step: &stepPayload{SSH: &SignSSHOptions{
+					CertType:   SSHHostCert,
+					Principals: []string{"host.smallstep.com"},
+				}},
+				Confirmation: &cnfPayload{
+					Kid: "fingerprint",
+				},
+			}
+			tok, err := generateX5CSSHToken(x5cJWK, claims, withX5CHdr(x5cCerts))
+			assert.FatalError(t, err)
+			return test{
+				p:           p,
+				claims:      claims,
+				token:       tok,
+				fingerprint: "fingerprint",
+				count:       11,
 			}
 		},
 	}
@@ -808,16 +874,14 @@ func TestX5C_AuthorizeSSHSign(t *testing.T) {
 								assert.Len(t, 0, v.webhooks)
 								assert.Equals(t, linkedca.Webhook_SSH, v.certType)
 								assert.Len(t, 2, v.options)
+							case sshFingerprintValidator:
+								assert.Equals(t, tc.fingerprint, string(v))
 							default:
 								assert.FatalError(t, fmt.Errorf("unexpected sign option of type %T", v))
 							}
 							tot++
 						}
-						if len(tc.claims.Step.SSH.CertType) > 0 {
-							assert.Equals(t, tot, 12)
-						} else {
-							assert.Equals(t, tot, 10)
-						}
+						assert.Equals(t, tc.count, tot)
 					}
 				}
 			}
