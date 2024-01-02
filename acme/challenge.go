@@ -19,7 +19,6 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"log"
 	"net"
 	"net/url"
 	"os"
@@ -463,8 +462,6 @@ func wireDPOP01Validate(ctx context.Context, ch *Challenge, db DB, jwk *jose.JSO
 	}
 
 	kid := base64.RawURLEncoding.EncodeToString(rawKid)
-
-	log.Printf("kid: %s", kid)
 
 	dpopOptions := provisioner.GetOptions().GetDPOPOptions()
 	key := dpopOptions.GetSigningKey()

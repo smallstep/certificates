@@ -3,7 +3,7 @@ package wire
 import (
 	"encoding/json"
 	"fmt"
-	"strings"
+	"go.step.sm/crypto/kms/uri"
 )
 
 type WireIDJSON struct {
@@ -25,18 +25,15 @@ type ClientID struct {
 }
 
 func ParseClientID(clientID string) (ClientID, error) {
-	at := strings.SplitN(clientID, "@", 2)
-	if len(at) != 2 {
-		return ClientID{}, fmt.Errorf("could not match client ID format: %s", clientID)
+	clientIdUri, err := uri.Parse(clientID)
+	if err != nil {
+		return ClientID{}, fmt.Errorf("invalid client id URI")
 	}
-	comp := at[0]
-	slash := strings.SplitN(comp, "/", 2)
-	if len(slash) != 2 {
-		return ClientID{}, fmt.Errorf("could not match client ID format: %s", clientID)
-	}
+	username := clientIdUri.User.Username()
+	deviceId, _ := clientIdUri.User.Password()
 	return ClientID{
-		Username: slash[0],
-		DeviceID: slash[1],
-		Domain:   at[1],
+		Username: username,
+		DeviceID: deviceId,
+		Domain:   clientIdUri.Host,
 	}, nil
 }

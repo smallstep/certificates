@@ -5,6 +5,7 @@ import (
 	"crypto/x509"
 	"encoding/base64"
 	"encoding/json"
+	"go.step.sm/crypto/kms/uri"
 	"net"
 	"net/http"
 	"strings"
@@ -54,8 +55,12 @@ func (n *NewOrderRequest) Validate() error {
 			if err != nil {
 				return acme.NewError(acme.ErrorMalformedType, "ID cannot be parsed")
 			}
-			if !strings.HasPrefix(orderValue.ClientID, "im:wireapp=") {
-				return acme.NewError(acme.ErrorMalformedType, "missing client ID prefix")
+			clientIdUri, err := uri.Parse(orderValue.ClientID)
+			if err != nil {
+				return acme.NewError(acme.ErrorMalformedType, "invalid client ID, it's supposed to be a valid URI")
+			}
+			if clientIdUri.Scheme != "wireapp" {
+				return acme.NewError(acme.ErrorMalformedType, "invalid client ID scheme")
 			}
 		default:
 			return acme.NewError(acme.ErrorMalformedType, "identifier type unsupported: %s", id.Type)
