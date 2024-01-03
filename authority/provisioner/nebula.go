@@ -2,6 +2,7 @@ package provisioner
 
 import (
 	"context"
+	"crypto/ecdh"
 	"crypto/ed25519"
 	"crypto/x509"
 	"encoding/base64"
@@ -338,9 +339,15 @@ func (p *Nebula) authorizeToken(token string, audiences []string) (*nebula.Nebul
 	}
 
 	var pub interface{}
-	if c.Details.IsCA {
+	switch {
+	case c.Details.Curve == nebula.Curve_P256:
+		// When Nebula is used with ECDSA P-256 keys, both CAs and clients use the same type.
+		if pub, err = ecdh.P256().NewPublicKey(c.Details.PublicKey); err != nil {
+			return nil, nil, errs.UnauthorizedErr(err, errs.WithMessage("failed to parse nebula public key"))
+		}
+	case c.Details.IsCA:
 		pub = ed25519.PublicKey(c.Details.PublicKey)
-	} else {
+	default:
 		pub = x25519.PublicKey(c.Details.PublicKey)
 	}
 
