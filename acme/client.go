@@ -55,6 +55,7 @@ func NewClient() Client {
 		http: &http.Client{
 			Timeout: 30 * time.Second,
 			Transport: &http.Transport{
+				Proxy: http.ProxyFromEnvironment,
 				TLSClientConfig: &tls.Config{
 					//nolint:gosec // used on tls-alpn-01 challenge
 					InsecureSkipVerify: true, // lgtm[go/disabled-certificate-check]
