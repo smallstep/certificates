@@ -53,9 +53,10 @@ func mustNebulaCA(t *testing.T) (*cert.NebulaCertificate, ed25519.PrivateKey) {
 			NotAfter:  time.Now().Add(10 * time.Minute),
 			PublicKey: pub,
 			IsCA:      true,
+			Curve:     cert.Curve_CURVE25519,
 		},
 	}
-	if err := nc.Sign(priv); err != nil {
+	if err := nc.Sign(cert.Curve_CURVE25519, priv); err != nil {
 		t.Fatal(err)
 	}
 	return nc, priv
@@ -92,10 +93,11 @@ func mustNebulaCert(t *testing.T, name string, ipNet *net.IPNet, groups []string
 			IsCA:           false,
 			Issuer:         issuer,
 			InvertedGroups: invertedGroups,
+			Curve:          cert.Curve_CURVE25519,
 		},
 	}
 
-	if err := nc.Sign(signer); err != nil {
+	if err := nc.Sign(cert.Curve_CURVE25519, signer); err != nil {
 		t.Fatal(err)
 	}
 
