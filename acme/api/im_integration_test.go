@@ -199,7 +199,7 @@ func TestIMIntegration(t *testing.T) {
 			Identifiers: []acme.Identifier{
 				{
 					Type:  "wireapp-id",
-					Value: `{"name": "Smith, Alice M (QA)", "domain": "example.com", "client-id": "wireapp://lJGYPz0ZRq2kvc_XpdaDlA:ed416ce8ecdd9fad@example.com", "handle": "wireapp://%40alice.smith.qa@example.com"}`,
+					Value: `{"name": "Smith, Alice M (QA)", "domain": "example.com", "client-id": "wireapp://lJGYPz0ZRq2kvc_XpdaDlA!ed416ce8ecdd9fad@example.com", "handle": "wireapp://%40alice.smith.qa@example.com"}`,
 				},
 			},
 		}
@@ -377,7 +377,7 @@ func TestIMIntegration(t *testing.T) {
 			},
 		})
 
-		qUserID, err := url.Parse("wireapp://lJGYPz0ZRq2kvc_XpdaDlA:ed416ce8ecdd9fad@example.com")
+		qUserID, err := url.Parse("wireapp://lJGYPz0ZRq2kvc_XpdaDlA!ed416ce8ecdd9fad@example.com")
 		if err != nil {
 			t.Fatal("parse user ID URI", err)
 		}

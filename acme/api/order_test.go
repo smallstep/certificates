@@ -190,7 +190,7 @@ func TestNewOrderRequest_Validate(t *testing.T) {
 			return test{
 				nor: &NewOrderRequest{
 					Identifiers: []acme.Identifier{
-						{Type: "wireapp-id", Value: `{"name": "Smith, Alice M (QA)", "domain": "example.com", "client-id": "wireapp://lJGYPz0ZRq2kvc_XpdaDlA:ed416ce8ecdd9fad@example.com", "handle": "wireapp://%40alice.smith.qa@example.com"}`},
+						{Type: "wireapp-id", Value: `{"name": "Smith, Alice M (QA)", "domain": "example.com", "client-id": "wireapp://lJGYPz0ZRq2kvc_XpdaDlA!ed416ce8ecdd9fad@example.com", "handle": "wireapp://%40alice.smith.qa@example.com"}`},
 					},
 					NotAfter:  naf,
 					NotBefore: nbf,
