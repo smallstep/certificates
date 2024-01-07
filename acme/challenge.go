@@ -528,6 +528,7 @@ type coseAlgorithmIdentifier int32
 const (
 	coseAlgES256 coseAlgorithmIdentifier = -7
 	coseAlgRS256 coseAlgorithmIdentifier = -257
+	coseAlgRS1   coseAlgorithmIdentifier = -65535 // deprecated, but (still) often used in TPMs
 )
 
 func doTPMAttestationFormat(_ context.Context, prov Provisioner, ch *Challenge, jwk *jose.JSONWebKey, att *attestationObject) (*tpmAttestationData, error) {
@@ -652,14 +653,15 @@ func doTPMAttestationFormat(_ context.Context, prov Provisioner, ch *Challenge, 
 		return nil, NewDetailedError(ErrorBadAttestationStatementType, "invalid alg in attestation statement")
 	}
 
-	// only RS256 and ES256 are allowed
-	coseAlg := coseAlgorithmIdentifier(alg)
-	if coseAlg != coseAlgRS256 && coseAlg != coseAlgES256 {
+	var hash crypto.Hash
+	switch coseAlgorithmIdentifier(alg) {
+	case coseAlgRS256, coseAlgES256:
+		hash = crypto.SHA256
+	case coseAlgRS1:
+		hash = crypto.SHA1
+	default:
 		return nil, NewDetailedError(ErrorBadAttestationStatementType, "invalid alg %d in attestation statement", alg)
 	}
-
-	// set the hash algorithm to use to SHA256
-	hash := crypto.SHA256
 
 	// recreate the generated key certification parameter values and verify
 	// the attested key using the public key of the AK.
