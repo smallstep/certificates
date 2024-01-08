@@ -5,11 +5,12 @@ import (
 	"crypto/x509"
 	"encoding/base64"
 	"encoding/json"
-	"go.step.sm/crypto/kms/uri"
 	"net"
 	"net/http"
 	"strings"
 	"time"
+
+	"go.step.sm/crypto/kms/uri"
 
 	"github.com/go-chi/chi/v5"
 
@@ -282,13 +283,11 @@ func newAuthorization(ctx context.Context, az *acme.Authorization) error {
 		case acme.WireID:
 			wireId, err := wire.ParseID([]byte(az.Identifier.Value))
 			if err != nil {
-				if err != nil {
-					return acme.NewError(acme.ErrorMalformedType, "WireID cannot be parsed")
-				}
+				return acme.WrapError(acme.ErrorMalformedType, err, "WireID cannot be parsed")
 			}
 			clientID, err := wire.ParseClientID(wireId.ClientID)
 			if err != nil {
-				return acme.NewError(acme.ErrorMalformedType, "DeviceID cannot be parsed")
+				return acme.WrapError(acme.ErrorMalformedType, err, "DeviceID cannot be parsed")
 			}
 
 			var targetProvider interface{ GetTarget(string) (string, error) }
@@ -302,7 +301,7 @@ func newAuthorization(ctx context.Context, az *acme.Authorization) error {
 
 			target, err = targetProvider.GetTarget(clientID.DeviceID)
 			if err != nil {
-				return acme.NewError(acme.ErrorMalformedType, "Invalid Go template registered for 'target'")
+				return acme.WrapError(acme.ErrorMalformedType, err, "Invalid Go template registered for 'target'")
 			}
 		default:
 		}

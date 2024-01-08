@@ -80,7 +80,7 @@ func TestNewOrderRequest_Validate(t *testing.T) {
 				err: acme.NewError(acme.ErrorMalformedType, "invalid DNS name: *.example.com:8080"),
 			}
 		},
-		"fail/bad-ip": func(t *testing.T) test {
+		"fail/bad-identifier/ip": func(t *testing.T) test {
 			nbf := time.Now().UTC().Add(time.Minute)
 			naf := time.Now().UTC().Add(5 * time.Minute)
 			return test{
@@ -103,7 +103,7 @@ func TestNewOrderRequest_Validate(t *testing.T) {
 						{Type: "wireapp-id", Value: "{}"},
 					},
 				},
-				err: acme.NewError(acme.ErrorMalformedType, "missing client ID prefix"),
+				err: acme.NewError(acme.ErrorMalformedType, "invalid client ID, it's supposed to be a valid URI"),
 			}
 		},
 		"ok": func(t *testing.T) test {
@@ -853,7 +853,6 @@ func TestHandler_newAuthorization(t *testing.T) {
 				assert.Nil(t, tc.err)
 			}
 		})
-
 	}
 }
 
@@ -1696,15 +1695,39 @@ func TestHandler_NewOrder(t *testing.T) {
 			}
 		},
 		"ok/default-naf-nbf-wireapp": func(t *testing.T) test {
+			acmeWireProv := newACMEProvWithOptions(t, &provisioner.Options{
+				OIDC: &provisioner.OIDCOptions{
+					Provider: provisioner.ProviderJSON{
+						IssuerURL:   "",
+						AuthURL:     "",
+						TokenURL:    "",
+						JWKSURL:     "",
+						UserInfoURL: "",
+						Algorithms:  []string{},
+					},
+					Config: provisioner.ConfigJSON{
+						ClientID:                   "integration test",
+						SupportedSigningAlgs:       []string{},
+						SkipClientIDCheck:          true,
+						SkipExpiryCheck:            true,
+						SkipIssuerCheck:            true,
+						InsecureSkipSignatureCheck: true,
+						Now:                        time.Now,
+					},
+				},
+				DPOP: &provisioner.DPOPOptions{
+					ValidationExecPath: "true", // true will always exit with code 0
+				},
+			})
 			acc := &acme.Account{ID: "accID"}
 			nor := &NewOrderRequest{
 				Identifiers: []acme.Identifier{
-					{Type: "wireapp-id", Value: `{"client-id": "wireapp://user:client@domain"}`},
+					{Type: "wireapp-id", Value: `{"client-id": "wireapp://user!client@domain"}`},
 				},
 			}
 			b, err := json.Marshal(nor)
 			assert.FatalError(t, err)
-			ctx := acme.NewProvisionerContext(context.Background(), prov)
+			ctx := acme.NewProvisionerContext(context.Background(), acmeWireProv)
 			ctx = context.WithValue(ctx, accContextKey, acc)
 			ctx = context.WithValue(ctx, payloadContextKey, &payloadInfo{value: b})
 			var (
@@ -1736,7 +1759,7 @@ func TestHandler_NewOrder(t *testing.T) {
 						assert.Equals(t, ch.AccountID, "accID")
 						assert.NotEquals(t, ch.Token, "")
 						assert.Equals(t, ch.Status, acme.StatusPending)
-						assert.Equals(t, ch.Value, `{"client-id": "wireapp://user:client@domain"}`)
+						assert.Equals(t, ch.Value, `{"client-id": "wireapp://user!client@domain"}`)
 						return nil
 					},
 					MockCreateAuthorization: func(ctx context.Context, az *acme.Authorization) error {

@@ -3,8 +3,9 @@ package wire
 import (
 	"encoding/json"
 	"fmt"
-	"go.step.sm/crypto/kms/uri"
 	"strings"
+
+	"go.step.sm/crypto/kms/uri"
 )
 
 type WireIDJSON struct {
