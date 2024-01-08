@@ -394,3 +394,13 @@ func (m *MockDB) GetOrdersByAccountID(ctx context.Context, accID string) ([]stri
 	}
 	return m.MockRet1.([]string), m.MockError
 }
+
+// GetDpop retrieves an DPoP from the database.
+func (m *MockDB) GetDpop(ctx context.Context, orderId string) (map[string]interface{}, error) {
+	return nil, errors.New("not implemented")
+}
+
+// CreateDpop creates DPoP resources and saves them to the DB.
+func (m *MockDB) CreateDpop(ctx context.Context, orderId string, dpop map[string]interface{}) error {
+	return errors.New("not implemented")
+}
