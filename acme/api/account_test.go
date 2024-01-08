@@ -24,12 +24,14 @@ import (
 )
 
 var (
-	defaultDisableRenewal   = false
-	globalProvisionerClaims = provisioner.Claims{
-		MinTLSDur:      &provisioner.Duration{Duration: 5 * time.Minute},
-		MaxTLSDur:      &provisioner.Duration{Duration: 24 * time.Hour},
-		DefaultTLSDur:  &provisioner.Duration{Duration: 24 * time.Hour},
-		DisableRenewal: &defaultDisableRenewal,
+	defaultDisableRenewal             = false
+	defaultDisableSmallstepExtensions = false
+	globalProvisionerClaims           = provisioner.Claims{
+		MinTLSDur:                  &provisioner.Duration{Duration: 5 * time.Minute},
+		MaxTLSDur:                  &provisioner.Duration{Duration: 24 * time.Hour},
+		DefaultTLSDur:              &provisioner.Duration{Duration: 24 * time.Hour},
+		DisableRenewal:             &defaultDisableRenewal,
+		DisableSmallstepExtensions: &defaultDisableSmallstepExtensions,
 	}
 )
 

@@ -7,6 +7,7 @@ import (
 	"crypto/rand"
 	"crypto/x509"
 	"crypto/x509/pkix"
+	"encoding/asn1"
 	"encoding/base64"
 	"encoding/json"
 	"errors"
@@ -20,7 +21,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/go-chi/chi"
+	"github.com/go-chi/chi/v5"
 	"github.com/smallstep/certificates/acme"
 	"github.com/smallstep/certificates/acme/db/nosql"
 	"github.com/smallstep/certificates/authority"
@@ -37,8 +38,7 @@ const (
 func TestIMIntegration(t *testing.T) {
 	ctx := context.Background()
 
-	// mock provisioner and linker
-	ctx = acme.NewProvisionerContext(ctx, newProvWithOptions(&provisioner.Options{
+	prov := newACMEProvWithOptions(t, &provisioner.Options{
 		OIDC: &provisioner.OIDCOptions{
 			Provider: provisioner.ProviderJSON{
 				IssuerURL:   "",
@@ -61,7 +61,10 @@ func TestIMIntegration(t *testing.T) {
 		DPOP: &provisioner.DPOPOptions{
 			ValidationExecPath: "true", // true will always exit with code 0
 		},
-	}))
+	})
+
+	// mock provisioner and linker
+	ctx = acme.NewProvisionerContext(ctx, prov)
 	ctx = acme.NewLinkerContext(ctx, acme.NewLinker(baseURL, linkerPrefix))
 
 	// create temporary BoltDB file
@@ -395,7 +398,12 @@ func TestIMIntegration(t *testing.T) {
 		csrTemplate := &x509.CertificateRequest{
 			Subject: pkix.Name{
 				Organization: []string{"example.com"},
-				CommonName:   "Smith, Alice M (QA)",
+				ExtraNames: []pkix.AttributeTypeAndValue{
+					{
+						Type:  asn1.ObjectIdentifier{2, 16, 840, 1, 113730, 3, 1, 241},
+						Value: "Smith, Alice M (QA)",
+					},
+				},
 			},
 			URIs: []*url.URL{
 				qUserName,
@@ -403,6 +411,7 @@ func TestIMIntegration(t *testing.T) {
 			},
 			SignatureAlgorithm: x509.PureEd25519,
 		}
+
 		csr, err := x509.CreateCertificateRequest(rand.Reader, csrTemplate, priv)
 		if err != nil {
 			t.Fatal("create CSR from template:", err)
