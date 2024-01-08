@@ -24,12 +24,9 @@ import (
 	"os"
 	"os/exec"
 	"reflect"
-	"slices"
 	"strconv"
 	"strings"
 	"time"
-
-	"gopkg.in/square/go-jose.v2/jwt"
 
 	"github.com/fxamacker/cbor/v2"
 	"github.com/google/go-tpm/legacy/tpm2"
@@ -38,6 +35,8 @@ import (
 	"go.step.sm/crypto/keyutil"
 	"go.step.sm/crypto/pemutil"
 	"go.step.sm/crypto/x509util"
+	"golang.org/x/exp/slices"
+	"gopkg.in/square/go-jose.v2/jwt"
 
 	"github.com/smallstep/certificates/authority/provisioner"
 	"github.com/smallstep/certificates/wire"
