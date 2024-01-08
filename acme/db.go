@@ -405,3 +405,8 @@ func (m *MockDB) GetDpop(ctx context.Context, orderId string) (map[string]interf
 func (m *MockDB) CreateDpop(ctx context.Context, orderId string, dpop map[string]interface{}) error {
 	return errors.New("not implemented")
 }
+
+// GetAllOrdersByAccountID returns a list of any order IDs owned by the account.
+func (m *MockDB) GetAllOrdersByAccountID(ctx context.Context, accID string) ([]string, error) {
+	return nil, errors.New("not implemented")
+}
