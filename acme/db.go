@@ -399,16 +399,26 @@ func (m *MockDB) GetOrdersByAccountID(ctx context.Context, accID string) ([]stri
 }
 
 // GetDpop retrieves an DPoP from the database.
-func (m *MockDB) GetDpop(ctx context.Context, orderId string) (map[string]interface{}, error) {
+func (m *MockDB) GetDpopToken(ctx context.Context, orderId string) (map[string]interface{}, error) {
 	return nil, errors.New("not implemented")
 }
 
 // CreateDpop creates DPoP resources and saves them to the DB.
-func (m *MockDB) CreateDpop(ctx context.Context, orderId string, dpop map[string]interface{}) error {
+func (m *MockDB) CreateDpopToken(ctx context.Context, orderId string, dpop map[string]interface{}) error {
 	return errors.New("not implemented")
 }
 
 // GetAllOrdersByAccountID returns a list of any order IDs owned by the account.
 func (m *MockDB) GetAllOrdersByAccountID(ctx context.Context, accID string) ([]string, error) {
+	return nil, errors.New("not implemented")
+}
+
+// CreateOidcToken creates oidc token resources and saves them to the DB.
+func (m *MockDB) CreateOidcToken(ctx context.Context, orderId string, idToken map[string]interface{}) error {
+	return errors.New("not implemented")
+}
+
+// GetOidcToken retrieves an oidc token from the database.
+func (m *MockDB) GetOidcToken(ctx context.Context, orderId string) (map[string]interface{}, error) {
 	return nil, errors.New("not implemented")
 }
