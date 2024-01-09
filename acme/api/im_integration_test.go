@@ -37,7 +37,6 @@ const (
 )
 
 func TestIMIntegration(t *testing.T) {
-	ctx := context.Background()
 
 	prov := newACMEProvWithOptions(t, &provisioner.Options{
 		OIDC: &provisioner.OIDCOptions{
@@ -65,6 +64,7 @@ func TestIMIntegration(t *testing.T) {
 	})
 
 	// mock provisioner and linker
+	ctx := context.Background()
 	ctx = acme.NewProvisionerContext(ctx, prov)
 	ctx = acme.NewLinkerContext(ctx, acme.NewLinker(baseURL, linkerPrefix))
 
@@ -113,7 +113,7 @@ func TestIMIntegration(t *testing.T) {
 
 	// get directory
 	dir := func(ctx context.Context) (dir Directory) {
-		req := httptest.NewRequest(http.MethodGet, "/foo/bar", nil)
+		req := httptest.NewRequest(http.MethodGet, "/foo/bar", http.NoBody)
 		req = req.WithContext(ctx)
 		w := httptest.NewRecorder()
 
@@ -138,7 +138,7 @@ func TestIMIntegration(t *testing.T) {
 
 	// get nonce
 	nonce := func(ctx context.Context) (nonce string) {
-		req := httptest.NewRequest(http.MethodGet, dir.NewNonce, nil).WithContext(ctx)
+		req := httptest.NewRequest(http.MethodGet, dir.NewNonce, http.NoBody).WithContext(ctx)
 		w := httptest.NewRecorder()
 		addNonce(GetNonce)(w, req)
 		res := w.Result()
@@ -164,7 +164,7 @@ func TestIMIntegration(t *testing.T) {
 		ctx = context.WithValue(ctx, payloadContextKey, &payloadInfo{value: rawNar})
 
 		// create account
-		req := httptest.NewRequest(http.MethodGet, dir.NewAccount, nil).WithContext(ctx)
+		req := httptest.NewRequest(http.MethodGet, dir.NewAccount, http.NoBody).WithContext(ctx)
 		w := httptest.NewRecorder()
 		NewAccount(w, req)
 
@@ -214,7 +214,7 @@ func TestIMIntegration(t *testing.T) {
 
 		ctx = context.WithValue(ctx, payloadContextKey, &payloadInfo{value: b})
 
-		req := httptest.NewRequest("POST", "https://random.local/", nil)
+		req := httptest.NewRequest("POST", "https://random.local/", http.NoBody)
 		req = req.WithContext(ctx)
 		w := httptest.NewRecorder()
 		NewOrder(w, req)
@@ -250,7 +250,7 @@ func TestIMIntegration(t *testing.T) {
 		chiCtx.URLParams.Add("authzID", authzID)
 		ctx = context.WithValue(ctx, chi.RouteCtxKey, chiCtx)
 
-		req := httptest.NewRequest(http.MethodGet, "https://random.local/", nil).WithContext(ctx)
+		req := httptest.NewRequest(http.MethodGet, "https://random.local/", http.NoBody).WithContext(ctx)
 		w := httptest.NewRecorder()
 		GetAuthorization(w, req)
 
@@ -287,7 +287,7 @@ func TestIMIntegration(t *testing.T) {
 			ctx = context.WithValue(ctx, chi.RouteCtxKey, chiCtx)
 			ctx = context.WithValue(ctx, payloadContextKey, &payloadInfo{value: nil})
 
-			req := httptest.NewRequest(http.MethodGet, "https://random.local/", nil).WithContext(ctx)
+			req := httptest.NewRequest(http.MethodGet, "https://random.local/", http.NoBody).WithContext(ctx)
 			w := httptest.NewRecorder()
 			GetChallenge(w, req)
 
@@ -343,7 +343,7 @@ func TestIMIntegration(t *testing.T) {
 		chiCtx.URLParams.Add("ordID", order.ID)
 		ctx = context.WithValue(ctx, chi.RouteCtxKey, chiCtx)
 
-		req := httptest.NewRequest(http.MethodGet, "https://random.local/", nil).WithContext(ctx)
+		req := httptest.NewRequest(http.MethodGet, "https://random.local/", http.NoBody).WithContext(ctx)
 		w := httptest.NewRecorder()
 		GetOrder(w, req)
 
@@ -371,7 +371,7 @@ func TestIMIntegration(t *testing.T) {
 	}(ctx)
 	t.Log("updated order status:", updatedOrder.Status)
 
-	// finalise order
+	// finalize order
 	finalizedOrder := func(ctx context.Context) (finalizedOrder *acme.Order) {
 		mockMustAuthority(t, &mockCASigner{
 			signer: func(*x509.CertificateRequest, provisioner.SignOptions, ...provisioner.SignOption) ([]*x509.Certificate, error) {
@@ -436,7 +436,7 @@ func TestIMIntegration(t *testing.T) {
 		chiCtx.URLParams.Add("ordID", order.ID)
 		ctx = context.WithValue(ctx, chi.RouteCtxKey, chiCtx)
 
-		req := httptest.NewRequest(http.MethodGet, "https://random.local/", nil).WithContext(ctx)
+		req := httptest.NewRequest(http.MethodGet, "https://random.local/", http.NoBody).WithContext(ctx)
 		w := httptest.NewRecorder()
 		FinalizeOrder(w, req)
 

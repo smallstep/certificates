@@ -121,7 +121,7 @@ func (db *DB) UpdateOrder(ctx context.Context, o *acme.Order) error {
 	return db.save(ctx, old.ID, nu, old, "order", orderTable)
 }
 
-func (db *DB) updateAddOrderIDs(ctx context.Context, accID string, anyOrder bool, addOids ...string) ([]string, error) {
+func (db *DB) updateAddOrderIDs(ctx context.Context, accID string, includeReadyOrders bool, addOids ...string) ([]string, error) {
 	ordersByAccountMux.Lock()
 	defer ordersByAccountMux.Unlock()
 
@@ -153,7 +153,7 @@ func (db *DB) updateAddOrderIDs(ctx context.Context, accID string, anyOrder bool
 			return nil, acme.WrapErrorISE(err, "error updating order %s for account %s", oid, accID)
 		}
 
-		if o.Status == acme.StatusPending || o.Status == acme.StatusReady {
+		if o.Status == acme.StatusPending || (o.Status == acme.StatusReady && includeReadyOrders) {
 			pendOids = append(pendOids, oid)
 		}
 	}

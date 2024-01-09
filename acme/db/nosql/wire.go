@@ -3,6 +3,7 @@ package nosql
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"time"
 
 	"github.com/pkg/errors"
@@ -17,36 +18,36 @@ type dbDpopToken struct {
 }
 
 // getDBDpopToken retrieves and unmarshals an DPoP type from the database.
-func (db *DB) getDBDpopToken(ctx context.Context, orderId string) (*dbDpopToken, error) {
-	b, err := db.db.Get(wireDpopTokenTable, []byte(orderId))
+func (db *DB) getDBDpopToken(_ context.Context, orderID string) (*dbDpopToken, error) {
+	b, err := db.db.Get(wireDpopTokenTable, []byte(orderID))
 	if nosql.IsErrNotFound(err) {
-		return nil, acme.NewError(acme.ErrorMalformedType, "dpop %s not found", orderId)
+		return nil, acme.NewError(acme.ErrorMalformedType, "dpop %s not found", orderID)
 	} else if err != nil {
-		return nil, errors.Wrapf(err, "error loading dpop %s", orderId)
+		return nil, errors.Wrapf(err, "error loading dpop %s", orderID)
 	}
 
 	d := new(dbDpopToken)
 	if err := json.Unmarshal(b, d); err != nil {
-		return nil, errors.Wrapf(err, "error unmarshaling dpop %s into dbDpopToken", orderId)
+		return nil, errors.Wrapf(err, "error unmarshaling dpop %s into dbDpopToken", orderID)
 	}
 	return d, nil
 }
 
 // GetDpopToken retrieves an DPoP from the database.
-func (db *DB) GetDpopToken(ctx context.Context, orderId string) (map[string]interface{}, error) {
-	dbDpop, err := db.getDBDpopToken(ctx, orderId)
+func (db *DB) GetDpopToken(ctx context.Context, orderID string) (map[string]any, error) {
+	dbDpop, err := db.getDBDpopToken(ctx, orderID)
 	if err != nil {
 		return nil, err
 	}
 
-	dpop := make(map[string]interface{})
+	dpop := make(map[string]any)
 	err = json.Unmarshal(dbDpop.Content, &dpop)
 
 	return dpop, err
 }
 
 // CreateDpopToken creates DPoP resources and saves them to the DB.
-func (db *DB) CreateDpopToken(ctx context.Context, orderId string, dpop map[string]interface{}) error {
+func (db *DB) CreateDpopToken(ctx context.Context, orderID string, dpop map[string]any) error {
 	content, err := json.Marshal(dpop)
 	if err != nil {
 		return err
@@ -54,12 +55,12 @@ func (db *DB) CreateDpopToken(ctx context.Context, orderId string, dpop map[stri
 
 	now := clock.Now()
 	dbDpop := &dbDpopToken{
-		ID:        orderId,
+		ID:        orderID,
 		Content:   content,
 		CreatedAt: now,
 	}
-	if err := db.save(ctx, orderId, dbDpop, nil, "dpop", wireDpopTokenTable); err != nil {
-		return err
+	if err := db.save(ctx, orderID, dbDpop, nil, "dpop", wireDpopTokenTable); err != nil {
+		return fmt.Errorf("failed saving dpop token: %w", err)
 	}
 	return nil
 }
@@ -71,35 +72,35 @@ type dbOidcToken struct {
 }
 
 // getDBOidcToken retrieves and unmarshals an OIDC id token type from the database.
-func (db *DB) getDBOidcToken(ctx context.Context, orderId string) (*dbOidcToken, error) {
-	b, err := db.db.Get(wireOidcTokenTable, []byte(orderId))
+func (db *DB) getDBOidcToken(_ context.Context, orderID string) (*dbOidcToken, error) {
+	b, err := db.db.Get(wireOidcTokenTable, []byte(orderID))
 	if nosql.IsErrNotFound(err) {
-		return nil, acme.NewError(acme.ErrorMalformedType, "oidc token %s not found", orderId)
+		return nil, acme.NewError(acme.ErrorMalformedType, "oidc token %s not found", orderID)
 	} else if err != nil {
-		return nil, errors.Wrapf(err, "error loading oidc token %s", orderId)
+		return nil, errors.Wrapf(err, "error loading oidc token %s", orderID)
 	}
 	o := new(dbOidcToken)
 	if err := json.Unmarshal(b, o); err != nil {
-		return nil, errors.Wrapf(err, "error unmarshaling oidc token %s into dbOidcToken", orderId)
+		return nil, errors.Wrapf(err, "error unmarshaling oidc token %s into dbOidcToken", orderID)
 	}
 	return o, nil
 }
 
 // GetOidcToken retrieves an oidc token from the database.
-func (db *DB) GetOidcToken(ctx context.Context, orderId string) (map[string]interface{}, error) {
-	dbOidc, err := db.getDBOidcToken(ctx, orderId)
+func (db *DB) GetOidcToken(ctx context.Context, orderID string) (map[string]any, error) {
+	dbOidc, err := db.getDBOidcToken(ctx, orderID)
 	if err != nil {
 		return nil, err
 	}
 
-	idToken := make(map[string]interface{})
+	idToken := make(map[string]any)
 	err = json.Unmarshal(dbOidc.Content, &idToken)
 
 	return idToken, err
 }
 
 // CreateOidcToken creates oidc token resources and saves them to the DB.
-func (db *DB) CreateOidcToken(ctx context.Context, orderId string, idToken map[string]interface{}) error {
+func (db *DB) CreateOidcToken(ctx context.Context, orderID string, idToken map[string]any) error {
 	content, err := json.Marshal(idToken)
 	if err != nil {
 		return err
@@ -107,12 +108,12 @@ func (db *DB) CreateOidcToken(ctx context.Context, orderId string, idToken map[s
 
 	now := clock.Now()
 	dbOidc := &dbOidcToken{
-		ID:        orderId,
+		ID:        orderID,
 		Content:   content,
 		CreatedAt: now,
 	}
-	if err := db.save(ctx, orderId, dbOidc, nil, "oidc", wireOidcTokenTable); err != nil {
-		return err
+	if err := db.save(ctx, orderID, dbOidc, nil, "oidc", wireOidcTokenTable); err != nil {
+		return fmt.Errorf("failed saving oidc token: %w", err)
 	}
 	return nil
 }

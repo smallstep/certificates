@@ -406,13 +406,12 @@ func (o *Order) sans(csr *x509.CertificateRequest) ([]x509util.SubjectAlternativ
 			if err != nil {
 				return sans, NewErrorISE("unsupported identifier value in order: %s", n.Value)
 			}
-			clientId, err := url.Parse(wireID.ClientID)
+			clientID, err := url.Parse(wireID.ClientID)
 			if err != nil {
 				return sans, NewErrorISE("clientId must be a URI: %s", wireID.ClientID)
 			}
-			tmpOrderURIs[indexURI] = clientId
+			tmpOrderURIs[indexURI] = clientID
 			indexURI++
-
 			handle, err := url.Parse(wireID.Handle)
 			if err != nil {
 				return sans, NewErrorISE("handle must be a URI: %s", wireID.Handle)

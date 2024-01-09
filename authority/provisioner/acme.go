@@ -254,12 +254,11 @@ func (p *ACME) AuthorizeOrderIdentifier(_ context.Context, identifier ACMEIdenti
 	case DNS:
 		err = x509Policy.IsDNSAllowed(identifier.Value)
 	case WireID:
-		wireSANs, err := wire.ParseID([]byte(identifier.Value))
-		if err != nil {
-			err = fmt.Errorf("could not parse Wire SANs: %w", err)
-			break
+		var wireID wire.ID
+		if wireID, err = wire.ParseID([]byte(identifier.Value)); err != nil {
+			return fmt.Errorf("failed parsing Wire SANs: %w", err)
 		}
-		err = x509Policy.AreSANsAllowed([]string{wireSANs.ClientID, wireSANs.Handle})
+		err = x509Policy.AreSANsAllowed([]string{wireID.ClientID, wireID.Handle})
 	default:
 		err = fmt.Errorf("invalid ACME identifier type '%s' provided", identifier.Type)
 	}

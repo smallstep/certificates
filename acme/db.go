@@ -55,10 +55,10 @@ type DB interface {
 	GetAllOrdersByAccountID(ctx context.Context, accountID string) ([]string, error)
 	UpdateOrder(ctx context.Context, o *Order) error
 
-	CreateDpopToken(ctx context.Context, orderId string, dpop map[string]interface{}) error
-	GetDpopToken(ctx context.Context, orderId string) (map[string]interface{}, error)
-	CreateOidcToken(ctx context.Context, orderId string, idToken map[string]interface{}) error
-	GetOidcToken(ctx context.Context, orderId string) (map[string]interface{}, error)
+	CreateDpopToken(ctx context.Context, orderID string, dpop map[string]interface{}) error
+	GetDpopToken(ctx context.Context, orderID string) (map[string]interface{}, error)
+	CreateOidcToken(ctx context.Context, orderID string, idToken map[string]interface{}) error
+	GetOidcToken(ctx context.Context, orderID string) (map[string]interface{}, error)
 }
 
 type dbKey struct{}
@@ -123,6 +123,12 @@ type MockDB struct {
 	MockGetOrder             func(ctx context.Context, id string) (*Order, error)
 	MockGetOrdersByAccountID func(ctx context.Context, accountID string) ([]string, error)
 	MockUpdateOrder          func(ctx context.Context, o *Order) error
+
+	MockGetAllOrdersByAccountID func(ctx context.Context, accountID string) ([]string, error)
+	MockGetDpopToken            func(ctx context.Context, orderID string) (map[string]interface{}, error)
+	MockCreateDpopToken         func(ctx context.Context, orderID string, dpop map[string]interface{}) error
+	MockGetOidcToken            func(ctx context.Context, orderID string) (map[string]interface{}, error)
+	MockCreateOidcToken         func(ctx context.Context, orderID string, idToken map[string]interface{}) error
 
 	MockRet1  interface{}
 	MockError error
@@ -398,27 +404,48 @@ func (m *MockDB) GetOrdersByAccountID(ctx context.Context, accID string) ([]stri
 	return m.MockRet1.([]string), m.MockError
 }
 
-// GetDpop retrieves an DPoP from the database.
-func (m *MockDB) GetDpopToken(ctx context.Context, orderId string) (map[string]interface{}, error) {
-	return nil, errors.New("not implemented")
+// GetAllOrdersByAccountID returns a list of any order IDs owned by the account.
+func (m *MockDB) GetAllOrdersByAccountID(ctx context.Context, accountID string) ([]string, error) {
+	if m.MockGetAllOrdersByAccountID != nil {
+		return m.MockGetAllOrdersByAccountID(ctx, accountID)
+	} else if m.MockError != nil {
+		return nil, m.MockError
+	}
+	return m.MockRet1.([]string), m.MockError
+}
+
+// GetDpop retrieves a DPoP from the database.
+func (m *MockDB) GetDpopToken(ctx context.Context, orderID string) (map[string]any, error) {
+	if m.MockGetDpopToken != nil {
+		return m.MockGetDpopToken(ctx, orderID)
+	} else if m.MockError != nil {
+		return nil, m.MockError
+	}
+	return m.MockRet1.(map[string]any), m.MockError
 }
 
 // CreateDpop creates DPoP resources and saves them to the DB.
-func (m *MockDB) CreateDpopToken(ctx context.Context, orderId string, dpop map[string]interface{}) error {
-	return errors.New("not implemented")
-}
-
-// GetAllOrdersByAccountID returns a list of any order IDs owned by the account.
-func (m *MockDB) GetAllOrdersByAccountID(ctx context.Context, accID string) ([]string, error) {
-	return nil, errors.New("not implemented")
-}
-
-// CreateOidcToken creates oidc token resources and saves them to the DB.
-func (m *MockDB) CreateOidcToken(ctx context.Context, orderId string, idToken map[string]interface{}) error {
-	return errors.New("not implemented")
+func (m *MockDB) CreateDpopToken(ctx context.Context, orderID string, dpop map[string]any) error {
+	if m.MockCreateDpopToken != nil {
+		return m.MockCreateDpopToken(ctx, orderID, dpop)
+	}
+	return m.MockError
 }
 
 // GetOidcToken retrieves an oidc token from the database.
-func (m *MockDB) GetOidcToken(ctx context.Context, orderId string) (map[string]interface{}, error) {
-	return nil, errors.New("not implemented")
+func (m *MockDB) GetOidcToken(ctx context.Context, orderID string) (map[string]any, error) {
+	if m.MockGetOidcToken != nil {
+		return m.MockGetOidcToken(ctx, orderID)
+	} else if m.MockError != nil {
+		return nil, m.MockError
+	}
+	return m.MockRet1.(map[string]any), m.MockError
+}
+
+// CreateOidcToken creates oidc token resources and saves them to the DB.
+func (m *MockDB) CreateOidcToken(ctx context.Context, orderID string, idToken map[string]any) error {
+	if m.MockCreateOidcToken != nil {
+		return m.MockCreateOidcToken(ctx, orderID, idToken)
+	}
+	return m.MockError
 }

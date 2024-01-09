@@ -3,6 +3,7 @@ package provisioner
 import (
 	"bytes"
 	"context"
+	"errors"
 	"fmt"
 	"net/url"
 	"text/template"
@@ -52,17 +53,22 @@ func (o *OIDCOptions) GetConfig() *oidc.Config {
 
 func (o *OIDCOptions) GetTarget(deviceID string) (string, error) {
 	if o == nil {
-		return "", fmt.Errorf("Misconfigured target template configuration")
+		return "", errors.New("misconfigured target template configuration")
 	}
 	targetTemplate := o.Provider.IssuerURL
-	tmpl, err := template.New("DeviceId").Parse(targetTemplate)
+	tmpl, err := template.New("DeviceID").Parse(targetTemplate)
+	if err != nil {
+		return "", fmt.Errorf("failed parsing oidc template: %w", err)
+	}
 	buf := new(bytes.Buffer)
-	err = tmpl.Execute(buf, struct{ DeviceId string }{deviceID})
-	return buf.String(), err
+	if err = tmpl.Execute(buf, struct{ DeviceID string }{DeviceID: deviceID}); err != nil {
+		return "", fmt.Errorf("failed executing oidc template: %w", err)
+	}
+	return buf.String(), nil
 }
 
 func toProviderConfig(in ProviderJSON) *oidc.ProviderConfig {
-	issuerUrl, err := url.Parse(in.IssuerURL)
+	issuerURL, err := url.Parse(in.IssuerURL)
 	if err != nil {
 		panic(err) // config error, it's ok to panic here
 	}
@@ -71,10 +77,10 @@ func toProviderConfig(in ProviderJSON) *oidc.ProviderConfig {
 	// This URL is going to look like: "https://idp:5556/dex?clientid=foo"
 	// If we don't trim the query params here i.e. 'clientid' then the idToken verification is going to fail because
 	// the 'iss' claim of the idToken will be "https://idp:5556/dex"
-	issuerUrl.RawQuery = ""
-	issuerUrl.Fragment = ""
+	issuerURL.RawQuery = ""
+	issuerURL.Fragment = ""
 	return &oidc.ProviderConfig{
-		IssuerURL:   issuerUrl.String(),
+		IssuerURL:   issuerURL.String(),
 		AuthURL:     in.AuthURL,
 		TokenURL:    in.TokenURL,
 		UserInfoURL: in.UserInfoURL,

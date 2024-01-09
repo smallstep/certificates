@@ -2,6 +2,7 @@ package provisioner
 
 import (
 	"bytes"
+	"errors"
 	"fmt"
 	"text/template"
 )
@@ -39,11 +40,16 @@ func (o *DPOPOptions) GetDPOPTarget() string {
 
 func (o *DPOPOptions) GetTarget(deviceID string) (string, error) {
 	if o == nil {
-		return "", fmt.Errorf("Misconfigured target template configuration")
+		return "", errors.New("misconfigured target template configuration")
 	}
 	targetTemplate := o.GetDPOPTarget()
-	tmpl, err := template.New("DeviceId").Parse(targetTemplate)
+	tmpl, err := template.New("DeviceID").Parse(targetTemplate)
+	if err != nil {
+		return "", fmt.Errorf("failed parsing dpop template: %w", err)
+	}
 	buf := new(bytes.Buffer)
-	err = tmpl.Execute(buf, struct{ DeviceId string }{deviceID})
-	return buf.String(), err
+	if err = tmpl.Execute(buf, struct{ DeviceID string }{DeviceID: deviceID}); err != nil {
+		return "", fmt.Errorf("failed executing dpop template: %w", err)
+	}
+	return buf.String(), nil
 }

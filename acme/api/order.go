@@ -56,11 +56,11 @@ func (n *NewOrderRequest) Validate() error {
 			if err != nil {
 				return acme.NewError(acme.ErrorMalformedType, "ID cannot be parsed")
 			}
-			clientIdUri, err := uri.Parse(orderValue.ClientID)
+			clientIDURI, err := uri.Parse(orderValue.ClientID)
 			if err != nil {
 				return acme.NewError(acme.ErrorMalformedType, "invalid client ID, it's supposed to be a valid URI")
 			}
-			if clientIdUri.Scheme != "wireapp" {
+			if clientIDURI.Scheme != "wireapp" {
 				return acme.NewError(acme.ErrorMalformedType, "invalid client ID scheme")
 			}
 		default:
@@ -280,11 +280,11 @@ func newAuthorization(ctx context.Context, az *acme.Authorization) error {
 
 		var target string
 		if az.Identifier.Type == acme.WireID {
-			wireId, err := wire.ParseID([]byte(az.Identifier.Value))
+			wireID, err := wire.ParseID([]byte(az.Identifier.Value))
 			if err != nil {
 				return acme.WrapError(acme.ErrorMalformedType, err, "failed parsing WireID")
 			}
-			clientID, err := wire.ParseClientID(wireId.ClientID)
+			clientID, err := wire.ParseClientID(wireID.ClientID)
 			if err != nil {
 				return acme.WrapError(acme.ErrorMalformedType, err, "failed parsing ClientID")
 			}
