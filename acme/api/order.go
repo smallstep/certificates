@@ -279,15 +279,14 @@ func newAuthorization(ctx context.Context, az *acme.Authorization) error {
 		}
 
 		var target string
-		switch az.Identifier.Type {
-		case acme.WireID:
+		if az.Identifier.Type == acme.WireID {
 			wireId, err := wire.ParseID([]byte(az.Identifier.Value))
 			if err != nil {
-				return acme.WrapError(acme.ErrorMalformedType, err, "WireID cannot be parsed")
+				return acme.WrapError(acme.ErrorMalformedType, err, "failed parsing WireID")
 			}
 			clientID, err := wire.ParseClientID(wireId.ClientID)
 			if err != nil {
-				return acme.WrapError(acme.ErrorMalformedType, err, "DeviceID cannot be parsed")
+				return acme.WrapError(acme.ErrorMalformedType, err, "failed parsing ClientID")
 			}
 
 			var targetProvider interface{ GetTarget(string) (string, error) }
@@ -297,13 +296,13 @@ func newAuthorization(ctx context.Context, az *acme.Authorization) error {
 			case acme.WIREDPOP01:
 				targetProvider = prov.GetOptions().GetDPOPOptions()
 			default:
+				return acme.NewError(acme.ErrorMalformedType, "unsupported type %q", typ)
 			}
 
 			target, err = targetProvider.GetTarget(clientID.DeviceID)
 			if err != nil {
-				return acme.WrapError(acme.ErrorMalformedType, err, "Invalid Go template registered for 'target'")
+				return acme.WrapError(acme.ErrorMalformedType, err, "invalid Go template registered for 'target'")
 			}
-		default:
 		}
 
 		ch := &acme.Challenge{
