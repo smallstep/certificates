@@ -19,7 +19,7 @@ type dbChallenge struct {
 	Status      acme.Status        `json:"status"`
 	Token       string             `json:"token"`
 	Value       string             `json:"value"`
-	Target      string             `json:"target"`
+	Target      string             `json:"target,omitempty"`
 	ValidatedAt string             `json:"validatedAt"`
 	CreatedAt   time.Time          `json:"createdAt"`
 	Error       *acme.Error        `json:"error"` // TODO(hs): a bit dangerous; should become db-specific type
