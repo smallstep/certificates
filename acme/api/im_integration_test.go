@@ -37,7 +37,6 @@ const (
 )
 
 func TestIMIntegration(t *testing.T) {
-
 	prov := newACMEProvWithOptions(t, &provisioner.Options{
 		OIDC: &provisioner.OIDCOptions{
 			Provider: provisioner.ProviderJSON{
@@ -70,44 +69,34 @@ func TestIMIntegration(t *testing.T) {
 
 	// create temporary BoltDB file
 	file, err := os.CreateTemp(os.TempDir(), "integration-db-")
-	if err != nil {
-		t.Fatal("opening temporary database file:", err)
-	}
+	require.NoError(t, err)
+
 	t.Log("database file name:", file.Name())
 	dbFn := file.Name()
 	err = file.Close()
-	if err != nil {
-		t.Error("closing database file:", err)
-	}
+	require.NoError(t, err)
 
 	// open BoltDB
 	rawDB, err := nosqlDB.New(nosqlDB.BBoltDriver, dbFn)
-	if err != nil {
-		t.Fatal("establishing raw db connection:", err)
-	}
+	require.NoError(t, err)
 
 	// create tables
 	db, err := nosql.New(rawDB)
-	if err != nil {
-		t.Fatal("establishing db connection:", err)
-	}
+	require.NoError(t, err)
 
 	// make DB available to handlers
 	ctx = acme.NewDatabaseContext(ctx, db)
 
 	// simulate signed payloads by making the signing key available in ctx
 	jwk, err := jose.GenerateJWK("OKP", "", "EdDSA", "sig", "", 0)
-	if err != nil {
-		t.Fatal("generating key:", err)
-	}
+	require.NoError(t, err)
+
 	ed25519PrivKey, ok := jwk.Key.(ed25519.PrivateKey)
-	if !ok {
-		t.Fatal("failed to generate private key")
-	}
+	require.True(t, ok)
+
 	ed25519PubKey, ok := ed25519PrivKey.Public().(ed25519.PublicKey)
-	if !ok {
-		t.Fatal("failed to extract public key")
-	}
+	require.True(t, ok)
+
 	jwk.Key = ed25519PubKey
 	ctx = context.WithValue(ctx, jwkContextKey, jwk)
 
@@ -119,19 +108,14 @@ func TestIMIntegration(t *testing.T) {
 
 		GetDirectory(w, req)
 		res := w.Result()
-		if res.StatusCode != 200 {
-			t.Errorf("expected 200, got %d", res.StatusCode)
-		}
+		require.Equal(t, http.StatusOK, res.StatusCode)
 
 		body, err := io.ReadAll(res.Body)
-		if err != nil {
-			t.Fatal("failed to read the response body:", err)
-		}
+		require.NoError(t, err)
 
 		err = json.Unmarshal(bytes.TrimSpace(body), &dir)
-		if err != nil {
-			t.Fatal("unmarshal response body:", err)
-		}
+		require.NoError(t, err)
+
 		return
 	}(ctx)
 	t.Log("directory:", dir)
@@ -142,9 +126,7 @@ func TestIMIntegration(t *testing.T) {
 		w := httptest.NewRecorder()
 		addNonce(GetNonce)(w, req)
 		res := w.Result()
-		if res.StatusCode != http.StatusNoContent {
-			t.Errorf("expected %d, got %d", http.StatusNoContent, res.StatusCode)
-		}
+		require.Equal(t, http.StatusNoContent, res.StatusCode)
 
 		nonce = res.Header["Replay-Nonce"][0]
 		return
@@ -158,37 +140,27 @@ func TestIMIntegration(t *testing.T) {
 			Contact: []string{"foo", "bar"},
 		}
 		rawNar, err := json.Marshal(nar)
-		if err != nil {
-			t.Fatal("marshal nar:", err)
-		}
-		ctx = context.WithValue(ctx, payloadContextKey, &payloadInfo{value: rawNar})
+		require.NoError(t, err)
 
 		// create account
+		ctx = context.WithValue(ctx, payloadContextKey, &payloadInfo{value: rawNar})
 		req := httptest.NewRequest(http.MethodGet, dir.NewAccount, http.NoBody).WithContext(ctx)
 		w := httptest.NewRecorder()
 		NewAccount(w, req)
 
 		res := w.Result()
-		if res.StatusCode != http.StatusCreated {
-			t.Errorf("expected %d, got %d", http.StatusCreated, res.StatusCode)
-		}
+		require.Equal(t, http.StatusCreated, res.StatusCode)
 
 		body, err := io.ReadAll(res.Body)
-		res.Body.Close()
-		if err != nil {
-			t.Fatal("read account payload:", err)
-		}
+		defer res.Body.Close()
+		require.NoError(t, err)
 
 		err = json.Unmarshal(bytes.TrimSpace(body), &acc)
-		if err != nil {
-			t.Fatal("unmarshal account:", err)
-		}
+		require.NoError(t, err)
 
 		locationParts := strings.Split(res.Header["Location"][0], "/")
 		acc, err = db.GetAccount(ctx, locationParts[len(locationParts)-1])
-		if err != nil {
-			t.Fatal("get account from DB:", err)
-		}
+		require.NoError(t, err)
 
 		return
 	}(ctx)
@@ -198,7 +170,6 @@ func TestIMIntegration(t *testing.T) {
 	// new order
 	order := func(ctx context.Context) (order *acme.Order) {
 		mockMustAuthority(t, &mockCA{})
-
 		nor := &NewOrderRequest{
 			Identifiers: []acme.Identifier{
 				{
@@ -208,37 +179,26 @@ func TestIMIntegration(t *testing.T) {
 			},
 		}
 		b, err := json.Marshal(nor)
-		if err != nil {
-			t.Fatal("marshal new order request: ", err)
-		}
+		require.NoError(t, err)
 
 		ctx = context.WithValue(ctx, payloadContextKey, &payloadInfo{value: b})
-
 		req := httptest.NewRequest("POST", "https://random.local/", http.NoBody)
 		req = req.WithContext(ctx)
 		w := httptest.NewRecorder()
 		NewOrder(w, req)
 
 		res := w.Result()
-		if res.StatusCode != http.StatusCreated {
-			t.Errorf("expected %d, got %d", http.StatusCreated, res.StatusCode)
-		}
+		require.Equal(t, http.StatusCreated, res.StatusCode)
 
 		body, err := io.ReadAll(res.Body)
-		res.Body.Close()
-		if err != nil {
-			t.Fatal("read account payload:", err)
-		}
+		defer res.Body.Close()
+		require.NoError(t, err)
 
 		err = json.Unmarshal(bytes.TrimSpace(body), &order)
-		if err != nil {
-			t.Fatal("unmarshal order:", err)
-		}
+		require.NoError(t, err)
 
 		order, err = db.GetOrder(ctx, order.ID)
-		if err != nil {
-			t.Fatal("get order from DB:", err)
-		}
+		require.NoError(t, err)
 
 		return
 	}(ctx)
@@ -255,25 +215,17 @@ func TestIMIntegration(t *testing.T) {
 		GetAuthorization(w, req)
 
 		res := w.Result()
-		if res.StatusCode != http.StatusOK {
-			t.Errorf("expected %d, got %d", http.StatusOK, res.StatusCode)
-		}
+		require.Equal(t, http.StatusOK, res.StatusCode)
 
 		body, err := io.ReadAll(res.Body)
-		res.Body.Close()
-		if err != nil {
-			t.Fatal("read account payload:", err)
-		}
+		defer res.Body.Close()
+		require.NoError(t, err)
 
 		err = json.Unmarshal(bytes.TrimSpace(body), &az)
-		if err != nil {
-			t.Fatal("unmarshal account:", err)
-		}
+		require.NoError(t, err)
 
 		az, err = db.GetAuthorization(ctx, authzID)
-		if err != nil {
-			t.Fatal("update authorization from DB")
-		}
+		require.NoError(t, err)
 
 		return
 	}
@@ -292,20 +244,14 @@ func TestIMIntegration(t *testing.T) {
 			GetChallenge(w, req)
 
 			res := w.Result()
-			if res.StatusCode != http.StatusOK {
-				t.Errorf("expected %d, got %d", http.StatusOK, res.StatusCode)
-			}
+			require.Equal(t, http.StatusOK, res.StatusCode)
 
 			body, err := io.ReadAll(res.Body)
-			res.Body.Close()
-			if err != nil {
-				t.Fatal("read challenge payload:", err)
-			}
+			defer res.Body.Close() //nolint:gocritic // close the body
+			require.NoError(t, err)
 
 			err = json.Unmarshal(bytes.TrimSpace(body), &challenge)
-			if err != nil {
-				t.Fatal("unmarshal challenge:", err)
-			}
+			require.NoError(t, err)
 
 			t.Log("challenge:", challenge.ID, challenge.Status)
 		}
@@ -324,9 +270,7 @@ func TestIMIntegration(t *testing.T) {
 		}
 
 		updatedAz, err = db.GetAuthorization(ctx, az.ID)
-		if err != nil {
-			t.Fatal("update authorization from DB", err)
-		}
+		require.NoError(t, err)
 
 		return
 	}
@@ -348,24 +292,16 @@ func TestIMIntegration(t *testing.T) {
 		GetOrder(w, req)
 
 		res := w.Result()
-		if res.StatusCode != http.StatusOK {
-			t.Errorf("expected %d, got %d", http.StatusOK, res.StatusCode)
-		}
+		require.Equal(t, http.StatusOK, res.StatusCode)
 
 		body, err := io.ReadAll(res.Body)
-		res.Body.Close()
-		if err != nil {
-			t.Fatal("read account payload:", err)
-		}
+		defer res.Body.Close()
+		require.NoError(t, err)
 
 		err = json.Unmarshal(bytes.TrimSpace(body), &updatedOrder)
-		if err != nil {
-			t.Fatal("unmarshal order:", err)
-		}
+		require.NoError(t, err)
 
-		if updatedOrder.Status != acme.StatusReady {
-			t.Errorf("expected %s, got %s", acme.StatusReady, updatedOrder.Status)
-		}
+		require.Equal(t, acme.StatusReady, updatedOrder.Status)
 
 		return
 	}(ctx)
@@ -382,19 +318,13 @@ func TestIMIntegration(t *testing.T) {
 		})
 
 		qUserID, err := url.Parse("wireapp://lJGYPz0ZRq2kvc_XpdaDlA!ed416ce8ecdd9fad@example.com")
-		if err != nil {
-			t.Fatal("parse user ID URI", err)
-		}
-		_ = qUserID
+		require.NoError(t, err)
+
 		qUserName, err := url.Parse("wireapp://%40alice.smith.qa@example.com")
-		if err != nil {
-			t.Fatal("parse user name URI", err)
-		}
-		_ = qUserName
+		require.NoError(t, err)
+
 		_, priv, err := ed25519.GenerateKey(rand.Reader)
-		if err != nil {
-			t.Fatal("generate key:", err)
-		}
+		require.NoError(t, err)
 
 		csrTemplate := &x509.CertificateRequest{
 			Subject: pkix.Name{
@@ -414,15 +344,11 @@ func TestIMIntegration(t *testing.T) {
 		}
 
 		csr, err := x509.CreateCertificateRequest(rand.Reader, csrTemplate, priv)
-		if err != nil {
-			t.Fatal("create CSR from template:", err)
-		}
+		require.NoError(t, err)
 
 		fr := FinalizeRequest{CSR: base64.RawURLEncoding.EncodeToString(csr)}
 		frRaw, err := json.Marshal(fr)
-		if err != nil {
-			t.Fatal("encode finalize request:", err)
-		}
+		require.NoError(t, err)
 
 		// TODO(hs): move these to a more appropriate place and/or provide more realistic value
 		err = db.CreateDpopToken(ctx, order.ID, map[string]any{"fake-dpop": "dpop-value"})
@@ -441,29 +367,19 @@ func TestIMIntegration(t *testing.T) {
 		FinalizeOrder(w, req)
 
 		res := w.Result()
-		if res.StatusCode != http.StatusOK {
-			t.Errorf("expected %d, got %d", http.StatusOK, res.StatusCode)
-		}
+		require.Equal(t, http.StatusOK, res.StatusCode)
 
 		body, err := io.ReadAll(res.Body)
-		res.Body.Close()
-		if err != nil {
-			t.Fatal("read account payload:", err)
-		}
+		defer res.Body.Close()
+		require.NoError(t, err)
 
 		err = json.Unmarshal(bytes.TrimSpace(body), &finalizedOrder)
-		if err != nil {
-			t.Fatal("unmarshal order:", err)
-		}
+		require.NoError(t, err)
 
-		if finalizedOrder.Status != acme.StatusValid {
-			t.Errorf("expected %s, got %s", acme.StatusValid, finalizedOrder.Status)
-		}
+		require.Equal(t, acme.StatusValid, finalizedOrder.Status)
 
 		finalizedOrder, err = db.GetOrder(ctx, order.ID)
-		if err != nil {
-			t.Fatal("get order from DB:", err)
-		}
+		require.NoError(t, err)
 
 		return
 	}(ctx)
