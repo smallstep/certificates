@@ -27,6 +27,7 @@ import (
 	"github.com/smallstep/certificates/authority"
 	"github.com/smallstep/certificates/authority/provisioner"
 	nosqlDB "github.com/smallstep/nosql"
+	"github.com/stretchr/testify/require"
 	"go.step.sm/crypto/jose"
 )
 
@@ -422,6 +423,12 @@ func TestIMIntegration(t *testing.T) {
 		if err != nil {
 			t.Fatal("encode finalize request:", err)
 		}
+
+		// TODO(hs): move these to a more appropriate place and/or provide more realistic value
+		err = db.CreateDpopToken(ctx, order.ID, map[string]any{"fake-dpop": "dpop-value"})
+		require.NoError(t, err)
+		err = db.CreateOidcToken(ctx, order.ID, map[string]any{"fake-oidc": "oidc-value"})
+		require.NoError(t, err)
 
 		ctx = context.WithValue(ctx, payloadContextKey, &payloadInfo{value: frRaw})
 
