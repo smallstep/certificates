@@ -23,8 +23,8 @@ var (
 	externalAccountKeyTable                   = []byte("acme_external_account_keys")
 	externalAccountKeyIDsByReferenceTable     = []byte("acme_external_account_keyID_reference_index")
 	externalAccountKeyIDsByProvisionerIDTable = []byte("acme_external_account_keyID_provisionerID_index")
-	dpopTokenTable                            = []byte("acme_dpop_token")
-	oidcTokenTable                            = []byte("oidc_token")
+	wireDpopTokenTable                        = []byte("wire_acme_dpop_token")
+	wireOidcTokenTable                        = []byte("wire_acme_oidc_token")
 )
 
 // DB is a struct that implements the AcmeDB interface.
@@ -38,11 +38,11 @@ func New(db nosqlDB.DB) (*DB, error) {
 		challengeTable, nonceTable, orderTable, ordersByAccountIDTable,
 		certTable, certBySerialTable, externalAccountKeyTable,
 		externalAccountKeyIDsByReferenceTable, externalAccountKeyIDsByProvisionerIDTable,
+		wireDpopTokenTable, wireOidcTokenTable,
 	}
 	for _, b := range tables {
 		if err := db.CreateTable(b); err != nil {
-			return nil, errors.Wrapf(err, "error creating table %s",
-				string(b))
+			return nil, errors.Wrapf(err, "error creating table %s", string(b))
 		}
 	}
 	return &DB{db}, nil

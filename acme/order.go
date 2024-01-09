@@ -7,6 +7,7 @@ import (
 	"crypto/x509"
 	"encoding/asn1"
 	"encoding/json"
+	"fmt"
 	"net"
 	"net/url"
 	"sort"
@@ -204,17 +205,28 @@ func (o *Order) Finalize(ctx context.Context, db DB, csr *x509.CertificateReques
 
 	// Template data
 	data := x509util.NewTemplateData()
-	subject, err := o.subject(csr)
-	if err != nil {
-		return err
-	}
-	data.SetSubject(subject)
+	if o.containsWireIdentifiers() {
+		subject, err := createWireSubject(o, csr)
+		if err != nil {
+			return fmt.Errorf("failed creating Wire subject: %w", err)
+		}
+		data.SetSubject(subject)
 
-	// Inject Wire's custom challenges into the template once they have been validated
-	dpop, err := db.GetDpopToken(ctx, o.ID)
-	data.Set("Dpop", dpop)
-	oidc, err := db.GetOidcToken(ctx, o.ID)
-	data.Set("Oidc", oidc)
+		// Inject Wire's custom challenges into the template once they have been validated
+		dpop, err := db.GetDpopToken(ctx, o.ID)
+		if err != nil {
+			return fmt.Errorf("failed getting Wire DPoP token: %w", err)
+		}
+		data.Set("Dpop", dpop)
+
+		oidc, err := db.GetOidcToken(ctx, o.ID)
+		if err != nil {
+			return fmt.Errorf("failed getting Wire OIDC token: %w", err)
+		}
+		data.Set("Oidc", oidc)
+	} else {
+		data.SetCommonName(csr.Subject.CommonName)
+	}
 
 	// Custom sign options passed to authority.Sign
 	var extraOptions []provisioner.SignOption
@@ -309,7 +321,19 @@ func (o *Order) Finalize(ctx context.Context, db DB, csr *x509.CertificateReques
 	return nil
 }
 
-func (o *Order) subject(csr *x509.CertificateRequest) (subject x509util.Subject, err error) {
+// containsWireIdentifiers checks if [Order] contains ACME
+// identifiers for the WireID type.
+func (o *Order) containsWireIdentifiers() bool {
+	for _, i := range o.Identifiers {
+		if i.Type == WireID {
+			return true
+		}
+	}
+	return false
+}
+
+// createWireSubject creates the subject for an [Order] with WireID identifiers.
+func createWireSubject(o *Order, csr *x509.CertificateRequest) (subject x509util.Subject, err error) {
 	wireIDs, otherIDs := 0, 0
 	for _, identifier := range o.Identifiers {
 		switch identifier.Type {
@@ -335,9 +359,6 @@ func (o *Order) subject(csr *x509.CertificateRequest) (subject x509util.Subject,
 			if !foundDisplayName {
 				return subject, NewErrorISE("CSR must contain the display name in 2.16.840.1.113730.3.1.241 OID")
 			}
-			/*if csr.Subject.CommonName != wireID.Name {
-				return subject, NewErrorISE("expected CN %v, found %v", wireID.Name, csr.Subject.CommonName)
-			}*/
 
 			if len(csr.Subject.Organization) == 0 || !strings.EqualFold(csr.Subject.Organization[0], wireID.Domain) {
 				return subject, NewErrorISE("expected Organization [%s], found %v", wireID.Domain, csr.Subject.Organization)
@@ -346,11 +367,14 @@ func (o *Order) subject(csr *x509.CertificateRequest) (subject x509util.Subject,
 			subject.Organization = []string{wireID.Domain}
 			wireIDs++
 		default:
+			otherIDs++
 		}
 	}
+
 	if wireIDs > 0 && otherIDs > 0 || wireIDs > 1 {
 		return subject, NewErrorISE("at most one WireID can be signed along with no other ID, found %d WireIDs and %d other IDs", wireIDs, otherIDs)
 	}
+
 	return
 }
 

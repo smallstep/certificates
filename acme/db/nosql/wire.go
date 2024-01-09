@@ -18,7 +18,7 @@ type dbDpopToken struct {
 
 // getDBDpopToken retrieves and unmarshals an DPoP type from the database.
 func (db *DB) getDBDpopToken(ctx context.Context, orderId string) (*dbDpopToken, error) {
-	b, err := db.db.Get(dpopTokenTable, []byte(orderId))
+	b, err := db.db.Get(wireDpopTokenTable, []byte(orderId))
 	if nosql.IsErrNotFound(err) {
 		return nil, acme.NewError(acme.ErrorMalformedType, "dpop %s not found", orderId)
 	} else if err != nil {
@@ -58,7 +58,7 @@ func (db *DB) CreateDpopToken(ctx context.Context, orderId string, dpop map[stri
 		Content:   content,
 		CreatedAt: now,
 	}
-	if err := db.save(ctx, orderId, dbDpop, nil, "dpop", dpopTokenTable); err != nil {
+	if err := db.save(ctx, orderId, dbDpop, nil, "dpop", wireDpopTokenTable); err != nil {
 		return err
 	}
 	return nil
@@ -72,7 +72,7 @@ type dbOidcToken struct {
 
 // getDBOidcToken retrieves and unmarshals an OIDC id token type from the database.
 func (db *DB) getDBOidcToken(ctx context.Context, orderId string) (*dbOidcToken, error) {
-	b, err := db.db.Get(oidcTokenTable, []byte(orderId))
+	b, err := db.db.Get(wireOidcTokenTable, []byte(orderId))
 	if nosql.IsErrNotFound(err) {
 		return nil, acme.NewError(acme.ErrorMalformedType, "oidc token %s not found", orderId)
 	} else if err != nil {
@@ -111,7 +111,7 @@ func (db *DB) CreateOidcToken(ctx context.Context, orderId string, idToken map[s
 		Content:   content,
 		CreatedAt: now,
 	}
-	if err := db.save(ctx, orderId, dbOidc, nil, "oidc", oidcTokenTable); err != nil {
+	if err := db.save(ctx, orderId, dbOidc, nil, "oidc", wireOidcTokenTable); err != nil {
 		return err
 	}
 	return nil
