@@ -104,6 +104,9 @@ type Authority struct {
 
 	// If true, do not output initialization logs
 	quietInit bool
+
+	// When not nil, called whenever applicable.
+	hooks Hooks
 }
 
 // Info contains information about the authority.

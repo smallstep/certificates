@@ -300,6 +300,10 @@ func (a *Authority) SignSSH(_ context.Context, key ssh.PublicKey, opts provision
 		return nil, errs.Wrap(http.StatusInternalServerError, err, "authority.SignSSH: error storing certificate in db")
 	}
 
+	if h := a.hooks; h != nil {
+		h.SSHCertificateIssued(prov.GetName())
+	}
+
 	return cert, nil
 }
 

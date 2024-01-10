@@ -27,6 +27,7 @@ import (
 	adminAPI "github.com/smallstep/certificates/authority/admin/api"
 	"github.com/smallstep/certificates/authority/config"
 	"github.com/smallstep/certificates/db"
+	"github.com/smallstep/certificates/internal/meter"
 	"github.com/smallstep/certificates/logging"
 	"github.com/smallstep/certificates/monitoring"
 	"github.com/smallstep/certificates/scep"
@@ -46,6 +47,7 @@ type options struct {
 	sshHostPassword []byte
 	sshUserPassword []byte
 	database        db.AuthDB
+	meter           *meter.M
 }
 
 func (o *options) apply(opts []Option) {
@@ -118,6 +120,13 @@ func WithQuiet(quiet bool) Option {
 	}
 }
 
+// WithMeter sets the meter.
+func WithMeter(m *meter.M) Option {
+	return func(o *options) {
+		o.meter = m
+	}
+}
+
 // CA is the type used to build the complete certificate authority. It builds
 // the HTTP server, set ups the middlewares and the HTTP handlers.
 type CA struct {
@@ -150,6 +159,8 @@ func (ca *CA) Init(cfg *config.Config) (*CA, error) {
 		authority.WithSSHHostPassword(ca.opts.sshHostPassword),
 		authority.WithSSHUserPassword(ca.opts.sshUserPassword),
 		authority.WithIssuerPassword(ca.opts.issuerPassword),
+		// TODO(@azazeal): hooks
+		// authority.WithPrometheusHooks(...),
 	}
 	if ca.opts.linkedCAToken != "" {
 		opts = append(opts, authority.WithLinkedCAToken(ca.opts.linkedCAToken))
@@ -161,6 +172,10 @@ func (ca *CA) Init(cfg *config.Config) (*CA, error) {
 
 	if ca.opts.quiet {
 		opts = append(opts, authority.WithQuietInit())
+	}
+
+	if m := ca.opts.meter; m != nil {
+		opts = append(opts, authority.WithHooks(m))
 	}
 
 	webhookTransport := http.DefaultTransport.(*http.Transport).Clone()
@@ -199,6 +214,11 @@ func (ca *CA) Init(cfg *config.Config) (*CA, error) {
 	// Mount the CRL to the insecure mux
 	insecureMux.Get("/crl", api.CRL)
 	insecureMux.Get("/1.0/crl", api.CRL)
+
+	if m := ca.opts.meter; m != nil {
+		// TODO(@azazeal): grab reference to meter
+		insecureMux.Get("/-/prometheus", m.Handler)
+	}
 
 	// Add ACME api endpoints in /acme and /1.0/acme
 	dns := cfg.DNSNames[0]
