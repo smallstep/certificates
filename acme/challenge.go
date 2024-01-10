@@ -383,6 +383,7 @@ func wireOIDC01Validate(ctx context.Context, ch *Challenge, db DB, jwk *jose.JSO
 		Handle    string `json:"name"`
 		Issuer    string `json:"iss,omitempty"`
 		GivenName string `json:"given_name,omitempty"`
+		KeyAuth   string `json:"keyauth"` // TODO(hs): use this property instead of the one in the payload after https://github.com/wireapp/rusty-jwt-tools/tree/fix/keyauth is done
 	}
 	err = idToken.Claims(&claims)
 	if err != nil {

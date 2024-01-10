@@ -56,12 +56,12 @@ func (o *OIDCOptions) GetTarget(deviceID string) (string, error) {
 		return "", errors.New("misconfigured target template configuration")
 	}
 	targetTemplate := o.Provider.IssuerURL
-	tmpl, err := template.New("DeviceID").Parse(targetTemplate)
+	tmpl, err := template.New("DeviceId").Parse(targetTemplate)
 	if err != nil {
 		return "", fmt.Errorf("failed parsing oidc template: %w", err)
 	}
 	buf := new(bytes.Buffer)
-	if err = tmpl.Execute(buf, struct{ DeviceID string }{DeviceID: deviceID}); err != nil {
+	if err = tmpl.Execute(buf, struct{ DeviceId string }{DeviceId: deviceID}); err != nil { //nolint:revive,stylecheck // TODO(hs): this requires changes in configuration
 		return "", fmt.Errorf("failed executing oidc template: %w", err)
 	}
 	return buf.String(), nil
