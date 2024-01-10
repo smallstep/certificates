@@ -36,8 +36,21 @@ const (
 	linkerPrefix = "acme"
 )
 
-func TestIMIntegration(t *testing.T) {
-	prov := newACMEProvWithOptions(t, &provisioner.Options{
+func newWireProvisionerWithOptions(t *testing.T, options *provisioner.Options) *provisioner.ACME {
+	p := newProvWithOptions(options)
+	a, ok := p.(*provisioner.ACME)
+	if !ok {
+		t.Fatal("not a valid ACME provisioner")
+	}
+	a.Challenges = []provisioner.ACMEChallenge{
+		provisioner.WIREOIDC_01,
+		provisioner.WIREDPOP_01,
+	}
+	return a
+}
+
+func TestWireIntegration(t *testing.T) {
+	prov := newWireProvisionerWithOptions(t, &provisioner.Options{
 		OIDC: &provisioner.OIDCOptions{
 			Provider: provisioner.ProviderJSON{
 				IssuerURL:   "",
