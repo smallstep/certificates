@@ -304,7 +304,7 @@ func (p *ACME) AuthorizeRenew(ctx context.Context, cert *x509.Certificate) error
 // Challenge provisioner property should have at least one element.
 func (p *ACME) IsChallengeEnabled(_ context.Context, challenge ACMEChallenge) bool {
 	enabledChallenges := []ACMEChallenge{
-		HTTP_01, DNS_01, TLS_ALPN_01, WIREOIDC_01, WIREDPOP_01,
+		HTTP_01, DNS_01, TLS_ALPN_01,
 	}
 	if len(p.Challenges) > 0 {
 		enabledChallenges = p.Challenges
