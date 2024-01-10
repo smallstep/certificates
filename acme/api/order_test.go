@@ -1695,7 +1695,7 @@ func TestHandler_NewOrder(t *testing.T) {
 			}
 		},
 		"ok/default-naf-nbf-wireapp": func(t *testing.T) test {
-			acmeWireProv := newACMEProvWithOptions(t, &provisioner.Options{
+			acmeWireProv := newWireProvisionerWithOptions(t, &provisioner.Options{
 				OIDC: &provisioner.OIDCOptions{
 					Provider: provisioner.ProviderJSON{
 						IssuerURL:   "",
