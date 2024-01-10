@@ -1715,9 +1715,7 @@ func TestHandler_NewOrder(t *testing.T) {
 						Now:                        time.Now,
 					},
 				},
-				DPOP: &provisioner.DPOPOptions{
-					ValidationExecPath: "true", // true will always exit with code 0
-				},
+				DPOP: &provisioner.DPOPOptions{},
 			})
 			acc := &acme.Account{ID: "accID"}
 			nor := &NewOrderRequest{
