@@ -780,12 +780,12 @@ func TestHandler_newAuthorization(t *testing.T) {
 				az: az,
 			}
 		},
-		"ok/im": func(t *testing.T) test {
+		"ok/wire": func(t *testing.T) test {
 			az := &acme.Authorization{
 				AccountID: "accID",
 				Identifier: acme.Identifier{
 					Type:  "wireapp",
-					Value: "wireapp://user:client@domain",
+					Value: "wireapp://user!client@domain",
 				},
 				Status:    acme.StatusPending,
 				ExpiresAt: clock.Now(),
