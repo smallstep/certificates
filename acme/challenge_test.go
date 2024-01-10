@@ -33,6 +33,7 @@ import (
 	"github.com/fxamacker/cbor/v2"
 	"github.com/smallstep/certificates/authority/config"
 	"github.com/smallstep/certificates/authority/provisioner"
+	"github.com/smallstep/certificates/wire"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"go.step.sm/crypto/jose"
@@ -4300,4 +4301,39 @@ func createSubjectAltNameExtension(dnsNames, emailAddresses x509util.MultiString
 		Critical: subjectIsEmpty,
 		Value:    rawBytes,
 	}, nil
+}
+
+func Test_wireVerifyAccess(t *testing.T) {
+	key := `
+-----BEGIN PUBLIC KEY-----
+MCowBQYDK2VwAyEA5c+4NKZSNQcR1T8qN6SjwgdPZQ0Ge12Ylx/YeGAJ35k=
+-----END PUBLIC KEY-----`
+	issuer := "https://wire.example.com/clients/314845990100130665/access-token"
+	kid := ""
+	wireID := wire.ID{}
+	token := `eyJhbGciOiJFZERTQSIsInR5cCI6ImF0K2p3dCIsImp3ayI6eyJrdHkiOiJPS1AiLCJjcnYiOiJFZDI1NTE5IiwieCI6IjVjLTROS1pTTlFjUjFUOHFONlNqd2dkUFpRMEdlMTJZbHhfWWVHQUozNWsifX0.eyJpYXQiOjE3MDQ4NDA4OTYsImV4cCI6MTcwNDg0NDg1NiwibmJmIjoxNzA0ODQwODk2LCJpc3MiOiJodHRwczovL3dpcmUuZXhhbXBsZS5jb20vY2xpZW50cy8zMTQ4NDU5OTAxMDAxMzA2NjUvYWNjZXNzLXRva2VuIiwic3ViIjoid2lyZWFwcDovL0pyajNhZjZZUTdlZlhxSVBhM0tUZnchNDVlOGVjMjg2ZGZkYjY5QHdpcmUuY29tIiwiYXVkIjoiaHR0cHM6Ly93aXJlLmV4YW1wbGUuY29tL2NsaWVudHMvMzE0ODQ1OTkwMTAwMTMwNjY1L2FjY2Vzcy10b2tlbiIsImp0aSI6IjI2MjUxNzgzLWUxNDItNDNhNC04ZWE5LWU0MTk3MTJmYjE0MSIsIm5vbmNlIjoiY1hKVU9EUnROemxzWmtocGQwOHhSVEpTVHpSVFowWnBiRGhLWkZKUFdYayIsImNoYWwiOiJiRzlZYVRObk4yUTJiVU5IVEhWb016aHRaREo1WTNSQ05VaFZaR3hXUjBvIiwiY25mIjp7ImtpZCI6IlFBdjZDOXE0N0N5ZmQxdTl6NnVYM1Zfby10MTFTOHA4MXdMSC1vVFJsaDAifSwicHJvb2YiOiJleUpoYkdjaU9pSkZaRVJUUVNJc0luUjVjQ0k2SW1Sd2IzQXJhbmQwSWl3aWFuZHJJanA3SW10MGVTSTZJazlMVUNJc0ltTnlkaUk2SWtWa01qVTFNVGtpTENKNElqb2laMk5VUWpCQmRHUjNkR0pqYmxoUFNtaHlTM2RKWmpob1F6ZFNVR2xtZEV0bFEzSjFUMmRpUVRCRVl5SjlmUS5leUpwWVhRaU9qRTNNRFE0TkRBNE9UWXNJbVY0Y0NJNk1UY3dORGt6TURnNU5pd2libUptSWpveE56QTBPRFF3T0RrMkxDSnpkV0lpT2lKM2FYSmxZWEJ3T2k4dlNuSnFNMkZtTmxsUk4yVm1XSEZKVUdFelMxUm1keUUwTldVNFpXTXlPRFprWm1SaU5qbEFkMmx5WlM1amIyMGlMQ0pxZEdraU9pSTBPVEl4WW1FMk5DMWhOVE0yTFRRd05qSXRZamhoTkMwNVpHVXlaR1l3WlRBMlpEWWlMQ0p1YjI1alpTSTZJbU5ZU2xWUFJGSjBUbnBzYzFwcmFIQmtNRGg0VWxSS1UxUjZVbFJhTUZwd1lrUm9TMXBHU2xCWFdHc2lMQ0pvZEcwaU9pSlFUMU5VSWl3aWFIUjFJam9pYUhSMGNITTZMeTkzYVhKbExtVjRZVzF3YkdVdVkyOXRMMk5zYVdWdWRITXZNekUwT0RRMU9Ua3dNVEF3TVRNd05qWTFMMkZqWTJWemN5MTBiMnRsYmlJc0ltTm9ZV3dpT2lKaVJ6bFpZVlJPYms0eVVUSmlWVTVJVkVoV2IwMTZhSFJhUkVvMVdUTlNRMDVWYUZaYVIzaFhVakJ2SWl3aWFHRnVaR3hsSWpvaWQybHlaV0Z3Y0Rvdkx5VTBNR0psYkhSeVlXMWZkMmx5WlVCM2FYSmxMbU52YlNJc0luUmxZVzBpT2lKM2FYSmxJbjAuUGVMaXEtZWlVWXhDREszT3dHMGtsN25lR0RQYUhtYW5KY1BlOEJOZ0pJemRHUm1nVEE1UVZQNTJsdzcwendJcy0yZ0JZTWxyOVVPb1VXX1l1bnN4RHciLCJjbGllbnRfaWQiOiJ3aXJlYXBwOi8vSnJqM2FmNllRN2VmWHFJUGEzS1RmdyE0NWU4ZWMyODZkZmRiNjlAd2lyZS5jb20iLCJhcGlfdmVyc2lvbiI6NSwic2NvcGUiOiJ3aXJlX2NsaWVudF9pZCJ9.VwMJGkXRaP0lC9UDe5iGU8fxOSeBKCXfHXhqcbu_n5JiP5b7WTJAymiCFmVyAaKWZIK6S9qxncqSj5AUPAfQAg`
+	maxExpiry := ""
+	ch := &Challenge{}
+
+	at, dpop, err := parseAndVerifyAccess(token, key, issuer, kid, wireID, maxExpiry, ch)
+	require.NoError(t, err)
+
+	fmt.Println(fmt.Sprintf("%#+v", at))
+	fmt.Println(fmt.Sprintf("%#+v", dpop))
+
+	t.Fail()
+
+	// tests := []struct {
+	// 	name    string
+	// 	wantErr bool
+	// }{
+	// 	// TODO: Add test cases.
+	// }
+	// for _, tt := range tests {
+	// 	t.Run(tt.name, func(t *testing.T) {
+	// 		if err := wireVerifyAccess(); (err != nil) != tt.wantErr {
+	// 			t.Errorf("wireVerifyAccess() error = %v, wantErr %v", err, tt.wantErr)
+	// 		}
+	// 	})
+	// }
 }
