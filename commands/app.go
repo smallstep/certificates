@@ -18,6 +18,7 @@ import (
 	"github.com/smallstep/certificates/authority/provisioner"
 	"github.com/smallstep/certificates/ca"
 	"github.com/smallstep/certificates/db"
+	"github.com/smallstep/certificates/internal/meter"
 	"github.com/smallstep/certificates/pki"
 	"github.com/urfave/cli"
 	"go.step.sm/cli-utils/errs"
@@ -244,14 +245,20 @@ To get a linked authority token:
 		}
 	}
 
-	srv, err := ca.New(cfg,
+	caOpts := []ca.Option{
 		ca.WithConfigFile(configFile),
 		ca.WithPassword(password),
 		ca.WithSSHHostPassword(sshHostPassword),
 		ca.WithSSHUserPassword(sshUserPassword),
 		ca.WithIssuerPassword(issuerPassword),
 		ca.WithLinkedCAToken(token),
-		ca.WithQuiet(quiet))
+		ca.WithQuiet(quiet),
+	}
+	if cfg.ServeMetrics {
+		caOpts = append(caOpts, ca.WithMeter(new(meter.M)))
+	}
+
+	srv, err := ca.New(cfg, caOpts...)
 	if err != nil {
 		fatal(err)
 	}

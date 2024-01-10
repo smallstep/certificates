@@ -381,3 +381,11 @@ func readCertificateBundle(pemCerts []byte) ([]*x509.Certificate, error) {
 	}
 	return certs, nil
 }
+
+// WithHooks is an option that sets the authority's [Hooks] to the provided ones.
+func WithHooks(h Hooks) Option {
+	return func(a *Authority) error {
+		a.hooks = h
+		return nil
+	}
+}

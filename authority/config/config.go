@@ -83,6 +83,7 @@ type Config struct {
 	Templates        *templates.Templates `json:"templates,omitempty"`
 	CommonName       string               `json:"commonName,omitempty"`
 	CRL              *CRLConfig           `json:"crl,omitempty"`
+	ServeMetrics     bool                 `json:"serveMetrics"`
 	SkipValidation   bool                 `json:"-"`
 
 	// Keeps record of the filename the Config is read from
