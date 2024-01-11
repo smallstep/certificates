@@ -370,7 +370,7 @@ func wireOIDC01Validate(ctx context.Context, ch *Challenge, db DB, jwk *jose.JSO
 			"error unmarshalling Wire challenge payload"))
 	}
 
-	oidcOptions := prov.GetOptions().GetOIDCOptions()
+	oidcOptions := prov.GetOptions().GetWireOptions().GetOIDCOptions()
 	idToken, err := oidcOptions.GetProvider(ctx).Verifier(oidcOptions.GetConfig()).Verify(ctx, oidcPayload.IDToken)
 	if err != nil {
 		return storeError(ctx, db, ch, false, WrapError(ErrorRejectedIdentifierType, err,
@@ -474,7 +474,7 @@ func wireDPOP01Validate(ctx context.Context, ch *Challenge, db DB, jwk *jose.JSO
 		return WrapErrorISE(err, "error parsing device id")
 	}
 
-	dpopOptions := prov.GetOptions().GetDPOPOptions()
+	dpopOptions := prov.GetOptions().GetWireOptions().GetDPOPOptions()
 
 	issuer, err := dpopOptions.GetTarget(clientID.DeviceID)
 	if err != nil {

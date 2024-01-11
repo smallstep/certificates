@@ -286,9 +286,9 @@ func newAuthorization(ctx context.Context, az *acme.Authorization) error {
 			var targetProvider interface{ GetTarget(string) (string, error) }
 			switch typ {
 			case acme.WIREOIDC01:
-				targetProvider = prov.GetOptions().GetOIDCOptions()
+				targetProvider = prov.GetOptions().GetWireOptions().GetOIDCOptions()
 			case acme.WIREDPOP01:
-				targetProvider = prov.GetOptions().GetDPOPOptions()
+				targetProvider = prov.GetOptions().GetWireOptions().GetDPOPOptions()
 			default:
 				return acme.NewError(acme.ErrorMalformedType, "unsupported type %q", typ)
 			}

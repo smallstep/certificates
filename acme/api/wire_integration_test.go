@@ -26,6 +26,7 @@ import (
 	"github.com/smallstep/certificates/acme/db/nosql"
 	"github.com/smallstep/certificates/authority"
 	"github.com/smallstep/certificates/authority/provisioner"
+	"github.com/smallstep/certificates/authority/provisioner/wire"
 	nosqlDB "github.com/smallstep/nosql"
 	"github.com/stretchr/testify/require"
 	"go.step.sm/crypto/jose"
@@ -51,26 +52,28 @@ func newWireProvisionerWithOptions(t *testing.T, options *provisioner.Options) *
 
 func TestWireIntegration(t *testing.T) {
 	prov := newWireProvisionerWithOptions(t, &provisioner.Options{
-		OIDC: &provisioner.OIDCOptions{
-			Provider: provisioner.ProviderJSON{
-				IssuerURL:   "",
-				AuthURL:     "",
-				TokenURL:    "",
-				JWKSURL:     "",
-				UserInfoURL: "",
-				Algorithms:  []string{},
+		Wire: &wire.Options{
+			OIDC: &wire.OIDCOptions{
+				Provider: wire.ProviderJSON{
+					IssuerURL:   "",
+					AuthURL:     "",
+					TokenURL:    "",
+					JWKSURL:     "",
+					UserInfoURL: "",
+					Algorithms:  []string{},
+				},
+				Config: wire.ConfigJSON{
+					ClientID:                   "integration test",
+					SupportedSigningAlgs:       []string{},
+					SkipClientIDCheck:          true,
+					SkipExpiryCheck:            true,
+					SkipIssuerCheck:            true,
+					InsecureSkipSignatureCheck: true,
+					Now:                        time.Now,
+				},
 			},
-			Config: provisioner.ConfigJSON{
-				ClientID:                   "integration test",
-				SupportedSigningAlgs:       []string{},
-				SkipClientIDCheck:          true,
-				SkipExpiryCheck:            true,
-				SkipIssuerCheck:            true,
-				InsecureSkipSignatureCheck: true,
-				Now:                        time.Now,
-			},
+			DPOP: &wire.DPOPOptions{},
 		},
-		DPOP: &provisioner.DPOPOptions{},
 	})
 
 	// mock provisioner and linker

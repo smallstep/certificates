@@ -24,6 +24,7 @@ import (
 	"github.com/smallstep/certificates/acme"
 	"github.com/smallstep/certificates/authority/policy"
 	"github.com/smallstep/certificates/authority/provisioner"
+	"github.com/smallstep/certificates/authority/provisioner/wire"
 )
 
 func TestNewOrderRequest_Validate(t *testing.T) {
@@ -1716,26 +1717,28 @@ func TestHandler_NewOrder(t *testing.T) {
 		},
 		"ok/default-naf-nbf-wireapp": func(t *testing.T) test {
 			acmeWireProv := newWireProvisionerWithOptions(t, &provisioner.Options{
-				OIDC: &provisioner.OIDCOptions{
-					Provider: provisioner.ProviderJSON{
-						IssuerURL:   "",
-						AuthURL:     "",
-						TokenURL:    "",
-						JWKSURL:     "",
-						UserInfoURL: "",
-						Algorithms:  []string{},
+				Wire: &wire.Options{
+					OIDC: &wire.OIDCOptions{
+						Provider: wire.ProviderJSON{
+							IssuerURL:   "",
+							AuthURL:     "",
+							TokenURL:    "",
+							JWKSURL:     "",
+							UserInfoURL: "",
+							Algorithms:  []string{},
+						},
+						Config: wire.ConfigJSON{
+							ClientID:                   "integration test",
+							SupportedSigningAlgs:       []string{},
+							SkipClientIDCheck:          true,
+							SkipExpiryCheck:            true,
+							SkipIssuerCheck:            true,
+							InsecureSkipSignatureCheck: true,
+							Now:                        time.Now,
+						},
 					},
-					Config: provisioner.ConfigJSON{
-						ClientID:                   "integration test",
-						SupportedSigningAlgs:       []string{},
-						SkipClientIDCheck:          true,
-						SkipExpiryCheck:            true,
-						SkipIssuerCheck:            true,
-						InsecureSkipSignatureCheck: true,
-						Now:                        time.Now,
-					},
+					DPOP: &wire.DPOPOptions{},
 				},
-				DPOP: &provisioner.DPOPOptions{},
 			})
 			acc := &acme.Account{ID: "accID"}
 			nor := &NewOrderRequest{
