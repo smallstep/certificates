@@ -14,7 +14,7 @@ func (o *Options) GetOIDCOptions() *OIDCOptions {
 	return o.OIDC
 }
 
-// GetDPOPOptions returns the OIDC options.
+// GetDPOPOptions returns the DPoP options.
 func (o *Options) GetDPOPOptions() *DPOPOptions {
 	if o == nil {
 		return nil

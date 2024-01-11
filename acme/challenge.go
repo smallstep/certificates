@@ -584,6 +584,9 @@ func parseAndVerifyWireAccessToken(v verifyParams) (*wireAccessToken, *wireDpopT
 	if accessToken.ClientID != v.wireID.ClientID {
 		return nil, nil, fmt.Errorf("invalid Wire client ID %q", accessToken.ClientID)
 	}
+	if accessToken.Expiry.Time().After(v.t.Add(time.Hour * 24 * 365)) {
+		return nil, nil, fmt.Errorf("'exp' %s is too far into the future", accessToken.Expiry.Time().String())
+	}
 
 	dpopJWT, err := jose.ParseSigned(accessToken.Proof)
 	if err != nil {
@@ -593,6 +596,8 @@ func parseAndVerifyWireAccessToken(v verifyParams) (*wireAccessToken, *wireDpopT
 	if err := dpopJWT.UnsafeClaimsWithoutVerification(&dpopToken); err != nil {
 		return nil, nil, fmt.Errorf("failed parsing Wire DPoP token: %w", err)
 	}
+
+	// TODO(hs): DPoP verification
 
 	challenge, ok := dpopToken["chal"].(string)
 	if !ok {
@@ -609,11 +614,6 @@ func parseAndVerifyWireAccessToken(v verifyParams) (*wireAccessToken, *wireDpopT
 	if handle != v.wireID.Handle {
 		return nil, nil, fmt.Errorf("invalid Wire client handle %q", handle)
 	}
-
-	// TODO(hs): what to do with max expiry?
-	// maxExpiry:= strconv.FormatInt(time.Now().Add(time.Hour*24*365).Unix(), 10),
-	// 	"--max-expiry",
-	// 	expiry,
 
 	return &accessToken, &dpopToken, nil
 }
