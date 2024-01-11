@@ -2,23 +2,31 @@ package wire
 
 import (
 	"bytes"
+	"crypto"
 	"errors"
 	"fmt"
 	"text/template"
+
+	"go.step.sm/crypto/pemutil"
 )
 
 type DPOPOptions struct {
 	// Public part of the  signing key for DPoP access token
-	SigningKey string `json:"key"`
+	SigningKey []byte `json:"key"`
 	// URI template acme client must call to fetch the DPoP challenge proof (an access token from wire-server)
 	Target string `json:"target"`
 }
 
-func (o *DPOPOptions) GetSigningKey() string {
+func (o *DPOPOptions) GetSigningKey() crypto.PublicKey {
 	if o == nil {
-		return ""
+		return nil
 	}
-	return o.SigningKey
+	k, err := pemutil.Parse(o.SigningKey) // TODO(hs): do this once?
+	if err != nil {
+		return nil
+	}
+
+	return k
 }
 
 func (o *DPOPOptions) GetTarget() string {
@@ -44,6 +52,9 @@ func (o *DPOPOptions) EvaluateTarget(deviceID string) (string, error) {
 }
 
 func (o *DPOPOptions) validate() error {
+	if _, err := pemutil.Parse(o.SigningKey); err != nil {
+		return fmt.Errorf("failed parsing key: %w", err)
+	}
 	if _, err := template.New("DeviceID").Parse(o.GetTarget()); err != nil {
 		return fmt.Errorf("failed parsing template: %w", err)
 	}

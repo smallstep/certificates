@@ -51,6 +51,9 @@ func newWireProvisionerWithOptions(t *testing.T, options *provisioner.Options) *
 }
 
 func TestWireIntegration(t *testing.T) {
+	fakeKey := `-----BEGIN PUBLIC KEY-----
+MCowBQYDK2VwAyEA5c+4NKZSNQcR1T8qN6SjwgdPZQ0Ge12Ylx/YeGAJ35k=
+-----END PUBLIC KEY-----`
 	prov := newWireProvisionerWithOptions(t, &provisioner.Options{
 		Wire: &wire.Options{
 			OIDC: &wire.OIDCOptions{
@@ -72,7 +75,9 @@ func TestWireIntegration(t *testing.T) {
 					Now:                        time.Now,
 				},
 			},
-			DPOP: &wire.DPOPOptions{},
+			DPOP: &wire.DPOPOptions{
+				SigningKey: []byte(fakeKey),
+			},
 		},
 	})
 

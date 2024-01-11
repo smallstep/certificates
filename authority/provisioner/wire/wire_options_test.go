@@ -8,6 +8,10 @@ import (
 )
 
 func TestOptions_Validate(t *testing.T) {
+	key := []byte(`-----BEGIN PUBLIC KEY-----
+MCowBQYDK2VwAyEA5c+4NKZSNQcR1T8qN6SjwgdPZQ0Ge12Ylx/YeGAJ35k=
+-----END PUBLIC KEY-----`)
+
 	type fields struct {
 		OIDC *OIDCOptions
 		DPOP *DPOPOptions
@@ -26,7 +30,9 @@ func TestOptions_Validate(t *testing.T) {
 					},
 					Config: &Config{},
 				},
-				DPOP: &DPOPOptions{},
+				DPOP: &DPOPOptions{
+					SigningKey: key,
+				},
 			},
 			expectedErr: nil,
 		},
@@ -91,6 +97,22 @@ func TestOptions_Validate(t *testing.T) {
 			expectedErr: errors.New("no DPoP options available"),
 		},
 		{
+			name: "fail/invalid-key",
+			fields: fields{
+				OIDC: &OIDCOptions{
+					Provider: &Provider{
+						IssuerURL: "https://example.com",
+					},
+					Config: &Config{},
+				},
+				DPOP: &DPOPOptions{
+					SigningKey: []byte{0x00},
+					Target:     "",
+				},
+			},
+			expectedErr: errors.New(`failed validating DPoP options: failed parsing key: error decoding PEM: not a valid PEM encoded block`),
+		},
+		{
 			name: "fail/target-template",
 			fields: fields{
 				OIDC: &OIDCOptions{
@@ -100,7 +122,8 @@ func TestOptions_Validate(t *testing.T) {
 					Config: &Config{},
 				},
 				DPOP: &DPOPOptions{
-					Target: "{{}",
+					SigningKey: key,
+					Target:     "{{}",
 				},
 			},
 			expectedErr: errors.New(`failed validating DPoP options: failed parsing template: template: DeviceID:1: unexpected "}" in command`),

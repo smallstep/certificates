@@ -34,6 +34,7 @@ import (
 	"go.step.sm/crypto/jose"
 	"go.step.sm/crypto/keyutil"
 	"go.step.sm/crypto/minica"
+	"go.step.sm/crypto/pemutil"
 	"go.step.sm/crypto/x509util"
 
 	"github.com/smallstep/certificates/acme/wire"
@@ -4305,10 +4306,11 @@ func createSubjectAltNameExtension(dnsNames, emailAddresses x509util.MultiString
 }
 
 func Test_parseAndVerifyWireAccessToken(t *testing.T) {
-	key := `
------BEGIN PUBLIC KEY-----
+	key := `-----BEGIN PUBLIC KEY-----
 MCowBQYDK2VwAyEA5c+4NKZSNQcR1T8qN6SjwgdPZQ0Ge12Ylx/YeGAJ35k=
------END PUBLIC KEY-----` // TODO(hs): different format?
+-----END PUBLIC KEY-----`
+	publicKey, err := pemutil.Parse([]byte(key))
+	require.NoError(t, err)
 	issuer := "https://wire.example.com/clients/314845990100130665/access-token"
 	kid := "QAv6C9q47Cyfd1u9z6uX3V_o-t11S8p81wLH-oTRlh0"
 	wireID := wire.ID{
@@ -4327,7 +4329,7 @@ MCowBQYDK2VwAyEA5c+4NKZSNQcR1T8qN6SjwgdPZQ0Ge12Ylx/YeGAJ35k=
 
 	at, dpop, err := parseAndVerifyWireAccessToken(verifyParams{
 		token:     token,
-		key:       key,
+		key:       publicKey,
 		kid:       kid,
 		issuer:    issuer,
 		wireID:    wireID,

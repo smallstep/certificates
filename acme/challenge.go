@@ -490,10 +490,9 @@ func wireDPOP01Validate(ctx context.Context, ch *Challenge, db DB, jwk *jose.JSO
 		return WrapErrorISE(err, "invalid Go template registered for 'target'")
 	}
 
-	key := dpopOptions.GetSigningKey()
 	params := verifyParams{
 		token:     dpopPayload.AccessToken,
-		key:       key,
+		key:       dpopOptions.GetSigningKey(),
 		kid:       kid,
 		issuer:    issuer,
 		wireID:    wireID,
@@ -548,7 +547,7 @@ type wireDpopToken map[string]any
 
 type verifyParams struct {
 	token     string
-	key       string
+	key       crypto.PublicKey
 	issuer    string
 	kid       string
 	wireID    wire.ID
@@ -557,23 +556,13 @@ type verifyParams struct {
 }
 
 func parseAndVerifyWireAccessToken(v verifyParams) (*wireAccessToken, *wireDpopToken, error) {
-	k, err := pemutil.Parse([]byte(v.key)) // TODO(hs): move this to earlier in the configuration process? Do it once?
-	if err != nil {
-		return nil, nil, fmt.Errorf("failed parsing public key: %w", err)
-	}
-
-	pk, ok := k.(ed25519.PublicKey) // TODO(hs): allow more key types
-	if !ok {
-		return nil, nil, fmt.Errorf("unexpected type: %T", k)
-	}
-
 	jwt, err := jose.ParseSigned(v.token)
 	if err != nil {
 		return nil, nil, fmt.Errorf("failed parsing token: %w", err)
 	}
 
 	var accessToken wireAccessToken
-	if err = jwt.Claims(pk, &accessToken); err != nil {
+	if err = jwt.Claims(v.key, &accessToken); err != nil {
 		return nil, nil, fmt.Errorf("failed getting token claims: %w", err)
 	}
 
