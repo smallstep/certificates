@@ -482,8 +482,16 @@ func wireDPOP01Validate(ctx context.Context, ch *Challenge, db DB, jwk *jose.JSO
 	}
 
 	key := dpopOptions.GetSigningKey()
-	expiry := strconv.FormatInt(time.Now().Add(time.Hour*24*365).Unix(), 10)
-	_, dpop, err := parseAndVerifyAccess(dpopPayload.AccessToken, key, issuer, kid, wireID, expiry, ch) // TODO: right format for key in config?
+	params := verifyParams{
+		token:     dpopPayload.AccessToken,
+		key:       key,
+		kid:       kid,
+		issuer:    issuer,
+		wireID:    wireID,
+		challenge: ch,
+		t:         clock.Now().UTC(),
+	}
+	_, dpop, err := parseAndVerifyWireAccessToken(params)
 	if err != nil {
 		return WrapErrorISE(err, "failed validating token")
 	}
@@ -529,8 +537,18 @@ type wireAccessToken struct {
 
 type wireDpopToken map[string]any
 
-func parseAndVerifyAccess(token string, key string, issuer string, kid string, wireID wire.ID, maxExpiry string, ch *Challenge) (*wireAccessToken, *wireDpopToken, error) {
-	k, err := pemutil.Parse([]byte(key)) // TODO(hs): move this to earlier in the configuration process? Do it once?
+type verifyParams struct {
+	token     string
+	key       string
+	issuer    string
+	kid       string
+	wireID    wire.ID
+	challenge *Challenge
+	t         time.Time
+}
+
+func parseAndVerifyWireAccessToken(v verifyParams) (*wireAccessToken, *wireDpopToken, error) {
+	k, err := pemutil.Parse([]byte(v.key)) // TODO(hs): move this to earlier in the configuration process? Do it once?
 	if err != nil {
 		return nil, nil, fmt.Errorf("failed parsing public key: %w", err)
 	}
@@ -540,7 +558,7 @@ func parseAndVerifyAccess(token string, key string, issuer string, kid string, w
 		return nil, nil, fmt.Errorf("unexpected type: %T", k)
 	}
 
-	jwt, err := jose.ParseSigned(token)
+	jwt, err := jose.ParseSigned(v.token)
 	if err != nil {
 		return nil, nil, fmt.Errorf("failed parsing token: %w", err)
 	}
@@ -550,12 +568,9 @@ func parseAndVerifyAccess(token string, key string, issuer string, kid string, w
 		return nil, nil, fmt.Errorf("failed getting token claims: %w", err)
 	}
 
-	fmt.Println(fmt.Sprintf("%#+v", jwt))
-	fmt.Println(fmt.Sprintf("%#+v", accessToken))
-
 	if err := accessToken.ValidateWithLeeway(jose.Expected{
-		Time:   time.Now().UTC(),
-		Issuer: issuer,
+		Time:   v.t,
+		Issuer: v.issuer,
 	}, 360*time.Second); err != nil {
 		return nil, nil, fmt.Errorf("failed validation: %w", err)
 	}
@@ -564,12 +579,12 @@ func parseAndVerifyAccess(token string, key string, issuer string, kid string, w
 		return nil, nil, errors.New("'cnf' is nil")
 	}
 
-	if accessToken.Cnf.Kid != kid {
-		return nil, nil, fmt.Errorf("expected kid %q; got %q", kid, accessToken.Cnf.Kid)
+	if accessToken.Cnf.Kid != v.kid {
+		return nil, nil, fmt.Errorf("expected kid %q; got %q", v.kid, accessToken.Cnf.Kid)
 	}
 
-	if accessToken.ClientID != wireID.ClientID {
-		return nil, nil, fmt.Errorf("invalid client ID %q", accessToken.ClientID)
+	if accessToken.ClientID != v.wireID.ClientID {
+		return nil, nil, fmt.Errorf("invalid Wire client ID %q", accessToken.ClientID)
 	}
 
 	parsedDpopToken, err := jose.ParseSigned(accessToken.Proof)
@@ -578,17 +593,20 @@ func parseAndVerifyAccess(token string, key string, issuer string, kid string, w
 	}
 	var dpopToken wireDpopToken
 	if err := parsedDpopToken.UnsafeClaimsWithoutVerification(&dpopToken); err != nil {
-		return nil, nil, fmt.Errorf("failed parsing dpop token: %w", err)
+		return nil, nil, fmt.Errorf("failed parsing Wire DPoP token: %w", err)
 	}
 
-	// TODO: validate DPoP too? Which key?
+	// TODO: validate DPoP too? Which key(s)?
 
 	handle, ok := dpopToken["handle"].(string)
 	if !ok {
-		return nil, nil, fmt.Errorf("invalid handle in dpop token")
+		return nil, nil, fmt.Errorf("invalid handle in Wire DPoP token")
 	}
 
 	_ = handle
+
+	// TODO(hs): what to do with max expiry?
+	// maxExpiry:= strconv.FormatInt(time.Now().Add(time.Hour*24*365).Unix(), 10),
 
 	// TODO: compare handle?
 	// TODO: compare challenge token / value?

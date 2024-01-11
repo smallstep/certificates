@@ -4304,37 +4304,55 @@ func createSubjectAltNameExtension(dnsNames, emailAddresses x509util.MultiString
 	}, nil
 }
 
-func Test_wireVerifyAccess(t *testing.T) {
+func Test_parseAndVerifyWireAccessToken(t *testing.T) {
 	key := `
 -----BEGIN PUBLIC KEY-----
 MCowBQYDK2VwAyEA5c+4NKZSNQcR1T8qN6SjwgdPZQ0Ge12Ylx/YeGAJ35k=
------END PUBLIC KEY-----`
+-----END PUBLIC KEY-----` // TODO(hs): different format?
 	issuer := "https://wire.example.com/clients/314845990100130665/access-token"
-	kid := ""
-	wireID := wire.ID{}
+	kid := "QAv6C9q47Cyfd1u9z6uX3V_o-t11S8p81wLH-oTRlh0"
+	wireID := wire.ID{
+		ClientID: "wireapp://Jrj3af6YQ7efXqIPa3KTfw!45e8ec286dfdb69@wire.com",
+	}
 	token := `eyJhbGciOiJFZERTQSIsInR5cCI6ImF0K2p3dCIsImp3ayI6eyJrdHkiOiJPS1AiLCJjcnYiOiJFZDI1NTE5IiwieCI6IjVjLTROS1pTTlFjUjFUOHFONlNqd2dkUFpRMEdlMTJZbHhfWWVHQUozNWsifX0.eyJpYXQiOjE3MDQ4NDA4OTYsImV4cCI6MTcwNDg0NDg1NiwibmJmIjoxNzA0ODQwODk2LCJpc3MiOiJodHRwczovL3dpcmUuZXhhbXBsZS5jb20vY2xpZW50cy8zMTQ4NDU5OTAxMDAxMzA2NjUvYWNjZXNzLXRva2VuIiwic3ViIjoid2lyZWFwcDovL0pyajNhZjZZUTdlZlhxSVBhM0tUZnchNDVlOGVjMjg2ZGZkYjY5QHdpcmUuY29tIiwiYXVkIjoiaHR0cHM6Ly93aXJlLmV4YW1wbGUuY29tL2NsaWVudHMvMzE0ODQ1OTkwMTAwMTMwNjY1L2FjY2Vzcy10b2tlbiIsImp0aSI6IjI2MjUxNzgzLWUxNDItNDNhNC04ZWE5LWU0MTk3MTJmYjE0MSIsIm5vbmNlIjoiY1hKVU9EUnROemxzWmtocGQwOHhSVEpTVHpSVFowWnBiRGhLWkZKUFdYayIsImNoYWwiOiJiRzlZYVRObk4yUTJiVU5IVEhWb016aHRaREo1WTNSQ05VaFZaR3hXUjBvIiwiY25mIjp7ImtpZCI6IlFBdjZDOXE0N0N5ZmQxdTl6NnVYM1Zfby10MTFTOHA4MXdMSC1vVFJsaDAifSwicHJvb2YiOiJleUpoYkdjaU9pSkZaRVJUUVNJc0luUjVjQ0k2SW1Sd2IzQXJhbmQwSWl3aWFuZHJJanA3SW10MGVTSTZJazlMVUNJc0ltTnlkaUk2SWtWa01qVTFNVGtpTENKNElqb2laMk5VUWpCQmRHUjNkR0pqYmxoUFNtaHlTM2RKWmpob1F6ZFNVR2xtZEV0bFEzSjFUMmRpUVRCRVl5SjlmUS5leUpwWVhRaU9qRTNNRFE0TkRBNE9UWXNJbVY0Y0NJNk1UY3dORGt6TURnNU5pd2libUptSWpveE56QTBPRFF3T0RrMkxDSnpkV0lpT2lKM2FYSmxZWEJ3T2k4dlNuSnFNMkZtTmxsUk4yVm1XSEZKVUdFelMxUm1keUUwTldVNFpXTXlPRFprWm1SaU5qbEFkMmx5WlM1amIyMGlMQ0pxZEdraU9pSTBPVEl4WW1FMk5DMWhOVE0yTFRRd05qSXRZamhoTkMwNVpHVXlaR1l3WlRBMlpEWWlMQ0p1YjI1alpTSTZJbU5ZU2xWUFJGSjBUbnBzYzFwcmFIQmtNRGg0VWxSS1UxUjZVbFJhTUZwd1lrUm9TMXBHU2xCWFdHc2lMQ0pvZEcwaU9pSlFUMU5VSWl3aWFIUjFJam9pYUhSMGNITTZMeTkzYVhKbExtVjRZVzF3YkdVdVkyOXRMMk5zYVdWdWRITXZNekUwT0RRMU9Ua3dNVEF3TVRNd05qWTFMMkZqWTJWemN5MTBiMnRsYmlJc0ltTm9ZV3dpT2lKaVJ6bFpZVlJPYms0eVVUSmlWVTVJVkVoV2IwMTZhSFJhUkVvMVdUTlNRMDVWYUZaYVIzaFhVakJ2SWl3aWFHRnVaR3hsSWpvaWQybHlaV0Z3Y0Rvdkx5VTBNR0psYkhSeVlXMWZkMmx5WlVCM2FYSmxMbU52YlNJc0luUmxZVzBpT2lKM2FYSmxJbjAuUGVMaXEtZWlVWXhDREszT3dHMGtsN25lR0RQYUhtYW5KY1BlOEJOZ0pJemRHUm1nVEE1UVZQNTJsdzcwendJcy0yZ0JZTWxyOVVPb1VXX1l1bnN4RHciLCJjbGllbnRfaWQiOiJ3aXJlYXBwOi8vSnJqM2FmNllRN2VmWHFJUGEzS1RmdyE0NWU4ZWMyODZkZmRiNjlAd2lyZS5jb20iLCJhcGlfdmVyc2lvbiI6NSwic2NvcGUiOiJ3aXJlX2NsaWVudF9pZCJ9.VwMJGkXRaP0lC9UDe5iGU8fxOSeBKCXfHXhqcbu_n5JiP5b7WTJAymiCFmVyAaKWZIK6S9qxncqSj5AUPAfQAg`
-	maxExpiry := ""
-	ch := &Challenge{}
+	ch := &Challenge{} // TODO(hs): fill after adding validation
 
-	at, dpop, err := parseAndVerifyAccess(token, key, issuer, kid, wireID, maxExpiry, ch)
+	issuedAtUnix, err := strconv.ParseInt("1704840896", 10, 64)
 	require.NoError(t, err)
+	issuedAt := time.Unix(issuedAtUnix, 0)
 
-	fmt.Println(fmt.Sprintf("%#+v", at))
-	fmt.Println(fmt.Sprintf("%#+v", dpop))
+	at, dpop, err := parseAndVerifyWireAccessToken(verifyParams{
+		token:     token,
+		key:       key,
+		kid:       kid,
+		issuer:    issuer,
+		wireID:    wireID,
+		challenge: ch,
+		t:         issuedAt.Add(1 * time.Minute),
+	})
+	if assert.NoError(t, err) {
+		// token assertions
+		assert.Equal(t, "26251783-e142-43a4-8ea9-e419712fb141", at.ID)
+		assert.Equal(t, "https://wire.example.com/clients/314845990100130665/access-token", at.Issuer)
+		assert.Equal(t, "wireapp://Jrj3af6YQ7efXqIPa3KTfw!45e8ec286dfdb69@wire.com", at.Subject)
+		assert.Contains(t, at.Audience, "https://wire.example.com/clients/314845990100130665/access-token")
+		assert.Equal(t, "bG9YaTNnN2Q2bUNHTHVoMzhtZDJ5Y3RCNUhVZGxWR0o", at.Challenge)
+		assert.Equal(t, "wireapp://Jrj3af6YQ7efXqIPa3KTfw!45e8ec286dfdb69@wire.com", at.ClientID)
+		assert.Equal(t, 5, at.APIVersion)
+		assert.Equal(t, "wire_client_id", at.Scope)
+		if assert.NotNil(t, at.Cnf) {
+			assert.Equal(t, "QAv6C9q47Cyfd1u9z6uX3V_o-t11S8p81wLH-oTRlh0", at.Cnf.Kid)
+		}
 
-	t.Fail()
-
-	// tests := []struct {
-	// 	name    string
-	// 	wantErr bool
-	// }{
-	// 	// TODO: Add test cases.
-	// }
-	// for _, tt := range tests {
-	// 	t.Run(tt.name, func(t *testing.T) {
-	// 		if err := wireVerifyAccess(); (err != nil) != tt.wantErr {
-	// 			t.Errorf("wireVerifyAccess() error = %v, wantErr %v", err, tt.wantErr)
-	// 		}
-	// 	})
-	// }
+		// dpop proof assertions
+		dt := *dpop
+		assert.Equal(t, "bG9YaTNnN2Q2bUNHTHVoMzhtZDJ5Y3RCNUhVZGxWR0o", dt["chal"].(string))
+		assert.Equal(t, "wireapp://%40beltram_wire@wire.com", dt["handle"].(string))
+		assert.Equal(t, "POST", dt["htm"].(string))
+		assert.Equal(t, "https://wire.example.com/clients/314845990100130665/access-token", dt["htu"].(string))
+		assert.Equal(t, "4921ba64-a536-4062-b8a4-9de2df0e06d6", dt["jti"].(string))
+		assert.Equal(t, "cXJUODRtNzlsZkhpd08xRTJSTzRTZ0ZpbDhKZFJPWXk", dt["nonce"].(string))
+		assert.Equal(t, "wireapp://Jrj3af6YQ7efXqIPa3KTfw!45e8ec286dfdb69@wire.com", dt["sub"].(string))
+		assert.Equal(t, "wire", dt["team"].(string))
+	}
 }
