@@ -282,13 +282,16 @@ func newAuthorization(ctx context.Context, az *acme.Authorization) error {
 			if err != nil {
 				return acme.WrapError(acme.ErrorMalformedType, err, "failed parsing ClientID")
 			}
-
+			wireOptions, err := prov.GetOptions().GetWireOptions()
+			if err != nil {
+				return acme.WrapErrorISE(err, "failed getting Wire options")
+			}
 			var targetProvider interface{ EvaluateTarget(string) (string, error) }
 			switch typ {
 			case acme.WIREOIDC01:
-				targetProvider = prov.GetOptions().GetWireOptions().GetOIDCOptions()
+				targetProvider = wireOptions.GetOIDCOptions()
 			case acme.WIREDPOP01:
-				targetProvider = prov.GetOptions().GetWireOptions().GetDPOPOptions()
+				targetProvider = wireOptions.GetDPOPOptions()
 			default:
 				return acme.NewError(acme.ErrorMalformedType, "unsupported type %q", typ)
 			}

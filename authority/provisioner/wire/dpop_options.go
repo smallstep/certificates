@@ -32,14 +32,20 @@ func (o *DPOPOptions) EvaluateTarget(deviceID string) (string, error) {
 	if o == nil {
 		return "", errors.New("misconfigured target template configuration")
 	}
-	targetTemplate := o.GetTarget()
-	tmpl, err := template.New("DeviceId").Parse(targetTemplate)
+	tmpl, err := template.New("DeviceID").Parse(o.GetTarget())
 	if err != nil {
 		return "", fmt.Errorf("failed parsing dpop template: %w", err)
 	}
 	buf := new(bytes.Buffer)
-	if err = tmpl.Execute(buf, struct{ DeviceId string }{DeviceId: deviceID}); err != nil { //nolint:revive,stylecheck // TODO(hs): this requires changes in configuration
+	if err = tmpl.Execute(buf, struct{ DeviceID string }{DeviceID: deviceID}); err != nil {
 		return "", fmt.Errorf("failed executing dpop template: %w", err)
 	}
 	return buf.String(), nil
+}
+
+func (o *DPOPOptions) validate() error {
+	if _, err := template.New("DeviceID").Parse(o.GetTarget()); err != nil {
+		return fmt.Errorf("failed parsing template: %w", err)
+	}
+	return nil
 }

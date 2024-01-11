@@ -59,27 +59,40 @@ func (o *OIDCOptions) GetConfig() *oidc.Config {
 	}
 }
 
+func (o *OIDCOptions) validate() error {
+	if o.Provider == nil {
+		return errors.New("provider not set")
+	}
+	if o.Provider.IssuerURL == "" {
+		return errors.New("issuer URL must not be empty")
+	}
+	if _, err := url.Parse(o.Provider.IssuerURL); err != nil {
+		return fmt.Errorf("failed parsing issuer URL: %w", err)
+	}
+	if _, err := template.New("DeviceID").Parse(o.Provider.IssuerURL); err != nil {
+		return fmt.Errorf("failed parsing template: %w", err)
+	}
+
+	return nil
+}
+
 func (o *OIDCOptions) EvaluateTarget(deviceID string) (string, error) {
 	if o == nil {
 		return "", errors.New("misconfigured target template configuration")
 	}
-	targetTemplate := o.Provider.IssuerURL
-	tmpl, err := template.New("DeviceId").Parse(targetTemplate)
+	tmpl, err := template.New("DeviceID").Parse(o.Provider.IssuerURL)
 	if err != nil {
-		return "", fmt.Errorf("failed parsing oidc template: %w", err)
+		return "", fmt.Errorf("failed parsing OIDC template: %w", err)
 	}
 	buf := new(bytes.Buffer)
-	if err = tmpl.Execute(buf, struct{ DeviceId string }{DeviceId: deviceID}); err != nil { //nolint:revive,stylecheck // TODO(hs): this requires changes in configuration
-		return "", fmt.Errorf("failed executing oidc template: %w", err)
+	if err = tmpl.Execute(buf, struct{ DeviceID string }{DeviceID: deviceID}); err != nil {
+		return "", fmt.Errorf("failed executing OIDC template: %w", err)
 	}
 	return buf.String(), nil
 }
 
 func toOIDCProviderConfig(in *Provider) *oidc.ProviderConfig {
-	issuerURL, err := url.Parse(in.IssuerURL)
-	if err != nil {
-		panic(err) // config error, it's ok to panic here
-	}
+	issuerURL, _ := url.Parse(in.IssuerURL) // NOTE: validation is performed in validate()
 	// Removes query params from the URL because we use it as a way to notify client about the actual OAuth ClientId
 	// for this provisioner.
 	// This URL is going to look like: "https://idp:5556/dex?clientid=foo"

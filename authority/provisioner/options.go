@@ -2,6 +2,7 @@ package provisioner
 
 import (
 	"encoding/json"
+	"fmt"
 	"strings"
 
 	"github.com/pkg/errors"
@@ -54,11 +55,14 @@ func (o *Options) GetSSHOptions() *SSHOptions {
 }
 
 // GetWireOptions returns the SSH options.
-func (o *Options) GetWireOptions() *wire.Options {
+func (o *Options) GetWireOptions() (*wire.Options, error) {
 	if o == nil {
-		return nil
+		return nil, errors.New("no Wire options available")
 	}
-	return o.Wire
+	if err := o.Wire.Validate(); err != nil {
+		return nil, fmt.Errorf("failed validating Wire options: %w", err)
+	}
+	return o.Wire, nil
 }
 
 // GetWebhooks returns the webhooks options.

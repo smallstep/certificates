@@ -55,7 +55,7 @@ func TestWireIntegration(t *testing.T) {
 		Wire: &wire.Options{
 			OIDC: &wire.OIDCOptions{
 				Provider: &wire.Provider{
-					IssuerURL:   "",
+					IssuerURL:   "https://issuer.example.com",
 					AuthURL:     "",
 					TokenURL:    "",
 					JWKSURL:     "",
