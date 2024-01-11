@@ -36,10 +36,9 @@ import (
 	"go.step.sm/crypto/pemutil"
 	"go.step.sm/crypto/x509util"
 	"golang.org/x/exp/slices"
-	"gopkg.in/square/go-jose.v2/jwt"
 
+	"github.com/smallstep/certificates/acme/wire"
 	"github.com/smallstep/certificates/authority/provisioner"
-	"github.com/smallstep/certificates/wire"
 )
 
 type ChallengeType string
@@ -390,8 +389,7 @@ func wireOIDC01Validate(ctx context.Context, ch *Challenge, db DB, jwk *jose.JSO
 		GivenName string `json:"given_name,omitempty"`
 		KeyAuth   string `json:"keyauth"` // TODO(hs): use this property instead of the one in the payload after https://github.com/wireapp/rusty-jwt-tools/tree/fix/keyauth is done
 	}
-	err = idToken.Claims(&claims)
-	if err != nil {
+	if err = idToken.Claims(&claims); err != nil {
 		return storeError(ctx, db, ch, false, WrapError(ErrorRejectedIdentifierType, err,
 			"error retrieving claims from ID token"))
 	}
@@ -423,28 +421,26 @@ func wireOIDC01Validate(ctx context.Context, ch *Challenge, db DB, jwk *jose.JSO
 		return WrapErrorISE(err, "error updating challenge")
 	}
 
-	parsedIDToken, err := jwt.ParseSigned(wireChallengePayload.IDToken)
+	parsedIDToken, err := jose.ParseSigned(wireChallengePayload.IDToken)
 	if err != nil {
-		return WrapErrorISE(err, "Invalid OIDC id token")
+		return WrapErrorISE(err, "invalid OIDC ID token")
 	}
 	oidcToken := make(map[string]interface{})
 	if err := parsedIDToken.UnsafeClaimsWithoutVerification(&oidcToken); err != nil {
-		return WrapErrorISE(err, "Failed parsing OIDC id token")
+		return WrapErrorISE(err, "failed parsing OIDC id token")
 	}
 
 	orders, err := db.GetAllOrdersByAccountID(ctx, ch.AccountID)
 	if err != nil {
-		return WrapErrorISE(err, "Could not find current order by account id")
+		return WrapErrorISE(err, "could not find current order by account id")
 	}
-
 	if len(orders) == 0 {
-		return WrapErrorISE(err, "There are not enough orders for this account for this custom OIDC challenge")
+		return NewErrorISE("there are not enough orders for this account for this custom OIDC challenge")
 	}
 
 	order := orders[len(orders)-1]
-
 	if err := db.CreateOidcToken(ctx, order, oidcToken); err != nil {
-		return WrapErrorISE(err, "Failed storing OIDC id token")
+		return WrapErrorISE(err, "failed storing OIDC id token")
 	}
 
 	return nil
@@ -456,19 +452,17 @@ func wireDPOP01Validate(ctx context.Context, ch *Challenge, db DB, jwk *jose.JSO
 		return NewErrorISE("missing provisioner")
 	}
 
-	rawKid, thumbprintErr := jwk.Thumbprint(crypto.SHA256)
-	if thumbprintErr != nil {
-		return storeError(ctx, db, ch, false, WrapError(ErrorServerInternalType, thumbprintErr, "failed to compute JWK thumbprint"))
+	rawKid, err := jwk.Thumbprint(crypto.SHA256)
+	if err != nil {
+		return storeError(ctx, db, ch, false, WrapError(ErrorServerInternalType, err, "failed to compute JWK thumbprint"))
 	}
-
 	kid := base64.RawURLEncoding.EncodeToString(rawKid)
 
 	dpopOptions := prov.GetOptions().GetDPOPOptions()
 	key := dpopOptions.GetSigningKey()
 
 	var wireChallengePayload WireChallengePayload
-	err := json.Unmarshal(payload, &wireChallengePayload)
-	if err != nil {
+	if err := json.Unmarshal(payload, &wireChallengePayload); err != nil {
 		return storeError(ctx, db, ch, false, WrapError(ErrorRejectedIdentifierType, err,
 			"error unmarshalling Wire challenge payload"))
 	}
@@ -485,7 +479,7 @@ func wireDPOP01Validate(ctx context.Context, ch *Challenge, db DB, jwk *jose.JSO
 
 	n, err := file.Write(buf.Bytes())
 	if err != nil {
-		return WrapErrorISE(err, "Failed writing signature key to temp file")
+		return WrapErrorISE(err, "failed writing signature key to temp file")
 	}
 	if n != buf.Len() {
 		return WrapErrorISE(err, "expected to write %d characters to the key file, got %d", buf.Len(), n)
@@ -503,7 +497,7 @@ func wireDPOP01Validate(ctx context.Context, ch *Challenge, db DB, jwk *jose.JSO
 
 	issuer, err := dpopOptions.GetTarget(clientID.DeviceID)
 	if err != nil {
-		return WrapErrorISE(err, "Invalid Go template registered for 'target'")
+		return WrapErrorISE(err, "invalid Go template registered for 'target'")
 	}
 
 	expiry := strconv.FormatInt(time.Now().Add(time.Hour*24*365).Unix(), 10)
@@ -565,42 +559,42 @@ func wireDPOP01Validate(ctx context.Context, ch *Challenge, db DB, jwk *jose.JSO
 		return WrapErrorISE(err, "error updating challenge")
 	}
 
-	parsedAccessToken, err := jwt.ParseSigned(wireChallengePayload.AccessToken)
+	parsedAccessToken, err := jose.ParseSigned(wireChallengePayload.AccessToken)
 	if err != nil {
-		return WrapErrorISE(err, "Invalid access token")
+		return WrapErrorISE(err, "invalid access token")
 	}
 	access := make(map[string]interface{})
 	if err := parsedAccessToken.UnsafeClaimsWithoutVerification(&access); err != nil {
-		return WrapErrorISE(err, "Failed parsing access token")
+		return WrapErrorISE(err, "failed parsing access token")
 	}
 
 	rawDpop, ok := access["proof"].(string)
 	if !ok {
-		return WrapErrorISE(err, "Invalid dpop proof format in access token")
+		return WrapErrorISE(err, "invalid dpop proof format in access token")
 	}
 
-	parsedDpopToken, err := jwt.ParseSigned(rawDpop)
+	parsedDpopToken, err := jose.ParseSigned(rawDpop)
 	if err != nil {
-		return WrapErrorISE(err, "Invalid DPoP token")
+		return WrapErrorISE(err, "invalid DPoP token")
 	}
 	dpop := make(map[string]interface{})
 	if err := parsedDpopToken.UnsafeClaimsWithoutVerification(&dpop); err != nil {
-		return WrapErrorISE(err, "Failed parsing dpop token")
+		return WrapErrorISE(err, "failed parsing dpop token")
 	}
 
 	orders, err := db.GetAllOrdersByAccountID(ctx, ch.AccountID)
 	if err != nil {
-		return WrapErrorISE(err, "Could not find current order by account id")
+		return WrapErrorISE(err, "could not find current order by account id")
 	}
 
 	if len(orders) == 0 {
-		return WrapErrorISE(err, "There are not enough orders for this account for this custom OIDC challenge")
+		return WrapErrorISE(err, "there are not enough orders for this account for this custom OIDC challenge")
 	}
 
 	order := orders[len(orders)-1]
 
 	if err := db.CreateDpopToken(ctx, order, dpop); err != nil {
-		return WrapErrorISE(err, "Failed storing DPoP token")
+		return WrapErrorISE(err, "failed storing DPoP token")
 	}
 
 	return nil

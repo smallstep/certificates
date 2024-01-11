@@ -17,8 +17,8 @@ import (
 	"go.step.sm/crypto/keyutil"
 	"go.step.sm/crypto/x509util"
 
+	"github.com/smallstep/certificates/acme/wire"
 	"github.com/smallstep/certificates/authority/provisioner"
-	"github.com/smallstep/certificates/wire"
 )
 
 type IdentifierType string
