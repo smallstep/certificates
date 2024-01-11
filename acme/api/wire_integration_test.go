@@ -54,7 +54,7 @@ func TestWireIntegration(t *testing.T) {
 	prov := newWireProvisionerWithOptions(t, &provisioner.Options{
 		Wire: &wire.Options{
 			OIDC: &wire.OIDCOptions{
-				Provider: wire.ProviderJSON{
+				Provider: &wire.Provider{
 					IssuerURL:   "",
 					AuthURL:     "",
 					TokenURL:    "",
@@ -62,7 +62,7 @@ func TestWireIntegration(t *testing.T) {
 					UserInfoURL: "",
 					Algorithms:  []string{},
 				},
-				Config: wire.ConfigJSON{
+				Config: &wire.Config{
 					ClientID:                   "integration test",
 					SupportedSigningAlgs:       []string{},
 					SkipClientIDCheck:          true,

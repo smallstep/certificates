@@ -8,10 +8,10 @@ import (
 )
 
 type DPOPOptions struct {
-	// Backend signing key for DPoP access token
+	// Public part of the  signing key for DPoP access token
 	SigningKey string `json:"key"`
 	// URI template acme client must call to fetch the DPoP challenge proof (an access token from wire-server)
-	DpopTarget string `json:"dpop-target"`
+	Target string `json:"target"`
 }
 
 func (o *DPOPOptions) GetSigningKey() string {
@@ -21,18 +21,18 @@ func (o *DPOPOptions) GetSigningKey() string {
 	return o.SigningKey
 }
 
-func (o *DPOPOptions) GetDPOPTarget() string {
+func (o *DPOPOptions) GetTarget() string {
 	if o == nil {
 		return ""
 	}
-	return o.DpopTarget
+	return o.Target
 }
 
-func (o *DPOPOptions) GetTarget(deviceID string) (string, error) {
+func (o *DPOPOptions) EvaluateTarget(deviceID string) (string, error) {
 	if o == nil {
 		return "", errors.New("misconfigured target template configuration")
 	}
-	targetTemplate := o.GetDPOPTarget()
+	targetTemplate := o.GetTarget()
 	tmpl, err := template.New("DeviceId").Parse(targetTemplate)
 	if err != nil {
 		return "", fmt.Errorf("failed parsing dpop template: %w", err)

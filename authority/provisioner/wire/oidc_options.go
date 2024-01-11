@@ -12,7 +12,7 @@ import (
 	"github.com/coreos/go-oidc/v3/oidc"
 )
 
-type ProviderJSON struct {
+type Provider struct {
 	IssuerURL   string   `json:"issuer,omitempty"`
 	AuthURL     string   `json:"authorization_endpoint,omitempty"`
 	TokenURL    string   `json:"token_endpoint,omitempty"`
@@ -21,9 +21,9 @@ type ProviderJSON struct {
 	Algorithms  []string `json:"id_token_signing_alg_values_supported,omitempty"`
 }
 
-type ConfigJSON struct {
-	ClientID                   string           `json:"client-id,omitempty"`
-	SupportedSigningAlgs       []string         `json:"support-signing-algs,omitempty"`
+type Config struct {
+	ClientID                   string           `json:"client_id,omitempty"`
+	SupportedSigningAlgs       []string         `json:"supported_signing_algs,omitempty"`
 	SkipClientIDCheck          bool             `json:"-"`
 	SkipExpiryCheck            bool             `json:"-"`
 	SkipIssuerCheck            bool             `json:"-"`
@@ -32,26 +32,34 @@ type ConfigJSON struct {
 }
 
 type OIDCOptions struct {
-	Provider ProviderJSON `json:"provider,omitempty"`
-	Config   ConfigJSON   `json:"config,omitempty"`
+	Provider *Provider `json:"provider,omitempty"`
+	Config   *Config   `json:"config,omitempty"`
 }
 
 func (o *OIDCOptions) GetProvider(ctx context.Context) *oidc.Provider {
-	if o == nil {
+	if o == nil || o.Provider == nil {
 		return nil
 	}
-	return toProviderConfig(o.Provider).NewProvider(ctx)
+	return toOIDCProviderConfig(o.Provider).NewProvider(ctx)
 }
 
 func (o *OIDCOptions) GetConfig() *oidc.Config {
-	if o == nil {
+	if o == nil || o.Config == nil {
 		return &oidc.Config{}
 	}
-	config := oidc.Config(o.Config)
-	return &config
+
+	return &oidc.Config{
+		ClientID:                   o.Config.ClientID,
+		SupportedSigningAlgs:       o.Config.SupportedSigningAlgs,
+		SkipClientIDCheck:          o.Config.SkipClientIDCheck,
+		SkipExpiryCheck:            o.Config.SkipExpiryCheck,
+		SkipIssuerCheck:            o.Config.SkipIssuerCheck,
+		Now:                        o.Config.Now,
+		InsecureSkipSignatureCheck: o.Config.InsecureSkipSignatureCheck,
+	}
 }
 
-func (o *OIDCOptions) GetTarget(deviceID string) (string, error) {
+func (o *OIDCOptions) EvaluateTarget(deviceID string) (string, error) {
 	if o == nil {
 		return "", errors.New("misconfigured target template configuration")
 	}
@@ -67,7 +75,7 @@ func (o *OIDCOptions) GetTarget(deviceID string) (string, error) {
 	return buf.String(), nil
 }
 
-func toProviderConfig(in ProviderJSON) *oidc.ProviderConfig {
+func toOIDCProviderConfig(in *Provider) *oidc.ProviderConfig {
 	issuerURL, err := url.Parse(in.IssuerURL)
 	if err != nil {
 		panic(err) // config error, it's ok to panic here

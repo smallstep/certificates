@@ -283,7 +283,7 @@ func newAuthorization(ctx context.Context, az *acme.Authorization) error {
 				return acme.WrapError(acme.ErrorMalformedType, err, "failed parsing ClientID")
 			}
 
-			var targetProvider interface{ GetTarget(string) (string, error) }
+			var targetProvider interface{ EvaluateTarget(string) (string, error) }
 			switch typ {
 			case acme.WIREOIDC01:
 				targetProvider = prov.GetOptions().GetWireOptions().GetOIDCOptions()
@@ -293,7 +293,7 @@ func newAuthorization(ctx context.Context, az *acme.Authorization) error {
 				return acme.NewError(acme.ErrorMalformedType, "unsupported type %q", typ)
 			}
 
-			target, err = targetProvider.GetTarget(clientID.DeviceID)
+			target, err = targetProvider.EvaluateTarget(clientID.DeviceID)
 			if err != nil {
 				return acme.WrapError(acme.ErrorMalformedType, err, "invalid Go template registered for 'target'")
 			}

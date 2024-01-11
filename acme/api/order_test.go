@@ -1719,7 +1719,7 @@ func TestHandler_NewOrder(t *testing.T) {
 			acmeWireProv := newWireProvisionerWithOptions(t, &provisioner.Options{
 				Wire: &wire.Options{
 					OIDC: &wire.OIDCOptions{
-						Provider: wire.ProviderJSON{
+						Provider: &wire.Provider{
 							IssuerURL:   "",
 							AuthURL:     "",
 							TokenURL:    "",
@@ -1727,7 +1727,7 @@ func TestHandler_NewOrder(t *testing.T) {
 							UserInfoURL: "",
 							Algorithms:  []string{},
 						},
-						Config: wire.ConfigJSON{
+						Config: &wire.Config{
 							ClientID:                   "integration test",
 							SupportedSigningAlgs:       []string{},
 							SkipClientIDCheck:          true,

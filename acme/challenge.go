@@ -476,7 +476,7 @@ func wireDPOP01Validate(ctx context.Context, ch *Challenge, db DB, jwk *jose.JSO
 
 	dpopOptions := prov.GetOptions().GetWireOptions().GetDPOPOptions()
 
-	issuer, err := dpopOptions.GetTarget(clientID.DeviceID)
+	issuer, err := dpopOptions.EvaluateTarget(clientID.DeviceID)
 	if err != nil {
 		return WrapErrorISE(err, "invalid Go template registered for 'target'")
 	}
