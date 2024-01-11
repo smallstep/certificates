@@ -389,7 +389,7 @@ func wireOIDC01Validate(ctx context.Context, ch *Challenge, db DB, jwk *jose.JSO
 			"error retrieving claims from ID token"))
 	}
 
-	challengeValues, err := wire.ParseID([]byte(ch.Value))
+	wireID, err := wire.ParseID([]byte(ch.Value))
 	if err != nil {
 		return WrapErrorISE(err, "error unmarshalling challenge data")
 	}
@@ -400,11 +400,11 @@ func wireOIDC01Validate(ctx context.Context, ch *Challenge, db DB, jwk *jose.JSO
 	}
 	if expectedKeyAuth != oidcPayload.KeyAuth {
 		return storeError(ctx, db, ch, true, NewError(ErrorRejectedIdentifierType,
-			"keyAuthorization does not match; expected %s, but got %s", expectedKeyAuth, oidcPayload.KeyAuth))
+			"keyAuthorization does not match; expected %q, but got %q", expectedKeyAuth, oidcPayload.KeyAuth))
 	}
 
-	if challengeValues.Name != claims.Name || challengeValues.Handle != claims.Handle {
-		return storeError(ctx, db, ch, false, NewError(ErrorRejectedIdentifierType, "OIDC claims don't match"))
+	if wireID.Name != claims.Name || wireID.Handle != claims.Handle {
+		return storeError(ctx, db, ch, false, NewError(ErrorRejectedIdentifierType, "claims in OIDC ID token don't match"))
 	}
 
 	// Update and store the challenge.
@@ -578,43 +578,40 @@ func parseAndVerifyWireAccessToken(v verifyParams) (*wireAccessToken, *wireDpopT
 	if accessToken.Cnf == nil {
 		return nil, nil, errors.New("'cnf' is nil")
 	}
-
 	if accessToken.Cnf.Kid != v.kid {
 		return nil, nil, fmt.Errorf("expected kid %q; got %q", v.kid, accessToken.Cnf.Kid)
 	}
-
 	if accessToken.ClientID != v.wireID.ClientID {
 		return nil, nil, fmt.Errorf("invalid Wire client ID %q", accessToken.ClientID)
 	}
 
-	parsedDpopToken, err := jose.ParseSigned(accessToken.Proof)
+	dpopJWT, err := jose.ParseSigned(accessToken.Proof)
 	if err != nil {
 		return nil, nil, fmt.Errorf("invalid Wire DPoP token: %w", err)
 	}
 	var dpopToken wireDpopToken
-	if err := parsedDpopToken.UnsafeClaimsWithoutVerification(&dpopToken); err != nil {
+	if err := dpopJWT.UnsafeClaimsWithoutVerification(&dpopToken); err != nil {
 		return nil, nil, fmt.Errorf("failed parsing Wire DPoP token: %w", err)
 	}
 
-	// TODO: validate DPoP too? Which key(s)?
+	challenge, ok := dpopToken["chal"].(string)
+	if !ok {
+		return nil, nil, fmt.Errorf("invalid challenge in Wire DPoP token")
+	}
+	if challenge != v.challenge.Token {
+		return nil, nil, fmt.Errorf("invalid Wire DPoP challenge %q", challenge)
+	}
 
 	handle, ok := dpopToken["handle"].(string)
 	if !ok {
 		return nil, nil, fmt.Errorf("invalid handle in Wire DPoP token")
 	}
-
-	_ = handle
+	if handle != v.wireID.Handle {
+		return nil, nil, fmt.Errorf("invalid Wire client handle %q", handle)
+	}
 
 	// TODO(hs): what to do with max expiry?
 	// maxExpiry:= strconv.FormatInt(time.Now().Add(time.Hour*24*365).Unix(), 10),
-
-	// TODO: compare handle?
-	// TODO: compare challenge token / value?
-	// TODO: max expiry?
-	// 	"--handle",
-	// 	challengeValues.Handle,
-	// 	"--challenge",
-	// 	ch.Token,
 	// 	"--max-expiry",
 	// 	expiry,
 
