@@ -4306,59 +4306,64 @@ func createSubjectAltNameExtension(dnsNames, emailAddresses x509util.MultiString
 }
 
 func Test_parseAndVerifyWireAccessToken(t *testing.T) {
-	key := `-----BEGIN PUBLIC KEY-----
-MCowBQYDK2VwAyEA5c+4NKZSNQcR1T8qN6SjwgdPZQ0Ge12Ylx/YeGAJ35k=
------END PUBLIC KEY-----`
+	key := `
+-----BEGIN PUBLIC KEY-----
+MCowBQYDK2VwAyEAB2IYqBWXAouDt3WcCZgCM3t9gumMEKMlgMsGenSu+fA=
+-----END PUBLIC KEY-----` // TODO(hs): different format?
 	publicKey, err := pemutil.Parse([]byte(key))
 	require.NoError(t, err)
-	issuer := "https://wire.example.com/clients/314845990100130665/access-token"
-	kid := "QAv6C9q47Cyfd1u9z6uX3V_o-t11S8p81wLH-oTRlh0"
+	issuer := "http://wire.com:19983/clients/7a41cf5b79683410/access-token"
 	wireID := wire.ID{
-		ClientID: "wireapp://Jrj3af6YQ7efXqIPa3KTfw!45e8ec286dfdb69@wire.com",
-		Handle:   "wireapp://%40beltram_wire@wire.com",
-	}
-	token := `eyJhbGciOiJFZERTQSIsInR5cCI6ImF0K2p3dCIsImp3ayI6eyJrdHkiOiJPS1AiLCJjcnYiOiJFZDI1NTE5IiwieCI6IjVjLTROS1pTTlFjUjFUOHFONlNqd2dkUFpRMEdlMTJZbHhfWWVHQUozNWsifX0.eyJpYXQiOjE3MDQ4NDA4OTYsImV4cCI6MTcwNDg0NDg1NiwibmJmIjoxNzA0ODQwODk2LCJpc3MiOiJodHRwczovL3dpcmUuZXhhbXBsZS5jb20vY2xpZW50cy8zMTQ4NDU5OTAxMDAxMzA2NjUvYWNjZXNzLXRva2VuIiwic3ViIjoid2lyZWFwcDovL0pyajNhZjZZUTdlZlhxSVBhM0tUZnchNDVlOGVjMjg2ZGZkYjY5QHdpcmUuY29tIiwiYXVkIjoiaHR0cHM6Ly93aXJlLmV4YW1wbGUuY29tL2NsaWVudHMvMzE0ODQ1OTkwMTAwMTMwNjY1L2FjY2Vzcy10b2tlbiIsImp0aSI6IjI2MjUxNzgzLWUxNDItNDNhNC04ZWE5LWU0MTk3MTJmYjE0MSIsIm5vbmNlIjoiY1hKVU9EUnROemxzWmtocGQwOHhSVEpTVHpSVFowWnBiRGhLWkZKUFdYayIsImNoYWwiOiJiRzlZYVRObk4yUTJiVU5IVEhWb016aHRaREo1WTNSQ05VaFZaR3hXUjBvIiwiY25mIjp7ImtpZCI6IlFBdjZDOXE0N0N5ZmQxdTl6NnVYM1Zfby10MTFTOHA4MXdMSC1vVFJsaDAifSwicHJvb2YiOiJleUpoYkdjaU9pSkZaRVJUUVNJc0luUjVjQ0k2SW1Sd2IzQXJhbmQwSWl3aWFuZHJJanA3SW10MGVTSTZJazlMVUNJc0ltTnlkaUk2SWtWa01qVTFNVGtpTENKNElqb2laMk5VUWpCQmRHUjNkR0pqYmxoUFNtaHlTM2RKWmpob1F6ZFNVR2xtZEV0bFEzSjFUMmRpUVRCRVl5SjlmUS5leUpwWVhRaU9qRTNNRFE0TkRBNE9UWXNJbVY0Y0NJNk1UY3dORGt6TURnNU5pd2libUptSWpveE56QTBPRFF3T0RrMkxDSnpkV0lpT2lKM2FYSmxZWEJ3T2k4dlNuSnFNMkZtTmxsUk4yVm1XSEZKVUdFelMxUm1keUUwTldVNFpXTXlPRFprWm1SaU5qbEFkMmx5WlM1amIyMGlMQ0pxZEdraU9pSTBPVEl4WW1FMk5DMWhOVE0yTFRRd05qSXRZamhoTkMwNVpHVXlaR1l3WlRBMlpEWWlMQ0p1YjI1alpTSTZJbU5ZU2xWUFJGSjBUbnBzYzFwcmFIQmtNRGg0VWxSS1UxUjZVbFJhTUZwd1lrUm9TMXBHU2xCWFdHc2lMQ0pvZEcwaU9pSlFUMU5VSWl3aWFIUjFJam9pYUhSMGNITTZMeTkzYVhKbExtVjRZVzF3YkdVdVkyOXRMMk5zYVdWdWRITXZNekUwT0RRMU9Ua3dNVEF3TVRNd05qWTFMMkZqWTJWemN5MTBiMnRsYmlJc0ltTm9ZV3dpT2lKaVJ6bFpZVlJPYms0eVVUSmlWVTVJVkVoV2IwMTZhSFJhUkVvMVdUTlNRMDVWYUZaYVIzaFhVakJ2SWl3aWFHRnVaR3hsSWpvaWQybHlaV0Z3Y0Rvdkx5VTBNR0psYkhSeVlXMWZkMmx5WlVCM2FYSmxMbU52YlNJc0luUmxZVzBpT2lKM2FYSmxJbjAuUGVMaXEtZWlVWXhDREszT3dHMGtsN25lR0RQYUhtYW5KY1BlOEJOZ0pJemRHUm1nVEE1UVZQNTJsdzcwendJcy0yZ0JZTWxyOVVPb1VXX1l1bnN4RHciLCJjbGllbnRfaWQiOiJ3aXJlYXBwOi8vSnJqM2FmNllRN2VmWHFJUGEzS1RmdyE0NWU4ZWMyODZkZmRiNjlAd2lyZS5jb20iLCJhcGlfdmVyc2lvbiI6NSwic2NvcGUiOiJ3aXJlX2NsaWVudF9pZCJ9.VwMJGkXRaP0lC9UDe5iGU8fxOSeBKCXfHXhqcbu_n5JiP5b7WTJAymiCFmVyAaKWZIK6S9qxncqSj5AUPAfQAg`
-	ch := &Challenge{
-		Type:  WIREDPOP01,
-		Token: "bG9YaTNnN2Q2bUNHTHVoMzhtZDJ5Y3RCNUhVZGxWR0o",
+		ClientID: "wireapp://guVX5xeFS3eTatmXBIyA4A!7a41cf5b79683410@wire.com",
+		Handle:   "wireapp://%40alice_wire@wire.com",
 	}
 
-	issuedAtUnix, err := strconv.ParseInt("1704840896", 10, 64)
+	token := `eyJhbGciOiJFZERTQSIsInR5cCI6ImF0K2p3dCIsImp3ayI6eyJrdHkiOiJPS1AiLCJjcnYiOiJFZDI1NTE5IiwieCI6IkIySVlxQldYQW91RHQzV2NDWmdDTTN0OWd1bU1FS01sZ01zR2VuU3UtZkEifX0.eyJpYXQiOjE3MDQ5ODUyMDUsImV4cCI6MTcwNDk4OTE2NSwibmJmIjoxNzA0OTg1MjA1LCJpc3MiOiJodHRwOi8vd2lyZS5jb206MTk5ODMvY2xpZW50cy83YTQxY2Y1Yjc5NjgzNDEwL2FjY2Vzcy10b2tlbiIsInN1YiI6IndpcmVhcHA6Ly9ndVZYNXhlRlMzZVRhdG1YQkl5QTRBITdhNDFjZjViNzk2ODM0MTBAd2lyZS5jb20iLCJhdWQiOiJodHRwOi8vd2lyZS5jb206MTk5ODMvY2xpZW50cy83YTQxY2Y1Yjc5NjgzNDEwL2FjY2Vzcy10b2tlbiIsImp0aSI6IjQyYzQ2ZDRjLWU1MTAtNDE3NS05ZmI1LWQwNTVlMTI1YTQ5ZCIsIm5vbmNlIjoiVUVKeVIyZHFPRWh6WkZKRVlXSkJhVGt5T0RORVlURTJhRXMwZEhJeGNFYyIsImNoYWwiOiJiWFVHTnBVZmNSeDNFaEIzNHhQM3k2MmFRWm9HWlM2aiIsImNuZiI6eyJraWQiOiJvTVdmTkRKUXNJNWNQbFhONVVvQk5uY0t0YzRmMmRxMnZ3Q2pqWHNxdzdRIn0sInByb29mIjoiZXlKaGJHY2lPaUpGWkVSVFFTSXNJblI1Y0NJNkltUndiM0FyYW5kMElpd2lhbmRySWpwN0ltdDBlU0k2SWs5TFVDSXNJbU55ZGlJNklrVmtNalUxTVRraUxDSjRJam9pTVV3eFpVZ3lZVFpCWjFaMmVsUndOVnBoYkV0U1puRTJjRlpRVDNSRmFrazNhRGhVVUhwQ1dVWm5UU0o5ZlEuZXlKcFlYUWlPakUzTURRNU9EVXlNRFVzSW1WNGNDSTZNVGN3TkRrNU1qUXdOU3dpYm1KbUlqb3hOekEwT1RnMU1qQTFMQ0p6ZFdJaU9pSjNhWEpsWVhCd09pOHZaM1ZXV0RWNFpVWlRNMlZVWVhSdFdFSkplVUUwUVNFM1lUUXhZMlkxWWpjNU5qZ3pOREV3UUhkcGNtVXVZMjl0SWl3aWFuUnBJam9pTldVMk5qZzBZMkl0Tm1JME9DMDBOamhrTFdJd09URXRabVl3TkdKbFpEWmxZekpsSWl3aWJtOXVZMlVpT2lKVlJVcDVVakprY1U5RmFIcGFSa3BGV1ZkS1FtRlVhM2xQUkU1RldWUkZNbUZGY3pCa1NFbDRZMFZqSWl3aWFIUnRJam9pVUU5VFZDSXNJbWgwZFNJNkltaDBkSEE2THk5M2FYSmxMbU52YlRveE9UazRNeTlqYkdsbGJuUnpMemRoTkRGalpqVmlOemsyT0RNME1UQXZZV05qWlhOekxYUnZhMlZ1SWl3aVkyaGhiQ0k2SW1KWVZVZE9jRlZtWTFKNE0wVm9Rak0wZUZBemVUWXlZVkZhYjBkYVV6WnFJaXdpYUdGdVpHeGxJam9pZDJseVpXRndjRG92THlVME1HRnNhV05sWDNkcGNtVkFkMmx5WlM1amIyMGlMQ0owWldGdElqb2lkMmx5WlNKOS52bkN1T2JURFRLVFhCYXpyX3Z2X0xyZDBZT1Rac2xteHQtM2xKNWZKSU9iRVRidUVCTGlEaS1JVWZHcFJHTm1Dbm9IZjVocHNsWW5HeFMzSjloUmVDZyIsImNsaWVudF9pZCI6IndpcmVhcHA6Ly9ndVZYNXhlRlMzZVRhdG1YQkl5QTRBITdhNDFjZjViNzk2ODM0MTBAd2lyZS5jb20iLCJhcGlfdmVyc2lvbiI6NSwic2NvcGUiOiJ3aXJlX2NsaWVudF9pZCJ9.uCVYhmvCJm7nM1NxJQKl_XZJcSqm9eFmNmbRJkA5Wpsw70ZF1YANYC9nQ91QgsnuAbaRZMJiJt3P8ZntR2ozDQ`
+	ch := &Challenge{
+		Type:  WIREDPOP01,
+		Token: "bXUGNpUfcRx3EhB34xP3y62aQZoGZS6j",
+	}
+
+	issuedAtUnix, err := strconv.ParseInt("1704985205", 10, 64)
 	require.NoError(t, err)
 	issuedAt := time.Unix(issuedAtUnix, 0)
 
+	jwkBytes := []byte(`{"crv": "Ed25519", "kty": "OKP", "x": "1L1eH2a6AgVvzTp5ZalKRfq6pVPOtEjI7h8TPzBYFgM"}`)
+	var accountJWK jose.JSONWebKey
+	json.Unmarshal(jwkBytes, &accountJWK)
+
 	at, dpop, err := parseAndVerifyWireAccessToken(verifyParams{
-		token:     token,
-		key:       publicKey,
-		kid:       kid,
-		issuer:    issuer,
-		wireID:    wireID,
-		challenge: ch,
-		t:         issuedAt.Add(1 * time.Minute),
+		token:      token,
+		key:        publicKey,
+		accountJWK: &accountJWK,
+		issuer:     issuer,
+		wireID:     wireID,
+		challenge:  ch,
+		t:          issuedAt.Add(1 * time.Minute), // set validation time to be one minute after issuance
 	})
 	if assert.NoError(t, err) {
 		// token assertions
-		assert.Equal(t, "26251783-e142-43a4-8ea9-e419712fb141", at.ID)
-		assert.Equal(t, "https://wire.example.com/clients/314845990100130665/access-token", at.Issuer)
-		assert.Equal(t, "wireapp://Jrj3af6YQ7efXqIPa3KTfw!45e8ec286dfdb69@wire.com", at.Subject)
-		assert.Contains(t, at.Audience, "https://wire.example.com/clients/314845990100130665/access-token")
-		assert.Equal(t, "bG9YaTNnN2Q2bUNHTHVoMzhtZDJ5Y3RCNUhVZGxWR0o", at.Challenge)
-		assert.Equal(t, "wireapp://Jrj3af6YQ7efXqIPa3KTfw!45e8ec286dfdb69@wire.com", at.ClientID)
+		assert.Equal(t, "42c46d4c-e510-4175-9fb5-d055e125a49d", at.ID)
+		assert.Equal(t, "http://wire.com:19983/clients/7a41cf5b79683410/access-token", at.Issuer)
+		assert.Equal(t, "wireapp://guVX5xeFS3eTatmXBIyA4A!7a41cf5b79683410@wire.com", at.Subject)
+		assert.Contains(t, at.Audience, "http://wire.com:19983/clients/7a41cf5b79683410/access-token")
+		assert.Equal(t, "bXUGNpUfcRx3EhB34xP3y62aQZoGZS6j", at.Challenge)
+		assert.Equal(t, "wireapp://guVX5xeFS3eTatmXBIyA4A!7a41cf5b79683410@wire.com", at.ClientID)
 		assert.Equal(t, 5, at.APIVersion)
 		assert.Equal(t, "wire_client_id", at.Scope)
 		if assert.NotNil(t, at.Cnf) {
-			assert.Equal(t, "QAv6C9q47Cyfd1u9z6uX3V_o-t11S8p81wLH-oTRlh0", at.Cnf.Kid)
+			assert.Equal(t, "oMWfNDJQsI5cPlXN5UoBNncKtc4f2dq2vwCjjXsqw7Q", at.Cnf.Kid)
 		}
 
 		// dpop proof assertions
 		dt := *dpop
-		assert.Equal(t, "bG9YaTNnN2Q2bUNHTHVoMzhtZDJ5Y3RCNUhVZGxWR0o", dt["chal"].(string))
-		assert.Equal(t, "wireapp://%40beltram_wire@wire.com", dt["handle"].(string))
+		assert.Equal(t, "bXUGNpUfcRx3EhB34xP3y62aQZoGZS6j", dt["chal"].(string))
+		assert.Equal(t, "wireapp://%40alice_wire@wire.com", dt["handle"].(string))
 		assert.Equal(t, "POST", dt["htm"].(string))
-		assert.Equal(t, "https://wire.example.com/clients/314845990100130665/access-token", dt["htu"].(string))
-		assert.Equal(t, "4921ba64-a536-4062-b8a4-9de2df0e06d6", dt["jti"].(string))
-		assert.Equal(t, "cXJUODRtNzlsZkhpd08xRTJSTzRTZ0ZpbDhKZFJPWXk", dt["nonce"].(string))
-		assert.Equal(t, "wireapp://Jrj3af6YQ7efXqIPa3KTfw!45e8ec286dfdb69@wire.com", dt["sub"].(string))
+		assert.Equal(t, "http://wire.com:19983/clients/7a41cf5b79683410/access-token", dt["htu"].(string))
+		assert.Equal(t, "5e6684cb-6b48-468d-b091-ff04bed6ec2e", dt["jti"].(string))
+		assert.Equal(t, "UEJyR2dqOEhzZFJEYWJBaTkyODNEYTE2aEs0dHIxcEc", dt["nonce"].(string))
+		assert.Equal(t, "wireapp://guVX5xeFS3eTatmXBIyA4A!7a41cf5b79683410@wire.com", dt["sub"].(string))
 		assert.Equal(t, "wire", dt["team"].(string))
 	}
 }

@@ -451,17 +451,11 @@ type wireDpopPayload struct {
 	AccessToken string `json:"access_token,omitempty"`
 }
 
-func wireDPOP01Validate(ctx context.Context, ch *Challenge, db DB, jwk *jose.JSONWebKey, payload []byte) error {
+func wireDPOP01Validate(ctx context.Context, ch *Challenge, db DB, accountJWK *jose.JSONWebKey, payload []byte) error {
 	prov, ok := ProvisionerFromContext(ctx)
 	if !ok {
 		return NewErrorISE("missing provisioner")
 	}
-
-	rawKid, err := jwk.Thumbprint(crypto.SHA256)
-	if err != nil {
-		return storeError(ctx, db, ch, false, WrapError(ErrorServerInternalType, err, "failed to compute JWK thumbprint"))
-	}
-	kid := base64.RawURLEncoding.EncodeToString(rawKid)
 
 	var dpopPayload wireDpopPayload
 	if err := json.Unmarshal(payload, &dpopPayload); err != nil {
@@ -491,13 +485,13 @@ func wireDPOP01Validate(ctx context.Context, ch *Challenge, db DB, jwk *jose.JSO
 	}
 
 	params := verifyParams{
-		token:     dpopPayload.AccessToken,
-		key:       dpopOptions.GetSigningKey(),
-		kid:       kid,
-		issuer:    issuer,
-		wireID:    wireID,
-		challenge: ch,
-		t:         clock.Now().UTC(),
+		token:      dpopPayload.AccessToken,
+		key:        dpopOptions.GetSigningKey(),
+		accountJWK: accountJWK,
+		issuer:     issuer,
+		wireID:     wireID,
+		challenge:  ch,
+		t:          clock.Now().UTC(),
 	}
 	_, dpop, err := parseAndVerifyWireAccessToken(params)
 	if err != nil {
@@ -546,13 +540,13 @@ type wireAccessToken struct {
 type wireDpopToken map[string]any
 
 type verifyParams struct {
-	token     string
-	key       crypto.PublicKey
-	issuer    string
-	kid       string
-	wireID    wire.ID
-	challenge *Challenge
-	t         time.Time
+	token      string
+	key        crypto.PublicKey
+	accountJWK *jose.JSONWebKey
+	issuer     string
+	wireID     wire.ID
+	challenge  *Challenge
+	t          time.Time
 }
 
 func parseAndVerifyWireAccessToken(v verifyParams) (*wireAccessToken, *wireDpopToken, error) {
@@ -563,7 +557,7 @@ func parseAndVerifyWireAccessToken(v verifyParams) (*wireAccessToken, *wireDpopT
 
 	var accessToken wireAccessToken
 	if err = jwt.Claims(v.key, &accessToken); err != nil {
-		return nil, nil, fmt.Errorf("failed getting token claims: %w", err)
+		return nil, nil, fmt.Errorf("failed validating Wire DPoP token claims: %w", err)
 	}
 
 	if err := accessToken.ValidateWithLeeway(jose.Expected{
@@ -573,11 +567,17 @@ func parseAndVerifyWireAccessToken(v verifyParams) (*wireAccessToken, *wireDpopT
 		return nil, nil, fmt.Errorf("failed validation: %w", err)
 	}
 
+	rawKid, err := v.accountJWK.Thumbprint(crypto.SHA256)
+	if err != nil {
+		return nil, nil, fmt.Errorf("failed to compute JWK thumbprint")
+	}
+	kid := base64.RawURLEncoding.EncodeToString(rawKid)
+
 	if accessToken.Cnf == nil {
 		return nil, nil, errors.New("'cnf' is nil")
 	}
-	if accessToken.Cnf.Kid != v.kid {
-		return nil, nil, fmt.Errorf("expected kid %q; got %q", v.kid, accessToken.Cnf.Kid)
+	if accessToken.Cnf.Kid != kid {
+		return nil, nil, fmt.Errorf("expected kid %q; got %q", kid, accessToken.Cnf.Kid)
 	}
 	if accessToken.ClientID != v.wireID.ClientID {
 		return nil, nil, fmt.Errorf("invalid Wire client ID %q", accessToken.ClientID)
@@ -591,11 +591,9 @@ func parseAndVerifyWireAccessToken(v verifyParams) (*wireAccessToken, *wireDpopT
 		return nil, nil, fmt.Errorf("invalid Wire DPoP token: %w", err)
 	}
 	var dpopToken wireDpopToken
-	if err := dpopJWT.UnsafeClaimsWithoutVerification(&dpopToken); err != nil {
-		return nil, nil, fmt.Errorf("failed parsing Wire DPoP token: %w", err)
+	if err := dpopJWT.Claims(v.accountJWK.Key, &dpopToken); err != nil {
+		return nil, nil, fmt.Errorf("failed validating Wire DPoP token claims: %w", err)
 	}
-
-	// TODO(hs): DPoP verification
 
 	challenge, ok := dpopToken["chal"].(string)
 	if !ok {
