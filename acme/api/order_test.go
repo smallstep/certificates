@@ -96,14 +96,34 @@ func TestNewOrderRequest_Validate(t *testing.T) {
 				err: acme.NewError(acme.ErrorMalformedType, "invalid IP address: %s", "192.168.42.1000"),
 			}
 		},
-		"fail/bad-identifier/wireapp-prefix-mismatch": func(t *testing.T) test {
+		"fail/bad-identifier/wireapp-invalid-uri": func(t *testing.T) test {
 			return test{
 				nor: &NewOrderRequest{
 					Identifiers: []acme.Identifier{
 						{Type: "wireapp-id", Value: "{}"},
 					},
 				},
-				err: acme.NewError(acme.ErrorMalformedType, "invalid client ID, it's supposed to be a valid URI"),
+				err: acme.NewError(acme.ErrorMalformedType, `invalid Wire client ID "": invalid Wire client ID URI "": error parsing : scheme is missing`),
+			}
+		},
+		"fail/bad-identifier/wireapp-wrong-scheme": func(t *testing.T) test {
+			return test{
+				nor: &NewOrderRequest{
+					Identifiers: []acme.Identifier{
+						{Type: "wireapp-id", Value: `{"name": "Smith, Alice M (QA)", "domain": "example.com", "client-id": "nowireapp://example.com", "handle": "wireapp://%40alice.smith.qa@example.com"}`},
+					},
+				},
+				err: acme.NewError(acme.ErrorMalformedType, `invalid Wire client ID "nowireapp://example.com": invalid Wire client ID scheme "nowireapp"; expected "wireapp"`),
+			}
+		},
+		"fail/bad-identifier/wireapp-invalid-user-parts": func(t *testing.T) test {
+			return test{
+				nor: &NewOrderRequest{
+					Identifiers: []acme.Identifier{
+						{Type: "wireapp-id", Value: `{"name": "Smith, Alice M (QA)", "domain": "example.com", "client-id": "wireapp://user-device@example.com", "handle": "wireapp://%40alice.smith.qa@example.com"}`},
+					},
+				},
+				err: acme.NewError(acme.ErrorMalformedType, `invalid Wire client ID "wireapp://user-device@example.com": invalid Wire client ID username "user-device"`),
 			}
 		},
 		"ok": func(t *testing.T) test {
@@ -184,7 +204,7 @@ func TestNewOrderRequest_Validate(t *testing.T) {
 				naf: naf,
 			}
 		},
-		"ok/wireapp-prefix": func(t *testing.T) test {
+		"ok/wireapp-idd": func(t *testing.T) test {
 			nbf := time.Now().UTC().Add(time.Minute)
 			naf := time.Now().UTC().Add(5 * time.Minute)
 			return test{
