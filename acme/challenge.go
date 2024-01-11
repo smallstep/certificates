@@ -33,10 +33,9 @@ import (
 	"go.step.sm/crypto/pemutil"
 	"go.step.sm/crypto/x509util"
 	"golang.org/x/exp/slices"
-	"gopkg.in/square/go-jose.v2/jwt"
 
+	"github.com/smallstep/certificates/acme/wire"
 	"github.com/smallstep/certificates/authority/provisioner"
-	"github.com/smallstep/certificates/wire"
 )
 
 type ChallengeType string
@@ -385,8 +384,7 @@ func wireOIDC01Validate(ctx context.Context, ch *Challenge, db DB, jwk *jose.JSO
 		GivenName string `json:"given_name,omitempty"`
 		KeyAuth   string `json:"keyauth"` // TODO(hs): use this property instead of the one in the payload after https://github.com/wireapp/rusty-jwt-tools/tree/fix/keyauth is done
 	}
-	err = idToken.Claims(&claims)
-	if err != nil {
+	if err := idToken.Claims(&claims); err != nil {
 		return storeError(ctx, db, ch, false, WrapError(ErrorRejectedIdentifierType, err,
 			"error retrieving claims from ID token"))
 	}
@@ -418,9 +416,9 @@ func wireOIDC01Validate(ctx context.Context, ch *Challenge, db DB, jwk *jose.JSO
 		return WrapErrorISE(err, "error updating challenge")
 	}
 
-	parsedIDToken, err := jwt.ParseSigned(oidcPayload.IDToken)
+	parsedIDToken, err := jose.ParseSigned(oidcPayload.IDToken)
 	if err != nil {
-		return WrapErrorISE(err, "invalid OIDC id token")
+		return WrapErrorISE(err, "invalid OIDC ID token")
 	}
 	oidcToken := make(map[string]interface{})
 	if err := parsedIDToken.UnsafeClaimsWithoutVerification(&oidcToken); err != nil {
@@ -432,7 +430,7 @@ func wireOIDC01Validate(ctx context.Context, ch *Challenge, db DB, jwk *jose.JSO
 		return WrapErrorISE(err, "could not find current order by account id")
 	}
 	if len(orders) == 0 {
-		return WrapErrorISE(err, "there are not enough orders for this account for this custom OIDC challenge")
+		return NewErrorISE("there are not enough orders for this account for this custom OIDC challenge")
 	}
 
 	order := orders[len(orders)-1]
@@ -454,15 +452,14 @@ func wireDPOP01Validate(ctx context.Context, ch *Challenge, db DB, jwk *jose.JSO
 		return NewErrorISE("missing provisioner")
 	}
 
-	rawKid, thumbprintErr := jwk.Thumbprint(crypto.SHA256)
-	if thumbprintErr != nil {
-		return storeError(ctx, db, ch, false, WrapError(ErrorServerInternalType, thumbprintErr, "failed to compute JWK thumbprint"))
+	rawKid, err := jwk.Thumbprint(crypto.SHA256)
+	if err != nil {
+		return storeError(ctx, db, ch, false, WrapError(ErrorServerInternalType, err, "failed to compute JWK thumbprint"))
 	}
 	kid := base64.RawURLEncoding.EncodeToString(rawKid)
 
 	var dpopPayload wireDpopPayload
-	err := json.Unmarshal(payload, &dpopPayload)
-	if err != nil {
+	if err := json.Unmarshal(payload, &dpopPayload); err != nil {
 		return storeError(ctx, db, ch, false, WrapError(ErrorRejectedIdentifierType, err,
 			"error unmarshalling Wire challenge payload"))
 	}

@@ -10,18 +10,16 @@ import (
 	"strings"
 	"time"
 
-	"go.step.sm/crypto/kms/uri"
-
 	"github.com/go-chi/chi/v5"
 
 	"go.step.sm/crypto/randutil"
 	"go.step.sm/crypto/x509util"
 
 	"github.com/smallstep/certificates/acme"
+	"github.com/smallstep/certificates/acme/wire"
 	"github.com/smallstep/certificates/api/render"
 	"github.com/smallstep/certificates/authority/policy"
 	"github.com/smallstep/certificates/authority/provisioner"
-	"github.com/smallstep/certificates/wire"
 )
 
 // NewOrderRequest represents the body for a NewOrder request.
@@ -52,16 +50,12 @@ func (n *NewOrderRequest) Validate() error {
 				return acme.NewError(acme.ErrorMalformedType, "permanent identifier cannot be empty")
 			}
 		case acme.WireID:
-			orderValue, err := wire.ParseID([]byte(id.Value))
+			wireID, err := wire.ParseID([]byte(id.Value))
 			if err != nil {
-				return acme.NewError(acme.ErrorMalformedType, "ID cannot be parsed")
+				return acme.WrapError(acme.ErrorMalformedType, err, "failed parsing Wire ID")
 			}
-			clientIDURI, err := uri.Parse(orderValue.ClientID)
-			if err != nil {
-				return acme.NewError(acme.ErrorMalformedType, "invalid client ID, it's supposed to be a valid URI")
-			}
-			if clientIDURI.Scheme != "wireapp" {
-				return acme.NewError(acme.ErrorMalformedType, "invalid client ID scheme")
+			if _, err := wire.ParseClientID(wireID.ClientID); err != nil {
+				return acme.WrapError(acme.ErrorMalformedType, err, "invalid Wire client ID %q", wireID.ClientID)
 			}
 		default:
 			return acme.NewError(acme.ErrorMalformedType, "identifier type unsupported: %s", id.Type)

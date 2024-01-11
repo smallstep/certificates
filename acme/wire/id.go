@@ -21,6 +21,7 @@ func ParseID(data []byte) (wireID ID, err error) {
 }
 
 type ClientID struct {
+	Scheme   string
 	Username string
 	DeviceID string
 	Domain   string
@@ -34,14 +35,18 @@ type ClientID struct {
 func ParseClientID(clientID string) (ClientID, error) {
 	clientIDURI, err := uri.Parse(clientID)
 	if err != nil {
-		return ClientID{}, fmt.Errorf("invalid clientID URI %q: %w", clientID, err)
+		return ClientID{}, fmt.Errorf("invalid Wire client ID URI %q: %w", clientID, err)
+	}
+	if clientIDURI.Scheme != "wireapp" {
+		return ClientID{}, fmt.Errorf("invalid Wire client ID scheme %q; expected \"wireapp\"", clientIDURI.Scheme)
 	}
 	fullUsername := clientIDURI.User.Username()
 	parts := strings.SplitN(fullUsername, "!", 2)
 	if len(parts) != 2 {
-		return ClientID{}, fmt.Errorf("invalid clientID %q", fullUsername)
+		return ClientID{}, fmt.Errorf("invalid Wire client ID username %q", fullUsername)
 	}
 	return ClientID{
+		Scheme:   clientIDURI.Scheme,
 		Username: parts[0],
 		DeviceID: parts[1],
 		Domain:   clientIDURI.Host,

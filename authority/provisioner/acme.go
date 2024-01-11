@@ -10,8 +10,9 @@ import (
 	"time"
 
 	"github.com/pkg/errors"
-	"github.com/smallstep/certificates/wire"
 	"go.step.sm/linkedca"
+
+	"github.com/smallstep/certificates/acme/wire"
 )
 
 // ACMEChallenge represents the supported acme challenges.
