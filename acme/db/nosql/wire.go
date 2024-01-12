@@ -9,12 +9,24 @@ import (
 	"github.com/pkg/errors"
 	"github.com/smallstep/certificates/acme"
 	"github.com/smallstep/nosql"
+	"go.step.sm/crypto/jose"
 )
 
 type dbDpopToken struct {
-	ID        string    `json:"id"`
-	Content   []byte    `json:"content"`
-	CreatedAt time.Time `json:"createdAt"`
+	ID        string            `json:"id"` // jti
+	Issuer    string            `json:"iss"`
+	Subject   string            `json:"sub"`
+	Audience  jose.Audience     `json:"aud,omitempty"`
+	Expiry    *jose.NumericDate `json:"exp,omitempty"`
+	NotBefore *jose.NumericDate `json:"nbf,omitempty"`
+	IssuedAt  *jose.NumericDate `json:"iat,omitempty"`
+	Nonce     string            `json:"nonce"`
+	Method    string            `json:"htm"`
+	URL       string            `json:"htu"`
+	Challenge string            `json:"chal"`
+	Handle    string            `json:"handle"`
+	Team      string            `json:"team"`
+	CreatedAt time.Time         `json:"createdAt"`
 }
 
 // getDBDpopToken retrieves and unmarshals an DPoP type from the database.
@@ -33,30 +45,49 @@ func (db *DB) getDBDpopToken(_ context.Context, orderID string) (*dbDpopToken, e
 	return d, nil
 }
 
-// GetDpopToken retrieves an DPoP from the database.
-func (db *DB) GetDpopToken(ctx context.Context, orderID string) (map[string]any, error) {
+// GetDpopToken retrieves a DPoP from the database.
+func (db *DB) GetDpopToken(ctx context.Context, orderID string) (*acme.WireDpopToken, error) {
 	dbDpop, err := db.getDBDpopToken(ctx, orderID)
 	if err != nil {
 		return nil, err
 	}
 
-	dpop := make(map[string]any)
-	err = json.Unmarshal(dbDpop.Content, &dpop)
-
-	return dpop, err
+	return &acme.WireDpopToken{
+		Claims: jose.Claims{
+			ID:        dbDpop.ID,
+			Issuer:    dbDpop.Issuer,
+			Subject:   dbDpop.Subject,
+			Audience:  dbDpop.Audience,
+			Expiry:    dbDpop.Expiry,
+			NotBefore: dbDpop.NotBefore,
+			IssuedAt:  dbDpop.IssuedAt,
+		},
+		Nonce:     dbDpop.Nonce,
+		Method:    dbDpop.Method,
+		URL:       dbDpop.URL,
+		Challenge: dbDpop.Challenge,
+		Handle:    dbDpop.Handle,
+		Team:      dbDpop.Team,
+	}, nil
 }
 
 // CreateDpopToken creates DPoP resources and saves them to the DB.
-func (db *DB) CreateDpopToken(ctx context.Context, orderID string, dpop map[string]any) error {
-	content, err := json.Marshal(dpop)
-	if err != nil {
-		return err
-	}
-
+func (db *DB) CreateDpopToken(ctx context.Context, orderID string, dpop *acme.WireDpopToken) error {
 	now := clock.Now()
 	dbDpop := &dbDpopToken{
-		ID:        orderID,
-		Content:   content,
+		ID:        dpop.ID,
+		Issuer:    dpop.Issuer,
+		Subject:   dpop.Subject,
+		Audience:  dpop.Audience,
+		Expiry:    dpop.Expiry,
+		NotBefore: dpop.NotBefore,
+		IssuedAt:  dpop.IssuedAt,
+		Nonce:     dpop.Nonce,
+		Method:    dpop.Method,
+		URL:       dpop.URL,
+		Challenge: dpop.Challenge,
+		Handle:    dpop.Handle,
+		Team:      dpop.Team,
 		CreatedAt: now,
 	}
 	if err := db.save(ctx, orderID, dbDpop, nil, "dpop", wireDpopTokenTable); err != nil {

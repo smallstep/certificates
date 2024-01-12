@@ -56,8 +56,8 @@ type DB interface {
 
 	// TODO(hs): put in a different interface
 	GetAllOrdersByAccountID(ctx context.Context, accountID string) ([]string, error)
-	CreateDpopToken(ctx context.Context, orderID string, dpop map[string]interface{}) error
-	GetDpopToken(ctx context.Context, orderID string) (map[string]interface{}, error)
+	CreateDpopToken(ctx context.Context, orderID string, dpop *WireDpopToken) error
+	GetDpopToken(ctx context.Context, orderID string) (*WireDpopToken, error)
 	CreateOidcToken(ctx context.Context, orderID string, idToken map[string]interface{}) error
 	GetOidcToken(ctx context.Context, orderID string) (map[string]interface{}, error)
 }
@@ -126,8 +126,8 @@ type MockDB struct {
 	MockUpdateOrder          func(ctx context.Context, o *Order) error
 
 	MockGetAllOrdersByAccountID func(ctx context.Context, accountID string) ([]string, error)
-	MockGetDpopToken            func(ctx context.Context, orderID string) (map[string]interface{}, error)
-	MockCreateDpopToken         func(ctx context.Context, orderID string, dpop map[string]interface{}) error
+	MockGetDpopToken            func(ctx context.Context, orderID string) (*WireDpopToken, error)
+	MockCreateDpopToken         func(ctx context.Context, orderID string, dpop *WireDpopToken) error
 	MockGetOidcToken            func(ctx context.Context, orderID string) (map[string]interface{}, error)
 	MockCreateOidcToken         func(ctx context.Context, orderID string, idToken map[string]interface{}) error
 
@@ -416,17 +416,17 @@ func (m *MockDB) GetAllOrdersByAccountID(ctx context.Context, accountID string) 
 }
 
 // GetDpop retrieves a DPoP from the database.
-func (m *MockDB) GetDpopToken(ctx context.Context, orderID string) (map[string]any, error) {
+func (m *MockDB) GetDpopToken(ctx context.Context, orderID string) (*WireDpopToken, error) {
 	if m.MockGetDpopToken != nil {
 		return m.MockGetDpopToken(ctx, orderID)
 	} else if m.MockError != nil {
 		return nil, m.MockError
 	}
-	return m.MockRet1.(map[string]any), m.MockError
+	return m.MockRet1.(*WireDpopToken), m.MockError
 }
 
 // CreateDpop creates DPoP resources and saves them to the DB.
-func (m *MockDB) CreateDpopToken(ctx context.Context, orderID string, dpop map[string]any) error {
+func (m *MockDB) CreateDpopToken(ctx context.Context, orderID string, dpop *WireDpopToken) error {
 	if m.MockCreateDpopToken != nil {
 		return m.MockCreateDpopToken(ctx, orderID, dpop)
 	}

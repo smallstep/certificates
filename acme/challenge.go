@@ -517,7 +517,7 @@ func wireDPOP01Validate(ctx context.Context, ch *Challenge, db DB, accountJWK *j
 	}
 
 	order := orders[len(orders)-1]
-	if err := db.CreateDpopToken(ctx, order, map[string]any(*dpop)); err != nil {
+	if err := db.CreateDpopToken(ctx, order, dpop); err != nil {
 		return WrapErrorISE(err, "failed storing DPoP token")
 	}
 
@@ -525,20 +525,28 @@ func wireDPOP01Validate(ctx context.Context, ch *Challenge, db DB, accountJWK *j
 }
 
 type wireCnf struct {
-	Kid string `json:"kid"`
+	Kid string `json:"kid,omitempty"`
 }
 
 type wireAccessToken struct {
 	jose.Claims
-	Challenge  string  `json:"chal"`
-	Cnf        wireCnf `json:"cnf"`
-	Proof      string  `json:"proof"`
-	ClientID   string  `json:"client_id"`
-	APIVersion int     `json:"api_version"`
-	Scope      string  `json:"scope"`
+	Challenge  string  `json:"chal,omitempty"`
+	Cnf        wireCnf `json:"cnf,omitempty"`
+	Proof      string  `json:"proof,omitempty"`
+	ClientID   string  `json:"client_id,omitempty"`
+	APIVersion int     `json:"api_version,omitempty"`
+	Scope      string  `json:"scope,omitempty"`
 }
 
-type wireDpopToken map[string]any
+type WireDpopToken struct {
+	jose.Claims
+	Nonce     string `json:"nonce,omitempty"`
+	Method    string `json:"htm,omitempty"`
+	URL       string `json:"htu,omitempty"`
+	Challenge string `json:"chal,omitempty"`
+	Handle    string `json:"handle,omitempty"`
+	Team      string `json:"team,omitempty"`
+}
 
 type wireVerifyParams struct {
 	token     string
@@ -551,7 +559,7 @@ type wireVerifyParams struct {
 	t         time.Time
 }
 
-func parseAndVerifyWireAccessToken(v wireVerifyParams) (*wireAccessToken, *wireDpopToken, error) {
+func parseAndVerifyWireAccessToken(v wireVerifyParams) (*wireAccessToken, *WireDpopToken, error) {
 	jwt, err := jose.ParseSigned(v.token)
 	if err != nil {
 		return nil, nil, fmt.Errorf("failed parsing token: %w", err)
@@ -583,25 +591,17 @@ func parseAndVerifyWireAccessToken(v wireVerifyParams) (*wireAccessToken, *wireD
 	if err != nil {
 		return nil, nil, fmt.Errorf("invalid Wire DPoP token: %w", err)
 	}
-	var dpopToken wireDpopToken
+	var dpopToken WireDpopToken
 	if err := dpopJWT.Claims(v.dpopKey, &dpopToken); err != nil {
 		return nil, nil, fmt.Errorf("failed validating Wire DPoP token claims: %w", err)
 	}
 
-	challenge, ok := dpopToken["chal"].(string)
-	if !ok {
-		return nil, nil, fmt.Errorf("invalid challenge in Wire DPoP token")
-	}
-	if challenge != v.chToken {
-		return nil, nil, fmt.Errorf("invalid Wire DPoP challenge %q", challenge)
+	if dpopToken.Challenge != v.chToken {
+		return nil, nil, fmt.Errorf("invalid Wire DPoP challenge %q", dpopToken.Challenge)
 	}
 
-	handle, ok := dpopToken["handle"].(string)
-	if !ok {
-		return nil, nil, fmt.Errorf("invalid handle in Wire DPoP token")
-	}
-	if handle != v.wireID.Handle {
-		return nil, nil, fmt.Errorf("invalid Wire client handle %q", handle)
+	if dpopToken.Handle != v.wireID.Handle {
+		return nil, nil, fmt.Errorf("invalid Wire client handle %q", dpopToken.Handle)
 	}
 
 	return &accessToken, &dpopToken, nil

@@ -4320,7 +4320,6 @@ MCowBQYDK2VwAyEAB2IYqBWXAouDt3WcCZgCM3t9gumMEKMlgMsGenSu+fA=
 
 	token := `eyJhbGciOiJFZERTQSIsInR5cCI6ImF0K2p3dCIsImp3ayI6eyJrdHkiOiJPS1AiLCJjcnYiOiJFZDI1NTE5IiwieCI6IkIySVlxQldYQW91RHQzV2NDWmdDTTN0OWd1bU1FS01sZ01zR2VuU3UtZkEifX0.eyJpYXQiOjE3MDQ5ODUyMDUsImV4cCI6MTcwNDk4OTE2NSwibmJmIjoxNzA0OTg1MjA1LCJpc3MiOiJodHRwOi8vd2lyZS5jb206MTk5ODMvY2xpZW50cy83YTQxY2Y1Yjc5NjgzNDEwL2FjY2Vzcy10b2tlbiIsInN1YiI6IndpcmVhcHA6Ly9ndVZYNXhlRlMzZVRhdG1YQkl5QTRBITdhNDFjZjViNzk2ODM0MTBAd2lyZS5jb20iLCJhdWQiOiJodHRwOi8vd2lyZS5jb206MTk5ODMvY2xpZW50cy83YTQxY2Y1Yjc5NjgzNDEwL2FjY2Vzcy10b2tlbiIsImp0aSI6IjQyYzQ2ZDRjLWU1MTAtNDE3NS05ZmI1LWQwNTVlMTI1YTQ5ZCIsIm5vbmNlIjoiVUVKeVIyZHFPRWh6WkZKRVlXSkJhVGt5T0RORVlURTJhRXMwZEhJeGNFYyIsImNoYWwiOiJiWFVHTnBVZmNSeDNFaEIzNHhQM3k2MmFRWm9HWlM2aiIsImNuZiI6eyJraWQiOiJvTVdmTkRKUXNJNWNQbFhONVVvQk5uY0t0YzRmMmRxMnZ3Q2pqWHNxdzdRIn0sInByb29mIjoiZXlKaGJHY2lPaUpGWkVSVFFTSXNJblI1Y0NJNkltUndiM0FyYW5kMElpd2lhbmRySWpwN0ltdDBlU0k2SWs5TFVDSXNJbU55ZGlJNklrVmtNalUxTVRraUxDSjRJam9pTVV3eFpVZ3lZVFpCWjFaMmVsUndOVnBoYkV0U1puRTJjRlpRVDNSRmFrazNhRGhVVUhwQ1dVWm5UU0o5ZlEuZXlKcFlYUWlPakUzTURRNU9EVXlNRFVzSW1WNGNDSTZNVGN3TkRrNU1qUXdOU3dpYm1KbUlqb3hOekEwT1RnMU1qQTFMQ0p6ZFdJaU9pSjNhWEpsWVhCd09pOHZaM1ZXV0RWNFpVWlRNMlZVWVhSdFdFSkplVUUwUVNFM1lUUXhZMlkxWWpjNU5qZ3pOREV3UUhkcGNtVXVZMjl0SWl3aWFuUnBJam9pTldVMk5qZzBZMkl0Tm1JME9DMDBOamhrTFdJd09URXRabVl3TkdKbFpEWmxZekpsSWl3aWJtOXVZMlVpT2lKVlJVcDVVakprY1U5RmFIcGFSa3BGV1ZkS1FtRlVhM2xQUkU1RldWUkZNbUZGY3pCa1NFbDRZMFZqSWl3aWFIUnRJam9pVUU5VFZDSXNJbWgwZFNJNkltaDBkSEE2THk5M2FYSmxMbU52YlRveE9UazRNeTlqYkdsbGJuUnpMemRoTkRGalpqVmlOemsyT0RNME1UQXZZV05qWlhOekxYUnZhMlZ1SWl3aVkyaGhiQ0k2SW1KWVZVZE9jRlZtWTFKNE0wVm9Rak0wZUZBemVUWXlZVkZhYjBkYVV6WnFJaXdpYUdGdVpHeGxJam9pZDJseVpXRndjRG92THlVME1HRnNhV05sWDNkcGNtVkFkMmx5WlM1amIyMGlMQ0owWldGdElqb2lkMmx5WlNKOS52bkN1T2JURFRLVFhCYXpyX3Z2X0xyZDBZT1Rac2xteHQtM2xKNWZKSU9iRVRidUVCTGlEaS1JVWZHcFJHTm1Dbm9IZjVocHNsWW5HeFMzSjloUmVDZyIsImNsaWVudF9pZCI6IndpcmVhcHA6Ly9ndVZYNXhlRlMzZVRhdG1YQkl5QTRBITdhNDFjZjViNzk2ODM0MTBAd2lyZS5jb20iLCJhcGlfdmVyc2lvbiI6NSwic2NvcGUiOiJ3aXJlX2NsaWVudF9pZCJ9.uCVYhmvCJm7nM1NxJQKl_XZJcSqm9eFmNmbRJkA5Wpsw70ZF1YANYC9nQ91QgsnuAbaRZMJiJt3P8ZntR2ozDQ`
 	ch := &Challenge{
-		Type:  WIREDPOP01,
 		Token: "bXUGNpUfcRx3EhB34xP3y62aQZoGZS6j",
 	}
 
@@ -4361,14 +4360,13 @@ MCowBQYDK2VwAyEAB2IYqBWXAouDt3WcCZgCM3t9gumMEKMlgMsGenSu+fA=
 		}
 
 		// dpop proof assertions
-		dt := *dpop
-		assert.Equal(t, "bXUGNpUfcRx3EhB34xP3y62aQZoGZS6j", dt["chal"].(string))
-		assert.Equal(t, "wireapp://%40alice_wire@wire.com", dt["handle"].(string))
-		assert.Equal(t, "POST", dt["htm"].(string))
-		assert.Equal(t, "http://wire.com:19983/clients/7a41cf5b79683410/access-token", dt["htu"].(string))
-		assert.Equal(t, "5e6684cb-6b48-468d-b091-ff04bed6ec2e", dt["jti"].(string))
-		assert.Equal(t, "UEJyR2dqOEhzZFJEYWJBaTkyODNEYTE2aEs0dHIxcEc", dt["nonce"].(string))
-		assert.Equal(t, "wireapp://guVX5xeFS3eTatmXBIyA4A!7a41cf5b79683410@wire.com", dt["sub"].(string))
-		assert.Equal(t, "wire", dt["team"].(string))
+		assert.Equal(t, "bXUGNpUfcRx3EhB34xP3y62aQZoGZS6j", dpop.Challenge)
+		assert.Equal(t, "wireapp://%40alice_wire@wire.com", dpop.Handle)
+		assert.Equal(t, "POST", dpop.Method)
+		assert.Equal(t, "http://wire.com:19983/clients/7a41cf5b79683410/access-token", dpop.URL)
+		assert.Equal(t, "5e6684cb-6b48-468d-b091-ff04bed6ec2e", dpop.ID)
+		assert.Equal(t, "UEJyR2dqOEhzZFJEYWJBaTkyODNEYTE2aEs0dHIxcEc", dpop.Nonce)
+		assert.Equal(t, "wireapp://guVX5xeFS3eTatmXBIyA4A!7a41cf5b79683410@wire.com", dpop.Subject)
+		assert.Equal(t, "wire", dpop.Team)
 	}
 }

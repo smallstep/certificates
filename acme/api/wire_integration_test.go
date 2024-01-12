@@ -370,7 +370,7 @@ MCowBQYDK2VwAyEA5c+4NKZSNQcR1T8qN6SjwgdPZQ0Ge12Ylx/YeGAJ35k=
 		require.NoError(t, err)
 
 		// TODO(hs): move these to a more appropriate place and/or provide more realistic value
-		err = db.CreateDpopToken(ctx, order.ID, map[string]any{"fake-dpop": "dpop-value"})
+		err = db.CreateDpopToken(ctx, order.ID, &acme.WireDpopToken{Challenge: "challenge", Handle: "handle", Team: "wire"})
 		require.NoError(t, err)
 		err = db.CreateOidcToken(ctx, order.ID, map[string]any{"fake-oidc": "oidc-value"})
 		require.NoError(t, err)
