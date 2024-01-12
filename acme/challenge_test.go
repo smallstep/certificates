@@ -4332,13 +4332,18 @@ MCowBQYDK2VwAyEAB2IYqBWXAouDt3WcCZgCM3t9gumMEKMlgMsGenSu+fA=
 	var accountJWK jose.JSONWebKey
 	json.Unmarshal(jwkBytes, &accountJWK)
 
-	at, dpop, err := parseAndVerifyWireAccessToken(verifyParams{
+	rawKid, err := accountJWK.Thumbprint(crypto.SHA256)
+	require.NoError(t, err)
+	accountJWK.KeyID = base64.RawURLEncoding.EncodeToString(rawKid)
+
+	at, dpop, err := parseAndVerifyWireAccessToken(wireVerifyParams{
 		token:     token,
 		tokenKey:  publicKey,
-		dpopKey:   &accountJWK,
+		dpopKey:   accountJWK.Public(),
+		dpopKeyID: accountJWK.KeyID,
 		issuer:    issuer,
 		wireID:    wireID,
-		challenge: ch,
+		chToken:   ch.Token,
 		t:         issuedAt.Add(1 * time.Minute), // set validation time to be one minute after issuance
 	})
 	if assert.NoError(t, err) {
