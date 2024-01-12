@@ -4382,21 +4382,11 @@ MCowBQYDK2VwAyEA5c+4NKZSNQcR1T8qN6SjwgdPZQ0Ge12Ylx/YeGAJ35k=
 	opts := &wireprovisioner.Options{
 		OIDC: &wireprovisioner.OIDCOptions{
 			Provider: &wireprovisioner.Provider{
-				IssuerURL:   "https://issuer.example.com",
-				AuthURL:     "",
-				TokenURL:    "",
-				JWKSURL:     "",
-				UserInfoURL: "",
-				Algorithms:  []string{},
+				IssuerURL: "https://issuer.example.com",
 			},
 			Config: &wireprovisioner.Config{
-				ClientID:                   "unit test",
-				SignatureAlgorithms:        []string{},
-				SkipClientIDCheck:          true,
-				SkipExpiryCheck:            true,
-				SkipIssuerCheck:            true,
-				InsecureSkipSignatureCheck: true,
-				Now:                        time.Now,
+				ClientID: "unit test",
+				Now:      time.Now,
 			},
 			TransformTemplate: transformTemplate,
 		},
@@ -4412,7 +4402,7 @@ MCowBQYDK2VwAyEA5c+4NKZSNQcR1T8qN6SjwgdPZQ0Ge12Ylx/YeGAJ35k=
 }
 
 func Test_idTokenTransformation(t *testing.T) {
-	// {"name": "wireapp://%40alice_wire@wire.com", "handle": "Alice Smith", "iss": "http://dex:15818/dex"}
+	// {"name": "wireapp://%40alice_wire@wire.com", "preferred_username": "Alice Smith", "iss": "http://dex:15818/dex", ...}
 	idTokenString := `eyJhbGciOiJSUzI1NiIsImtpZCI6IjZhNDZlYzQ3YTQzYWI1ZTc4NzU3MzM5NWY1MGY4ZGQ5MWI2OTM5MzcifQ.eyJpc3MiOiJodHRwOi8vZGV4OjE1ODE4L2RleCIsInN1YiI6IkNqcDNhWEpsWVhCd09pOHZTMmh0VjBOTFpFTlRXakoyT1dWTWFHRk9XVlp6WnlFeU5UZzFNVEpoT0RRek5qTXhaV1V6UUhkcGNtVXVZMjl0RWdSc1pHRnciLCJhdWQiOiJ3aXJlYXBwIiwiZXhwIjoxNzA1MDkxNTYyLCJpYXQiOjE3MDUwMDUxNjIsIm5vbmNlIjoib0VjUzBRQUNXLVIyZWkxS09wUmZ2QSIsImF0X2hhc2giOiJoYzk0NmFwS25FeEV5TDVlSzJZMzdRIiwiY19oYXNoIjoidmRubFp2V1d1bVd1Z2NYR1JpOU5FUSIsIm5hbWUiOiJ3aXJlYXBwOi8vJTQwYWxpY2Vfd2lyZUB3aXJlLmNvbSIsInByZWZlcnJlZF91c2VybmFtZSI6IkFsaWNlIFNtaXRoIn0.aEBhWJugBJ9J_0L_4odUCg8SR8HMXVjd__X8uZRo42BSJQQO7-wdpy0jU3S4FOX9fQKr68wD61gS_QsnhfiT7w9U36mLpxaYlNVDCYfpa-gklVFit_0mjUOukXajTLK6H527TGiSss8z22utc40ckS1SbZa2BzKu3yOcqnFHUQwQc5sLYfpRABTB6WBoYFtnWDzdpyWJDaOzz7lfKYv2JBnf9vV8u8SYm-6gNKgtiQ3UUnjhIVUjdfHet2BMvmV2ooZ8V441RULCzKKG_sWZba-D_k_TOnSholGobtUOcKHlmVlmfUe8v7kuyBdhbPcembfgViaNldLQGKZjZfgvLg`
 	var claims struct {
 		Name   string `json:"name,omitempty"`
