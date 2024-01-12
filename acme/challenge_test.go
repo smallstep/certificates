@@ -4309,7 +4309,7 @@ func Test_parseAndVerifyWireAccessToken(t *testing.T) {
 	key := `
 -----BEGIN PUBLIC KEY-----
 MCowBQYDK2VwAyEAB2IYqBWXAouDt3WcCZgCM3t9gumMEKMlgMsGenSu+fA=
------END PUBLIC KEY-----` // TODO(hs): different format?
+-----END PUBLIC KEY-----`
 	publicKey, err := pemutil.Parse([]byte(key))
 	require.NoError(t, err)
 	issuer := "http://wire.com:19983/clients/7a41cf5b79683410/access-token"

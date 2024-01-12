@@ -43,16 +43,16 @@ func (o *Options) Validate() error {
 
 func validate(o *Options) error {
 	if oidc := o.GetOIDCOptions(); oidc != nil {
-		if err := oidc.validate(); err != nil {
-			return fmt.Errorf("failed validating OIDC options: %w", err)
+		if err := oidc.validateAndInitialize(); err != nil {
+			return fmt.Errorf("failed initializing OIDC options: %w", err)
 		}
 	} else {
 		return errors.New("no OIDC options available")
 	}
 
 	if dpop := o.GetDPOPOptions(); dpop != nil {
-		if err := dpop.validate(); err != nil {
-			return fmt.Errorf("failed validating DPoP options: %w", err)
+		if err := dpop.validateAndInitialize(); err != nil {
+			return fmt.Errorf("failed initializing DPoP options: %w", err)
 		}
 	} else {
 		return errors.New("no DPoP options available")
