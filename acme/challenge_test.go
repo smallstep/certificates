@@ -4333,13 +4333,13 @@ MCowBQYDK2VwAyEAB2IYqBWXAouDt3WcCZgCM3t9gumMEKMlgMsGenSu+fA=
 	json.Unmarshal(jwkBytes, &accountJWK)
 
 	at, dpop, err := parseAndVerifyWireAccessToken(verifyParams{
-		token:      token,
-		key:        publicKey,
-		accountJWK: &accountJWK,
-		issuer:     issuer,
-		wireID:     wireID,
-		challenge:  ch,
-		t:          issuedAt.Add(1 * time.Minute), // set validation time to be one minute after issuance
+		token:     token,
+		tokenKey:  publicKey,
+		dpopKey:   &accountJWK,
+		issuer:    issuer,
+		wireID:    wireID,
+		challenge: ch,
+		t:         issuedAt.Add(1 * time.Minute), // set validation time to be one minute after issuance
 	})
 	if assert.NoError(t, err) {
 		// token assertions

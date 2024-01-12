@@ -485,13 +485,13 @@ func wireDPOP01Validate(ctx context.Context, ch *Challenge, db DB, accountJWK *j
 	}
 
 	params := verifyParams{
-		token:      dpopPayload.AccessToken,
-		key:        dpopOptions.GetSigningKey(),
-		accountJWK: accountJWK,
-		issuer:     issuer,
-		wireID:     wireID,
-		challenge:  ch,
-		t:          clock.Now().UTC(),
+		token:     dpopPayload.AccessToken,
+		tokenKey:  dpopOptions.GetSigningKey(),
+		dpopKey:   accountJWK,
+		issuer:    issuer,
+		wireID:    wireID,
+		challenge: ch,
+		t:         clock.Now().UTC(),
 	}
 	_, dpop, err := parseAndVerifyWireAccessToken(params)
 	if err != nil {
@@ -540,13 +540,13 @@ type wireAccessToken struct {
 type wireDpopToken map[string]any
 
 type verifyParams struct {
-	token      string
-	key        crypto.PublicKey
-	accountJWK *jose.JSONWebKey
-	issuer     string
-	wireID     wire.ID
-	challenge  *Challenge
-	t          time.Time
+	token     string
+	tokenKey  crypto.PublicKey
+	dpopKey   *jose.JSONWebKey
+	issuer    string
+	wireID    wire.ID
+	challenge *Challenge
+	t         time.Time
 }
 
 func parseAndVerifyWireAccessToken(v verifyParams) (*wireAccessToken, *wireDpopToken, error) {
@@ -556,7 +556,7 @@ func parseAndVerifyWireAccessToken(v verifyParams) (*wireAccessToken, *wireDpopT
 	}
 
 	var accessToken wireAccessToken
-	if err = jwt.Claims(v.key, &accessToken); err != nil {
+	if err = jwt.Claims(v.tokenKey, &accessToken); err != nil {
 		return nil, nil, fmt.Errorf("failed validating Wire DPoP token claims: %w", err)
 	}
 
@@ -567,7 +567,7 @@ func parseAndVerifyWireAccessToken(v verifyParams) (*wireAccessToken, *wireDpopT
 		return nil, nil, fmt.Errorf("failed validation: %w", err)
 	}
 
-	rawKid, err := v.accountJWK.Thumbprint(crypto.SHA256)
+	rawKid, err := v.dpopKey.Thumbprint(crypto.SHA256)
 	if err != nil {
 		return nil, nil, fmt.Errorf("failed to compute JWK thumbprint")
 	}
@@ -591,7 +591,7 @@ func parseAndVerifyWireAccessToken(v verifyParams) (*wireAccessToken, *wireDpopT
 		return nil, nil, fmt.Errorf("invalid Wire DPoP token: %w", err)
 	}
 	var dpopToken wireDpopToken
-	if err := dpopJWT.Claims(v.accountJWK.Key, &dpopToken); err != nil {
+	if err := dpopJWT.Claims(v.dpopKey.Key, &dpopToken); err != nil {
 		return nil, nil, fmt.Errorf("failed validating Wire DPoP token claims: %w", err)
 	}
 

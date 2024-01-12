@@ -67,7 +67,7 @@ MCowBQYDK2VwAyEA5c+4NKZSNQcR1T8qN6SjwgdPZQ0Ge12Ylx/YeGAJ35k=
 				},
 				Config: &wire.Config{
 					ClientID:                   "integration test",
-					SupportedSigningAlgs:       []string{},
+					SignatureAlgorithms:        []string{},
 					SkipClientIDCheck:          true,
 					SkipExpiryCheck:            true,
 					SkipIssuerCheck:            true,

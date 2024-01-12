@@ -22,13 +22,13 @@ type Provider struct {
 }
 
 type Config struct {
-	ClientID                   string           `json:"client_id,omitempty"`
-	SupportedSigningAlgs       []string         `json:"supported_signing_algs,omitempty"`
+	ClientID                   string           `json:"clientId,omitempty"`
+	SignatureAlgorithms        []string         `json:"signatureAlgorithms,omitempty"`
 	SkipClientIDCheck          bool             `json:"-"`
 	SkipExpiryCheck            bool             `json:"-"`
 	SkipIssuerCheck            bool             `json:"-"`
-	Now                        func() time.Time `json:"-"`
 	InsecureSkipSignatureCheck bool             `json:"-"`
+	Now                        func() time.Time `json:"-"`
 }
 
 type OIDCOptions struct {
@@ -50,7 +50,7 @@ func (o *OIDCOptions) GetConfig() *oidc.Config {
 
 	return &oidc.Config{
 		ClientID:                   o.Config.ClientID,
-		SupportedSigningAlgs:       o.Config.SupportedSigningAlgs,
+		SupportedSigningAlgs:       o.Config.SignatureAlgorithms,
 		SkipClientIDCheck:          o.Config.SkipClientIDCheck,
 		SkipExpiryCheck:            o.Config.SkipExpiryCheck,
 		SkipIssuerCheck:            o.Config.SkipIssuerCheck,
