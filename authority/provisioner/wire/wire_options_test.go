@@ -84,6 +84,22 @@ MCowBQYDK2VwAyEA5c+4NKZSNQcR1T8qN6SjwgdPZQ0Ge12Ylx/YeGAJ35k=
 			expectedErr: errors.New(`failed initializing OIDC options: failed parsing OIDC template: template: DeviceID:1: unexpected "}" in command`),
 		},
 		{
+			name: "fail/invalid-transform-template",
+			fields: fields{
+				OIDC: &OIDCOptions{
+					Provider: &Provider{
+						IssuerURL: "https://example.com",
+					},
+					Config:            &Config{},
+					TransformTemplate: "{{}",
+				},
+				DPOP: &DPOPOptions{
+					SigningKey: key,
+				},
+			},
+			expectedErr: errors.New(`failed initializing OIDC options: failed parsing OIDC transformation template: template: transform:1: unexpected "}" in command`),
+		},
+		{
 			name: "fail/no-dpop-options",
 			fields: fields{
 				OIDC: &OIDCOptions{

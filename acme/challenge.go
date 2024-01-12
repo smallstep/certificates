@@ -25,6 +25,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/coreos/go-oidc/v3/oidc"
 	"github.com/fxamacker/cbor/v2"
 	"github.com/google/go-tpm/legacy/tpm2"
 	"github.com/smallstep/go-attestation/attest"
@@ -36,6 +37,7 @@ import (
 
 	"github.com/smallstep/certificates/acme/wire"
 	"github.com/smallstep/certificates/authority/provisioner"
+	wireprovisioner "github.com/smallstep/certificates/authority/provisioner/wire"
 )
 
 type ChallengeType string
@@ -408,8 +410,8 @@ func wireOIDC01Validate(ctx context.Context, ch *Challenge, db DB, jwk *jose.JSO
 			"keyAuthorization does not match; expected %q, but got %q", expectedKeyAuth, oidcPayload.KeyAuth))
 	}
 
-	if wireID.Name != claims.Name || wireID.Handle != claims.Handle {
-		return storeError(ctx, db, ch, false, NewError(ErrorRejectedIdentifierType, "claims in OIDC ID token don't match"))
+	if err := validateWireOIDCClaims(oidcOptions, idToken, wireID); err != nil {
+		return storeError(ctx, db, ch, true, WrapError(ErrorRejectedIdentifierType, err, "claims in OIDC ID token don't match"))
 	}
 
 	// Update and store the challenge.
@@ -441,6 +443,35 @@ func wireOIDC01Validate(ctx context.Context, ch *Challenge, db DB, jwk *jose.JSO
 	order := orders[len(orders)-1]
 	if err := db.CreateOidcToken(ctx, order, oidcToken); err != nil {
 		return WrapErrorISE(err, "failed storing OIDC id token")
+	}
+
+	return nil
+}
+
+func validateWireOIDCClaims(o *wireprovisioner.OIDCOptions, token *oidc.IDToken, wireID wire.ID) error {
+	var m map[string]any
+	if err := token.Claims(&m); err != nil {
+		return fmt.Errorf("failed extracting OIDC ID token claims: %w", err)
+	}
+	transformed, err := o.Transform(m)
+	if err != nil {
+		return fmt.Errorf("failed transforming OIDC ID token: %w", err)
+	}
+
+	name, ok := transformed["name"]
+	if !ok {
+		return fmt.Errorf("transformed OIDC ID token does not contain 'name'")
+	}
+	if wireID.Name != name {
+		return fmt.Errorf("invalid 'name' %q after transformation", name)
+	}
+
+	handle, ok := transformed["handle"]
+	if !ok {
+		return fmt.Errorf("transformed OIDC ID token does not contain 'handle'")
+	}
+	if wireID.Handle != handle {
+		return fmt.Errorf("invalid 'handle' %q after transformation", handle)
 	}
 
 	return nil
@@ -496,7 +527,8 @@ func wireDPOP01Validate(ctx context.Context, ch *Challenge, db DB, accountJWK *j
 	}
 	_, dpop, err := parseAndVerifyWireAccessToken(params)
 	if err != nil {
-		return WrapErrorISE(err, "failed validating token")
+		return storeError(ctx, db, ch, true, WrapError(ErrorRejectedIdentifierType, err,
+			"failed validating Wire access token"))
 	}
 
 	// Update and store the challenge.

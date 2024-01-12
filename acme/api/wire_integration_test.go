@@ -74,6 +74,7 @@ MCowBQYDK2VwAyEA5c+4NKZSNQcR1T8qN6SjwgdPZQ0Ge12Ylx/YeGAJ35k=
 					InsecureSkipSignatureCheck: true,
 					Now:                        time.Now,
 				},
+				TransformTemplate: "",
 			},
 			DPOP: &wire.DPOPOptions{
 				SigningKey: []byte(fakeKey),
