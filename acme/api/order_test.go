@@ -885,6 +885,10 @@ func TestHandler_NewOrder(t *testing.T) {
 	u := fmt.Sprintf("%s/acme/%s/order/ordID",
 		baseURL.String(), escProvName)
 
+	fakeWireSigningKey := `-----BEGIN PUBLIC KEY-----
+MCowBQYDK2VwAyEA5c+4NKZSNQcR1T8qN6SjwgdPZQ0Ge12Ylx/YeGAJ35k=
+-----END PUBLIC KEY-----`
+
 	type test struct {
 		ca         acme.CertificateAuthority
 		db         acme.DB
@@ -1719,17 +1723,17 @@ func TestHandler_NewOrder(t *testing.T) {
 			acmeWireProv := newWireProvisionerWithOptions(t, &provisioner.Options{
 				Wire: &wire.Options{
 					OIDC: &wire.OIDCOptions{
-						Provider: wire.ProviderJSON{
-							IssuerURL:   "",
+						Provider: &wire.Provider{
+							IssuerURL:   "https://issuer.example.com",
 							AuthURL:     "",
 							TokenURL:    "",
 							JWKSURL:     "",
 							UserInfoURL: "",
 							Algorithms:  []string{},
 						},
-						Config: wire.ConfigJSON{
+						Config: &wire.Config{
 							ClientID:                   "integration test",
-							SupportedSigningAlgs:       []string{},
+							SignatureAlgorithms:        []string{},
 							SkipClientIDCheck:          true,
 							SkipExpiryCheck:            true,
 							SkipIssuerCheck:            true,
@@ -1737,7 +1741,9 @@ func TestHandler_NewOrder(t *testing.T) {
 							Now:                        time.Now,
 						},
 					},
-					DPOP: &wire.DPOPOptions{},
+					DPOP: &wire.DPOPOptions{
+						SigningKey: []byte(fakeWireSigningKey),
+					},
 				},
 			})
 			acc := &acme.Account{ID: "accID"}

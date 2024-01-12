@@ -370,7 +370,12 @@ func wireOIDC01Validate(ctx context.Context, ch *Challenge, db DB, jwk *jose.JSO
 			"error unmarshalling Wire challenge payload"))
 	}
 
-	oidcOptions := prov.GetOptions().GetWireOptions().GetOIDCOptions()
+	wireOptions, err := prov.GetOptions().GetWireOptions()
+	if err != nil {
+		return WrapErrorISE(err, "failed getting Wire options")
+	}
+
+	oidcOptions := wireOptions.GetOIDCOptions()
 	idToken, err := oidcOptions.GetProvider(ctx).Verifier(oidcOptions.GetConfig()).Verify(ctx, oidcPayload.IDToken)
 	if err != nil {
 		return storeError(ctx, db, ch, false, WrapError(ErrorRejectedIdentifierType, err,
@@ -468,20 +473,25 @@ func wireDPOP01Validate(ctx context.Context, ch *Challenge, db DB, accountJWK *j
 		return WrapErrorISE(err, "error parsing device id")
 	}
 
-	dpopOptions := prov.GetOptions().GetWireOptions().GetDPOPOptions()
-	issuer, err := dpopOptions.GetTarget(clientID.DeviceID)
+	wireOptions, err := prov.GetOptions().GetWireOptions()
+	if err != nil {
+		return WrapErrorISE(err, "failed getting Wire options")
+	}
+
+	dpopOptions := wireOptions.GetDPOPOptions()
+	issuer, err := dpopOptions.EvaluateTarget(clientID.DeviceID)
 	if err != nil {
 		return WrapErrorISE(err, "invalid Go template registered for 'target'")
 	}
 
 	params := verifyParams{
-		token:      dpopPayload.AccessToken,
-		key:        dpopOptions.GetSigningKey(),
-		accountJWK: accountJWK,
-		issuer:     issuer,
-		wireID:     wireID,
-		challenge:  ch,
-		t:          clock.Now().UTC(),
+		token:     dpopPayload.AccessToken,
+		tokenKey:  dpopOptions.GetSigningKey(),
+		dpopKey:   accountJWK,
+		issuer:    issuer,
+		wireID:    wireID,
+		challenge: ch,
+		t:         clock.Now().UTC(),
 	}
 	_, dpop, err := parseAndVerifyWireAccessToken(params)
 	if err != nil {
@@ -530,33 +540,23 @@ type wireAccessToken struct {
 type wireDpopToken map[string]any
 
 type verifyParams struct {
-	token      string
-	key        string
-	issuer     string
-	accountJWK *jose.JSONWebKey
-	wireID     wire.ID
-	challenge  *Challenge
-	t          time.Time
+	token     string
+	tokenKey  crypto.PublicKey
+	dpopKey   *jose.JSONWebKey
+	issuer    string
+	wireID    wire.ID
+	challenge *Challenge
+	t         time.Time
 }
 
 func parseAndVerifyWireAccessToken(v verifyParams) (*wireAccessToken, *wireDpopToken, error) {
-	k, err := pemutil.Parse([]byte(v.key)) // TODO(hs): move this to earlier in the configuration process? Do it once?
-	if err != nil {
-		return nil, nil, fmt.Errorf("failed parsing public key: %w", err)
-	}
-
-	pk, ok := k.(ed25519.PublicKey) // TODO(hs): allow more key types
-	if !ok {
-		return nil, nil, fmt.Errorf("unexpected type: %T", k)
-	}
-
 	jwt, err := jose.ParseSigned(v.token)
 	if err != nil {
 		return nil, nil, fmt.Errorf("failed parsing token: %w", err)
 	}
 
 	var accessToken wireAccessToken
-	if err = jwt.Claims(pk, &accessToken); err != nil {
+	if err = jwt.Claims(v.tokenKey, &accessToken); err != nil {
 		return nil, nil, fmt.Errorf("failed validating Wire DPoP token claims: %w", err)
 	}
 
@@ -567,7 +567,7 @@ func parseAndVerifyWireAccessToken(v verifyParams) (*wireAccessToken, *wireDpopT
 		return nil, nil, fmt.Errorf("failed validation: %w", err)
 	}
 
-	rawKid, err := v.accountJWK.Thumbprint(crypto.SHA256)
+	rawKid, err := v.dpopKey.Thumbprint(crypto.SHA256)
 	if err != nil {
 		return nil, nil, fmt.Errorf("failed to compute JWK thumbprint")
 	}
@@ -590,9 +590,8 @@ func parseAndVerifyWireAccessToken(v verifyParams) (*wireAccessToken, *wireDpopT
 	if err != nil {
 		return nil, nil, fmt.Errorf("invalid Wire DPoP token: %w", err)
 	}
-
 	var dpopToken wireDpopToken
-	if err := dpopJWT.Claims(v.accountJWK.Key, &dpopToken); err != nil {
+	if err := dpopJWT.Claims(v.dpopKey.Key, &dpopToken); err != nil {
 		return nil, nil, fmt.Errorf("failed validating Wire DPoP token claims: %w", err)
 	}
 

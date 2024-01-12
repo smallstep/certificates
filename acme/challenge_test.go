@@ -34,6 +34,7 @@ import (
 	"go.step.sm/crypto/jose"
 	"go.step.sm/crypto/keyutil"
 	"go.step.sm/crypto/minica"
+	"go.step.sm/crypto/pemutil"
 	"go.step.sm/crypto/x509util"
 
 	"github.com/smallstep/certificates/acme/wire"
@@ -4308,7 +4309,9 @@ func Test_parseAndVerifyWireAccessToken(t *testing.T) {
 	key := `
 -----BEGIN PUBLIC KEY-----
 MCowBQYDK2VwAyEAB2IYqBWXAouDt3WcCZgCM3t9gumMEKMlgMsGenSu+fA=
------END PUBLIC KEY-----` // TODO(hs): different format?
+-----END PUBLIC KEY-----`
+	publicKey, err := pemutil.Parse([]byte(key))
+	require.NoError(t, err)
 	issuer := "http://wire.com:19983/clients/7a41cf5b79683410/access-token"
 	wireID := wire.ID{
 		ClientID: "wireapp://guVX5xeFS3eTatmXBIyA4A!7a41cf5b79683410@wire.com",
@@ -4330,13 +4333,13 @@ MCowBQYDK2VwAyEAB2IYqBWXAouDt3WcCZgCM3t9gumMEKMlgMsGenSu+fA=
 	json.Unmarshal(jwkBytes, &accountJWK)
 
 	at, dpop, err := parseAndVerifyWireAccessToken(verifyParams{
-		token:      token,
-		key:        key,
-		accountJWK: &accountJWK,
-		issuer:     issuer,
-		wireID:     wireID,
-		challenge:  ch,
-		t:          issuedAt.Add(1 * time.Minute), // set validation time to be one minute after issuance
+		token:     token,
+		tokenKey:  publicKey,
+		dpopKey:   &accountJWK,
+		issuer:    issuer,
+		wireID:    wireID,
+		challenge: ch,
+		t:         issuedAt.Add(1 * time.Minute), // set validation time to be one minute after issuance
 	})
 	if assert.NoError(t, err) {
 		// token assertions
