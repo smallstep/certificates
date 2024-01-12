@@ -55,7 +55,7 @@ MCowBQYDK2VwAyEA5c+4NKZSNQcR1T8qN6SjwgdPZQ0Ge12Ylx/YeGAJ35k=
 				},
 				DPOP: &DPOPOptions{},
 			},
-			expectedErr: errors.New("failed validating OIDC options: issuer URL must not be empty"),
+			expectedErr: errors.New("failed initializing OIDC options: issuer URL must not be empty"),
 		},
 		{
 			name: "fail/invalid-issuer-url",
@@ -68,7 +68,7 @@ MCowBQYDK2VwAyEA5c+4NKZSNQcR1T8qN6SjwgdPZQ0Ge12Ylx/YeGAJ35k=
 				},
 				DPOP: &DPOPOptions{},
 			},
-			expectedErr: errors.New(`failed validating OIDC options: failed creationg OIDC provider config: failed parsing issuer URL: parse "\x00": net/url: invalid control character in URL`),
+			expectedErr: errors.New(`failed initializing OIDC options: failed creationg OIDC provider config: failed parsing issuer URL: parse "\x00": net/url: invalid control character in URL`),
 		},
 		{
 			name: "fail/issuer-url-template",
@@ -81,7 +81,7 @@ MCowBQYDK2VwAyEA5c+4NKZSNQcR1T8qN6SjwgdPZQ0Ge12Ylx/YeGAJ35k=
 				},
 				DPOP: &DPOPOptions{},
 			},
-			expectedErr: errors.New(`failed validating OIDC options: failed parsing OIDC template: template: DeviceID:1: unexpected "}" in command`),
+			expectedErr: errors.New(`failed initializing OIDC options: failed parsing OIDC template: template: DeviceID:1: unexpected "}" in command`),
 		},
 		{
 			name: "fail/no-dpop-options",
@@ -110,7 +110,7 @@ MCowBQYDK2VwAyEA5c+4NKZSNQcR1T8qN6SjwgdPZQ0Ge12Ylx/YeGAJ35k=
 					Target:     "",
 				},
 			},
-			expectedErr: errors.New(`failed validating DPoP options: failed parsing key: error decoding PEM: not a valid PEM encoded block`),
+			expectedErr: errors.New(`failed initializing DPoP options: failed parsing key: error decoding PEM: not a valid PEM encoded block`),
 		},
 		{
 			name: "fail/target-template",
@@ -126,7 +126,7 @@ MCowBQYDK2VwAyEA5c+4NKZSNQcR1T8qN6SjwgdPZQ0Ge12Ylx/YeGAJ35k=
 					Target:     "{{}",
 				},
 			},
-			expectedErr: errors.New(`failed validating DPoP options: failed parsing DPoP template: template: DeviceID:1: unexpected "}" in command`),
+			expectedErr: errors.New(`failed initializing DPoP options: failed parsing DPoP template: template: DeviceID:1: unexpected "}" in command`),
 		},
 	}
 	for _, tt := range tests {
