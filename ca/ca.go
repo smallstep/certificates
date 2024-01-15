@@ -27,7 +27,7 @@ import (
 	adminAPI "github.com/smallstep/certificates/authority/admin/api"
 	"github.com/smallstep/certificates/authority/config"
 	"github.com/smallstep/certificates/db"
-	"github.com/smallstep/certificates/internal/meter"
+	"github.com/smallstep/certificates/internal/metrix"
 	"github.com/smallstep/certificates/logging"
 	"github.com/smallstep/certificates/monitoring"
 	"github.com/smallstep/certificates/scep"
@@ -47,7 +47,7 @@ type options struct {
 	sshHostPassword []byte
 	sshUserPassword []byte
 	database        db.AuthDB
-	meter           *meter.M
+	metricsAddr     string
 }
 
 func (o *options) apply(opts []Option) {
@@ -120,10 +120,10 @@ func WithQuiet(quiet bool) Option {
 	}
 }
 
-// WithMeter sets the meter.
-func WithMeter(m *meter.M) Option {
+// WithMetricsAddr sets the address on which the metrics server will bind one.
+func WithMetricsAddr(addr string) Option {
 	return func(o *options) {
-		o.meter = m
+		o.metricsAddr = addr
 	}
 }
 
@@ -134,6 +134,7 @@ type CA struct {
 	config      *config.Config
 	srv         *server.Server
 	insecureSrv *server.Server
+	metricsSrv  *server.Server
 	opts        *options
 	renewer     *TLSRenewer
 	compactStop chan struct{}
@@ -159,8 +160,6 @@ func (ca *CA) Init(cfg *config.Config) (*CA, error) {
 		authority.WithSSHHostPassword(ca.opts.sshHostPassword),
 		authority.WithSSHUserPassword(ca.opts.sshUserPassword),
 		authority.WithIssuerPassword(ca.opts.issuerPassword),
-		// TODO(@azazeal): hooks
-		// authority.WithPrometheusHooks(...),
 	}
 	if ca.opts.linkedCAToken != "" {
 		opts = append(opts, authority.WithLinkedCAToken(ca.opts.linkedCAToken))
@@ -174,8 +173,11 @@ func (ca *CA) Init(cfg *config.Config) (*CA, error) {
 		opts = append(opts, authority.WithQuietInit())
 	}
 
-	if m := ca.opts.meter; m != nil {
-		opts = append(opts, authority.WithHooks(m))
+	var meter *metrix.Meter
+	if ca.config.MetricsAddr != "" {
+		meter = metrix.New()
+
+		opts = append(opts, authority.WithMeter(meter))
 	}
 
 	webhookTransport := http.DefaultTransport.(*http.Transport).Clone()
@@ -214,11 +216,6 @@ func (ca *CA) Init(cfg *config.Config) (*CA, error) {
 	// Mount the CRL to the insecure mux
 	insecureMux.Get("/crl", api.CRL)
 	insecureMux.Get("/1.0/crl", api.CRL)
-
-	if m := ca.opts.meter; m != nil {
-		// TODO(@azazeal): grab reference to meter
-		insecureMux.Get("/-/prometheus", m.Handler)
-	}
 
 	// Add ACME api endpoints in /acme and /1.0/acme
 	dns := cfg.DNSNames[0]
@@ -338,6 +335,13 @@ func (ca *CA) Init(cfg *config.Config) (*CA, error) {
 		}
 	}
 
+	if meter != nil {
+		ca.metricsSrv = server.New(ca.config.MetricsAddr, meter, nil)
+		ca.metricsSrv.BaseContext = func(net.Listener) context.Context {
+			return baseContext
+		}
+	}
+
 	return ca, nil
 }
 
@@ -424,6 +428,14 @@ func (ca *CA) Run() error {
 		}()
 	}
 
+	if ca.metricsSrv != nil {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			errs <- ca.metricsSrv.ListenAndServe()
+		}()
+	}
+
 	wg.Add(1)
 	go func() {
 		defer wg.Done()
@@ -487,6 +499,7 @@ func (ca *CA) Reload() error {
 		WithQuiet(ca.opts.quiet),
 		WithConfigFile(ca.opts.configFile),
 		WithDatabase(ca.auth.GetDatabase()),
+		WithMetricsAddr(ca.opts.metricsAddr),
 	)
 	if err != nil {
 		logContinue("Reload failed because the CA with new configuration could not be initialized.")
@@ -497,6 +510,13 @@ func (ca *CA) Reload() error {
 		if err = ca.insecureSrv.Reload(newCA.insecureSrv); err != nil {
 			logContinue("Reload failed because insecure server could not be replaced.")
 			return errors.Wrap(err, "error reloading insecure server")
+		}
+	}
+
+	if ca.metricsSrv != nil {
+		if err = ca.metricsSrv.Reload(newCA.metricsSrv); err != nil {
+			logContinue("Reload failed because metrics server could not be replaced.")
+			return errors.Wrap(err, "error reloading metrics server")
 		}
 	}
 

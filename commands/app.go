@@ -18,7 +18,6 @@ import (
 	"github.com/smallstep/certificates/authority/provisioner"
 	"github.com/smallstep/certificates/ca"
 	"github.com/smallstep/certificates/db"
-	"github.com/smallstep/certificates/internal/meter"
 	"github.com/smallstep/certificates/pki"
 	"github.com/urfave/cli"
 	"go.step.sm/cli-utils/errs"
@@ -254,8 +253,8 @@ To get a linked authority token:
 		ca.WithLinkedCAToken(token),
 		ca.WithQuiet(quiet),
 	}
-	if cfg.ServeMetrics {
-		caOpts = append(caOpts, ca.WithMeter(new(meter.M)))
+	if addr := cfg.MetricsAddr; addr != "" {
+		caOpts = append(caOpts, ca.WithMetricsAddr(addr))
 	}
 
 	srv, err := ca.New(cfg, caOpts...)

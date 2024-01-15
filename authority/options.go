@@ -382,10 +382,10 @@ func readCertificateBundle(pemCerts []byte) ([]*x509.Certificate, error) {
 	return certs, nil
 }
 
-// WithHooks is an option that sets the authority's [Hooks] to the provided ones.
-func WithHooks(h Hooks) Option {
+// WithMeter is an option that sets the authority's [Meter] to the provided one.
+func WithMeter(m Meter) Option {
 	return func(a *Authority) error {
-		a.hooks = h
+		a.meter = m
 		return nil
 	}
 }

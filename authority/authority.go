@@ -106,7 +106,7 @@ type Authority struct {
 	quietInit bool
 
 	// When not nil, called whenever applicable.
-	hooks Hooks
+	meter Meter
 }
 
 // Info contains information about the authority.

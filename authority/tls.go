@@ -289,8 +289,8 @@ func (a *Authority) Sign(csr *x509.CertificateRequest, signOpts provisioner.Sign
 		}
 	}
 
-	if h := a.hooks; h != nil {
-		h.X509CertificateIssued(prov.GetName())
+	if h := a.meter; h != nil {
+		h.X509Signatures(prov.GetName())
 	}
 
 	return fullchain, nil
