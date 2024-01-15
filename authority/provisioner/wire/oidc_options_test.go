@@ -9,9 +9,11 @@ import (
 )
 
 func TestOIDCOptions_Transform(t *testing.T) {
-	defaultTransform, err := template.New("defaultTransform").Parse(`{"name": "{{ .name }}", "handle": "{{ .preferred_username }}"}`)
+	defaultTransform, err := parseTransform(``)
 	require.NoError(t, err)
-	swapTransform, err := template.New("swapTransform").Parse(`{"name": "{{ .preferred_username }}", "handle": "{{ .name }}"}`)
+	swapTransform, err := parseTransform(`{"name": "{{ .preferred_username }}", "handle": "{{ .name }}"}`)
+	require.NoError(t, err)
+	funcTransform, err := parseTransform(`{"name": "{{ .name }}", "handle": "{{ first .usernames }}"}`)
 	require.NoError(t, err)
 	type fields struct {
 		transform *template.Template
@@ -84,6 +86,23 @@ func TestOIDCOptions_Transform(t *testing.T) {
 				"name":               "Preferred",
 				"handle":             "Example",
 				"preferred_username": "Preferred",
+			},
+		},
+		{
+			name: "ok/transform-with-functions",
+			fields: fields{
+				transform: funcTransform,
+			},
+			args: args{
+				v: map[string]any{
+					"name":      "Example",
+					"usernames": []string{"name-1", "name-2", "name-3"},
+				},
+			},
+			want: map[string]any{
+				"name":      "Example",
+				"handle":    "name-1",
+				"usernames": []string{"name-1", "name-2", "name-3"},
 			},
 		},
 	}

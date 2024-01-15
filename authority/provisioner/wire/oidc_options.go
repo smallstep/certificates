@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/coreos/go-oidc/v3/oidc"
+	"go.step.sm/crypto/x509util"
 )
 
 type Provider struct {
@@ -85,16 +86,20 @@ func (o *OIDCOptions) validateAndInitialize() (err error) {
 		return fmt.Errorf("failed parsing OIDC template: %w", err)
 	}
 
-	transformTemplate := defaultTemplate
-	if o.TransformTemplate != "" {
-		transformTemplate = o.TransformTemplate
-	}
-	o.transform, err = template.New("transform").Parse(transformTemplate)
+	o.transform, err = parseTransform(o.TransformTemplate)
 	if err != nil {
 		return fmt.Errorf("failed parsing OIDC transformation template: %w", err)
 	}
 
 	return nil
+}
+
+func parseTransform(transformTemplate string) (*template.Template, error) {
+	if transformTemplate == "" {
+		transformTemplate = defaultTemplate
+	}
+
+	return template.New("transform").Funcs(x509util.GetFuncMap()).Parse(transformTemplate)
 }
 
 func (o *OIDCOptions) EvaluateTarget(deviceID string) (string, error) {
@@ -109,6 +114,7 @@ func (o *OIDCOptions) Transform(v map[string]any) (map[string]any, error) {
 	if o.transform == nil || v == nil {
 		return v, nil
 	}
+	// TODO(hs): add support for extracting error message from template "fail" function?
 	buf := new(bytes.Buffer)
 	if err := o.transform.Execute(buf, v); err != nil {
 		return nil, fmt.Errorf("failed executing OIDC transformation: %w", err)
