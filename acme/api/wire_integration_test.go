@@ -12,7 +12,6 @@ import (
 	"encoding/json"
 	"errors"
 	"io"
-	"math/big"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
@@ -28,8 +27,11 @@ import (
 	"github.com/smallstep/certificates/authority/provisioner"
 	"github.com/smallstep/certificates/authority/provisioner/wire"
 	nosqlDB "github.com/smallstep/nosql"
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"go.step.sm/crypto/jose"
+	"go.step.sm/crypto/minica"
+	"go.step.sm/crypto/x509util"
 )
 
 const (
@@ -55,6 +57,17 @@ func TestWireIntegration(t *testing.T) {
 MCowBQYDK2VwAyEA5c+4NKZSNQcR1T8qN6SjwgdPZQ0Ge12Ylx/YeGAJ35k=
 -----END PUBLIC KEY-----`
 	prov := newWireProvisionerWithOptions(t, &provisioner.Options{
+		X509: &provisioner.X509Options{
+			Template: `{
+				"subject": {
+					"organization": "WireTest",
+					"commonName": {{ toJson .Oidc.name }}
+				},
+				"uris": [{{ toJson .Oidc.handle }}, {{ toJson .Dpop.sub }}],
+				"keyUsage": ["digitalSignature"],
+				"extKeyUsage": ["clientAuth"]
+			}`,
+		},
 		Wire: &wire.Options{
 			OIDC: &wire.OIDCOptions{
 				Provider: &wire.Provider{
@@ -298,6 +311,16 @@ MCowBQYDK2VwAyEA5c+4NKZSNQcR1T8qN6SjwgdPZQ0Ge12Ylx/YeGAJ35k=
 		updatedAz := updateAz(ctx, az)
 		for _, challenge := range updatedAz.Challenges {
 			t.Log("updated challenge:", challenge.ID, challenge.Status)
+			switch challenge.Type {
+			case acme.WIREOIDC01:
+				err = db.CreateOidcToken(ctx, order.ID, map[string]any{"name": "Smith, Alice M (QA)", "handle": "%40alice.smith.qa@example.com"})
+				require.NoError(t, err)
+			case acme.WIREDPOP01:
+				err = db.CreateDpopToken(ctx, order.ID, map[string]any{"sub": "wireapp://lJGYPz0ZRq2kvc_XpdaDlA!ed416ce8ecdd9fad@example.com"})
+				require.NoError(t, err)
+			default:
+				require.Fail(t, "unexpected challenge type")
+			}
 		}
 	}
 
@@ -329,11 +352,36 @@ MCowBQYDK2VwAyEA5c+4NKZSNQcR1T8qN6SjwgdPZQ0Ge12Ylx/YeGAJ35k=
 
 	// finalize order
 	finalizedOrder := func(ctx context.Context) (finalizedOrder *acme.Order) {
+		ca, err := minica.New(minica.WithName("WireTestCA"))
+		require.NoError(t, err)
 		mockMustAuthority(t, &mockCASigner{
-			signer: func(*x509.CertificateRequest, provisioner.SignOptions, ...provisioner.SignOption) ([]*x509.Certificate, error) {
-				return []*x509.Certificate{
-					{SerialNumber: big.NewInt(2)},
-				}, nil
+			signer: func(csr *x509.CertificateRequest, signOpts provisioner.SignOptions, extraOpts ...provisioner.SignOption) ([]*x509.Certificate, error) {
+				var (
+					certOptions []x509util.Option
+				)
+				for _, op := range extraOpts {
+					if k, ok := op.(provisioner.CertificateOptions); ok {
+						certOptions = append(certOptions, k.Options(signOpts)...)
+					}
+				}
+
+				x509utilTemplate, err := x509util.NewCertificate(csr, certOptions...)
+				require.NoError(t, err)
+
+				template := x509utilTemplate.GetCertificate()
+				require.NotNil(t, template)
+
+				cert, err := ca.Sign(template)
+				require.NoError(t, err)
+
+				u1, err := url.Parse("%40alice.smith.qa@example.com")
+				require.NoError(t, err)
+				u2, err := url.Parse("wireapp://lJGYPz0ZRq2kvc_XpdaDlA%21ed416ce8ecdd9fad@example.com")
+				require.NoError(t, err)
+				assert.Equal(t, []*url.URL{u1, u2}, cert.URIs)
+				assert.Equal(t, "Smith, Alice M (QA)", cert.Subject.CommonName)
+
+				return []*x509.Certificate{cert, ca.Intermediate}, nil
 			},
 		})
 
@@ -368,12 +416,6 @@ MCowBQYDK2VwAyEA5c+4NKZSNQcR1T8qN6SjwgdPZQ0Ge12Ylx/YeGAJ35k=
 
 		fr := FinalizeRequest{CSR: base64.RawURLEncoding.EncodeToString(csr)}
 		frRaw, err := json.Marshal(fr)
-		require.NoError(t, err)
-
-		// TODO(hs): move these to a more appropriate place and/or provide more realistic value
-		err = db.CreateDpopToken(ctx, order.ID, map[string]any{"fake-dpop": "dpop-value"})
-		require.NoError(t, err)
-		err = db.CreateOidcToken(ctx, order.ID, map[string]any{"fake-oidc": "oidc-value"})
 		require.NoError(t, err)
 
 		ctx = context.WithValue(ctx, payloadContextKey, &payloadInfo{value: frRaw})
