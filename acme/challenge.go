@@ -401,6 +401,7 @@ func wireOIDC01Validate(ctx context.Context, ch *Challenge, db DB, jwk *jose.JSO
 		return WrapErrorISE(err, "error unmarshalling challenge data")
 	}
 
+	// TODO(hs): move this into validation?
 	expectedKeyAuth, err := KeyAuthorization(ch.Token, jwk)
 	if err != nil {
 		return err
@@ -410,7 +411,8 @@ func wireOIDC01Validate(ctx context.Context, ch *Challenge, db DB, jwk *jose.JSO
 			"keyAuthorization does not match; expected %q, but got %q", expectedKeyAuth, oidcPayload.KeyAuth))
 	}
 
-	if err := validateWireOIDCClaims(oidcOptions, idToken, wireID); err != nil {
+	transformedIDToken, err := validateWireOIDCClaims(oidcOptions, idToken, wireID)
+	if err != nil {
 		return storeError(ctx, db, ch, true, WrapError(ErrorRejectedIdentifierType, err, "claims in OIDC ID token don't match"))
 	}
 
@@ -423,15 +425,6 @@ func wireOIDC01Validate(ctx context.Context, ch *Challenge, db DB, jwk *jose.JSO
 		return WrapErrorISE(err, "error updating challenge")
 	}
 
-	parsedIDToken, err := jose.ParseSigned(oidcPayload.IDToken)
-	if err != nil {
-		return WrapErrorISE(err, "invalid OIDC ID token")
-	}
-	oidcToken := make(map[string]interface{})
-	if err := parsedIDToken.UnsafeClaimsWithoutVerification(&oidcToken); err != nil {
-		return WrapErrorISE(err, "failed parsing OIDC id token")
-	}
-
 	orders, err := db.GetAllOrdersByAccountID(ctx, ch.AccountID)
 	if err != nil {
 		return WrapErrorISE(err, "could not find current order by account id")
@@ -441,40 +434,40 @@ func wireOIDC01Validate(ctx context.Context, ch *Challenge, db DB, jwk *jose.JSO
 	}
 
 	order := orders[len(orders)-1]
-	if err := db.CreateOidcToken(ctx, order, oidcToken); err != nil {
+	if err := db.CreateOidcToken(ctx, order, transformedIDToken); err != nil {
 		return WrapErrorISE(err, "failed storing OIDC id token")
 	}
 
 	return nil
 }
 
-func validateWireOIDCClaims(o *wireprovisioner.OIDCOptions, token *oidc.IDToken, wireID wire.ID) error {
+func validateWireOIDCClaims(o *wireprovisioner.OIDCOptions, token *oidc.IDToken, wireID wire.ID) (map[string]any, error) {
 	var m map[string]any
 	if err := token.Claims(&m); err != nil {
-		return fmt.Errorf("failed extracting OIDC ID token claims: %w", err)
+		return nil, fmt.Errorf("failed extracting OIDC ID token claims: %w", err)
 	}
 	transformed, err := o.Transform(m)
 	if err != nil {
-		return fmt.Errorf("failed transforming OIDC ID token: %w", err)
+		return nil, fmt.Errorf("failed transforming OIDC ID token: %w", err)
 	}
 
 	name, ok := transformed["name"]
 	if !ok {
-		return fmt.Errorf("transformed OIDC ID token does not contain 'name'")
+		return nil, fmt.Errorf("transformed OIDC ID token does not contain 'name'")
 	}
 	if wireID.Name != name {
-		return fmt.Errorf("invalid 'name' %q after transformation", name)
+		return nil, fmt.Errorf("invalid 'name' %q after transformation", name)
 	}
 
 	handle, ok := transformed["handle"]
 	if !ok {
-		return fmt.Errorf("transformed OIDC ID token does not contain 'handle'")
+		return nil, fmt.Errorf("transformed OIDC ID token does not contain 'handle'")
 	}
 	if wireID.Handle != handle {
-		return fmt.Errorf("invalid 'handle' %q after transformation", handle)
+		return nil, fmt.Errorf("invalid 'handle' %q after transformation", handle)
 	}
 
-	return nil
+	return transformed, nil
 }
 
 type wireDpopPayload struct {
