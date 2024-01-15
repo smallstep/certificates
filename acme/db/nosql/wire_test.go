@@ -108,7 +108,8 @@ func TestDB_GetDpopToken(t *testing.T) {
 				assert.EqualError(t, err, tc.expectedErr.Error())
 				ae := &acme.Error{}
 				if errors.As(err, &ae) {
-					ee, _ := tc.expectedErr.(*acme.Error)
+					ee := &acme.Error{}
+					require.True(t, errors.As(tc.expectedErr, &ee))
 					assert.Equal(t, ee.Detail, ae.Detail)
 					assert.Equal(t, ee.Type, ae.Type)
 					assert.Equal(t, ee.Status, ae.Status)
@@ -296,7 +297,8 @@ func TestDB_GetOidcToken(t *testing.T) {
 				assert.EqualError(t, err, tc.expectedErr.Error())
 				ae := &acme.Error{}
 				if errors.As(err, &ae) {
-					ee, _ := tc.expectedErr.(*acme.Error)
+					ee := &acme.Error{}
+					require.True(t, errors.As(tc.expectedErr, &ee))
 					assert.Equal(t, ee.Detail, ae.Detail)
 					assert.Equal(t, ee.Type, ae.Type)
 					assert.Equal(t, ee.Status, ae.Status)
