@@ -52,6 +52,8 @@ func newWireProvisionerWithOptions(t *testing.T, options *provisioner.Options) *
 	return a
 }
 
+// TODO(hs): replace with test CA server + acmez based test client for
+// more realistic integration test?
 func TestWireIntegration(t *testing.T) {
 	fakeKey := `-----BEGIN PUBLIC KEY-----
 MCowBQYDK2VwAyEA5c+4NKZSNQcR1T8qN6SjwgdPZQ0Ge12Ylx/YeGAJ35k=
@@ -313,7 +315,7 @@ MCowBQYDK2VwAyEA5c+4NKZSNQcR1T8qN6SjwgdPZQ0Ge12Ylx/YeGAJ35k=
 			t.Log("updated challenge:", challenge.ID, challenge.Status)
 			switch challenge.Type {
 			case acme.WIREOIDC01:
-				err = db.CreateOidcToken(ctx, order.ID, map[string]any{"name": "Smith, Alice M (QA)", "handle": "%40alice.smith.qa@example.com"})
+				err = db.CreateOidcToken(ctx, order.ID, map[string]any{"name": "Smith, Alice M (QA)", "handle": "wireapp://%40alice.smith.qa@example.com"})
 				require.NoError(t, err)
 			case acme.WIREDPOP01:
 				err = db.CreateDpopToken(ctx, order.ID, map[string]any{"sub": "wireapp://lJGYPz0ZRq2kvc_XpdaDlA!ed416ce8ecdd9fad@example.com"})
@@ -374,7 +376,7 @@ MCowBQYDK2VwAyEA5c+4NKZSNQcR1T8qN6SjwgdPZQ0Ge12Ylx/YeGAJ35k=
 				cert, err := ca.Sign(template)
 				require.NoError(t, err)
 
-				u1, err := url.Parse("%40alice.smith.qa@example.com")
+				u1, err := url.Parse("wireapp://%40alice.smith.qa@example.com")
 				require.NoError(t, err)
 				u2, err := url.Parse("wireapp://lJGYPz0ZRq2kvc_XpdaDlA%21ed416ce8ecdd9fad@example.com")
 				require.NoError(t, err)
