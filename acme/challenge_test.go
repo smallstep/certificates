@@ -986,6 +986,150 @@ MCowBQYDK2VwAyEA5c+4NKZSNQcR1T8qN6SjwgdPZQ0Ge12Ylx/YeGAJ35k=
 				},
 			}
 		},
+		"ok/wire-dpop-01": func(t *testing.T) test {
+			jwk, keyAuth := mustAccountAndKeyAuthorization(t, "token")
+			_ = keyAuth // TODO(hs): keyAuth (not) required for DPoP? Or needs to be added to validation?
+			dpopSigner, err := jose.NewSigner(jose.SigningKey{
+				Algorithm: jose.SignatureAlgorithm(jwk.Algorithm),
+				Key:       jwk,
+			}, new(jose.SignerOptions))
+			require.NoError(t, err)
+			signerJWK, err := jose.GenerateJWK("EC", "P-256", "ES256", "sig", "", 0)
+			require.NoError(t, err)
+			signer, err := jose.NewSigner(jose.SigningKey{
+				Algorithm: jose.SignatureAlgorithm(signerJWK.Algorithm),
+				Key:       signerJWK,
+			}, new(jose.SignerOptions))
+			require.NoError(t, err)
+			signerPEMBlock, err := pemutil.Serialize(signerJWK.Public().Key)
+			require.NoError(t, err)
+			signerPEMBytes := pem.EncodeToMemory(signerPEMBlock)
+
+			dpopBytes, err := json.Marshal(struct {
+				jose.Claims
+				Challenge string `json:"chal,omitempty"`
+				Handle    string `json:"handle,omitempty"`
+			}{
+				Claims: jose.Claims{
+					Subject: "wireapp://guVX5xeFS3eTatmXBIyA4A!7a41cf5b79683410@wire.com",
+				},
+				Challenge: "token",
+				Handle:    "wireapp://%40alice_wire@wire.com",
+			})
+			require.NoError(t, err)
+			dpop, err := dpopSigner.Sign(dpopBytes)
+			require.NoError(t, err)
+			proof, err := dpop.CompactSerialize()
+			require.NoError(t, err)
+
+			tokenBytes, err := json.Marshal(struct {
+				jose.Claims
+				Challenge string `json:"chal,omitempty"`
+				Cnf       struct {
+					Kid string `json:"kid,omitempty"`
+				} `json:"cnf"`
+				Proof      string `json:"proof,omitempty"`
+				ClientID   string `json:"client_id"`
+				APIVersion int    `json:"api_version"`
+				Scope      string `json:"scope"`
+			}{
+				Claims: jose.Claims{
+					Issuer:   "http://issuer.example.com",
+					Audience: []string{"test"},
+					Expiry:   jose.NewNumericDate(time.Now().Add(1 * time.Minute)),
+				},
+				Challenge: "token",
+				Cnf: struct {
+					Kid string `json:"kid,omitempty"`
+				}{
+					Kid: jwk.KeyID,
+				},
+				Proof:      proof,
+				ClientID:   "wireapp://CzbfFjDOQrenCbDxVmgnFw!594930e9d50bb175@wire.com",
+				APIVersion: 5,
+				Scope:      "wire_client_id",
+			})
+
+			require.NoError(t, err)
+			signed, err := signer.Sign(tokenBytes)
+			require.NoError(t, err)
+			accessToken, err := signed.CompactSerialize()
+			require.NoError(t, err)
+			payload, err := json.Marshal(struct {
+				AccessToken string `json:"access_token"`
+			}{
+				AccessToken: accessToken,
+			})
+			require.NoError(t, err)
+			valueBytes, err := json.Marshal(struct {
+				Name     string `json:"name,omitempty"`
+				Domain   string `json:"domain,omitempty"`
+				ClientID string `json:"client-id,omitempty"`
+				Handle   string `json:"handle,omitempty"`
+			}{
+				Name:     "Alice Smith",
+				Domain:   "wire.com",
+				ClientID: "wireapp://CzbfFjDOQrenCbDxVmgnFw!594930e9d50bb175@wire.com",
+				Handle:   "wireapp://%40alice_wire@wire.com",
+			})
+			require.NoError(t, err)
+			ctx := NewProvisionerContext(context.Background(), newWireProvisionerWithOptions(t, &provisioner.Options{
+				Wire: &wireprovisioner.Options{
+					OIDC: &wireprovisioner.OIDCOptions{
+						Provider: &wireprovisioner.Provider{
+							IssuerURL: "http://issuerexample.com",
+						},
+						Config: &wireprovisioner.Config{
+							ClientID:                   "test",
+							SignatureAlgorithms:        []string{"ES256"},
+							SkipClientIDCheck:          false,
+							SkipExpiryCheck:            false,
+							SkipIssuerCheck:            false,
+							InsecureSkipSignatureCheck: false,
+							Now:                        time.Now,
+						},
+						TransformTemplate: "",
+					},
+					DPOP: &wireprovisioner.DPOPOptions{
+						SigningKey: signerPEMBytes,
+					},
+				},
+			}))
+			return test{
+				ch: &Challenge{
+					ID:              "chID",
+					AuthorizationID: "azID",
+					AccountID:       "accID",
+					Token:           "token",
+					Type:            "wire-dpop-01",
+					Status:          StatusPending,
+					Value:           string(valueBytes),
+				},
+				payload: payload,
+				ctx:     ctx,
+				jwk:     jwk,
+				db: &MockDB{
+					MockUpdateChallenge: func(ctx context.Context, updch *Challenge) error {
+						assert.Equal(t, "chID", updch.ID)
+						assert.Equal(t, "token", updch.Token)
+						assert.Equal(t, StatusValid, updch.Status)
+						assert.Equal(t, ChallengeType("wire-dpop-01"), updch.Type)
+						assert.Equal(t, string(valueBytes), updch.Value)
+						return nil
+					},
+					MockGetAllOrdersByAccountID: func(ctx context.Context, accountID string) ([]string, error) {
+						assert.Equal(t, "accID", accountID)
+						return []string{"orderID"}, nil
+					},
+					MockCreateDpopToken: func(ctx context.Context, orderID string, dpop map[string]interface{}) error {
+						assert.Equal(t, "orderID", orderID)
+						assert.Equal(t, "token", dpop["chal"].(string))
+						assert.Equal(t, "wireapp://%40alice_wire@wire.com", dpop["handle"].(string))
+						return nil
+					},
+				},
+			}
+		},
 	}
 	for name, run := range tests {
 		t.Run(name, func(t *testing.T) {
