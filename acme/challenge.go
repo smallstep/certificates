@@ -115,7 +115,7 @@ func (ch *Challenge) Validate(ctx context.Context, db DB, jwk *jose.JSONWebKey, 
 	case WIREDPOP01:
 		return wireDPOP01Validate(ctx, ch, db, jwk, payload)
 	default:
-		return NewErrorISE("unexpected challenge type '%s'", ch.Type)
+		return NewErrorISE("unexpected challenge type %q", ch.Type)
 	}
 }
 
@@ -378,7 +378,8 @@ func wireOIDC01Validate(ctx context.Context, ch *Challenge, db DB, jwk *jose.JSO
 	}
 
 	oidcOptions := wireOptions.GetOIDCOptions()
-	idToken, err := oidcOptions.GetProvider(ctx).Verifier(oidcOptions.GetConfig()).Verify(ctx, oidcPayload.IDToken)
+	verifier := oidcOptions.GetProvider(ctx).Verifier(oidcOptions.GetConfig())
+	idToken, err := verifier.Verify(ctx, oidcPayload.IDToken)
 	if err != nil {
 		return storeError(ctx, db, ch, false, WrapError(ErrorRejectedIdentifierType, err,
 			"error verifying ID token signature"))
