@@ -21,14 +21,14 @@ type dbDpopToken struct {
 func (db *DB) getDBDpopToken(_ context.Context, orderID string) (*dbDpopToken, error) {
 	b, err := db.db.Get(wireDpopTokenTable, []byte(orderID))
 	if nosql.IsErrNotFound(err) {
-		return nil, acme.NewError(acme.ErrorMalformedType, "dpop %s not found", orderID)
+		return nil, acme.NewError(acme.ErrorMalformedType, "dpop token %q not found", orderID)
 	} else if err != nil {
-		return nil, errors.Wrapf(err, "error loading dpop %s", orderID)
+		return nil, errors.Wrapf(err, "error loading dpop %q", orderID)
 	}
 
 	d := new(dbDpopToken)
 	if err := json.Unmarshal(b, d); err != nil {
-		return nil, errors.Wrapf(err, "error unmarshaling dpop %s into dbDpopToken", orderID)
+		return nil, errors.Wrapf(err, "error unmarshaling dpop %q into dbDpopToken", orderID)
 	}
 	return d, nil
 }
@@ -50,7 +50,7 @@ func (db *DB) GetDpopToken(ctx context.Context, orderID string) (map[string]any,
 func (db *DB) CreateDpopToken(ctx context.Context, orderID string, dpop map[string]any) error {
 	content, err := json.Marshal(dpop)
 	if err != nil {
-		return err
+		return fmt.Errorf("failed marshaling dpop token: %w", err)
 	}
 
 	now := clock.Now()
@@ -75,13 +75,13 @@ type dbOidcToken struct {
 func (db *DB) getDBOidcToken(_ context.Context, orderID string) (*dbOidcToken, error) {
 	b, err := db.db.Get(wireOidcTokenTable, []byte(orderID))
 	if nosql.IsErrNotFound(err) {
-		return nil, acme.NewError(acme.ErrorMalformedType, "oidc token %s not found", orderID)
+		return nil, acme.NewError(acme.ErrorMalformedType, "oidc token %q not found", orderID)
 	} else if err != nil {
-		return nil, errors.Wrapf(err, "error loading oidc token %s", orderID)
+		return nil, errors.Wrapf(err, "error loading oidc token %q", orderID)
 	}
 	o := new(dbOidcToken)
 	if err := json.Unmarshal(b, o); err != nil {
-		return nil, errors.Wrapf(err, "error unmarshaling oidc token %s into dbOidcToken", orderID)
+		return nil, errors.Wrapf(err, "error unmarshaling oidc token %q into dbOidcToken", orderID)
 	}
 	return o, nil
 }
@@ -103,7 +103,7 @@ func (db *DB) GetOidcToken(ctx context.Context, orderID string) (map[string]any,
 func (db *DB) CreateOidcToken(ctx context.Context, orderID string, idToken map[string]any) error {
 	content, err := json.Marshal(idToken)
 	if err != nil {
-		return err
+		return fmt.Errorf("failed marshaling oidc token: %w", err)
 	}
 
 	now := clock.Now()

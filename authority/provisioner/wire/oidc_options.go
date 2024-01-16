@@ -3,6 +3,7 @@ package wire
 import (
 	"bytes"
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"net/url"
@@ -10,6 +11,7 @@ import (
 	"time"
 
 	"github.com/coreos/go-oidc/v3/oidc"
+	"go.step.sm/crypto/x509util"
 )
 
 type Provider struct {
@@ -32,11 +34,13 @@ type Config struct {
 }
 
 type OIDCOptions struct {
-	Provider *Provider `json:"provider,omitempty"`
-	Config   *Config   `json:"config,omitempty"`
+	Provider          *Provider `json:"provider,omitempty"`
+	Config            *Config   `json:"config,omitempty"`
+	TransformTemplate string    `json:"transform,omitempty"`
 
 	oidcProviderConfig *oidc.ProviderConfig
 	target             *template.Template
+	transform          *template.Template
 }
 
 func (o *OIDCOptions) GetProvider(ctx context.Context) *oidc.Provider {
@@ -62,6 +66,8 @@ func (o *OIDCOptions) GetConfig() *oidc.Config {
 	}
 }
 
+const defaultTemplate = `{"name": "{{ .name }}", "handle": "{{ .preferred_username }}"}`
+
 func (o *OIDCOptions) validateAndInitialize() (err error) {
 	if o.Provider == nil {
 		return errors.New("provider not set")
@@ -80,7 +86,20 @@ func (o *OIDCOptions) validateAndInitialize() (err error) {
 		return fmt.Errorf("failed parsing OIDC template: %w", err)
 	}
 
+	o.transform, err = parseTransform(o.TransformTemplate)
+	if err != nil {
+		return fmt.Errorf("failed parsing OIDC transformation template: %w", err)
+	}
+
 	return nil
+}
+
+func parseTransform(transformTemplate string) (*template.Template, error) {
+	if transformTemplate == "" {
+		transformTemplate = defaultTemplate
+	}
+
+	return template.New("transform").Funcs(x509util.GetFuncMap()).Parse(transformTemplate)
 }
 
 func (o *OIDCOptions) EvaluateTarget(deviceID string) (string, error) {
@@ -89,6 +108,28 @@ func (o *OIDCOptions) EvaluateTarget(deviceID string) (string, error) {
 		return "", fmt.Errorf("failed executing OIDC template: %w", err)
 	}
 	return buf.String(), nil
+}
+
+func (o *OIDCOptions) Transform(v map[string]any) (map[string]any, error) {
+	if o.transform == nil || v == nil {
+		return v, nil
+	}
+	// TODO(hs): add support for extracting error message from template "fail" function?
+	buf := new(bytes.Buffer)
+	if err := o.transform.Execute(buf, v); err != nil {
+		return nil, fmt.Errorf("failed executing OIDC transformation: %w", err)
+	}
+	var r map[string]any
+	if err := json.Unmarshal(buf.Bytes(), &r); err != nil {
+		return nil, fmt.Errorf("failed unmarshaling transformed OIDC token: %w", err)
+	}
+	// add original claims if not yet in the transformed result
+	for key, value := range v {
+		if _, ok := r[key]; !ok {
+			r[key] = value
+		}
+	}
+	return r, nil
 }
 
 func toOIDCProviderConfig(in *Provider) (*oidc.ProviderConfig, error) {

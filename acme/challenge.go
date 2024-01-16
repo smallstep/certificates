@@ -25,6 +25,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/coreos/go-oidc/v3/oidc"
 	"github.com/fxamacker/cbor/v2"
 	"github.com/google/go-tpm/legacy/tpm2"
 	"github.com/smallstep/go-attestation/attest"
@@ -36,6 +37,7 @@ import (
 
 	"github.com/smallstep/certificates/acme/wire"
 	"github.com/smallstep/certificates/authority/provisioner"
+	wireprovisioner "github.com/smallstep/certificates/authority/provisioner/wire"
 )
 
 type ChallengeType string
@@ -113,7 +115,7 @@ func (ch *Challenge) Validate(ctx context.Context, db DB, jwk *jose.JSONWebKey, 
 	case WIREDPOP01:
 		return wireDPOP01Validate(ctx, ch, db, jwk, payload)
 	default:
-		return NewErrorISE("unexpected challenge type '%s'", ch.Type)
+		return NewErrorISE("unexpected challenge type %q", ch.Type)
 	}
 }
 
@@ -360,14 +362,18 @@ type wireOidcPayload struct {
 func wireOIDC01Validate(ctx context.Context, ch *Challenge, db DB, jwk *jose.JSONWebKey, payload []byte) error {
 	prov, ok := ProvisionerFromContext(ctx)
 	if !ok {
-		return NewErrorISE("no provisioner provided")
+		return NewErrorISE("missing provisioner")
 	}
 
 	var oidcPayload wireOidcPayload
 	err := json.Unmarshal(payload, &oidcPayload)
 	if err != nil {
-		return storeError(ctx, db, ch, false, WrapError(ErrorRejectedIdentifierType, err,
-			"error unmarshalling Wire challenge payload"))
+		return WrapError(ErrorMalformedType, err, "error unmarshalling Wire OIDC challenge payload")
+	}
+
+	wireID, err := wire.ParseID([]byte(ch.Value))
+	if err != nil {
+		return WrapErrorISE(err, "error unmarshalling challenge data")
 	}
 
 	wireOptions, err := prov.GetOptions().GetWireOptions()
@@ -375,10 +381,21 @@ func wireOIDC01Validate(ctx context.Context, ch *Challenge, db DB, jwk *jose.JSO
 		return WrapErrorISE(err, "failed getting Wire options")
 	}
 
-	oidcOptions := wireOptions.GetOIDCOptions()
-	idToken, err := oidcOptions.GetProvider(ctx).Verifier(oidcOptions.GetConfig()).Verify(ctx, oidcPayload.IDToken)
+	// TODO(hs): move this into validation below?
+	expectedKeyAuth, err := KeyAuthorization(ch.Token, jwk)
 	if err != nil {
-		return storeError(ctx, db, ch, false, WrapError(ErrorRejectedIdentifierType, err,
+		return WrapErrorISE(err, "error determining key authorization")
+	}
+	if expectedKeyAuth != oidcPayload.KeyAuth {
+		return storeError(ctx, db, ch, true, NewError(ErrorRejectedIdentifierType,
+			"keyAuthorization does not match; expected %q, but got %q", expectedKeyAuth, oidcPayload.KeyAuth))
+	}
+
+	oidcOptions := wireOptions.GetOIDCOptions()
+	verifier := oidcOptions.GetProvider(ctx).Verifier(oidcOptions.GetConfig())
+	idToken, err := verifier.Verify(ctx, oidcPayload.IDToken)
+	if err != nil {
+		return storeError(ctx, db, ch, true, WrapError(ErrorRejectedIdentifierType, err,
 			"error verifying ID token signature"))
 	}
 
@@ -390,26 +407,13 @@ func wireOIDC01Validate(ctx context.Context, ch *Challenge, db DB, jwk *jose.JSO
 		KeyAuth   string `json:"keyauth"` // TODO(hs): use this property instead of the one in the payload after https://github.com/wireapp/rusty-jwt-tools/tree/fix/keyauth is done
 	}
 	if err := idToken.Claims(&claims); err != nil {
-		return storeError(ctx, db, ch, false, WrapError(ErrorRejectedIdentifierType, err,
+		return storeError(ctx, db, ch, true, WrapError(ErrorRejectedIdentifierType, err,
 			"error retrieving claims from ID token"))
 	}
 
-	wireID, err := wire.ParseID([]byte(ch.Value))
+	transformedIDToken, err := validateWireOIDCClaims(oidcOptions, idToken, wireID)
 	if err != nil {
-		return WrapErrorISE(err, "error unmarshalling challenge data")
-	}
-
-	expectedKeyAuth, err := KeyAuthorization(ch.Token, jwk)
-	if err != nil {
-		return err
-	}
-	if expectedKeyAuth != oidcPayload.KeyAuth {
-		return storeError(ctx, db, ch, true, NewError(ErrorRejectedIdentifierType,
-			"keyAuthorization does not match; expected %q, but got %q", expectedKeyAuth, oidcPayload.KeyAuth))
-	}
-
-	if wireID.Name != claims.Name || wireID.Handle != claims.Handle {
-		return storeError(ctx, db, ch, false, NewError(ErrorRejectedIdentifierType, "claims in OIDC ID token don't match"))
+		return storeError(ctx, db, ch, true, WrapError(ErrorRejectedIdentifierType, err, "claims in OIDC ID token don't match"))
 	}
 
 	// Update and store the challenge.
@@ -421,29 +425,49 @@ func wireOIDC01Validate(ctx context.Context, ch *Challenge, db DB, jwk *jose.JSO
 		return WrapErrorISE(err, "error updating challenge")
 	}
 
-	parsedIDToken, err := jose.ParseSigned(oidcPayload.IDToken)
-	if err != nil {
-		return WrapErrorISE(err, "invalid OIDC ID token")
-	}
-	oidcToken := make(map[string]interface{})
-	if err := parsedIDToken.UnsafeClaimsWithoutVerification(&oidcToken); err != nil {
-		return WrapErrorISE(err, "failed parsing OIDC id token")
-	}
-
 	orders, err := db.GetAllOrdersByAccountID(ctx, ch.AccountID)
 	if err != nil {
-		return WrapErrorISE(err, "could not find current order by account id")
+		return WrapErrorISE(err, "could not retrieve current order by account id")
 	}
 	if len(orders) == 0 {
 		return NewErrorISE("there are not enough orders for this account for this custom OIDC challenge")
 	}
 
 	order := orders[len(orders)-1]
-	if err := db.CreateOidcToken(ctx, order, oidcToken); err != nil {
+	if err := db.CreateOidcToken(ctx, order, transformedIDToken); err != nil {
 		return WrapErrorISE(err, "failed storing OIDC id token")
 	}
 
 	return nil
+}
+
+func validateWireOIDCClaims(o *wireprovisioner.OIDCOptions, token *oidc.IDToken, wireID wire.ID) (map[string]any, error) {
+	var m map[string]any
+	if err := token.Claims(&m); err != nil {
+		return nil, fmt.Errorf("failed extracting OIDC ID token claims: %w", err)
+	}
+	transformed, err := o.Transform(m)
+	if err != nil {
+		return nil, fmt.Errorf("failed transforming OIDC ID token: %w", err)
+	}
+
+	name, ok := transformed["name"]
+	if !ok {
+		return nil, fmt.Errorf("transformed OIDC ID token does not contain 'name'")
+	}
+	if wireID.Name != name {
+		return nil, fmt.Errorf("invalid 'name' %q after transformation", name)
+	}
+
+	handle, ok := transformed["handle"]
+	if !ok {
+		return nil, fmt.Errorf("transformed OIDC ID token does not contain 'handle'")
+	}
+	if wireID.Handle != handle {
+		return nil, fmt.Errorf("invalid 'handle' %q after transformation", handle)
+	}
+
+	return transformed, nil
 }
 
 type wireDpopPayload struct {
@@ -459,8 +483,7 @@ func wireDPOP01Validate(ctx context.Context, ch *Challenge, db DB, accountJWK *j
 
 	var dpopPayload wireDpopPayload
 	if err := json.Unmarshal(payload, &dpopPayload); err != nil {
-		return storeError(ctx, db, ch, false, WrapError(ErrorRejectedIdentifierType, err,
-			"error unmarshalling Wire challenge payload"))
+		return WrapError(ErrorMalformedType, err, "error unmarshalling Wire DPoP challenge payload")
 	}
 
 	wireID, err := wire.ParseID([]byte(ch.Value))
@@ -496,7 +519,8 @@ func wireDPOP01Validate(ctx context.Context, ch *Challenge, db DB, accountJWK *j
 	}
 	_, dpop, err := parseAndVerifyWireAccessToken(params)
 	if err != nil {
-		return WrapErrorISE(err, "failed validating token")
+		return storeError(ctx, db, ch, true, WrapError(ErrorRejectedIdentifierType, err,
+			"failed validating Wire access token"))
 	}
 
 	// Update and store the challenge.

@@ -10,9 +10,9 @@ import (
 	"encoding/asn1"
 	"encoding/base64"
 	"encoding/json"
+	"encoding/pem"
 	"errors"
 	"io"
-	"math/big"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
@@ -28,8 +28,12 @@ import (
 	"github.com/smallstep/certificates/authority/provisioner"
 	"github.com/smallstep/certificates/authority/provisioner/wire"
 	nosqlDB "github.com/smallstep/nosql"
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"go.step.sm/crypto/jose"
+	"go.step.sm/crypto/minica"
+	"go.step.sm/crypto/pemutil"
+	"go.step.sm/crypto/x509util"
 )
 
 const (
@@ -50,11 +54,42 @@ func newWireProvisionerWithOptions(t *testing.T, options *provisioner.Options) *
 	return a
 }
 
+// TODO(hs): replace with test CA server + acmez based test client for
+// more realistic integration test?
 func TestWireIntegration(t *testing.T) {
-	fakeKey := `-----BEGIN PUBLIC KEY-----
-MCowBQYDK2VwAyEA5c+4NKZSNQcR1T8qN6SjwgdPZQ0Ge12Ylx/YeGAJ35k=
------END PUBLIC KEY-----`
+	accessTokenSignerJWK, err := jose.GenerateJWK("EC", "P-256", "ES256", "sig", "", 0)
+	require.NoError(t, err)
+
+	accessTokenSignerPEMBlock, err := pemutil.Serialize(accessTokenSignerJWK.Public().Key)
+	require.NoError(t, err)
+	accessTokenSignerPEMBytes := pem.EncodeToMemory(accessTokenSignerPEMBlock)
+
+	accessTokenSigner, err := jose.NewSigner(jose.SigningKey{
+		Algorithm: jose.SignatureAlgorithm(accessTokenSignerJWK.Algorithm),
+		Key:       accessTokenSignerJWK,
+	}, new(jose.SignerOptions))
+	require.NoError(t, err)
+
+	oidcTokenSignerJWK, err := jose.GenerateJWK("EC", "P-256", "ES256", "sig", "", 0)
+	require.NoError(t, err)
+	oidcTokenSigner, err := jose.NewSigner(jose.SigningKey{
+		Algorithm: jose.SignatureAlgorithm(oidcTokenSignerJWK.Algorithm),
+		Key:       oidcTokenSignerJWK,
+	}, new(jose.SignerOptions))
+	require.NoError(t, err)
+
 	prov := newWireProvisionerWithOptions(t, &provisioner.Options{
+		X509: &provisioner.X509Options{
+			Template: `{
+				"subject": {
+					"organization": "WireTest",
+					"commonName": {{ toJson .Oidc.name }}
+				},
+				"uris": [{{ toJson .Oidc.handle }}, {{ toJson .Dpop.sub }}],
+				"keyUsage": ["digitalSignature"],
+				"extKeyUsage": ["clientAuth"]
+			}`,
+		},
 		Wire: &wire.Options{
 			OIDC: &wire.OIDCOptions{
 				Provider: &wire.Provider{
@@ -71,12 +106,13 @@ MCowBQYDK2VwAyEA5c+4NKZSNQcR1T8qN6SjwgdPZQ0Ge12Ylx/YeGAJ35k=
 					SkipClientIDCheck:          true,
 					SkipExpiryCheck:            true,
 					SkipIssuerCheck:            true,
-					InsecureSkipSignatureCheck: true,
+					InsecureSkipSignatureCheck: true, // NOTE: this skips actual token verification
 					Now:                        time.Now,
 				},
+				TransformTemplate: "",
 			},
 			DPOP: &wire.DPOPOptions{
-				SigningKey: []byte(fakeKey),
+				SigningKey: accessTokenSignerPEMBytes,
 			},
 		},
 	})
@@ -112,6 +148,12 @@ MCowBQYDK2VwAyEA5c+4NKZSNQcR1T8qN6SjwgdPZQ0Ge12Ylx/YeGAJ35k=
 
 	ed25519PrivKey, ok := jwk.Key.(ed25519.PrivateKey)
 	require.True(t, ok)
+
+	dpopSigner, err := jose.NewSigner(jose.SigningKey{
+		Algorithm: jose.SignatureAlgorithm(jwk.Algorithm),
+		Key:       jwk,
+	}, new(jose.SignerOptions))
+	require.NoError(t, err)
 
 	ed25519PubKey, ok := ed25519PrivKey.Public().(ed25519.PublicKey)
 	require.True(t, ok)
@@ -256,7 +298,102 @@ MCowBQYDK2VwAyEA5c+4NKZSNQcR1T8qN6SjwgdPZQ0Ge12Ylx/YeGAJ35k=
 			chiCtx := chi.NewRouteContext()
 			chiCtx.URLParams.Add("chID", challenge.ID)
 			ctx = context.WithValue(ctx, chi.RouteCtxKey, chiCtx)
-			ctx = context.WithValue(ctx, payloadContextKey, &payloadInfo{value: nil})
+
+			var payload []byte
+			switch challenge.Type {
+			case acme.WIREDPOP01:
+				dpopBytes, err := json.Marshal(struct {
+					jose.Claims
+					Challenge string `json:"chal,omitempty"`
+					Handle    string `json:"handle,omitempty"`
+				}{
+					Claims: jose.Claims{
+						Subject: "wireapp://lJGYPz0ZRq2kvc_XpdaDlA!ed416ce8ecdd9fad@example.com",
+					},
+					Challenge: "token",
+					Handle:    "wireapp://%40alice.smith.qa@example.com",
+				})
+				require.NoError(t, err)
+				dpop, err := dpopSigner.Sign(dpopBytes)
+				require.NoError(t, err)
+				proof, err := dpop.CompactSerialize()
+				require.NoError(t, err)
+				tokenBytes, err := json.Marshal(struct {
+					jose.Claims
+					Challenge string `json:"chal,omitempty"`
+					Cnf       struct {
+						Kid string `json:"kid,omitempty"`
+					} `json:"cnf"`
+					Proof      string `json:"proof,omitempty"`
+					ClientID   string `json:"client_id"`
+					APIVersion int    `json:"api_version"`
+					Scope      string `json:"scope"`
+				}{
+					Claims: jose.Claims{
+						Issuer:   "http://issuer.example.com",
+						Audience: []string{"test"},
+						Expiry:   jose.NewNumericDate(time.Now().Add(1 * time.Minute)),
+					},
+					Challenge: "token",
+					Cnf: struct {
+						Kid string `json:"kid,omitempty"`
+					}{
+						Kid: jwk.KeyID,
+					},
+					Proof:      proof,
+					ClientID:   "wireapp://lJGYPz0ZRq2kvc_XpdaDlA!ed416ce8ecdd9fad@example.com",
+					APIVersion: 5,
+					Scope:      "wire_client_id",
+				})
+
+				require.NoError(t, err)
+				signed, err := accessTokenSigner.Sign(tokenBytes)
+				require.NoError(t, err)
+				accessToken, err := signed.CompactSerialize()
+				require.NoError(t, err)
+
+				p, err := json.Marshal(struct {
+					AccessToken string `json:"access_token"`
+				}{
+					AccessToken: accessToken,
+				})
+				require.NoError(t, err)
+				payload = p
+			case acme.WIREOIDC01:
+				keyAuth, err := acme.KeyAuthorization("token", jwk)
+				require.NoError(t, err)
+				tokenBytes, err := json.Marshal(struct {
+					jose.Claims
+					Name              string `json:"name,omitempty"`
+					PreferredUsername string `json:"preferred_username,omitempty"`
+				}{
+					Claims: jose.Claims{
+						Issuer:   "https://issuer.example.com",
+						Audience: []string{"test"},
+						Expiry:   jose.NewNumericDate(time.Now().Add(1 * time.Minute)),
+					},
+					Name:              "Alice Smith",
+					PreferredUsername: "wireapp://%40alice_wire@wire.com",
+				})
+				require.NoError(t, err)
+				signed, err := oidcTokenSigner.Sign(tokenBytes)
+				require.NoError(t, err)
+				idToken, err := signed.CompactSerialize()
+				require.NoError(t, err)
+				p, err := json.Marshal(struct {
+					IDToken string `json:"id_token"`
+					KeyAuth string `json:"keyauth"`
+				}{
+					IDToken: idToken,
+					KeyAuth: keyAuth,
+				})
+				require.NoError(t, err)
+				payload = p
+			default:
+				require.Fail(t, "unexpected challenge payload type")
+			}
+
+			ctx = context.WithValue(ctx, payloadContextKey, &payloadInfo{value: payload})
 
 			req := httptest.NewRequest(http.MethodGet, "https://random.local/", http.NoBody).WithContext(ctx)
 			w := httptest.NewRecorder()
@@ -297,6 +434,16 @@ MCowBQYDK2VwAyEA5c+4NKZSNQcR1T8qN6SjwgdPZQ0Ge12Ylx/YeGAJ35k=
 		updatedAz := updateAz(ctx, az)
 		for _, challenge := range updatedAz.Challenges {
 			t.Log("updated challenge:", challenge.ID, challenge.Status)
+			switch challenge.Type {
+			case acme.WIREOIDC01:
+				err = db.CreateOidcToken(ctx, order.ID, map[string]any{"name": "Smith, Alice M (QA)", "handle": "wireapp://%40alice.smith.qa@example.com"})
+				require.NoError(t, err)
+			case acme.WIREDPOP01:
+				err = db.CreateDpopToken(ctx, order.ID, map[string]any{"sub": "wireapp://lJGYPz0ZRq2kvc_XpdaDlA!ed416ce8ecdd9fad@example.com"})
+				require.NoError(t, err)
+			default:
+				require.Fail(t, "unexpected challenge type")
+			}
 		}
 	}
 
@@ -328,11 +475,36 @@ MCowBQYDK2VwAyEA5c+4NKZSNQcR1T8qN6SjwgdPZQ0Ge12Ylx/YeGAJ35k=
 
 	// finalize order
 	finalizedOrder := func(ctx context.Context) (finalizedOrder *acme.Order) {
+		ca, err := minica.New(minica.WithName("WireTestCA"))
+		require.NoError(t, err)
 		mockMustAuthority(t, &mockCASigner{
-			signer: func(*x509.CertificateRequest, provisioner.SignOptions, ...provisioner.SignOption) ([]*x509.Certificate, error) {
-				return []*x509.Certificate{
-					{SerialNumber: big.NewInt(2)},
-				}, nil
+			signer: func(csr *x509.CertificateRequest, signOpts provisioner.SignOptions, extraOpts ...provisioner.SignOption) ([]*x509.Certificate, error) {
+				var (
+					certOptions []x509util.Option
+				)
+				for _, op := range extraOpts {
+					if k, ok := op.(provisioner.CertificateOptions); ok {
+						certOptions = append(certOptions, k.Options(signOpts)...)
+					}
+				}
+
+				x509utilTemplate, err := x509util.NewCertificate(csr, certOptions...)
+				require.NoError(t, err)
+
+				template := x509utilTemplate.GetCertificate()
+				require.NotNil(t, template)
+
+				cert, err := ca.Sign(template)
+				require.NoError(t, err)
+
+				u1, err := url.Parse("wireapp://%40alice.smith.qa@example.com")
+				require.NoError(t, err)
+				u2, err := url.Parse("wireapp://lJGYPz0ZRq2kvc_XpdaDlA%21ed416ce8ecdd9fad@example.com")
+				require.NoError(t, err)
+				assert.Equal(t, []*url.URL{u1, u2}, cert.URIs)
+				assert.Equal(t, "Smith, Alice M (QA)", cert.Subject.CommonName)
+
+				return []*x509.Certificate{cert, ca.Intermediate}, nil
 			},
 		})
 
@@ -367,12 +539,6 @@ MCowBQYDK2VwAyEA5c+4NKZSNQcR1T8qN6SjwgdPZQ0Ge12Ylx/YeGAJ35k=
 
 		fr := FinalizeRequest{CSR: base64.RawURLEncoding.EncodeToString(csr)}
 		frRaw, err := json.Marshal(fr)
-		require.NoError(t, err)
-
-		// TODO(hs): move these to a more appropriate place and/or provide more realistic value
-		err = db.CreateDpopToken(ctx, order.ID, map[string]any{"fake-dpop": "dpop-value"})
-		require.NoError(t, err)
-		err = db.CreateOidcToken(ctx, order.ID, map[string]any{"fake-oidc": "oidc-value"})
 		require.NoError(t, err)
 
 		ctx = context.WithValue(ctx, payloadContextKey, &payloadInfo{value: frRaw})
