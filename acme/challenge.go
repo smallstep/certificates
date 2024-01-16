@@ -562,6 +562,12 @@ type wireAccessToken struct {
 	Scope      string  `json:"scope"`
 }
 
+type wireDpopJwt struct {
+	jose.Claims
+	ClientID  string `json:"client_id"`
+	Challenge string `json:"chal"`
+}
+
 type wireDpopToken map[string]any
 
 type wireVerifyParams struct {
@@ -581,6 +587,23 @@ func parseAndVerifyWireAccessToken(v wireVerifyParams) (*wireAccessToken, *wireD
 		return nil, nil, fmt.Errorf("failed parsing token: %w", err)
 	}
 
+	if len(jwt.Headers) != 1 {
+		return nil, nil, fmt.Errorf("token has wrong number of headers %d", len(jwt.Headers))
+	}
+	keyID, err := KeyToID(&jose.JSONWebKey{Key: v.tokenKey})
+	if err != nil {
+		return nil, nil, fmt.Errorf("failed calculating token key ID: %w", err)
+	}
+	jwtKeyID := jwt.Headers[0].KeyID
+	if jwtKeyID == "" {
+		if jwtKeyID, err = KeyToID(jwt.Headers[0].JSONWebKey); err != nil {
+			return nil, nil, fmt.Errorf("failed extracting token key ID: %w", err)
+		}
+	}
+	if jwtKeyID != keyID {
+		return nil, nil, fmt.Errorf("invalid token key ID %q", jwtKeyID)
+	}
+
 	var accessToken wireAccessToken
 	if err = jwt.Claims(v.tokenKey, &accessToken); err != nil {
 		return nil, nil, fmt.Errorf("failed validating Wire DPoP token claims: %w", err)
@@ -589,10 +612,13 @@ func parseAndVerifyWireAccessToken(v wireVerifyParams) (*wireAccessToken, *wireD
 	if err := accessToken.ValidateWithLeeway(jose.Expected{
 		Time:   v.t,
 		Issuer: v.issuer,
-	}, 360*time.Second); err != nil {
+	}, 1*time.Minute); err != nil {
 		return nil, nil, fmt.Errorf("failed validation: %w", err)
 	}
 
+	if accessToken.Challenge == "" {
+		return nil, nil, errors.New("access token challenge must not be empty")
+	}
 	if accessToken.Cnf.Kid != v.dpopKeyID {
 		return nil, nil, fmt.Errorf("expected kid %q; got %q", v.dpopKeyID, accessToken.Cnf.Kid)
 	}
@@ -602,11 +628,49 @@ func parseAndVerifyWireAccessToken(v wireVerifyParams) (*wireAccessToken, *wireD
 	if accessToken.Expiry.Time().After(v.t.Add(time.Hour * 24 * 365)) {
 		return nil, nil, fmt.Errorf("'exp' %s is too far into the future", accessToken.Expiry.Time().String())
 	}
+	if accessToken.Scope != "wire_client_id" {
+		return nil, nil, fmt.Errorf("invalid Wire scope %q", accessToken.Scope)
+	}
 
 	dpopJWT, err := jose.ParseSigned(accessToken.Proof)
 	if err != nil {
 		return nil, nil, fmt.Errorf("invalid Wire DPoP token: %w", err)
 	}
+	if len(dpopJWT.Headers) != 1 {
+		return nil, nil, fmt.Errorf("DPoP token has wrong number of headers %d", len(jwt.Headers))
+	}
+	dpopJwtKeyID := dpopJWT.Headers[0].KeyID
+	if dpopJwtKeyID == "" {
+		if dpopJwtKeyID, err = KeyToID(dpopJWT.Headers[0].JSONWebKey); err != nil {
+			return nil, nil, fmt.Errorf("failed extracting DPoP token key ID: %w", err)
+		}
+	}
+	if dpopJwtKeyID != v.dpopKeyID {
+		return nil, nil, fmt.Errorf("invalid DPoP token key ID %q", dpopJWT.Headers[0].KeyID)
+	}
+
+	var wireDpop wireDpopJwt
+	if err := dpopJWT.Claims(v.dpopKey, &wireDpop); err != nil {
+		return nil, nil, fmt.Errorf("failed validating Wire DPoP token claims: %w", err)
+	}
+
+	if err := wireDpop.ValidateWithLeeway(jose.Expected{
+		Time:   v.t,
+		Issuer: v.issuer,
+	}, 1*time.Minute); err != nil {
+		return nil, nil, fmt.Errorf("failed DPoP validation: %w", err)
+	}
+	if wireDpop.Expiry.Time().After(v.t.Add(time.Hour * 24 * 365)) {
+		return nil, nil, fmt.Errorf("'exp' %s is too far into the future", wireDpop.Expiry.Time().String())
+	}
+	if wireDpop.ClientID != v.wireID.ClientID {
+		return nil, nil, fmt.Errorf("DPoP contains invalid Wire client ID %q", wireDpop.ClientID)
+	}
+	if wireDpop.Challenge != accessToken.Challenge {
+		return nil, nil, fmt.Errorf("DPoP contains invalid challenge %q", wireDpop.Challenge)
+	}
+
+	// TODO(hs): can we use the wireDpopJwt and map that instead of doing Claims() twice?
 	var dpopToken wireDpopToken
 	if err := dpopJWT.Claims(v.dpopKey, &dpopToken); err != nil {
 		return nil, nil, fmt.Errorf("failed validating Wire DPoP token claims: %w", err)
@@ -616,7 +680,7 @@ func parseAndVerifyWireAccessToken(v wireVerifyParams) (*wireAccessToken, *wireD
 	if !ok {
 		return nil, nil, fmt.Errorf("invalid challenge in Wire DPoP token")
 	}
-	if challenge != v.chToken {
+	if challenge == "" || challenge != v.chToken {
 		return nil, nil, fmt.Errorf("invalid Wire DPoP challenge %q", challenge)
 	}
 
@@ -624,7 +688,7 @@ func parseAndVerifyWireAccessToken(v wireVerifyParams) (*wireAccessToken, *wireD
 	if !ok {
 		return nil, nil, fmt.Errorf("invalid handle in Wire DPoP token")
 	}
-	if handle != v.wireID.Handle {
+	if handle == "" || handle != v.wireID.Handle {
 		return nil, nil, fmt.Errorf("invalid Wire client handle %q", handle)
 	}
 

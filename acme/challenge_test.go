@@ -1007,12 +1007,14 @@ MCowBQYDK2VwAyEA5c+4NKZSNQcR1T8qN6SjwgdPZQ0Ge12Ylx/YeGAJ35k=
 				jose.Claims
 				Challenge string `json:"chal,omitempty"`
 				Handle    string `json:"handle,omitempty"`
+				ClientID  string `json:"client_id,omitempty"`
 			}{
 				Claims: jose.Claims{
 					Subject: "wireapp://CzbfFjDOQrenCbDxVmgnFw!594930e9d50bb175@wire.com",
 				},
 				Challenge: "token",
 				Handle:    "wireapp://%40alice_wire@wire.com",
+				ClientID:  "wireapp://CzbfFjDOQrenCbDxVmgnFw!594930e9d50bb175@wire.com",
 			})
 			require.NoError(t, err)
 			dpop, err := dpopSigner.Sign(dpopBytes)
