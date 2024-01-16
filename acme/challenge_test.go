@@ -31,18 +31,17 @@ import (
 	"time"
 
 	"github.com/fxamacker/cbor/v2"
-	"go.step.sm/crypto/jose"
-	"go.step.sm/crypto/keyutil"
-	"go.step.sm/crypto/minica"
-	"go.step.sm/crypto/pemutil"
-	"go.step.sm/crypto/x509util"
-
 	"github.com/smallstep/certificates/acme/wire"
 	"github.com/smallstep/certificates/authority/config"
 	"github.com/smallstep/certificates/authority/provisioner"
 	wireprovisioner "github.com/smallstep/certificates/authority/provisioner/wire"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"go.step.sm/crypto/jose"
+	"go.step.sm/crypto/keyutil"
+	"go.step.sm/crypto/minica"
+	"go.step.sm/crypto/pemutil"
+	"go.step.sm/crypto/x509util"
 )
 
 type mockClient struct {
@@ -888,7 +887,7 @@ MCowBQYDK2VwAyEA5c+4NKZSNQcR1T8qN6SjwgdPZQ0Ge12Ylx/YeGAJ35k=
 				Key:       signerJWK,
 			}, new(jose.SignerOptions))
 			require.NoError(t, err)
-			srv := mustOIDCServer(t, signerJWK.Public())
+			srv := mustJWKServer(t, signerJWK.Public())
 			tokenBytes, err := json.Marshal(struct {
 				jose.Claims
 				Name              string `json:"name,omitempty"`
@@ -1011,7 +1010,7 @@ MCowBQYDK2VwAyEA5c+4NKZSNQcR1T8qN6SjwgdPZQ0Ge12Ylx/YeGAJ35k=
 				Handle    string `json:"handle,omitempty"`
 			}{
 				Claims: jose.Claims{
-					Subject: "wireapp://guVX5xeFS3eTatmXBIyA4A!7a41cf5b79683410@wire.com",
+					Subject: "wireapp://CzbfFjDOQrenCbDxVmgnFw!594930e9d50bb175@wire.com",
 				},
 				Challenge: "token",
 				Handle:    "wireapp://%40alice_wire@wire.com",
@@ -1021,7 +1020,6 @@ MCowBQYDK2VwAyEA5c+4NKZSNQcR1T8qN6SjwgdPZQ0Ge12Ylx/YeGAJ35k=
 			require.NoError(t, err)
 			proof, err := dpop.CompactSerialize()
 			require.NoError(t, err)
-
 			tokenBytes, err := json.Marshal(struct {
 				jose.Claims
 				Challenge string `json:"chal,omitempty"`
@@ -1125,6 +1123,7 @@ MCowBQYDK2VwAyEA5c+4NKZSNQcR1T8qN6SjwgdPZQ0Ge12Ylx/YeGAJ35k=
 						assert.Equal(t, "orderID", orderID)
 						assert.Equal(t, "token", dpop["chal"].(string))
 						assert.Equal(t, "wireapp://%40alice_wire@wire.com", dpop["handle"].(string))
+						assert.Equal(t, "wireapp://CzbfFjDOQrenCbDxVmgnFw!594930e9d50bb175@wire.com", dpop["sub"].(string))
 						return nil
 					},
 				},
@@ -1163,7 +1162,7 @@ MCowBQYDK2VwAyEA5c+4NKZSNQcR1T8qN6SjwgdPZQ0Ge12Ylx/YeGAJ35k=
 	}
 }
 
-func mustOIDCServer(t *testing.T, pub jose.JSONWebKey) *httptest.Server {
+func mustJWKServer(t *testing.T, pub jose.JSONWebKey) *httptest.Server {
 	t.Helper()
 	mux := http.NewServeMux()
 	server := httptest.NewServer(mux)
@@ -4682,6 +4681,54 @@ MCowBQYDK2VwAyEAB2IYqBWXAouDt3WcCZgCM3t9gumMEKMlgMsGenSu+fA=
 		assert.Equal(t, "wireapp://guVX5xeFS3eTatmXBIyA4A!7a41cf5b79683410@wire.com", dt["sub"].(string))
 		assert.Equal(t, "wire", dt["team"].(string))
 	}
+}
+
+func Test_validateWireOIDCClaims(t *testing.T) {
+	fakeKey := `
+-----BEGIN PUBLIC KEY-----
+MCowBQYDK2VwAyEA5c+4NKZSNQcR1T8qN6SjwgdPZQ0Ge12Ylx/YeGAJ35k=
+-----END PUBLIC KEY-----`
+	opts := &wireprovisioner.Options{
+		OIDC: &wireprovisioner.OIDCOptions{
+			Provider: &wireprovisioner.Provider{
+				IssuerURL: "http://dex:15818/dex",
+			},
+			Config: &wireprovisioner.Config{
+				ClientID: "wireapp",
+				Now: func() time.Time {
+					return time.Date(2024, 1, 12, 18, 32, 41, 0, time.UTC) // (Token Expiry: 2024-01-12 21:32:42 +0100 CET)
+				},
+				InsecureSkipSignatureCheck: true,
+			},
+			TransformTemplate: `{"name": "{{ .preferred_username }}", "handle": "{{ .name }}"}`,
+		},
+		DPOP: &wireprovisioner.DPOPOptions{
+			SigningKey: []byte(fakeKey),
+		},
+	}
+
+	err := opts.Validate()
+	require.NoError(t, err)
+
+	idTokenString := `eyJhbGciOiJSUzI1NiIsImtpZCI6IjZhNDZlYzQ3YTQzYWI1ZTc4NzU3MzM5NWY1MGY4ZGQ5MWI2OTM5MzcifQ.eyJpc3MiOiJodHRwOi8vZGV4OjE1ODE4L2RleCIsInN1YiI6IkNqcDNhWEpsWVhCd09pOHZTMmh0VjBOTFpFTlRXakoyT1dWTWFHRk9XVlp6WnlFeU5UZzFNVEpoT0RRek5qTXhaV1V6UUhkcGNtVXVZMjl0RWdSc1pHRnciLCJhdWQiOiJ3aXJlYXBwIiwiZXhwIjoxNzA1MDkxNTYyLCJpYXQiOjE3MDUwMDUxNjIsIm5vbmNlIjoib0VjUzBRQUNXLVIyZWkxS09wUmZ2QSIsImF0X2hhc2giOiJoYzk0NmFwS25FeEV5TDVlSzJZMzdRIiwiY19oYXNoIjoidmRubFp2V1d1bVd1Z2NYR1JpOU5FUSIsIm5hbWUiOiJ3aXJlYXBwOi8vJTQwYWxpY2Vfd2lyZUB3aXJlLmNvbSIsInByZWZlcnJlZF91c2VybmFtZSI6IkFsaWNlIFNtaXRoIn0.aEBhWJugBJ9J_0L_4odUCg8SR8HMXVjd__X8uZRo42BSJQQO7-wdpy0jU3S4FOX9fQKr68wD61gS_QsnhfiT7w9U36mLpxaYlNVDCYfpa-gklVFit_0mjUOukXajTLK6H527TGiSss8z22utc40ckS1SbZa2BzKu3yOcqnFHUQwQc5sLYfpRABTB6WBoYFtnWDzdpyWJDaOzz7lfKYv2JBnf9vV8u8SYm-6gNKgtiQ3UUnjhIVUjdfHet2BMvmV2ooZ8V441RULCzKKG_sWZba-D_k_TOnSholGobtUOcKHlmVlmfUe8v7kuyBdhbPcembfgViaNldLQGKZjZfgvLg`
+	ctx := context.Background()
+	o := opts.GetOIDCOptions()
+	c := o.GetConfig()
+	verifier := o.GetProvider(ctx).Verifier(c)
+	idToken, err := verifier.Verify(ctx, idTokenString)
+	require.NoError(t, err)
+
+	wireID := wire.ID{
+		Name:   "Alice Smith",
+		Handle: "wireapp://%40alice_wire@wire.com",
+	}
+
+	got, err := validateWireOIDCClaims(o, idToken, wireID)
+	assert.NoError(t, err)
+
+	assert.Equal(t, "wireapp://%40alice_wire@wire.com", got["handle"].(string))
+	assert.Equal(t, "Alice Smith", got["name"].(string))
+	assert.Equal(t, "http://dex:15818/dex", got["iss"].(string))
 }
 
 func createWireOptions(t *testing.T, transformTemplate string) *wireprovisioner.Options {
