@@ -70,6 +70,14 @@ func TestWireIntegration(t *testing.T) {
 	}, new(jose.SignerOptions))
 	require.NoError(t, err)
 
+	oidcTokenSignerJWK, err := jose.GenerateJWK("EC", "P-256", "ES256", "sig", "", 0)
+	require.NoError(t, err)
+	oidcTokenSigner, err := jose.NewSigner(jose.SigningKey{
+		Algorithm: jose.SignatureAlgorithm(oidcTokenSignerJWK.Algorithm),
+		Key:       oidcTokenSignerJWK,
+	}, new(jose.SignerOptions))
+	require.NoError(t, err)
+
 	prov := newWireProvisionerWithOptions(t, &provisioner.Options{
 		X509: &provisioner.X509Options{
 			Template: `{
@@ -98,7 +106,7 @@ func TestWireIntegration(t *testing.T) {
 					SkipClientIDCheck:          true,
 					SkipExpiryCheck:            true,
 					SkipIssuerCheck:            true,
-					InsecureSkipSignatureCheck: true,
+					InsecureSkipSignatureCheck: true, // NOTE: this skips actual token verification
 					Now:                        time.Now,
 				},
 				TransformTemplate: "",
@@ -292,7 +300,8 @@ func TestWireIntegration(t *testing.T) {
 			ctx = context.WithValue(ctx, chi.RouteCtxKey, chiCtx)
 
 			var payload []byte
-			if challenge.Type == acme.WIREDPOP01 { // TODO(hs): OIDC payload
+			switch challenge.Type {
+			case acme.WIREDPOP01:
 				dpopBytes, err := json.Marshal(struct {
 					jose.Claims
 					Challenge string `json:"chal,omitempty"`
@@ -350,6 +359,38 @@ func TestWireIntegration(t *testing.T) {
 				})
 				require.NoError(t, err)
 				payload = p
+			case acme.WIREOIDC01:
+				keyAuth, err := acme.KeyAuthorization("token", jwk)
+				require.NoError(t, err)
+				tokenBytes, err := json.Marshal(struct {
+					jose.Claims
+					Name              string `json:"name,omitempty"`
+					PreferredUsername string `json:"preferred_username,omitempty"`
+				}{
+					Claims: jose.Claims{
+						Issuer:   "https://issuer.example.com",
+						Audience: []string{"test"},
+						Expiry:   jose.NewNumericDate(time.Now().Add(1 * time.Minute)),
+					},
+					Name:              "Alice Smith",
+					PreferredUsername: "wireapp://%40alice_wire@wire.com",
+				})
+				require.NoError(t, err)
+				signed, err := oidcTokenSigner.Sign(tokenBytes)
+				require.NoError(t, err)
+				idToken, err := signed.CompactSerialize()
+				require.NoError(t, err)
+				p, err := json.Marshal(struct {
+					IDToken string `json:"id_token"`
+					KeyAuth string `json:"keyauth"`
+				}{
+					IDToken: idToken,
+					KeyAuth: keyAuth,
+				})
+				require.NoError(t, err)
+				payload = p
+			default:
+				require.Fail(t, "unexpected challenge payload type")
 			}
 
 			ctx = context.WithValue(ctx, payloadContextKey, &payloadInfo{value: payload})
