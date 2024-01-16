@@ -244,7 +244,7 @@ To get a linked authority token:
 		}
 	}
 
-	caOpts := []ca.Option{
+	srv, err := ca.New(cfg,
 		ca.WithConfigFile(configFile),
 		ca.WithPassword(password),
 		ca.WithSSHHostPassword(sshHostPassword),
@@ -252,12 +252,7 @@ To get a linked authority token:
 		ca.WithIssuerPassword(issuerPassword),
 		ca.WithLinkedCAToken(token),
 		ca.WithQuiet(quiet),
-	}
-	if addr := cfg.MetricsAddr; addr != "" {
-		caOpts = append(caOpts, ca.WithMetricsAddr(addr))
-	}
-
-	srv, err := ca.New(cfg, caOpts...)
+	)
 	if err != nil {
 		fatal(err)
 	}

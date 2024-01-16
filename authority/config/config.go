@@ -328,6 +328,12 @@ func (c *Config) Validate() error {
 		return errors.Errorf("invalid address %s", c.Address)
 	}
 
+	if addr := c.MetricsAddr; addr != "" {
+		if _, _, err := net.SplitHostPort(addr); err != nil {
+			return errors.Errorf("invalid metrics address %s", c.Address)
+		}
+	}
+
 	if c.TLS == nil {
 		c.TLS = &DefaultTLSOptions
 	} else {

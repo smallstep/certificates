@@ -47,7 +47,6 @@ type options struct {
 	sshHostPassword []byte
 	sshUserPassword []byte
 	database        db.AuthDB
-	metricsAddr     string
 }
 
 func (o *options) apply(opts []Option) {
@@ -117,13 +116,6 @@ func WithLinkedCAToken(token string) Option {
 func WithQuiet(quiet bool) Option {
 	return func(o *options) {
 		o.quiet = quiet
-	}
-}
-
-// WithMetricsAddr sets the address on which the metrics server will bind one.
-func WithMetricsAddr(addr string) Option {
-	return func(o *options) {
-		o.metricsAddr = addr
 	}
 }
 
@@ -499,7 +491,6 @@ func (ca *CA) Reload() error {
 		WithQuiet(ca.opts.quiet),
 		WithConfigFile(ca.opts.configFile),
 		WithDatabase(ca.auth.GetDatabase()),
-		WithMetricsAddr(ca.opts.metricsAddr),
 	)
 	if err != nil {
 		logContinue("Reload failed because the CA with new configuration could not be initialized.")
