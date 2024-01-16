@@ -290,7 +290,7 @@ func (a *Authority) Sign(csr *x509.CertificateRequest, signOpts provisioner.Sign
 	}
 
 	if h := a.meter; h != nil {
-		h.X509Signatures(prov.GetName())
+		h.X509Signed(prov.GetName())
 	}
 
 	return fullchain, nil
@@ -347,7 +347,8 @@ func (a *Authority) RenewContext(ctx context.Context, oldCert *x509.Certificate,
 	}
 
 	// Check step provisioner extensions
-	if err := a.authorizeRenew(ctx, oldCert); err != nil {
+	prov, err := a.authorizeRenew(ctx, oldCert)
+	if err != nil {
 		return nil, errs.StatusCodeError(http.StatusInternalServerError, err, opts...)
 	}
 
@@ -448,6 +449,10 @@ func (a *Authority) RenewContext(ctx context.Context, oldCert *x509.Certificate,
 		if !errors.Is(err, db.ErrNotImplemented) {
 			return nil, errs.StatusCodeError(http.StatusInternalServerError, err, opts...)
 		}
+	}
+
+	if h := a.meter; h != nil {
+		h.X509Renewed(prov.GetName())
 	}
 
 	return fullchain, nil

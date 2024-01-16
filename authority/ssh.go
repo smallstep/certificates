@@ -301,7 +301,7 @@ func (a *Authority) SignSSH(_ context.Context, key ssh.PublicKey, opts provision
 	}
 
 	if h := a.meter; h != nil {
-		h.SSHSignatures(prov.GetName())
+		h.SSHSigned(prov.GetName())
 	}
 
 	return cert, nil
@@ -373,6 +373,8 @@ func (a *Authority) RenewSSH(ctx context.Context, oldCert *ssh.Certificate) (*ss
 	if err = a.storeRenewedSSHCertificate(prov, oldCert, cert); err != nil && !errors.Is(err, db.ErrNotImplemented) {
 		return nil, errs.Wrap(http.StatusInternalServerError, err, "renewSSH: error storing certificate in db")
 	}
+
+	// TODO(@azazeal): SSH renew trigger
 
 	return cert, nil
 }
