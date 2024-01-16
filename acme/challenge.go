@@ -362,14 +362,18 @@ type wireOidcPayload struct {
 func wireOIDC01Validate(ctx context.Context, ch *Challenge, db DB, jwk *jose.JSONWebKey, payload []byte) error {
 	prov, ok := ProvisionerFromContext(ctx)
 	if !ok {
-		return NewErrorISE("no provisioner provided")
+		return NewErrorISE("missing provisioner")
 	}
 
 	var oidcPayload wireOidcPayload
 	err := json.Unmarshal(payload, &oidcPayload)
 	if err != nil {
-		return storeError(ctx, db, ch, false, WrapError(ErrorRejectedIdentifierType, err,
-			"error unmarshalling Wire challenge payload"))
+		return WrapError(ErrorMalformedType, err, "error unmarshalling Wire OIDC challenge payload")
+	}
+
+	wireID, err := wire.ParseID([]byte(ch.Value))
+	if err != nil {
+		return WrapErrorISE(err, "error unmarshalling challenge data")
 	}
 
 	wireOptions, err := prov.GetOptions().GetWireOptions()
@@ -377,11 +381,21 @@ func wireOIDC01Validate(ctx context.Context, ch *Challenge, db DB, jwk *jose.JSO
 		return WrapErrorISE(err, "failed getting Wire options")
 	}
 
+	// TODO(hs): move this into validation below?
+	expectedKeyAuth, err := KeyAuthorization(ch.Token, jwk)
+	if err != nil {
+		return WrapErrorISE(err, "error determining key authorization")
+	}
+	if expectedKeyAuth != oidcPayload.KeyAuth {
+		return storeError(ctx, db, ch, true, NewError(ErrorRejectedIdentifierType,
+			"keyAuthorization does not match; expected %q, but got %q", expectedKeyAuth, oidcPayload.KeyAuth))
+	}
+
 	oidcOptions := wireOptions.GetOIDCOptions()
 	verifier := oidcOptions.GetProvider(ctx).Verifier(oidcOptions.GetConfig())
 	idToken, err := verifier.Verify(ctx, oidcPayload.IDToken)
 	if err != nil {
-		return storeError(ctx, db, ch, false, WrapError(ErrorRejectedIdentifierType, err,
+		return storeError(ctx, db, ch, true, WrapError(ErrorRejectedIdentifierType, err,
 			"error verifying ID token signature"))
 	}
 
@@ -393,23 +407,8 @@ func wireOIDC01Validate(ctx context.Context, ch *Challenge, db DB, jwk *jose.JSO
 		KeyAuth   string `json:"keyauth"` // TODO(hs): use this property instead of the one in the payload after https://github.com/wireapp/rusty-jwt-tools/tree/fix/keyauth is done
 	}
 	if err := idToken.Claims(&claims); err != nil {
-		return storeError(ctx, db, ch, false, WrapError(ErrorRejectedIdentifierType, err,
+		return storeError(ctx, db, ch, true, WrapError(ErrorRejectedIdentifierType, err,
 			"error retrieving claims from ID token"))
-	}
-
-	wireID, err := wire.ParseID([]byte(ch.Value))
-	if err != nil {
-		return WrapErrorISE(err, "error unmarshalling challenge data")
-	}
-
-	// TODO(hs): move this into validation?
-	expectedKeyAuth, err := KeyAuthorization(ch.Token, jwk)
-	if err != nil {
-		return err
-	}
-	if expectedKeyAuth != oidcPayload.KeyAuth {
-		return storeError(ctx, db, ch, true, NewError(ErrorRejectedIdentifierType,
-			"keyAuthorization does not match; expected %q, but got %q", expectedKeyAuth, oidcPayload.KeyAuth))
 	}
 
 	transformedIDToken, err := validateWireOIDCClaims(oidcOptions, idToken, wireID)
@@ -428,7 +427,7 @@ func wireOIDC01Validate(ctx context.Context, ch *Challenge, db DB, jwk *jose.JSO
 
 	orders, err := db.GetAllOrdersByAccountID(ctx, ch.AccountID)
 	if err != nil {
-		return WrapErrorISE(err, "could not find current order by account id")
+		return WrapErrorISE(err, "could not retrieve current order by account id")
 	}
 	if len(orders) == 0 {
 		return NewErrorISE("there are not enough orders for this account for this custom OIDC challenge")
@@ -484,7 +483,7 @@ func wireDPOP01Validate(ctx context.Context, ch *Challenge, db DB, accountJWK *j
 
 	var dpopPayload wireDpopPayload
 	if err := json.Unmarshal(payload, &dpopPayload); err != nil {
-		return WrapError(ErrorMalformedType, err, "error unmarshalling Wire challenge payload")
+		return WrapError(ErrorMalformedType, err, "error unmarshalling Wire DPoP challenge payload")
 	}
 
 	wireID, err := wire.ParseID([]byte(ch.Value))
