@@ -484,8 +484,7 @@ func wireDPOP01Validate(ctx context.Context, ch *Challenge, db DB, accountJWK *j
 
 	var dpopPayload wireDpopPayload
 	if err := json.Unmarshal(payload, &dpopPayload); err != nil {
-		return storeError(ctx, db, ch, false, WrapError(ErrorRejectedIdentifierType, err,
-			"error unmarshalling Wire challenge payload"))
+		return WrapError(ErrorMalformedType, err, "error unmarshalling Wire challenge payload")
 	}
 
 	wireID, err := wire.ParseID([]byte(ch.Value))

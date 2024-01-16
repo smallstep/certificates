@@ -57,6 +57,9 @@ func (o *Options) GetSSHOptions() *SSHOptions {
 // GetWireOptions returns the SSH options.
 func (o *Options) GetWireOptions() (*wire.Options, error) {
 	if o == nil {
+		return nil, errors.New("no options available")
+	}
+	if o.Wire == nil {
 		return nil, errors.New("no Wire options available")
 	}
 	if err := o.Wire.Validate(); err != nil {
