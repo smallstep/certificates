@@ -10,6 +10,7 @@ import (
 	"encoding/asn1"
 	"encoding/base64"
 	"encoding/json"
+	"encoding/pem"
 	"errors"
 	"io"
 	"net/http"
@@ -31,6 +32,7 @@ import (
 	"github.com/stretchr/testify/require"
 	"go.step.sm/crypto/jose"
 	"go.step.sm/crypto/minica"
+	"go.step.sm/crypto/pemutil"
 	"go.step.sm/crypto/x509util"
 )
 
@@ -55,9 +57,19 @@ func newWireProvisionerWithOptions(t *testing.T, options *provisioner.Options) *
 // TODO(hs): replace with test CA server + acmez based test client for
 // more realistic integration test?
 func TestWireIntegration(t *testing.T) {
-	fakeKey := `-----BEGIN PUBLIC KEY-----
-MCowBQYDK2VwAyEA5c+4NKZSNQcR1T8qN6SjwgdPZQ0Ge12Ylx/YeGAJ35k=
------END PUBLIC KEY-----`
+	accessTokenSignerJWK, err := jose.GenerateJWK("EC", "P-256", "ES256", "sig", "", 0)
+	require.NoError(t, err)
+
+	accessTokenSignerPEMBlock, err := pemutil.Serialize(accessTokenSignerJWK.Public().Key)
+	require.NoError(t, err)
+	accessTokenSignerPEMBytes := pem.EncodeToMemory(accessTokenSignerPEMBlock)
+
+	accessTokenSigner, err := jose.NewSigner(jose.SigningKey{
+		Algorithm: jose.SignatureAlgorithm(accessTokenSignerJWK.Algorithm),
+		Key:       accessTokenSignerJWK,
+	}, new(jose.SignerOptions))
+	require.NoError(t, err)
+
 	prov := newWireProvisionerWithOptions(t, &provisioner.Options{
 		X509: &provisioner.X509Options{
 			Template: `{
@@ -92,7 +104,7 @@ MCowBQYDK2VwAyEA5c+4NKZSNQcR1T8qN6SjwgdPZQ0Ge12Ylx/YeGAJ35k=
 				TransformTemplate: "",
 			},
 			DPOP: &wire.DPOPOptions{
-				SigningKey: []byte(fakeKey),
+				SigningKey: accessTokenSignerPEMBytes,
 			},
 		},
 	})
@@ -128,6 +140,12 @@ MCowBQYDK2VwAyEA5c+4NKZSNQcR1T8qN6SjwgdPZQ0Ge12Ylx/YeGAJ35k=
 
 	ed25519PrivKey, ok := jwk.Key.(ed25519.PrivateKey)
 	require.True(t, ok)
+
+	dpopSigner, err := jose.NewSigner(jose.SigningKey{
+		Algorithm: jose.SignatureAlgorithm(jwk.Algorithm),
+		Key:       jwk,
+	}, new(jose.SignerOptions))
+	require.NoError(t, err)
 
 	ed25519PubKey, ok := ed25519PrivKey.Public().(ed25519.PublicKey)
 	require.True(t, ok)
@@ -272,7 +290,69 @@ MCowBQYDK2VwAyEA5c+4NKZSNQcR1T8qN6SjwgdPZQ0Ge12Ylx/YeGAJ35k=
 			chiCtx := chi.NewRouteContext()
 			chiCtx.URLParams.Add("chID", challenge.ID)
 			ctx = context.WithValue(ctx, chi.RouteCtxKey, chiCtx)
-			ctx = context.WithValue(ctx, payloadContextKey, &payloadInfo{value: nil})
+
+			var payload []byte
+			if challenge.Type == acme.WIREDPOP01 { // TODO(hs): OIDC payload
+				dpopBytes, err := json.Marshal(struct {
+					jose.Claims
+					Challenge string `json:"chal,omitempty"`
+					Handle    string `json:"handle,omitempty"`
+				}{
+					Claims: jose.Claims{
+						Subject: "wireapp://lJGYPz0ZRq2kvc_XpdaDlA!ed416ce8ecdd9fad@example.com",
+					},
+					Challenge: "token",
+					Handle:    "wireapp://%40alice.smith.qa@example.com",
+				})
+				require.NoError(t, err)
+				dpop, err := dpopSigner.Sign(dpopBytes)
+				require.NoError(t, err)
+				proof, err := dpop.CompactSerialize()
+				require.NoError(t, err)
+				tokenBytes, err := json.Marshal(struct {
+					jose.Claims
+					Challenge string `json:"chal,omitempty"`
+					Cnf       struct {
+						Kid string `json:"kid,omitempty"`
+					} `json:"cnf"`
+					Proof      string `json:"proof,omitempty"`
+					ClientID   string `json:"client_id"`
+					APIVersion int    `json:"api_version"`
+					Scope      string `json:"scope"`
+				}{
+					Claims: jose.Claims{
+						Issuer:   "http://issuer.example.com",
+						Audience: []string{"test"},
+						Expiry:   jose.NewNumericDate(time.Now().Add(1 * time.Minute)),
+					},
+					Challenge: "token",
+					Cnf: struct {
+						Kid string `json:"kid,omitempty"`
+					}{
+						Kid: jwk.KeyID,
+					},
+					Proof:      proof,
+					ClientID:   "wireapp://lJGYPz0ZRq2kvc_XpdaDlA!ed416ce8ecdd9fad@example.com",
+					APIVersion: 5,
+					Scope:      "wire_client_id",
+				})
+
+				require.NoError(t, err)
+				signed, err := accessTokenSigner.Sign(tokenBytes)
+				require.NoError(t, err)
+				accessToken, err := signed.CompactSerialize()
+				require.NoError(t, err)
+
+				p, err := json.Marshal(struct {
+					AccessToken string `json:"access_token"`
+				}{
+					AccessToken: accessToken,
+				})
+				require.NoError(t, err)
+				payload = p
+			}
+
+			ctx = context.WithValue(ctx, payloadContextKey, &payloadInfo{value: payload})
 
 			req := httptest.NewRequest(http.MethodGet, "https://random.local/", http.NoBody).WithContext(ctx)
 			w := httptest.NewRecorder()
