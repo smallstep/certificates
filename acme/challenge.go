@@ -362,6 +362,10 @@ func wireOIDC01Validate(ctx context.Context, ch *Challenge, db DB, jwk *jose.JSO
 	if !ok {
 		return NewErrorISE("missing provisioner")
 	}
+	linker, ok := LinkerFromContext(ctx)
+	if !ok {
+		return NewErrorISE("missing linker")
+	}
 
 	var oidcPayload wireOidcPayload
 	err := json.Unmarshal(payload, &oidcPayload)
@@ -388,11 +392,12 @@ func wireOIDC01Validate(ctx context.Context, ch *Challenge, db DB, jwk *jose.JSO
 	}
 
 	var claims struct {
-		Name      string `json:"preferred_username,omitempty"`
-		Handle    string `json:"name"`
-		Issuer    string `json:"iss,omitempty"`
-		GivenName string `json:"given_name,omitempty"`
-		KeyAuth   string `json:"keyauth"`
+		Name         string `json:"preferred_username,omitempty"`
+		Handle       string `json:"name"`
+		Issuer       string `json:"iss,omitempty"`
+		GivenName    string `json:"given_name,omitempty"`
+		KeyAuth      string `json:"keyauth"`
+		ACMEAudience string `json:"acme_aud,omitempty"`
 	}
 	if err := idToken.Claims(&claims); err != nil {
 		return storeError(ctx, db, ch, true, WrapError(ErrorRejectedIdentifierType, err,
@@ -407,6 +412,13 @@ func wireOIDC01Validate(ctx context.Context, ch *Challenge, db DB, jwk *jose.JSO
 	if expectedKeyAuth != claims.KeyAuth {
 		return storeError(ctx, db, ch, true, NewError(ErrorRejectedIdentifierType,
 			"keyAuthorization does not match; expected %q, but got %q", expectedKeyAuth, claims.KeyAuth))
+	}
+
+	// audience is the full URL to the challenge
+	acmeAudience := linker.GetLink(ctx, ChallengeLinkType, ch.AuthorizationID, ch.ID)
+	if claims.ACMEAudience != acmeAudience {
+		return storeError(ctx, db, ch, true, NewError(ErrorRejectedIdentifierType,
+			"invalid 'acme_aud' %q", claims.ACMEAudience))
 	}
 
 	transformedIDToken, err := validateWireOIDCClaims(oidcOptions, idToken, wireID)
@@ -478,6 +490,10 @@ func wireDPOP01Validate(ctx context.Context, ch *Challenge, db DB, accountJWK *j
 	if !ok {
 		return NewErrorISE("missing provisioner")
 	}
+	linker, ok := LinkerFromContext(ctx)
+	if !ok {
+		return NewErrorISE("missing linker")
+	}
 
 	var dpopPayload wireDpopPayload
 	if err := json.Unmarshal(payload, &dpopPayload); err != nil {
@@ -505,12 +521,16 @@ func wireDPOP01Validate(ctx context.Context, ch *Challenge, db DB, accountJWK *j
 		return WrapErrorISE(err, "invalid Go template registered for 'target'")
 	}
 
+	// audience is the full URL to the challenge
+	audience := linker.GetLink(ctx, ChallengeLinkType, ch.AuthorizationID, ch.ID)
+
 	params := wireVerifyParams{
 		token:     dpopPayload.AccessToken,
 		tokenKey:  dpopOptions.GetSigningKey(),
 		dpopKey:   accountJWK.Public(),
 		dpopKeyID: accountJWK.KeyID,
 		issuer:    issuer,
+		audience:  audience,
 		wireID:    wireID,
 		chToken:   ch.Token,
 		t:         clock.Now().UTC(),
@@ -577,6 +597,7 @@ type wireVerifyParams struct {
 	dpopKey   crypto.PublicKey
 	dpopKeyID string
 	issuer    string
+	audience  string
 	wireID    wire.ID
 	chToken   string
 	t         time.Time
@@ -611,8 +632,9 @@ func parseAndVerifyWireAccessToken(v wireVerifyParams) (*wireAccessToken, *wireD
 	}
 
 	if err := accessToken.ValidateWithLeeway(jose.Expected{
-		Time:   v.t,
-		Issuer: v.issuer,
+		Time:     v.t,
+		Issuer:   v.issuer,
+		Audience: jose.Audience{v.audience},
 	}, 1*time.Minute); err != nil {
 		return nil, nil, fmt.Errorf("failed validation: %w", err)
 	}
@@ -626,7 +648,7 @@ func parseAndVerifyWireAccessToken(v wireVerifyParams) (*wireAccessToken, *wireD
 	if accessToken.ClientID != v.wireID.ClientID {
 		return nil, nil, fmt.Errorf("invalid Wire client ID %q", accessToken.ClientID)
 	}
-	if accessToken.Expiry.Time().After(v.t.Add(time.Hour * 24 * 365)) {
+	if accessToken.Expiry.Time().After(v.t.Add(time.Hour)) {
 		return nil, nil, fmt.Errorf("'exp' %s is too far into the future", accessToken.Expiry.Time().String())
 	}
 	if accessToken.Scope != "wire_client_id" {
@@ -656,14 +678,15 @@ func parseAndVerifyWireAccessToken(v wireVerifyParams) (*wireAccessToken, *wireD
 	}
 
 	if err := wireDpop.ValidateWithLeeway(jose.Expected{
-		Time: v.t,
+		Time:     v.t,
+		Audience: jose.Audience{v.audience},
 	}, 1*time.Minute); err != nil {
 		return nil, nil, fmt.Errorf("failed DPoP validation: %w", err)
 	}
 	if wireDpop.HTU == "" || wireDpop.HTU != v.issuer { // DPoP doesn't contains "iss" claim, but has it in the "htu" claim
 		return nil, nil, fmt.Errorf("DPoP contains invalid issuer (htu) %q", wireDpop.HTU)
 	}
-	if wireDpop.Expiry.Time().After(v.t.Add(time.Hour * 24 * 365)) {
+	if wireDpop.Expiry.Time().After(v.t.Add(time.Hour)) {
 		return nil, nil, fmt.Errorf("'exp' %s is too far into the future", wireDpop.Expiry.Time().String())
 	}
 	if wireDpop.Subject != v.wireID.ClientID {

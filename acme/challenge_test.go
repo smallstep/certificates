@@ -202,7 +202,7 @@ func newWireProvisionerWithOptions(t *testing.T, options *provisioner.Options) *
 	t.Helper()
 	prov := &provisioner.ACME{
 		Type:    "ACME",
-		Name:    "acme",
+		Name:    "wire",
 		Options: options,
 		Challenges: []provisioner.ACMEChallenge{
 			provisioner.WIREOIDC_01,
@@ -892,6 +892,7 @@ MCowBQYDK2VwAyEA5c+4NKZSNQcR1T8qN6SjwgdPZQ0Ge12Ylx/YeGAJ35k=
 				Name              string `json:"name,omitempty"`
 				PreferredUsername string `json:"preferred_username,omitempty"`
 				KeyAuth           string `json:"keyauth"`
+				ACMEAudience      string `json:"acme_aud"`
 			}{
 				Claims: jose.Claims{
 					Issuer:   srv.URL,
@@ -901,6 +902,7 @@ MCowBQYDK2VwAyEA5c+4NKZSNQcR1T8qN6SjwgdPZQ0Ge12Ylx/YeGAJ35k=
 				Name:              "Alice Smith",
 				PreferredUsername: "wireapp://%40alice_wire@wire.com",
 				KeyAuth:           keyAuth,
+				ACMEAudience:      "https://ca.example.com/acme/wire/challenge/azID/chID",
 			})
 			require.NoError(t, err)
 			signed, err := signer.Sign(tokenBytes)
@@ -945,6 +947,7 @@ MCowBQYDK2VwAyEA5c+4NKZSNQcR1T8qN6SjwgdPZQ0Ge12Ylx/YeGAJ35k=
 					},
 				},
 			}))
+			ctx = NewLinkerContext(ctx, NewLinker("ca.example.com", "acme"))
 			return test{
 				ch: &Challenge{
 					ID:              "chID",
@@ -999,7 +1002,6 @@ MCowBQYDK2VwAyEA5c+4NKZSNQcR1T8qN6SjwgdPZQ0Ge12Ylx/YeGAJ35k=
 			signerPEMBlock, err := pemutil.Serialize(signerJWK.Public().Key)
 			require.NoError(t, err)
 			signerPEMBytes := pem.EncodeToMemory(signerPEMBlock)
-
 			dpopBytes, err := json.Marshal(struct {
 				jose.Claims
 				Challenge string `json:"chal,omitempty"`
@@ -1008,7 +1010,8 @@ MCowBQYDK2VwAyEA5c+4NKZSNQcR1T8qN6SjwgdPZQ0Ge12Ylx/YeGAJ35k=
 				HTU       string `json:"htu,omitempty"`
 			}{
 				Claims: jose.Claims{
-					Subject: "wireapp://CzbfFjDOQrenCbDxVmgnFw!594930e9d50bb175@wire.com",
+					Subject:  "wireapp://CzbfFjDOQrenCbDxVmgnFw!594930e9d50bb175@wire.com",
+					Audience: jose.Audience{"https://ca.example.com/acme/wire/challenge/azID/chID"},
 				},
 				Challenge: "token",
 				Handle:    "wireapp://%40alice_wire@wire.com",
@@ -1034,7 +1037,7 @@ MCowBQYDK2VwAyEA5c+4NKZSNQcR1T8qN6SjwgdPZQ0Ge12Ylx/YeGAJ35k=
 			}{
 				Claims: jose.Claims{
 					Issuer:   "http://issuer.example.com",
-					Audience: []string{"test"},
+					Audience: jose.Audience{"https://ca.example.com/acme/wire/challenge/azID/chID"},
 					Expiry:   jose.NewNumericDate(time.Now().Add(1 * time.Minute)),
 				},
 				Challenge: "token",
@@ -1092,6 +1095,7 @@ MCowBQYDK2VwAyEA5c+4NKZSNQcR1T8qN6SjwgdPZQ0Ge12Ylx/YeGAJ35k=
 					},
 				},
 			}))
+			ctx = NewLinkerContext(ctx, NewLinker("ca.example.com", "acme"))
 			return test{
 				ch: &Challenge{
 					ID:              "chID",
