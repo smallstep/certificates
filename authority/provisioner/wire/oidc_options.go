@@ -24,8 +24,10 @@ type Provider struct {
 }
 
 type Config struct {
-	ClientID                   string           `json:"clientId,omitempty"`
-	SignatureAlgorithms        []string         `json:"signatureAlgorithms,omitempty"`
+	ClientID            string   `json:"clientId,omitempty"`
+	SignatureAlgorithms []string `json:"signatureAlgorithms,omitempty"`
+
+	// the properties below are only used for testing
 	SkipClientIDCheck          bool             `json:"-"`
 	SkipExpiryCheck            bool             `json:"-"`
 	SkipIssuerCheck            bool             `json:"-"`
