@@ -24,8 +24,10 @@ type Provider struct {
 }
 
 type Config struct {
-	ClientID                   string           `json:"clientId,omitempty"`
-	SignatureAlgorithms        []string         `json:"signatureAlgorithms,omitempty"`
+	ClientID            string   `json:"clientId,omitempty"`
+	SignatureAlgorithms []string `json:"signatureAlgorithms,omitempty"`
+
+	// the properties below are only used for testing
 	SkipClientIDCheck          bool             `json:"-"`
 	SkipExpiryCheck            bool             `json:"-"`
 	SkipIssuerCheck            bool             `json:"-"`
@@ -66,7 +68,7 @@ func (o *OIDCOptions) GetConfig() *oidc.Config {
 	}
 }
 
-const defaultTemplate = `{"name": "{{ .name }}", "handle": "{{ .preferred_username }}"}`
+const defaultTemplate = `{"name": "{{ .name }}", "preferred_username": "{{ .preferred_username }}"}`
 
 func (o *OIDCOptions) validateAndInitialize() (err error) {
 	if o.Provider == nil {

@@ -10,7 +10,7 @@ import (
 )
 
 type DPOPOptions struct {
-	// Public part of the  signing key for DPoP access token
+	// Public part of the  signing key for DPoP access token in PEM format
 	SigningKey []byte `json:"key"`
 	// URI template for the URI the ACME client must call to fetch the DPoP challenge proof (an access token from wire-server)
 	Target string `json:"target"`

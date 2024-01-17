@@ -202,7 +202,7 @@ func newWireProvisionerWithOptions(t *testing.T, options *provisioner.Options) *
 	t.Helper()
 	prov := &provisioner.ACME{
 		Type:    "ACME",
-		Name:    "acme",
+		Name:    "wire",
 		Options: options,
 		Challenges: []provisioner.ACMEChallenge{
 			provisioner.WIREOIDC_01,
@@ -891,6 +891,8 @@ MCowBQYDK2VwAyEA5c+4NKZSNQcR1T8qN6SjwgdPZQ0Ge12Ylx/YeGAJ35k=
 				jose.Claims
 				Name              string `json:"name,omitempty"`
 				PreferredUsername string `json:"preferred_username,omitempty"`
+				KeyAuth           string `json:"keyauth"`
+				ACMEAudience      string `json:"acme_aud"`
 			}{
 				Claims: jose.Claims{
 					Issuer:   srv.URL,
@@ -899,6 +901,8 @@ MCowBQYDK2VwAyEA5c+4NKZSNQcR1T8qN6SjwgdPZQ0Ge12Ylx/YeGAJ35k=
 				},
 				Name:              "Alice Smith",
 				PreferredUsername: "wireapp://%40alice_wire@wire.com",
+				KeyAuth:           keyAuth,
+				ACMEAudience:      "https://ca.example.com/acme/wire/challenge/azID/chID",
 			})
 			require.NoError(t, err)
 			signed, err := signer.Sign(tokenBytes)
@@ -907,10 +911,8 @@ MCowBQYDK2VwAyEA5c+4NKZSNQcR1T8qN6SjwgdPZQ0Ge12Ylx/YeGAJ35k=
 			require.NoError(t, err)
 			payload, err := json.Marshal(struct {
 				IDToken string `json:"id_token"`
-				KeyAuth string `json:"keyauth"`
 			}{
 				IDToken: idToken,
-				KeyAuth: keyAuth,
 			})
 			require.NoError(t, err)
 			valueBytes, err := json.Marshal(struct {
@@ -929,17 +931,14 @@ MCowBQYDK2VwAyEA5c+4NKZSNQcR1T8qN6SjwgdPZQ0Ge12Ylx/YeGAJ35k=
 				Wire: &wireprovisioner.Options{
 					OIDC: &wireprovisioner.OIDCOptions{
 						Provider: &wireprovisioner.Provider{
-							IssuerURL: srv.URL,
-							JWKSURL:   srv.URL + "/keys",
+							IssuerURL:  srv.URL,
+							JWKSURL:    srv.URL + "/keys",
+							Algorithms: []string{"ES256"},
 						},
 						Config: &wireprovisioner.Config{
-							ClientID:                   "test",
-							SignatureAlgorithms:        []string{"ES256"},
-							SkipClientIDCheck:          false,
-							SkipExpiryCheck:            false,
-							SkipIssuerCheck:            false,
-							InsecureSkipSignatureCheck: false,
-							Now:                        time.Now,
+							ClientID:            "test",
+							SignatureAlgorithms: []string{"ES256"},
+							Now:                 time.Now,
 						},
 						TransformTemplate: "",
 					},
@@ -948,6 +947,7 @@ MCowBQYDK2VwAyEA5c+4NKZSNQcR1T8qN6SjwgdPZQ0Ge12Ylx/YeGAJ35k=
 					},
 				},
 			}))
+			ctx = NewLinkerContext(ctx, NewLinker("ca.example.com", "acme"))
 			return test{
 				ch: &Challenge{
 					ID:              "chID",
@@ -978,7 +978,7 @@ MCowBQYDK2VwAyEA5c+4NKZSNQcR1T8qN6SjwgdPZQ0Ge12Ylx/YeGAJ35k=
 					MockCreateOidcToken: func(ctx context.Context, orderID string, idToken map[string]interface{}) error {
 						assert.Equal(t, "orderID", orderID)
 						assert.Equal(t, "Alice Smith", idToken["name"].(string))
-						assert.Equal(t, "wireapp://%40alice_wire@wire.com", idToken["handle"].(string))
+						assert.Equal(t, "wireapp://%40alice_wire@wire.com", idToken["preferred_username"].(string))
 						return nil
 					},
 				},
@@ -1002,17 +1002,21 @@ MCowBQYDK2VwAyEA5c+4NKZSNQcR1T8qN6SjwgdPZQ0Ge12Ylx/YeGAJ35k=
 			signerPEMBlock, err := pemutil.Serialize(signerJWK.Public().Key)
 			require.NoError(t, err)
 			signerPEMBytes := pem.EncodeToMemory(signerPEMBlock)
-
 			dpopBytes, err := json.Marshal(struct {
 				jose.Claims
 				Challenge string `json:"chal,omitempty"`
 				Handle    string `json:"handle,omitempty"`
+				Nonce     string `json:"nonce,omitempty"`
+				HTU       string `json:"htu,omitempty"`
 			}{
 				Claims: jose.Claims{
-					Subject: "wireapp://CzbfFjDOQrenCbDxVmgnFw!594930e9d50bb175@wire.com",
+					Subject:  "wireapp://CzbfFjDOQrenCbDxVmgnFw!594930e9d50bb175@wire.com",
+					Audience: jose.Audience{"https://ca.example.com/acme/wire/challenge/azID/chID"},
 				},
 				Challenge: "token",
 				Handle:    "wireapp://%40alice_wire@wire.com",
+				Nonce:     "nonce",
+				HTU:       "http://issuer.example.com",
 			})
 			require.NoError(t, err)
 			dpop, err := dpopSigner.Sign(dpopBytes)
@@ -1022,6 +1026,7 @@ MCowBQYDK2VwAyEA5c+4NKZSNQcR1T8qN6SjwgdPZQ0Ge12Ylx/YeGAJ35k=
 			tokenBytes, err := json.Marshal(struct {
 				jose.Claims
 				Challenge string `json:"chal,omitempty"`
+				Nonce     string `json:"nonce,omitempty"`
 				Cnf       struct {
 					Kid string `json:"kid,omitempty"`
 				} `json:"cnf"`
@@ -1032,10 +1037,11 @@ MCowBQYDK2VwAyEA5c+4NKZSNQcR1T8qN6SjwgdPZQ0Ge12Ylx/YeGAJ35k=
 			}{
 				Claims: jose.Claims{
 					Issuer:   "http://issuer.example.com",
-					Audience: []string{"test"},
+					Audience: jose.Audience{"https://ca.example.com/acme/wire/challenge/azID/chID"},
 					Expiry:   jose.NewNumericDate(time.Now().Add(1 * time.Minute)),
 				},
 				Challenge: "token",
+				Nonce:     "nonce",
 				Cnf: struct {
 					Kid string `json:"kid,omitempty"`
 				}{
@@ -1073,24 +1079,23 @@ MCowBQYDK2VwAyEA5c+4NKZSNQcR1T8qN6SjwgdPZQ0Ge12Ylx/YeGAJ35k=
 				Wire: &wireprovisioner.Options{
 					OIDC: &wireprovisioner.OIDCOptions{
 						Provider: &wireprovisioner.Provider{
-							IssuerURL: "http://issuerexample.com",
+							IssuerURL:  "http://issuerexample.com",
+							Algorithms: []string{"ES256"},
 						},
 						Config: &wireprovisioner.Config{
-							ClientID:                   "test",
-							SignatureAlgorithms:        []string{"ES256"},
-							SkipClientIDCheck:          false,
-							SkipExpiryCheck:            false,
-							SkipIssuerCheck:            false,
-							InsecureSkipSignatureCheck: false,
-							Now:                        time.Now,
+							ClientID:            "test",
+							SignatureAlgorithms: []string{"ES256"},
+							Now:                 time.Now,
 						},
 						TransformTemplate: "",
 					},
 					DPOP: &wireprovisioner.DPOPOptions{
+						Target:     "http://issuer.example.com",
 						SigningKey: signerPEMBytes,
 					},
 				},
 			}))
+			ctx = NewLinkerContext(ctx, NewLinker("ca.example.com", "acme"))
 			return test{
 				ch: &Challenge{
 					ID:              "chID",

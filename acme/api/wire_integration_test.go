@@ -85,7 +85,7 @@ func TestWireIntegration(t *testing.T) {
 					"organization": "WireTest",
 					"commonName": {{ toJson .Oidc.name }}
 				},
-				"uris": [{{ toJson .Oidc.handle }}, {{ toJson .Dpop.sub }}],
+				"uris": [{{ toJson .Oidc.preferred_username }}, {{ toJson .Dpop.sub }}],
 				"keyUsage": ["digitalSignature"],
 				"extKeyUsage": ["clientAuth"]
 			}`,
@@ -98,11 +98,11 @@ func TestWireIntegration(t *testing.T) {
 					TokenURL:    "",
 					JWKSURL:     "",
 					UserInfoURL: "",
-					Algorithms:  []string{},
+					Algorithms:  []string{"ES256"},
 				},
 				Config: &wire.Config{
 					ClientID:                   "integration test",
-					SignatureAlgorithms:        []string{},
+					SignatureAlgorithms:        []string{"ES256"},
 					SkipClientIDCheck:          true,
 					SkipExpiryCheck:            true,
 					SkipIssuerCheck:            true,
@@ -306,12 +306,16 @@ func TestWireIntegration(t *testing.T) {
 					jose.Claims
 					Challenge string `json:"chal,omitempty"`
 					Handle    string `json:"handle,omitempty"`
+					Nonce     string `json:"nonce,omitempty"`
+					HTU       string `json:"htu,omitempty"`
 				}{
 					Claims: jose.Claims{
 						Subject: "wireapp://lJGYPz0ZRq2kvc_XpdaDlA!ed416ce8ecdd9fad@example.com",
 					},
 					Challenge: "token",
 					Handle:    "wireapp://%40alice.smith.qa@example.com",
+					Nonce:     "nonce",
+					HTU:       "http://issuer.example.com",
 				})
 				require.NoError(t, err)
 				dpop, err := dpopSigner.Sign(dpopBytes)
@@ -366,6 +370,7 @@ func TestWireIntegration(t *testing.T) {
 					jose.Claims
 					Name              string `json:"name,omitempty"`
 					PreferredUsername string `json:"preferred_username,omitempty"`
+					KeyAuth           string `json:"keyauth"`
 				}{
 					Claims: jose.Claims{
 						Issuer:   "https://issuer.example.com",
@@ -374,6 +379,7 @@ func TestWireIntegration(t *testing.T) {
 					},
 					Name:              "Alice Smith",
 					PreferredUsername: "wireapp://%40alice_wire@wire.com",
+					KeyAuth:           keyAuth,
 				})
 				require.NoError(t, err)
 				signed, err := oidcTokenSigner.Sign(tokenBytes)
@@ -382,10 +388,8 @@ func TestWireIntegration(t *testing.T) {
 				require.NoError(t, err)
 				p, err := json.Marshal(struct {
 					IDToken string `json:"id_token"`
-					KeyAuth string `json:"keyauth"`
 				}{
 					IDToken: idToken,
-					KeyAuth: keyAuth,
 				})
 				require.NoError(t, err)
 				payload = p
@@ -436,7 +440,7 @@ func TestWireIntegration(t *testing.T) {
 			t.Log("updated challenge:", challenge.ID, challenge.Status)
 			switch challenge.Type {
 			case acme.WIREOIDC01:
-				err = db.CreateOidcToken(ctx, order.ID, map[string]any{"name": "Smith, Alice M (QA)", "handle": "wireapp://%40alice.smith.qa@example.com"})
+				err = db.CreateOidcToken(ctx, order.ID, map[string]any{"name": "Smith, Alice M (QA)", "preferred_username": "wireapp://%40alice.smith.qa@example.com"})
 				require.NoError(t, err)
 			case acme.WIREDPOP01:
 				err = db.CreateDpopToken(ctx, order.ID, map[string]any{"sub": "wireapp://lJGYPz0ZRq2kvc_XpdaDlA!ed416ce8ecdd9fad@example.com"})

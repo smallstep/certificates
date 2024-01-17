@@ -11,9 +11,9 @@ import (
 func TestOIDCOptions_Transform(t *testing.T) {
 	defaultTransform, err := parseTransform(``)
 	require.NoError(t, err)
-	swapTransform, err := parseTransform(`{"name": "{{ .preferred_username }}", "handle": "{{ .name }}"}`)
+	swapTransform, err := parseTransform(`{"name": "{{ .preferred_username }}", "preferred_username": "{{ .name }}"}`)
 	require.NoError(t, err)
-	funcTransform, err := parseTransform(`{"name": "{{ .name }}", "handle": "{{ first .usernames }}"}`)
+	funcTransform, err := parseTransform(`{"name": "{{ .name }}", "preferred_username": "{{ first .usernames }}"}`)
 	require.NoError(t, err)
 	type fields struct {
 		transform *template.Template
@@ -67,7 +67,6 @@ func TestOIDCOptions_Transform(t *testing.T) {
 			},
 			want: map[string]any{
 				"name":               "Example",
-				"handle":             "Preferred",
 				"preferred_username": "Preferred",
 			},
 		},
@@ -84,8 +83,7 @@ func TestOIDCOptions_Transform(t *testing.T) {
 			},
 			want: map[string]any{
 				"name":               "Preferred",
-				"handle":             "Example",
-				"preferred_username": "Preferred",
+				"preferred_username": "Example",
 			},
 		},
 		{
@@ -100,9 +98,9 @@ func TestOIDCOptions_Transform(t *testing.T) {
 				},
 			},
 			want: map[string]any{
-				"name":      "Example",
-				"handle":    "name-1",
-				"usernames": []string{"name-1", "name-2", "name-3"},
+				"name":               "Example",
+				"preferred_username": "name-1",
+				"usernames":          []string{"name-1", "name-2", "name-3"},
 			},
 		},
 	}
