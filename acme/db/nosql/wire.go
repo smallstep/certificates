@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/pkg/errors"
 	"github.com/smallstep/certificates/acme"
 	"github.com/smallstep/nosql"
 )
@@ -20,15 +19,16 @@ type dbDpopToken struct {
 // getDBDpopToken retrieves and unmarshals an DPoP type from the database.
 func (db *DB) getDBDpopToken(_ context.Context, orderID string) (*dbDpopToken, error) {
 	b, err := db.db.Get(wireDpopTokenTable, []byte(orderID))
-	if nosql.IsErrNotFound(err) {
-		return nil, acme.NewError(acme.ErrorMalformedType, "dpop token %q not found", orderID)
-	} else if err != nil {
-		return nil, errors.Wrapf(err, "error loading dpop %q", orderID)
+	if err != nil {
+		if nosql.IsErrNotFound(err) {
+			return nil, acme.NewError(acme.ErrorMalformedType, "dpop token %q not found", orderID)
+		}
+		return nil, fmt.Errorf("failed loading dpop token %q: %w", orderID, err)
 	}
 
 	d := new(dbDpopToken)
 	if err := json.Unmarshal(b, d); err != nil {
-		return nil, errors.Wrapf(err, "error unmarshaling dpop %q into dbDpopToken", orderID)
+		return nil, fmt.Errorf("failed unmarshaling dpop token %q into dbDpopToken: %w", orderID, err)
 	}
 	return d, nil
 }
@@ -74,14 +74,16 @@ type dbOidcToken struct {
 // getDBOidcToken retrieves and unmarshals an OIDC id token type from the database.
 func (db *DB) getDBOidcToken(_ context.Context, orderID string) (*dbOidcToken, error) {
 	b, err := db.db.Get(wireOidcTokenTable, []byte(orderID))
-	if nosql.IsErrNotFound(err) {
-		return nil, acme.NewError(acme.ErrorMalformedType, "oidc token %q not found", orderID)
-	} else if err != nil {
-		return nil, errors.Wrapf(err, "error loading oidc token %q", orderID)
+	if err != nil {
+		if nosql.IsErrNotFound(err) {
+			return nil, acme.NewError(acme.ErrorMalformedType, "oidc token %q not found", orderID)
+		}
+		return nil, fmt.Errorf("failed loading oidc token %q: %w", orderID, err)
 	}
+
 	o := new(dbOidcToken)
 	if err := json.Unmarshal(b, o); err != nil {
-		return nil, errors.Wrapf(err, "error unmarshaling oidc token %q into dbOidcToken", orderID)
+		return nil, fmt.Errorf("failed unmarshaling oidc token %q into dbOidcToken: %w", orderID, err)
 	}
 	return o, nil
 }

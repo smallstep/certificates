@@ -57,7 +57,7 @@ func TestDB_GetDpopToken(t *testing.T) {
 					db: db,
 				},
 				orderID:     "orderID",
-				expectedErr: errors.New(`error unmarshaling dpop "orderID" into dbDpopToken: invalid character ':' after top-level value`),
+				expectedErr: errors.New(`failed unmarshaling dpop token "orderID" into dbDpopToken: invalid character ':' after top-level value`),
 			}
 		},
 		"fail/db.Get": func(t *testing.T) test {
@@ -73,7 +73,7 @@ func TestDB_GetDpopToken(t *testing.T) {
 					db: db,
 				},
 				orderID:     "orderID",
-				expectedErr: errors.New(`error loading dpop "orderID": fail`),
+				expectedErr: errors.New(`failed loading dpop token "orderID": fail`),
 			}
 		},
 		"ok": func(t *testing.T) test {
@@ -245,7 +245,7 @@ func TestDB_GetOidcToken(t *testing.T) {
 					db: db,
 				},
 				orderID:     "orderID",
-				expectedErr: errors.New(`error unmarshaling oidc token "orderID" into dbOidcToken: invalid character ':' after top-level value`),
+				expectedErr: errors.New(`failed unmarshaling oidc token "orderID" into dbOidcToken: invalid character ':' after top-level value`),
 			}
 		},
 		"fail/db.Get": func(t *testing.T) test {
@@ -261,7 +261,7 @@ func TestDB_GetOidcToken(t *testing.T) {
 					db: db,
 				},
 				orderID:     "orderID",
-				expectedErr: errors.New(`error loading oidc token "orderID": fail`),
+				expectedErr: errors.New(`failed loading oidc token "orderID": fail`),
 			}
 		},
 		"ok": func(t *testing.T) test {
