@@ -3,6 +3,7 @@ package api
 import (
 	"encoding/pem"
 	"net/http"
+	"time"
 
 	"github.com/smallstep/certificates/api/render"
 )
@@ -14,6 +15,14 @@ func CRL(w http.ResponseWriter, r *http.Request) {
 		render.Error(w, err)
 		return
 	}
+
+	exp, err := mustAuthority(r.Context()).GetCertificateRevocationListExpiration()
+	if err != nil {
+		render.Error(w, err)
+		return
+	}
+
+	w.Header().Add("Expires", exp.Format(time.RFC1123))
 
 	_, formatAsPEM := r.URL.Query()["pem"]
 	if formatAsPEM {

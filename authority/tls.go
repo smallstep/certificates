@@ -675,6 +675,27 @@ func (a *Authority) revokeSSH(crt *ssh.Certificate, rci *db.RevokedCertificateIn
 	return a.db.RevokeSSH(rci)
 }
 
+// GetCertificateRevocationListExpiration will return the expiration date of the currently generated CRL from the DB, or a not implemented
+// error if the underlying AuthDB does not support CRLs
+func (a *Authority) GetCertificateRevocationListExpiration() (time.Time, error) {
+	zeroTime := time.Date(0, 0, 0, 0, 0, 0, 0, time.UTC)
+	if !a.config.CRL.IsEnabled() {
+		return zeroTime, errs.Wrap(http.StatusNotFound, errors.Errorf("Certificate Revocation Lists are not enabled"), "authority.GetCertificateRevocationList")
+	}
+
+	crlDB, ok := a.db.(db.CertificateRevocationListDB)
+	if !ok {
+		return zeroTime, errs.Wrap(http.StatusNotImplemented, errors.Errorf("Database does not support Certificate Revocation Lists"), "authority.GetCertificateRevocationList")
+	}
+
+	crlInfo, err := crlDB.GetCRL()
+	if err != nil {
+		return zeroTime, errs.Wrap(http.StatusInternalServerError, err, "authority.GetCertificateRevocationList")
+	}
+
+	return crlInfo.ExpiresAt, nil
+}
+
 // GetCertificateRevocationList will return the currently generated CRL from the DB, or a not implemented
 // error if the underlying AuthDB does not support CRLs
 func (a *Authority) GetCertificateRevocationList() ([]byte, error) {
