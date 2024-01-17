@@ -68,7 +68,7 @@ func (o *OIDCOptions) GetConfig() *oidc.Config {
 	}
 }
 
-const defaultTemplate = `{"name": "{{ .name }}", "handle": "{{ .preferred_username }}"}`
+const defaultTemplate = `{"name": "{{ .name }}", "preferred_username": "{{ .preferred_username }}"}`
 
 func (o *OIDCOptions) validateAndInitialize() (err error) {
 	if o.Provider == nil {

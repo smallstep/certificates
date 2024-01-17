@@ -1729,11 +1729,11 @@ MCowBQYDK2VwAyEA5c+4NKZSNQcR1T8qN6SjwgdPZQ0Ge12Ylx/YeGAJ35k=
 							TokenURL:    "",
 							JWKSURL:     "",
 							UserInfoURL: "",
-							Algorithms:  []string{},
+							Algorithms:  []string{"ES256"},
 						},
 						Config: &wire.Config{
 							ClientID:                   "integration test",
-							SignatureAlgorithms:        []string{},
+							SignatureAlgorithms:        []string{"ES256"},
 							SkipClientIDCheck:          true,
 							SkipExpiryCheck:            true,
 							SkipIssuerCheck:            true,

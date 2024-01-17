@@ -163,7 +163,8 @@ MCowBQYDK2VwAyEA5c+4NKZSNQcR1T8qN6SjwgdPZQ0Ge12Ylx/YeGAJ35k=
 				Wire: &wireprovisioner.Options{
 					OIDC: &wireprovisioner.OIDCOptions{
 						Provider: &wireprovisioner.Provider{
-							IssuerURL: "http://issuer.example.com",
+							IssuerURL:  "http://issuer.example.com",
+							Algorithms: []string{"ES256"},
 						},
 						Config: &wireprovisioner.Config{
 							ClientID:            "test",
@@ -322,7 +323,8 @@ MCowBQYDK2VwAyEA5c+4NKZSNQcR1T8qN6SjwgdPZQ0Ge12Ylx/YeGAJ35k=
 				Wire: &wireprovisioner.Options{
 					OIDC: &wireprovisioner.OIDCOptions{
 						Provider: &wireprovisioner.Provider{
-							IssuerURL: "http://issuer.example.com",
+							IssuerURL:  "http://issuer.example.com",
+							Algorithms: []string{"ES256"},
 						},
 						Config: &wireprovisioner.Config{
 							ClientID:            "test",
@@ -463,16 +465,13 @@ MCowBQYDK2VwAyEA5c+4NKZSNQcR1T8qN6SjwgdPZQ0Ge12Ylx/YeGAJ35k=
 				Wire: &wireprovisioner.Options{
 					OIDC: &wireprovisioner.OIDCOptions{
 						Provider: &wireprovisioner.Provider{
-							IssuerURL: "http://issuer.example.com",
+							IssuerURL:  "http://issuer.example.com",
+							Algorithms: []string{"ES256"},
 						},
 						Config: &wireprovisioner.Config{
-							ClientID:                   "test",
-							SignatureAlgorithms:        []string{"ES256"},
-							SkipClientIDCheck:          false,
-							SkipExpiryCheck:            false,
-							SkipIssuerCheck:            false,
-							InsecureSkipSignatureCheck: false,
-							Now:                        time.Now,
+							ClientID:            "test",
+							SignatureAlgorithms: []string{"ES256"},
+							Now:                 time.Now,
 						},
 						TransformTemplate: "",
 					},
@@ -612,16 +611,13 @@ MCowBQYDK2VwAyEA5c+4NKZSNQcR1T8qN6SjwgdPZQ0Ge12Ylx/YeGAJ35k=
 				Wire: &wireprovisioner.Options{
 					OIDC: &wireprovisioner.OIDCOptions{
 						Provider: &wireprovisioner.Provider{
-							IssuerURL: "http://issuer.example.com",
+							IssuerURL:  "http://issuer.example.com",
+							Algorithms: []string{"ES256"},
 						},
 						Config: &wireprovisioner.Config{
-							ClientID:                   "test",
-							SignatureAlgorithms:        []string{"ES256"},
-							SkipClientIDCheck:          false,
-							SkipExpiryCheck:            false,
-							SkipIssuerCheck:            false,
-							InsecureSkipSignatureCheck: false,
-							Now:                        time.Now,
+							ClientID:            "test",
+							SignatureAlgorithms: []string{"ES256"},
+							Now:                 time.Now,
 						},
 						TransformTemplate: "",
 					},
@@ -761,16 +757,13 @@ MCowBQYDK2VwAyEA5c+4NKZSNQcR1T8qN6SjwgdPZQ0Ge12Ylx/YeGAJ35k=
 				Wire: &wireprovisioner.Options{
 					OIDC: &wireprovisioner.OIDCOptions{
 						Provider: &wireprovisioner.Provider{
-							IssuerURL: "http://issuer.example.com",
+							IssuerURL:  "http://issuer.example.com",
+							Algorithms: []string{"ES256"},
 						},
 						Config: &wireprovisioner.Config{
-							ClientID:                   "test",
-							SignatureAlgorithms:        []string{"ES256"},
-							SkipClientIDCheck:          false,
-							SkipExpiryCheck:            false,
-							SkipIssuerCheck:            false,
-							InsecureSkipSignatureCheck: false,
-							Now:                        time.Now,
+							ClientID:            "test",
+							SignatureAlgorithms: []string{"ES256"},
+							Now:                 time.Now,
 						},
 						TransformTemplate: "",
 					},
@@ -917,16 +910,13 @@ MCowBQYDK2VwAyEA5c+4NKZSNQcR1T8qN6SjwgdPZQ0Ge12Ylx/YeGAJ35k=
 				Wire: &wireprovisioner.Options{
 					OIDC: &wireprovisioner.OIDCOptions{
 						Provider: &wireprovisioner.Provider{
-							IssuerURL: "http://issuer.example.com",
+							IssuerURL:  "http://issuer.example.com",
+							Algorithms: []string{"ES256"},
 						},
 						Config: &wireprovisioner.Config{
-							ClientID:                   "test",
-							SignatureAlgorithms:        []string{"ES256"},
-							SkipClientIDCheck:          false,
-							SkipExpiryCheck:            false,
-							SkipIssuerCheck:            false,
-							InsecureSkipSignatureCheck: false,
-							Now:                        time.Now,
+							ClientID:            "test",
+							SignatureAlgorithms: []string{"ES256"},
+							Now:                 time.Now,
 						},
 						TransformTemplate: "",
 					},
@@ -1106,12 +1096,38 @@ MCowBQYDK2VwAyEA5c+4NKZSNQcR1T8qN6SjwgdPZQ0Ge12Ylx/YeGAJ35k=
 		},
 		"fail/keyauth-mismatch": func(t *testing.T) test {
 			jwk, _ := mustAccountAndKeyAuthorization(t, "token")
+			signerJWK, err := jose.GenerateJWK("EC", "P-256", "ES256", "sig", "", 0)
+			require.NoError(t, err)
+			signer, err := jose.NewSigner(jose.SigningKey{
+				Algorithm: jose.SignatureAlgorithm(signerJWK.Algorithm),
+				Key:       signerJWK,
+			}, new(jose.SignerOptions))
+			require.NoError(t, err)
+			srv := mustJWKServer(t, signerJWK.Public())
+			tokenBytes, err := json.Marshal(struct {
+				jose.Claims
+				Name              string `json:"name,omitempty"`
+				PreferredUsername string `json:"preferred_username,omitempty"`
+				KeyAuth           string `json:"keyauth"`
+			}{
+				Claims: jose.Claims{
+					Issuer:   srv.URL,
+					Audience: []string{"test"},
+					Expiry:   jose.NewNumericDate(time.Now().Add(1 * time.Minute)),
+				},
+				Name:              "Alice Smith",
+				PreferredUsername: "wireapp://%40bob@wire.com",
+				KeyAuth:           "wrong-keyauth",
+			})
+			require.NoError(t, err)
+			signed, err := signer.Sign(tokenBytes)
+			require.NoError(t, err)
+			idToken, err := signed.CompactSerialize()
+			require.NoError(t, err)
 			payload, err := json.Marshal(struct {
 				IDToken string `json:"id_token"`
-				KeyAuth string `json:"keyauth"`
 			}{
-				IDToken: "some-token",
-				KeyAuth: "wrong-key-authorization",
+				IDToken: idToken,
 			})
 			require.NoError(t, err)
 			valueBytes, err := json.Marshal(struct {
@@ -1130,7 +1146,9 @@ MCowBQYDK2VwAyEA5c+4NKZSNQcR1T8qN6SjwgdPZQ0Ge12Ylx/YeGAJ35k=
 				Wire: &wireprovisioner.Options{
 					OIDC: &wireprovisioner.OIDCOptions{
 						Provider: &wireprovisioner.Provider{
-							IssuerURL: "http://issuer.example.com",
+							IssuerURL:  srv.URL,
+							JWKSURL:    srv.URL + "/keys",
+							Algorithms: []string{"ES256"},
 						},
 						Config: &wireprovisioner.Config{
 							ClientID:            "test",
@@ -1154,6 +1172,7 @@ MCowBQYDK2VwAyEA5c+4NKZSNQcR1T8qN6SjwgdPZQ0Ge12Ylx/YeGAJ35k=
 					Status:          StatusPending,
 					Value:           string(valueBytes),
 				},
+				srv:     srv,
 				payload: payload,
 				ctx:     ctx,
 				jwk:     jwk,
@@ -1170,7 +1189,7 @@ MCowBQYDK2VwAyEA5c+4NKZSNQcR1T8qN6SjwgdPZQ0Ge12Ylx/YeGAJ35k=
 								assert.Equal(t, "urn:ietf:params:acme:error:rejectedIdentifier", k.Type)
 								assert.Equal(t, "The server will not issue certificates for the identifier", k.Detail)
 								assert.Equal(t, 400, k.Status)
-								assert.Contains(t, k.Err.Error(), `keyAuthorization does not match; expected`)
+								assert.Contains(t, k.Err.Error(), "keyAuthorization does not match")
 							}
 						}
 						return nil
@@ -1194,6 +1213,7 @@ MCowBQYDK2VwAyEA5c+4NKZSNQcR1T8qN6SjwgdPZQ0Ge12Ylx/YeGAJ35k=
 				jose.Claims
 				Name              string `json:"name,omitempty"`
 				PreferredUsername string `json:"preferred_username,omitempty"`
+				KeyAuth           string `json:"keyauth"`
 			}{
 				Claims: jose.Claims{
 					Issuer:   srv.URL,
@@ -1201,7 +1221,8 @@ MCowBQYDK2VwAyEA5c+4NKZSNQcR1T8qN6SjwgdPZQ0Ge12Ylx/YeGAJ35k=
 					Expiry:   jose.NewNumericDate(time.Now().Add(1 * time.Minute)),
 				},
 				Name:              "Alice Smith",
-				PreferredUsername: "wireapp://%40alice_wire@wire.com",
+				PreferredUsername: "wireapp://%40bob@wire.com",
+				KeyAuth:           keyAuth,
 			})
 			require.NoError(t, err)
 			signed, err := signer.Sign(tokenBytes)
@@ -1210,10 +1231,8 @@ MCowBQYDK2VwAyEA5c+4NKZSNQcR1T8qN6SjwgdPZQ0Ge12Ylx/YeGAJ35k=
 			require.NoError(t, err)
 			payload, err := json.Marshal(struct {
 				IDToken string `json:"id_token"`
-				KeyAuth string `json:"keyauth"`
 			}{
 				IDToken: idToken,
-				KeyAuth: keyAuth,
 			})
 			require.NoError(t, err)
 			valueBytes, err := json.Marshal(struct {
@@ -1232,17 +1251,14 @@ MCowBQYDK2VwAyEA5c+4NKZSNQcR1T8qN6SjwgdPZQ0Ge12Ylx/YeGAJ35k=
 				Wire: &wireprovisioner.Options{
 					OIDC: &wireprovisioner.OIDCOptions{
 						Provider: &wireprovisioner.Provider{
-							IssuerURL: srv.URL,
-							JWKSURL:   srv.URL + "/keys",
+							IssuerURL:  srv.URL,
+							JWKSURL:    srv.URL + "/keys",
+							Algorithms: []string{"ES256"},
 						},
 						Config: &wireprovisioner.Config{
-							ClientID:                   "test",
-							SignatureAlgorithms:        []string{"ES256"},
-							SkipClientIDCheck:          false,
-							SkipExpiryCheck:            false,
-							SkipIssuerCheck:            false,
-							InsecureSkipSignatureCheck: false,
-							Now:                        time.Now,
+							ClientID:            "test",
+							SignatureAlgorithms: []string{"ES256"},
+							Now:                 time.Now,
 						},
 						TransformTemplate: "",
 					},
@@ -1300,6 +1316,7 @@ MCowBQYDK2VwAyEA5c+4NKZSNQcR1T8qN6SjwgdPZQ0Ge12Ylx/YeGAJ35k=
 				jose.Claims
 				Name              string `json:"name,omitempty"`
 				PreferredUsername string `json:"preferred_username,omitempty"`
+				KeyAuth           string `json:"keyauth"`
 			}{
 				Claims: jose.Claims{
 					Issuer:   srv.URL,
@@ -1308,6 +1325,7 @@ MCowBQYDK2VwAyEA5c+4NKZSNQcR1T8qN6SjwgdPZQ0Ge12Ylx/YeGAJ35k=
 				},
 				Name:              "Alice Smith",
 				PreferredUsername: "wireapp://%40bob@wire.com",
+				KeyAuth:           keyAuth,
 			})
 			require.NoError(t, err)
 			signed, err := signer.Sign(tokenBytes)
@@ -1316,10 +1334,8 @@ MCowBQYDK2VwAyEA5c+4NKZSNQcR1T8qN6SjwgdPZQ0Ge12Ylx/YeGAJ35k=
 			require.NoError(t, err)
 			payload, err := json.Marshal(struct {
 				IDToken string `json:"id_token"`
-				KeyAuth string `json:"keyauth"`
 			}{
 				IDToken: idToken,
-				KeyAuth: keyAuth,
 			})
 			require.NoError(t, err)
 			valueBytes, err := json.Marshal(struct {
@@ -1338,17 +1354,14 @@ MCowBQYDK2VwAyEA5c+4NKZSNQcR1T8qN6SjwgdPZQ0Ge12Ylx/YeGAJ35k=
 				Wire: &wireprovisioner.Options{
 					OIDC: &wireprovisioner.OIDCOptions{
 						Provider: &wireprovisioner.Provider{
-							IssuerURL: srv.URL,
-							JWKSURL:   srv.URL + "/keys",
+							IssuerURL:  srv.URL,
+							JWKSURL:    srv.URL + "/keys",
+							Algorithms: []string{"ES256"},
 						},
 						Config: &wireprovisioner.Config{
-							ClientID:                   "test",
-							SignatureAlgorithms:        []string{"ES256"},
-							SkipClientIDCheck:          false,
-							SkipExpiryCheck:            false,
-							SkipIssuerCheck:            false,
-							InsecureSkipSignatureCheck: false,
-							Now:                        time.Now,
+							ClientID:            "test",
+							SignatureAlgorithms: []string{"ES256"},
+							Now:                 time.Now,
 						},
 						TransformTemplate: "",
 					},
@@ -1384,7 +1397,7 @@ MCowBQYDK2VwAyEA5c+4NKZSNQcR1T8qN6SjwgdPZQ0Ge12Ylx/YeGAJ35k=
 								assert.Equal(t, "urn:ietf:params:acme:error:rejectedIdentifier", k.Type)
 								assert.Equal(t, "The server will not issue certificates for the identifier", k.Detail)
 								assert.Equal(t, 400, k.Status)
-								assert.Equal(t, `claims in OIDC ID token don't match: invalid 'handle' "wireapp://%40bob@wire.com" after transformation`, k.Err.Error())
+								assert.Equal(t, `claims in OIDC ID token don't match: invalid 'preferred_username' "wireapp://%40bob@wire.com" after transformation`, k.Err.Error())
 							}
 						}
 						return nil
@@ -1406,6 +1419,7 @@ MCowBQYDK2VwAyEA5c+4NKZSNQcR1T8qN6SjwgdPZQ0Ge12Ylx/YeGAJ35k=
 				jose.Claims
 				Name              string `json:"name,omitempty"`
 				PreferredUsername string `json:"preferred_username,omitempty"`
+				KeyAuth           string `json:"keyauth"`
 			}{
 				Claims: jose.Claims{
 					Issuer:   srv.URL,
@@ -1414,6 +1428,7 @@ MCowBQYDK2VwAyEA5c+4NKZSNQcR1T8qN6SjwgdPZQ0Ge12Ylx/YeGAJ35k=
 				},
 				Name:              "Alice Smith",
 				PreferredUsername: "wireapp://%40alice_wire@wire.com",
+				KeyAuth:           keyAuth,
 			})
 			require.NoError(t, err)
 			signed, err := signer.Sign(tokenBytes)
@@ -1422,10 +1437,8 @@ MCowBQYDK2VwAyEA5c+4NKZSNQcR1T8qN6SjwgdPZQ0Ge12Ylx/YeGAJ35k=
 			require.NoError(t, err)
 			payload, err := json.Marshal(struct {
 				IDToken string `json:"id_token"`
-				KeyAuth string `json:"keyauth"`
 			}{
 				IDToken: idToken,
-				KeyAuth: keyAuth,
 			})
 			require.NoError(t, err)
 			valueBytes, err := json.Marshal(struct {
@@ -1444,17 +1457,14 @@ MCowBQYDK2VwAyEA5c+4NKZSNQcR1T8qN6SjwgdPZQ0Ge12Ylx/YeGAJ35k=
 				Wire: &wireprovisioner.Options{
 					OIDC: &wireprovisioner.OIDCOptions{
 						Provider: &wireprovisioner.Provider{
-							IssuerURL: srv.URL,
-							JWKSURL:   srv.URL + "/keys",
+							IssuerURL:  srv.URL,
+							JWKSURL:    srv.URL + "/keys",
+							Algorithms: []string{"ES256"},
 						},
 						Config: &wireprovisioner.Config{
-							ClientID:                   "test",
-							SignatureAlgorithms:        []string{"ES256"},
-							SkipClientIDCheck:          false,
-							SkipExpiryCheck:            false,
-							SkipIssuerCheck:            false,
-							InsecureSkipSignatureCheck: false,
-							Now:                        time.Now,
+							ClientID:            "test",
+							SignatureAlgorithms: []string{"ES256"},
+							Now:                 time.Now,
 						},
 						TransformTemplate: "",
 					},
@@ -1509,6 +1519,7 @@ MCowBQYDK2VwAyEA5c+4NKZSNQcR1T8qN6SjwgdPZQ0Ge12Ylx/YeGAJ35k=
 				jose.Claims
 				Name              string `json:"name,omitempty"`
 				PreferredUsername string `json:"preferred_username,omitempty"`
+				KeyAuth           string `json:"keyauth"`
 			}{
 				Claims: jose.Claims{
 					Issuer:   srv.URL,
@@ -1517,6 +1528,7 @@ MCowBQYDK2VwAyEA5c+4NKZSNQcR1T8qN6SjwgdPZQ0Ge12Ylx/YeGAJ35k=
 				},
 				Name:              "Alice Smith",
 				PreferredUsername: "wireapp://%40alice_wire@wire.com",
+				KeyAuth:           keyAuth,
 			})
 			require.NoError(t, err)
 			signed, err := signer.Sign(tokenBytes)
@@ -1525,10 +1537,8 @@ MCowBQYDK2VwAyEA5c+4NKZSNQcR1T8qN6SjwgdPZQ0Ge12Ylx/YeGAJ35k=
 			require.NoError(t, err)
 			payload, err := json.Marshal(struct {
 				IDToken string `json:"id_token"`
-				KeyAuth string `json:"keyauth"`
 			}{
 				IDToken: idToken,
-				KeyAuth: keyAuth,
 			})
 			require.NoError(t, err)
 			valueBytes, err := json.Marshal(struct {
@@ -1547,17 +1557,14 @@ MCowBQYDK2VwAyEA5c+4NKZSNQcR1T8qN6SjwgdPZQ0Ge12Ylx/YeGAJ35k=
 				Wire: &wireprovisioner.Options{
 					OIDC: &wireprovisioner.OIDCOptions{
 						Provider: &wireprovisioner.Provider{
-							IssuerURL: srv.URL,
-							JWKSURL:   srv.URL + "/keys",
+							IssuerURL:  srv.URL,
+							JWKSURL:    srv.URL + "/keys",
+							Algorithms: []string{"ES256"},
 						},
 						Config: &wireprovisioner.Config{
-							ClientID:                   "test",
-							SignatureAlgorithms:        []string{"ES256"},
-							SkipClientIDCheck:          false,
-							SkipExpiryCheck:            false,
-							SkipIssuerCheck:            false,
-							InsecureSkipSignatureCheck: false,
-							Now:                        time.Now,
+							ClientID:            "test",
+							SignatureAlgorithms: []string{"ES256"},
+							Now:                 time.Now,
 						},
 						TransformTemplate: "",
 					},
@@ -1616,6 +1623,7 @@ MCowBQYDK2VwAyEA5c+4NKZSNQcR1T8qN6SjwgdPZQ0Ge12Ylx/YeGAJ35k=
 				jose.Claims
 				Name              string `json:"name,omitempty"`
 				PreferredUsername string `json:"preferred_username,omitempty"`
+				KeyAuth           string `json:"keyauth"`
 			}{
 				Claims: jose.Claims{
 					Issuer:   srv.URL,
@@ -1624,6 +1632,7 @@ MCowBQYDK2VwAyEA5c+4NKZSNQcR1T8qN6SjwgdPZQ0Ge12Ylx/YeGAJ35k=
 				},
 				Name:              "Alice Smith",
 				PreferredUsername: "wireapp://%40alice_wire@wire.com",
+				KeyAuth:           keyAuth,
 			})
 			require.NoError(t, err)
 			signed, err := signer.Sign(tokenBytes)
@@ -1632,10 +1641,8 @@ MCowBQYDK2VwAyEA5c+4NKZSNQcR1T8qN6SjwgdPZQ0Ge12Ylx/YeGAJ35k=
 			require.NoError(t, err)
 			payload, err := json.Marshal(struct {
 				IDToken string `json:"id_token"`
-				KeyAuth string `json:"keyauth"`
 			}{
 				IDToken: idToken,
-				KeyAuth: keyAuth,
 			})
 			require.NoError(t, err)
 			valueBytes, err := json.Marshal(struct {
@@ -1654,17 +1661,14 @@ MCowBQYDK2VwAyEA5c+4NKZSNQcR1T8qN6SjwgdPZQ0Ge12Ylx/YeGAJ35k=
 				Wire: &wireprovisioner.Options{
 					OIDC: &wireprovisioner.OIDCOptions{
 						Provider: &wireprovisioner.Provider{
-							IssuerURL: srv.URL,
-							JWKSURL:   srv.URL + "/keys",
+							IssuerURL:  srv.URL,
+							JWKSURL:    srv.URL + "/keys",
+							Algorithms: []string{"ES256"},
 						},
 						Config: &wireprovisioner.Config{
-							ClientID:                   "test",
-							SignatureAlgorithms:        []string{"ES256"},
-							SkipClientIDCheck:          false,
-							SkipExpiryCheck:            false,
-							SkipIssuerCheck:            false,
-							InsecureSkipSignatureCheck: false,
-							Now:                        time.Now,
+							ClientID:            "test",
+							SignatureAlgorithms: []string{"ES256"},
+							Now:                 time.Now,
 						},
 						TransformTemplate: "",
 					},
@@ -1723,6 +1727,7 @@ MCowBQYDK2VwAyEA5c+4NKZSNQcR1T8qN6SjwgdPZQ0Ge12Ylx/YeGAJ35k=
 				jose.Claims
 				Name              string `json:"name,omitempty"`
 				PreferredUsername string `json:"preferred_username,omitempty"`
+				KeyAuth           string `json:"keyauth"`
 			}{
 				Claims: jose.Claims{
 					Issuer:   srv.URL,
@@ -1731,6 +1736,7 @@ MCowBQYDK2VwAyEA5c+4NKZSNQcR1T8qN6SjwgdPZQ0Ge12Ylx/YeGAJ35k=
 				},
 				Name:              "Alice Smith",
 				PreferredUsername: "wireapp://%40alice_wire@wire.com",
+				KeyAuth:           keyAuth,
 			})
 			require.NoError(t, err)
 			signed, err := signer.Sign(tokenBytes)
@@ -1739,10 +1745,8 @@ MCowBQYDK2VwAyEA5c+4NKZSNQcR1T8qN6SjwgdPZQ0Ge12Ylx/YeGAJ35k=
 			require.NoError(t, err)
 			payload, err := json.Marshal(struct {
 				IDToken string `json:"id_token"`
-				KeyAuth string `json:"keyauth"`
 			}{
 				IDToken: idToken,
-				KeyAuth: keyAuth,
 			})
 			require.NoError(t, err)
 			valueBytes, err := json.Marshal(struct {
@@ -1761,17 +1765,14 @@ MCowBQYDK2VwAyEA5c+4NKZSNQcR1T8qN6SjwgdPZQ0Ge12Ylx/YeGAJ35k=
 				Wire: &wireprovisioner.Options{
 					OIDC: &wireprovisioner.OIDCOptions{
 						Provider: &wireprovisioner.Provider{
-							IssuerURL: srv.URL,
-							JWKSURL:   srv.URL + "/keys",
+							IssuerURL:  srv.URL,
+							JWKSURL:    srv.URL + "/keys",
+							Algorithms: []string{"ES256"},
 						},
 						Config: &wireprovisioner.Config{
-							ClientID:                   "test",
-							SignatureAlgorithms:        []string{"ES256"},
-							SkipClientIDCheck:          false,
-							SkipExpiryCheck:            false,
-							SkipIssuerCheck:            false,
-							InsecureSkipSignatureCheck: false,
-							Now:                        time.Now,
+							ClientID:            "test",
+							SignatureAlgorithms: []string{"ES256"},
+							Now:                 time.Now,
 						},
 						TransformTemplate: "",
 					},
@@ -1810,7 +1811,7 @@ MCowBQYDK2VwAyEA5c+4NKZSNQcR1T8qN6SjwgdPZQ0Ge12Ylx/YeGAJ35k=
 					MockCreateOidcToken: func(ctx context.Context, orderID string, idToken map[string]interface{}) error {
 						assert.Equal(t, "orderID", orderID)
 						assert.Equal(t, "Alice Smith", idToken["name"].(string))
-						assert.Equal(t, "wireapp://%40alice_wire@wire.com", idToken["handle"].(string))
+						assert.Equal(t, "wireapp://%40alice_wire@wire.com", idToken["preferred_username"].(string))
 						return errors.New("fail")
 					},
 				},
@@ -1836,6 +1837,7 @@ MCowBQYDK2VwAyEA5c+4NKZSNQcR1T8qN6SjwgdPZQ0Ge12Ylx/YeGAJ35k=
 				jose.Claims
 				Name              string `json:"name,omitempty"`
 				PreferredUsername string `json:"preferred_username,omitempty"`
+				KeyAuth           string `json:"keyauth"`
 			}{
 				Claims: jose.Claims{
 					Issuer:   srv.URL,
@@ -1844,6 +1846,7 @@ MCowBQYDK2VwAyEA5c+4NKZSNQcR1T8qN6SjwgdPZQ0Ge12Ylx/YeGAJ35k=
 				},
 				Name:              "Alice Smith",
 				PreferredUsername: "wireapp://%40alice_wire@wire.com",
+				KeyAuth:           keyAuth,
 			})
 			require.NoError(t, err)
 			signed, err := signer.Sign(tokenBytes)
@@ -1852,10 +1855,8 @@ MCowBQYDK2VwAyEA5c+4NKZSNQcR1T8qN6SjwgdPZQ0Ge12Ylx/YeGAJ35k=
 			require.NoError(t, err)
 			payload, err := json.Marshal(struct {
 				IDToken string `json:"id_token"`
-				KeyAuth string `json:"keyauth"`
 			}{
 				IDToken: idToken,
-				KeyAuth: keyAuth,
 			})
 			require.NoError(t, err)
 			valueBytes, err := json.Marshal(struct {
@@ -1874,17 +1875,14 @@ MCowBQYDK2VwAyEA5c+4NKZSNQcR1T8qN6SjwgdPZQ0Ge12Ylx/YeGAJ35k=
 				Wire: &wireprovisioner.Options{
 					OIDC: &wireprovisioner.OIDCOptions{
 						Provider: &wireprovisioner.Provider{
-							IssuerURL: srv.URL,
-							JWKSURL:   srv.URL + "/keys",
+							IssuerURL:  srv.URL,
+							JWKSURL:    srv.URL + "/keys",
+							Algorithms: []string{"ES256"},
 						},
 						Config: &wireprovisioner.Config{
-							ClientID:                   "test",
-							SignatureAlgorithms:        []string{"ES256"},
-							SkipClientIDCheck:          false,
-							SkipExpiryCheck:            false,
-							SkipIssuerCheck:            false,
-							InsecureSkipSignatureCheck: false,
-							Now:                        time.Now,
+							ClientID:            "test",
+							SignatureAlgorithms: []string{"ES256"},
+							Now:                 time.Now,
 						},
 						TransformTemplate: "",
 					},
@@ -1923,7 +1921,7 @@ MCowBQYDK2VwAyEA5c+4NKZSNQcR1T8qN6SjwgdPZQ0Ge12Ylx/YeGAJ35k=
 					MockCreateOidcToken: func(ctx context.Context, orderID string, idToken map[string]interface{}) error {
 						assert.Equal(t, "orderID", orderID)
 						assert.Equal(t, "Alice Smith", idToken["name"].(string))
-						assert.Equal(t, "wireapp://%40alice_wire@wire.com", idToken["handle"].(string))
+						assert.Equal(t, "wireapp://%40alice_wire@wire.com", idToken["preferred_username"].(string))
 						return nil
 					},
 				},
@@ -2034,16 +2032,18 @@ MCowBQYDK2VwAyEA5c+4NKZSNQcR1T8qN6SjwgdPZQ0Ge12Ylx/YeGAJ35k=
 	opts := &wireprovisioner.Options{
 		OIDC: &wireprovisioner.OIDCOptions{
 			Provider: &wireprovisioner.Provider{
-				IssuerURL: "http://dex:15818/dex",
+				IssuerURL:  "http://dex:15818/dex",
+				Algorithms: []string{"ES256"},
 			},
 			Config: &wireprovisioner.Config{
-				ClientID: "wireapp",
+				ClientID:            "wireapp",
+				SignatureAlgorithms: []string{"ES256"},
 				Now: func() time.Time {
 					return time.Date(2024, 1, 12, 18, 32, 41, 0, time.UTC) // (Token Expiry: 2024-01-12 21:32:42 +0100 CET)
 				},
-				InsecureSkipSignatureCheck: true,
+				InsecureSkipSignatureCheck: true, // skipping signature check for this specific test
 			},
-			TransformTemplate: `{"name": "{{ .preferred_username }}", "handle": "{{ .name }}"}`,
+			TransformTemplate: `{"name": "{{ .preferred_username }}", "preferred_username": "{{ .name }}"}`,
 		},
 		DPOP: &wireprovisioner.DPOPOptions{
 			SigningKey: []byte(fakeKey),
@@ -2069,7 +2069,7 @@ MCowBQYDK2VwAyEA5c+4NKZSNQcR1T8qN6SjwgdPZQ0Ge12Ylx/YeGAJ35k=
 	got, err := validateWireOIDCClaims(o, idToken, wireID)
 	assert.NoError(t, err)
 
-	assert.Equal(t, "wireapp://%40alice_wire@wire.com", got["handle"].(string))
+	assert.Equal(t, "wireapp://%40alice_wire@wire.com", got["preferred_username"].(string))
 	assert.Equal(t, "Alice Smith", got["name"].(string))
 	assert.Equal(t, "http://dex:15818/dex", got["iss"].(string))
 }
@@ -2083,11 +2083,13 @@ MCowBQYDK2VwAyEA5c+4NKZSNQcR1T8qN6SjwgdPZQ0Ge12Ylx/YeGAJ35k=
 	opts := &wireprovisioner.Options{
 		OIDC: &wireprovisioner.OIDCOptions{
 			Provider: &wireprovisioner.Provider{
-				IssuerURL: "https://issuer.example.com",
+				IssuerURL:  "https://issuer.example.com",
+				Algorithms: []string{"ES256"},
 			},
 			Config: &wireprovisioner.Config{
-				ClientID: "unit test",
-				Now:      time.Now,
+				ClientID:            "unit test",
+				SignatureAlgorithms: []string{"ES256"},
+				Now:                 time.Now,
 			},
 			TransformTemplate: transformTemplate,
 		},
@@ -2130,18 +2132,18 @@ func Test_idTokenTransformation(t *testing.T) {
 	require.NoError(t, err)
 
 	// default transformation sets preferred username to handle; name as name
-	assert.Equal(t, "Alice Smith", result["handle"].(string))
+	assert.Equal(t, "Alice Smith", result["preferred_username"].(string))
 	assert.Equal(t, "wireapp://%40alice_wire@wire.com", result["name"].(string))
 	assert.Equal(t, "http://dex:15818/dex", result["iss"].(string))
 
 	// swap the preferred_name and the name
-	swap := `{"name": "{{ .preferred_username }}", "handle": "{{ .name }}"}`
+	swap := `{"name": "{{ .preferred_username }}", "preferred_username": "{{ .name }}"}`
 	opts = createWireOptions(t, swap)
 	result, err = opts.GetOIDCOptions().Transform(m)
 	require.NoError(t, err)
 
 	// with the transformation, handle now contains wireapp://%40alice_wire@wire.com, name contains Alice Smith
-	assert.Equal(t, "wireapp://%40alice_wire@wire.com", result["handle"].(string))
+	assert.Equal(t, "wireapp://%40alice_wire@wire.com", result["preferred_username"].(string))
 	assert.Equal(t, "Alice Smith", result["name"].(string))
 	assert.Equal(t, "http://dex:15818/dex", result["iss"].(string))
 }

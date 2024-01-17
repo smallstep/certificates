@@ -270,7 +270,7 @@ func TestDB_GetOidcToken(t *testing.T) {
 			require.NoError(t, err)
 			token := dbOidcToken{
 				ID:        "orderID",
-				Content:   []byte(`{"name": "Alice Smith", "handle": "@alice.smith"}`),
+				Content:   []byte(`{"name": "Alice Smith", "preferred_username": "@alice.smith"}`),
 				CreatedAt: time.Now(),
 			}
 			b, err := json.Marshal(token)
@@ -283,8 +283,8 @@ func TestDB_GetOidcToken(t *testing.T) {
 				},
 				orderID: "orderID",
 				expected: map[string]any{
-					"name":   "Alice Smith",
-					"handle": "@alice.smith",
+					"name":               "Alice Smith",
+					"preferred_username": "@alice.smith",
 				},
 			}
 		},
@@ -335,8 +335,8 @@ func TestDB_CreateOidcToken(t *testing.T) {
 				},
 				orderID: "orderID",
 				oidc: map[string]any{
-					"name":   "Alice Smith",
-					"handle": "@alice.smith",
+					"name":               "Alice Smith",
+					"preferred_username": "@alice.smith",
 				},
 				expectedErr: errors.New("failed saving oidc token: error saving acme oidc: fail"),
 			}
@@ -351,8 +351,8 @@ func TestDB_CreateOidcToken(t *testing.T) {
 				},
 				orderID: "orderID",
 				oidc: map[string]any{
-					"name":   "Alice Smith",
-					"handle": "@alice.smith",
+					"name":               "Alice Smith",
+					"preferred_username": "@alice.smith",
 				},
 			}
 		},

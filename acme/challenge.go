@@ -355,8 +355,6 @@ func dns01Validate(ctx context.Context, ch *Challenge, db DB, jwk *jose.JSONWebK
 type wireOidcPayload struct {
 	// IDToken contains the OIDC identity token
 	IDToken string `json:"id_token"`
-	// KeyAuth ({challenge-token}.{jwk-thumbprint})
-	KeyAuth string `json:"keyauth"`
 }
 
 func wireOIDC01Validate(ctx context.Context, ch *Challenge, db DB, jwk *jose.JSONWebKey, payload []byte) error {
@@ -381,16 +379,6 @@ func wireOIDC01Validate(ctx context.Context, ch *Challenge, db DB, jwk *jose.JSO
 		return WrapErrorISE(err, "failed getting Wire options")
 	}
 
-	// TODO(hs): move this into validation below?
-	expectedKeyAuth, err := KeyAuthorization(ch.Token, jwk)
-	if err != nil {
-		return WrapErrorISE(err, "error determining key authorization")
-	}
-	if expectedKeyAuth != oidcPayload.KeyAuth {
-		return storeError(ctx, db, ch, true, NewError(ErrorRejectedIdentifierType,
-			"keyAuthorization does not match; expected %q, but got %q", expectedKeyAuth, oidcPayload.KeyAuth))
-	}
-
 	oidcOptions := wireOptions.GetOIDCOptions()
 	verifier := oidcOptions.GetProvider(ctx).Verifier(oidcOptions.GetConfig())
 	idToken, err := verifier.Verify(ctx, oidcPayload.IDToken)
@@ -404,11 +392,21 @@ func wireOIDC01Validate(ctx context.Context, ch *Challenge, db DB, jwk *jose.JSO
 		Handle    string `json:"name"`
 		Issuer    string `json:"iss,omitempty"`
 		GivenName string `json:"given_name,omitempty"`
-		KeyAuth   string `json:"keyauth"` // TODO(hs): use this property instead of the one in the payload after https://github.com/wireapp/rusty-jwt-tools/tree/fix/keyauth is done
+		KeyAuth   string `json:"keyauth"`
 	}
 	if err := idToken.Claims(&claims); err != nil {
 		return storeError(ctx, db, ch, true, WrapError(ErrorRejectedIdentifierType, err,
 			"error retrieving claims from ID token"))
+	}
+
+	// TODO(hs): move this into validation below?
+	expectedKeyAuth, err := KeyAuthorization(ch.Token, jwk)
+	if err != nil {
+		return WrapErrorISE(err, "error determining key authorization")
+	}
+	if expectedKeyAuth != claims.KeyAuth {
+		return storeError(ctx, db, ch, true, NewError(ErrorRejectedIdentifierType,
+			"keyAuthorization does not match; expected %q, but got %q", expectedKeyAuth, claims.KeyAuth))
 	}
 
 	transformedIDToken, err := validateWireOIDCClaims(oidcOptions, idToken, wireID)
@@ -459,12 +457,12 @@ func validateWireOIDCClaims(o *wireprovisioner.OIDCOptions, token *oidc.IDToken,
 		return nil, fmt.Errorf("invalid 'name' %q after transformation", name)
 	}
 
-	handle, ok := transformed["handle"]
+	preferredUsername, ok := transformed["preferred_username"]
 	if !ok {
-		return nil, fmt.Errorf("transformed OIDC ID token does not contain 'handle'")
+		return nil, fmt.Errorf("transformed OIDC ID token does not contain 'preferred_username'")
 	}
-	if wireID.Handle != handle {
-		return nil, fmt.Errorf("invalid 'handle' %q after transformation", handle)
+	if wireID.Handle != preferredUsername {
+		return nil, fmt.Errorf("invalid 'preferred_username' %q after transformation", preferredUsername)
 	}
 
 	return transformed, nil
