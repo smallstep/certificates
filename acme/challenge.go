@@ -555,6 +555,7 @@ type wireCnf struct {
 type wireAccessToken struct {
 	jose.Claims
 	Challenge  string  `json:"chal"`
+	Nonce      string  `json:"nonce"`
 	Cnf        wireCnf `json:"cnf"`
 	Proof      string  `json:"proof"`
 	ClientID   string  `json:"client_id"`
@@ -566,6 +567,8 @@ type wireDpopJwt struct {
 	jose.Claims
 	ClientID  string `json:"client_id"`
 	Challenge string `json:"chal"`
+	Nonce     string `json:"nonce"`
+	HTU       string `json:"htu"`
 }
 
 type wireDpopToken map[string]any
@@ -619,7 +622,7 @@ func parseAndVerifyWireAccessToken(v wireVerifyParams) (*wireAccessToken, *wireD
 	if accessToken.Challenge == "" {
 		return nil, nil, errors.New("access token challenge must not be empty")
 	}
-	if accessToken.Cnf.Kid != v.dpopKeyID {
+	if accessToken.Cnf.Kid == "" || accessToken.Cnf.Kid != v.dpopKeyID {
 		return nil, nil, fmt.Errorf("expected kid %q; got %q", v.dpopKeyID, accessToken.Cnf.Kid)
 	}
 	if accessToken.ClientID != v.wireID.ClientID {
@@ -656,18 +659,22 @@ func parseAndVerifyWireAccessToken(v wireVerifyParams) (*wireAccessToken, *wireD
 
 	if err := wireDpop.ValidateWithLeeway(jose.Expected{
 		Time: v.t,
-		//Issuer: v.issuer, // TODO(hs): doesn't seem to be set as claim in e2e test?
 	}, 1*time.Minute); err != nil {
 		return nil, nil, fmt.Errorf("failed DPoP validation: %w", err)
+	}
+	if wireDpop.HTU == "" || wireDpop.HTU != v.issuer { // DPoP doesn't contains "iss" claim, but has it in the "htu" claim
+		return nil, nil, fmt.Errorf("DPoP contains invalid issuer (htu) %q", wireDpop.HTU)
 	}
 	if wireDpop.Expiry.Time().After(v.t.Add(time.Hour * 24 * 365)) {
 		return nil, nil, fmt.Errorf("'exp' %s is too far into the future", wireDpop.Expiry.Time().String())
 	}
-	// TODO(hs): doesn't seem to be set as claim in e2e test?
-	// if wireDpop.ClientID != v.wireID.ClientID {
-	// 	return nil, nil, fmt.Errorf("DPoP contains invalid Wire client ID %q", wireDpop.ClientID)
-	// }
-	if wireDpop.Challenge != accessToken.Challenge {
+	if wireDpop.Subject != v.wireID.ClientID {
+		return nil, nil, fmt.Errorf("DPoP contains invalid Wire client ID %q", wireDpop.ClientID)
+	}
+	if wireDpop.Nonce == "" || wireDpop.Nonce != accessToken.Nonce {
+		return nil, nil, fmt.Errorf("DPoP contains invalid nonce %q", wireDpop.Nonce)
+	}
+	if wireDpop.Challenge == "" || wireDpop.Challenge != accessToken.Challenge {
 		return nil, nil, fmt.Errorf("DPoP contains invalid challenge %q", wireDpop.Challenge)
 	}
 
