@@ -24,6 +24,7 @@ import (
 	"github.com/smallstep/certificates/acme"
 	"github.com/smallstep/certificates/authority/policy"
 	"github.com/smallstep/certificates/authority/provisioner"
+	"github.com/smallstep/certificates/authority/provisioner/wire"
 )
 
 func TestNewOrderRequest_Validate(t *testing.T) {
@@ -884,6 +885,10 @@ func TestHandler_NewOrder(t *testing.T) {
 	u := fmt.Sprintf("%s/acme/%s/order/ordID",
 		baseURL.String(), escProvName)
 
+	fakeWireSigningKey := `-----BEGIN PUBLIC KEY-----
+MCowBQYDK2VwAyEA5c+4NKZSNQcR1T8qN6SjwgdPZQ0Ge12Ylx/YeGAJ35k=
+-----END PUBLIC KEY-----`
+
 	type test struct {
 		ca         acme.CertificateAuthority
 		db         acme.DB
@@ -1716,27 +1721,29 @@ func TestHandler_NewOrder(t *testing.T) {
 		},
 		"ok/default-naf-nbf-wireapp": func(t *testing.T) test {
 			acmeWireProv := newWireProvisionerWithOptions(t, &provisioner.Options{
-				OIDC: &provisioner.OIDCOptions{
-					Provider: provisioner.ProviderJSON{
-						IssuerURL:   "",
-						AuthURL:     "",
-						TokenURL:    "",
-						JWKSURL:     "",
-						UserInfoURL: "",
-						Algorithms:  []string{},
+				Wire: &wire.Options{
+					OIDC: &wire.OIDCOptions{
+						Provider: &wire.Provider{
+							IssuerURL:   "https://issuer.example.com",
+							AuthURL:     "",
+							TokenURL:    "",
+							JWKSURL:     "",
+							UserInfoURL: "",
+							Algorithms:  []string{"ES256"},
+						},
+						Config: &wire.Config{
+							ClientID:                   "integration test",
+							SignatureAlgorithms:        []string{"ES256"},
+							SkipClientIDCheck:          true,
+							SkipExpiryCheck:            true,
+							SkipIssuerCheck:            true,
+							InsecureSkipSignatureCheck: true,
+							Now:                        time.Now,
+						},
 					},
-					Config: provisioner.ConfigJSON{
-						ClientID:                   "integration test",
-						SupportedSigningAlgs:       []string{},
-						SkipClientIDCheck:          true,
-						SkipExpiryCheck:            true,
-						SkipIssuerCheck:            true,
-						InsecureSkipSignatureCheck: true,
-						Now:                        time.Now,
+					DPOP: &wire.DPOPOptions{
+						SigningKey: []byte(fakeWireSigningKey),
 					},
-				},
-				DPOP: &provisioner.DPOPOptions{
-					ValidationExecPath: "true", // true will always exit with code 0
 				},
 			})
 			acc := &acme.Account{ID: "accID"}

@@ -2,6 +2,7 @@ package provisioner
 
 import (
 	"encoding/json"
+	"fmt"
 	"strings"
 
 	"github.com/pkg/errors"
@@ -11,6 +12,7 @@ import (
 	"go.step.sm/crypto/x509util"
 
 	"github.com/smallstep/certificates/authority/policy"
+	"github.com/smallstep/certificates/authority/provisioner/wire"
 )
 
 // CertificateOptions is an interface that returns a list of options passed when
@@ -30,11 +32,10 @@ func (fn certificateOptionsFunc) Options(so SignOptions) []x509util.Option {
 type Options struct {
 	X509 *X509Options `json:"x509,omitempty"`
 	SSH  *SSHOptions  `json:"ssh,omitempty"`
-	OIDC *OIDCOptions `json:"oidc,omitempty"`
-	DPOP *DPOPOptions `json:"dpop,omitempty"`
-
 	// Webhooks is a list of webhooks that can augment template data
 	Webhooks []*Webhook `json:"webhooks,omitempty"`
+	// Wire holds the options used for the ACME Wire integration
+	Wire *wire.Options `json:"wire,omitempty"`
 }
 
 // GetX509Options returns the X.509 options.
@@ -53,20 +54,18 @@ func (o *Options) GetSSHOptions() *SSHOptions {
 	return o.SSH
 }
 
-// GetOIDCOptions returns the OIDC options.
-func (o *Options) GetOIDCOptions() *OIDCOptions {
+// GetWireOptions returns the SSH options.
+func (o *Options) GetWireOptions() (*wire.Options, error) {
 	if o == nil {
-		return nil
+		return nil, errors.New("no options available")
 	}
-	return o.OIDC
-}
-
-// GetDPOPOptions returns the OIDC options.
-func (o *Options) GetDPOPOptions() *DPOPOptions {
-	if o == nil {
-		return nil
+	if o.Wire == nil {
+		return nil, errors.New("no Wire options available")
 	}
-	return o.DPOP
+	if err := o.Wire.Validate(); err != nil {
+		return nil, fmt.Errorf("failed validating Wire options: %w", err)
+	}
+	return o.Wire, nil
 }
 
 // GetWebhooks returns the webhooks options.
