@@ -1007,14 +1007,16 @@ MCowBQYDK2VwAyEA5c+4NKZSNQcR1T8qN6SjwgdPZQ0Ge12Ylx/YeGAJ35k=
 				jose.Claims
 				Challenge string `json:"chal,omitempty"`
 				Handle    string `json:"handle,omitempty"`
-				ClientID  string `json:"client_id,omitempty"`
+				Nonce     string `json:"nonce,omitempty"`
+				HTU       string `json:"htu,omitempty"`
 			}{
 				Claims: jose.Claims{
 					Subject: "wireapp://CzbfFjDOQrenCbDxVmgnFw!594930e9d50bb175@wire.com",
 				},
 				Challenge: "token",
 				Handle:    "wireapp://%40alice_wire@wire.com",
-				ClientID:  "wireapp://CzbfFjDOQrenCbDxVmgnFw!594930e9d50bb175@wire.com",
+				Nonce:     "nonce",
+				HTU:       "http://issuer.example.com",
 			})
 			require.NoError(t, err)
 			dpop, err := dpopSigner.Sign(dpopBytes)
@@ -1024,6 +1026,7 @@ MCowBQYDK2VwAyEA5c+4NKZSNQcR1T8qN6SjwgdPZQ0Ge12Ylx/YeGAJ35k=
 			tokenBytes, err := json.Marshal(struct {
 				jose.Claims
 				Challenge string `json:"chal,omitempty"`
+				Nonce     string `json:"nonce,omitempty"`
 				Cnf       struct {
 					Kid string `json:"kid,omitempty"`
 				} `json:"cnf"`
@@ -1038,6 +1041,7 @@ MCowBQYDK2VwAyEA5c+4NKZSNQcR1T8qN6SjwgdPZQ0Ge12Ylx/YeGAJ35k=
 					Expiry:   jose.NewNumericDate(time.Now().Add(1 * time.Minute)),
 				},
 				Challenge: "token",
+				Nonce:     "nonce",
 				Cnf: struct {
 					Kid string `json:"kid,omitempty"`
 				}{
@@ -1089,6 +1093,7 @@ MCowBQYDK2VwAyEA5c+4NKZSNQcR1T8qN6SjwgdPZQ0Ge12Ylx/YeGAJ35k=
 						TransformTemplate: "",
 					},
 					DPOP: &wireprovisioner.DPOPOptions{
+						Target:     "http://issuer.example.com",
 						SigningKey: signerPEMBytes,
 					},
 				},
