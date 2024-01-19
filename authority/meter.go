@@ -14,3 +14,14 @@ type Meter interface {
 	// SSHRenewedf is called whenever a SSH certificate is renewed.
 	SSHRenewed(provisioner string)
 }
+
+// noopMeter implements a noop [Meter].
+type noopMeter struct{}
+
+func (noopMeter) X509Signed(string) {}
+
+func (noopMeter) X509Renewed(string) {}
+
+func (noopMeter) SSHSigned(string) {}
+
+func (noopMeter) SSHRenewed(string) {}

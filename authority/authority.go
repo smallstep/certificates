@@ -145,6 +145,10 @@ func New(cfg *config.Config, opts ...Option) (*Authority, error) {
 		}
 	}
 
+	if a.meter == nil {
+		a.meter = noopMeter{}
+	}
+
 	return a, nil
 }
 
@@ -183,6 +187,10 @@ func NewEmbedded(opts ...Option) (*Authority, error) {
 		if err := a.init(); err != nil {
 			return nil, err
 		}
+	}
+
+	if a.meter == nil {
+		a.meter = noopMeter{}
 	}
 
 	return a, nil
