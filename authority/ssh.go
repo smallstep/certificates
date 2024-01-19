@@ -146,7 +146,10 @@ func (a *Authority) GetSSHBastion(ctx context.Context, user, hostname string) (*
 }
 
 // SignSSH creates a signed SSH certificate with the given public key and options.
-func (a *Authority) SignSSH(_ context.Context, key ssh.PublicKey, opts provisioner.SignSSHOptions, signOpts ...provisioner.SignOption) (*ssh.Certificate, error) {
+func (a *Authority) SignSSH(_ context.Context, key ssh.PublicKey, opts provisioner.SignSSHOptions, signOpts ...provisioner.SignOption) (cert *ssh.Certificate, err error) {
+	var prov provisioner.Interface
+	defer a.incrProvisionerCounter(&prov, &err, Meter.SSHSigned)
+
 	var (
 		certOptions []sshutil.Option
 		mods        []provisioner.SSHCertModifier
@@ -154,20 +157,12 @@ func (a *Authority) SignSSH(_ context.Context, key ssh.PublicKey, opts provision
 	)
 
 	// Validate given options.
-	if err := opts.Validate(); err != nil {
-		return nil, err
+	if err = opts.Validate(); err != nil {
+		return
 	}
 
 	// Set backdate with the configured value
 	opts.Backdate = a.config.AuthorityConfig.Backdate.Duration
-
-	var prov provisioner.Interface
-	measure := func(ok bool) {
-		// we don't know whether the provisioner is set in the following for/switch
-		if prov != nil {
-			a.meter.SSHSigned(prov.GetName(), ok)
-		}
-	}
 
 	var webhookCtl webhookController
 	for _, op := range signOpts {
@@ -190,10 +185,10 @@ func (a *Authority) SignSSH(_ context.Context, key ssh.PublicKey, opts provision
 
 		// validate the given SSHOptions
 		case provisioner.SSHCertOptionsValidator:
-			if err := o.Valid(opts); err != nil {
-				measure(false)
+			if err = o.Valid(opts); err != nil {
+				err = errs.BadRequestErr(err, "error validating ssh certificate options")
 
-				return nil, errs.BadRequestErr(err, "error validating ssh certificate options")
+				return
 			}
 
 		// call webhooks
@@ -201,9 +196,9 @@ func (a *Authority) SignSSH(_ context.Context, key ssh.PublicKey, opts provision
 			webhookCtl = o
 
 		default:
-			measure(false)
+			err = errs.InternalServer("authority.SignSSH: invalid extra option type %T", o)
 
-			return nil, errs.InternalServer("authority.SignSSH: invalid extra option type %T", o)
+			return
 		}
 	}
 
@@ -216,35 +211,36 @@ func (a *Authority) SignSSH(_ context.Context, key ssh.PublicKey, opts provision
 	}
 
 	// Call enriching webhooks
-	if err := callEnrichingWebhooksSSH(webhookCtl, cr); err != nil {
-		measure(false)
-
-		return nil, errs.ApplyOptions(
+	if err = a.callEnrichingWebhooksSSH(prov, webhookCtl, cr); err != nil {
+		err = errs.ApplyOptions(
 			errs.ForbiddenErr(err, err.Error()),
 			errs.WithKeyVal("signOptions", signOpts),
 		)
+
+		return
 	}
 
 	// Create certificate from template.
-	certificate, err := sshutil.NewCertificate(cr, certOptions...)
-	if err != nil {
-		measure(false)
-
+	var certificate *sshutil.Certificate
+	if certificate, err = sshutil.NewCertificate(cr, certOptions...); err != nil {
 		var te *sshutil.TemplateError
-		if errors.As(err, &te) {
-			return nil, errs.ApplyOptions(
+		switch {
+		case errors.As(err, &te):
+			err = errs.ApplyOptions(
 				errs.BadRequestErr(err, err.Error()),
 				errs.WithKeyVal("signOptions", signOpts),
 			)
-		}
-		// explicitly check for unmarshaling errors, which are most probably caused by JSON template syntax errors
-		if strings.HasPrefix(err.Error(), "error unmarshaling certificate") {
-			return nil, errs.InternalServerErr(templatingError(err),
+		case strings.HasPrefix(err.Error(), "error unmarshaling certificate"):
+			// explicitly check for unmarshaling errors, which are most probably caused by JSON template syntax errors
+			err = errs.InternalServerErr(templatingError(err),
 				errs.WithKeyVal("signOptions", signOpts),
 				errs.WithMessage("error applying certificate template"),
 			)
+		default:
+			err = errs.Wrap(http.StatusInternalServerError, err, "authority.SignSSH")
 		}
-		return nil, errs.Wrap(http.StatusInternalServerError, err, "authority.SignSSH")
+
+		return
 	}
 
 	// Get actual *ssh.Certificate and continue with provisioner modifiers.
@@ -252,18 +248,18 @@ func (a *Authority) SignSSH(_ context.Context, key ssh.PublicKey, opts provision
 
 	// Use SignSSHOptions to modify the certificate validity. It will be later
 	// checked or set if not defined.
-	if err := opts.ModifyValidity(certTpl); err != nil {
-		measure(false)
+	if err = opts.ModifyValidity(certTpl); err != nil {
+		err = errs.BadRequestErr(err, err.Error())
 
-		return nil, errs.BadRequestErr(err, err.Error())
+		return
 	}
 
 	// Use provisioner modifiers.
 	for _, m := range mods {
-		if err := m.Modify(certTpl, opts); err != nil {
-			measure(false)
+		if err = m.Modify(certTpl, opts); err != nil {
+			err = errs.ForbiddenErr(err, "error creating ssh certificate")
 
-			return nil, errs.ForbiddenErr(err, "error creating ssh certificate")
+			return
 		}
 	}
 
@@ -272,72 +268,72 @@ func (a *Authority) SignSSH(_ context.Context, key ssh.PublicKey, opts provision
 	switch certTpl.CertType {
 	case ssh.UserCert:
 		if a.sshCAUserCertSignKey == nil {
-			measure(false)
+			err = errs.NotImplemented("authority.SignSSH: user certificate signing is not enabled")
 
-			return nil, errs.NotImplemented("authority.SignSSH: user certificate signing is not enabled")
+			return
 		}
 		signer = a.sshCAUserCertSignKey
 	case ssh.HostCert:
 		if a.sshCAHostCertSignKey == nil {
-			measure(false)
+			err = errs.NotImplemented("authority.SignSSH: host certificate signing is not enabled")
 
-			return nil, errs.NotImplemented("authority.SignSSH: host certificate signing is not enabled")
+			return
 		}
 		signer = a.sshCAHostCertSignKey
 	default:
-		measure(false)
+		err = errs.InternalServer("authority.SignSSH: unexpected ssh certificate type: %d", certTpl.CertType)
 
-		return nil, errs.InternalServer("authority.SignSSH: unexpected ssh certificate type: %d", certTpl.CertType)
+		return
 	}
 
 	// Check if authority is allowed to sign the certificate
-	if err := a.isAllowedToSignSSHCertificate(certTpl); err != nil {
-		measure(false)
-
+	if err = a.isAllowedToSignSSHCertificate(certTpl); err != nil {
 		var ee *errs.Error
 		if errors.As(err, &ee) {
-			return nil, ee
+			err = ee
+		} else {
+			err = errs.InternalServerErr(err,
+				errs.WithMessage("authority.SignSSH: error creating ssh certificate"),
+			)
 		}
-		return nil, errs.InternalServerErr(err,
-			errs.WithMessage("authority.SignSSH: error creating ssh certificate"),
-		)
+
+		return
 	}
 
 	// Send certificate to webhooks for authorization
-	if err := callAuthorizingWebhooksSSH(webhookCtl, certificate, certTpl); err != nil {
-		measure(false)
-
-		return nil, errs.ApplyOptions(
+	if err = a.callAuthorizingWebhooksSSH(prov, webhookCtl, certificate, certTpl); err != nil {
+		err = errs.ApplyOptions(
 			errs.ForbiddenErr(err, "authority.SignSSH: error signing certificate"),
 		)
+
+		return
 	}
 
 	// Sign certificate.
-	cert, err := sshutil.CreateCertificate(certTpl, signer)
-	if err != nil {
-		measure(false)
+	if cert, err = sshutil.CreateCertificate(certTpl, signer); err != nil {
+		err = errs.Wrap(http.StatusInternalServerError, err, "authority.SignSSH: error signing certificate")
 
-		return nil, errs.Wrap(http.StatusInternalServerError, err, "authority.SignSSH: error signing certificate")
+		return
 	}
 
 	// User provisioners validators.
 	for _, v := range validators {
-		if err := v.Valid(cert, opts); err != nil {
-			measure(false)
+		if err = v.Valid(cert, opts); err != nil {
+			err = errs.ForbiddenErr(err, "error validating ssh certificate")
 
-			return nil, errs.ForbiddenErr(err, "error validating ssh certificate")
+			return
 		}
 	}
 
-	if err = a.storeSSHCertificate(prov, cert); err != nil && !errors.Is(err, db.ErrNotImplemented) {
-		measure(false)
-
-		return nil, errs.Wrap(http.StatusInternalServerError, err, "authority.SignSSH: error storing certificate in db")
+	if err = a.storeSSHCertificate(prov, cert); err != nil {
+		if !errors.Is(err, db.ErrNotImplemented) {
+			err = errs.Wrap(http.StatusInternalServerError, err, "authority.SignSSH: error storing certificate in db")
+		} else {
+			err = nil
+		}
 	}
 
-	measure(true)
-
-	return cert, nil
+	return
 }
 
 // isAllowedToSignSSHCertificate checks if the Authority is allowed to sign the SSH certificate.
@@ -346,23 +342,21 @@ func (a *Authority) isAllowedToSignSSHCertificate(cert *ssh.Certificate) error {
 }
 
 // RenewSSH creates a signed SSH certificate using the old SSH certificate as a template.
-func (a *Authority) RenewSSH(ctx context.Context, oldCert *ssh.Certificate) (*ssh.Certificate, error) {
+func (a *Authority) RenewSSH(ctx context.Context, oldCert *ssh.Certificate) (cert *ssh.Certificate, err error) {
+	var prov provisioner.Interface
+	defer a.incrProvisionerCounter(&prov, &err, Meter.SSHRenewed)
+
 	if oldCert.ValidAfter == 0 || oldCert.ValidBefore == 0 {
-		return nil, errs.BadRequest("cannot renew a certificate without validity period")
+		err = errs.BadRequest("cannot renew a certificate without validity period")
+
+		return
 	}
 
-	if err := a.authorizeSSHCertificate(ctx, oldCert); err != nil {
-		return nil, err
+	if err = a.authorizeSSHCertificate(ctx, oldCert); err != nil {
+		return
 	}
 
 	// Attempt to extract the provisioner from the token.
-	var prov provisioner.Interface
-	measure := func(ok bool) {
-		if prov != nil {
-			a.meter.SSHRenewed(prov.GetName(), ok)
-		}
-	}
-
 	if token, ok := provisioner.TokenFromContext(ctx); ok {
 		prov, _, _ = a.getProvisionerFromToken(token)
 	}
@@ -391,54 +385,48 @@ func (a *Authority) RenewSSH(ctx context.Context, oldCert *ssh.Certificate) (*ss
 	switch certTpl.CertType {
 	case ssh.UserCert:
 		if a.sshCAUserCertSignKey == nil {
-			measure(false)
+			err = errs.NotImplemented("renewSSH: user certificate signing is not enabled")
 
-			return nil, errs.NotImplemented("renewSSH: user certificate signing is not enabled")
+			return
 		}
 		signer = a.sshCAUserCertSignKey
 	case ssh.HostCert:
 		if a.sshCAHostCertSignKey == nil {
-			measure(false)
+			err = errs.NotImplemented("renewSSH: host certificate signing is not enabled")
 
-			return nil, errs.NotImplemented("renewSSH: host certificate signing is not enabled")
+			return
 		}
 		signer = a.sshCAHostCertSignKey
 	default:
-		measure(false)
+		err = errs.InternalServer("renewSSH: unexpected ssh certificate type: %d", certTpl.CertType)
 
-		return nil, errs.InternalServer("renewSSH: unexpected ssh certificate type: %d", certTpl.CertType)
+		return
 	}
 
 	// Sign certificate.
-	cert, err := sshutil.CreateCertificate(certTpl, signer)
-	if err != nil {
-		measure(false)
+	if cert, err = sshutil.CreateCertificate(certTpl, signer); err != nil {
+		err = errs.Wrap(http.StatusInternalServerError, err, "signSSH: error signing certificate")
 
-		return nil, errs.Wrap(http.StatusInternalServerError, err, "signSSH: error signing certificate")
+		return
 	}
 
-	if err = a.storeRenewedSSHCertificate(prov, oldCert, cert); err != nil && !errors.Is(err, db.ErrNotImplemented) {
-		measure(false)
-
-		return nil, errs.Wrap(http.StatusInternalServerError, err, "renewSSH: error storing certificate in db")
+	if err = a.storeRenewedSSHCertificate(prov, oldCert, cert); err != nil {
+		if !errors.Is(err, db.ErrNotImplemented) {
+			err = errs.Wrap(http.StatusInternalServerError, err, "renewSSH: error storing certificate in db")
+		} else {
+			err = nil
+		}
 	}
 
-	measure(true)
-
-	return cert, nil
+	return
 }
 
 // RekeySSH creates a signed SSH certificate using the old SSH certificate as a template.
-func (a *Authority) RekeySSH(ctx context.Context, oldCert *ssh.Certificate, pub ssh.PublicKey, signOpts ...provisioner.SignOption) (*ssh.Certificate, error) {
-	var validators []provisioner.SSHCertValidator
-
+func (a *Authority) RekeySSH(ctx context.Context, oldCert *ssh.Certificate, pub ssh.PublicKey, signOpts ...provisioner.SignOption) (cert *ssh.Certificate, err error) {
 	var prov provisioner.Interface
-	measure := func(ok bool) {
-		// we don't know whether the provisioner is set in the following for/switch
-		if prov != nil {
-			a.meter.SSHRekeyed(prov.GetName(), ok)
-		}
-	}
+	defer a.incrProvisionerCounter(&prov, &err, Meter.SSHRekeyed)
+
+	var validators []provisioner.SSHCertValidator
 
 	for _, op := range signOpts {
 		switch o := op.(type) {
@@ -449,22 +437,20 @@ func (a *Authority) RekeySSH(ctx context.Context, oldCert *ssh.Certificate, pub 
 		case provisioner.SSHCertValidator:
 			validators = append(validators, o)
 		default:
-			measure(false)
+			err = errs.InternalServer("rekeySSH; invalid extra option type %T", o)
 
-			return nil, errs.InternalServer("rekeySSH; invalid extra option type %T", o)
+			return
 		}
 	}
 
 	if oldCert.ValidAfter == 0 || oldCert.ValidBefore == 0 {
-		measure(false)
+		err = errs.BadRequest("cannot rekey a certificate without validity period")
 
-		return nil, errs.BadRequest("cannot rekey a certificate without validity period")
+		return
 	}
 
-	if err := a.authorizeSSHCertificate(ctx, oldCert); err != nil {
-		measure(false)
-
-		return nil, err
+	if err = a.authorizeSSHCertificate(ctx, oldCert); err != nil {
+		return
 	}
 
 	backdate := a.config.AuthorityConfig.Backdate.Duration
@@ -475,7 +461,7 @@ func (a *Authority) RekeySSH(ctx context.Context, oldCert *ssh.Certificate, pub 
 
 	// Build base certificate with the new key.
 	// Nonce and serial will be automatically generated on signing.
-	cert := &ssh.Certificate{
+	cert = &ssh.Certificate{
 		Key:             pub,
 		CertType:        oldCert.CertType,
 		KeyId:           oldCert.KeyId,
@@ -491,51 +477,49 @@ func (a *Authority) RekeySSH(ctx context.Context, oldCert *ssh.Certificate, pub 
 	switch cert.CertType {
 	case ssh.UserCert:
 		if a.sshCAUserCertSignKey == nil {
-			measure(false)
+			err = errs.NotImplemented("rekeySSH; user certificate signing is not enabled")
 
-			return nil, errs.NotImplemented("rekeySSH; user certificate signing is not enabled")
+			return
 		}
 		signer = a.sshCAUserCertSignKey
 	case ssh.HostCert:
 		if a.sshCAHostCertSignKey == nil {
-			measure(false)
+			err = errs.NotImplemented("rekeySSH; host certificate signing is not enabled")
 
-			return nil, errs.NotImplemented("rekeySSH; host certificate signing is not enabled")
+			return
 		}
 		signer = a.sshCAHostCertSignKey
 	default:
-		measure(false)
+		err = errs.BadRequest("unexpected certificate type '%d'", cert.CertType)
 
-		return nil, errs.BadRequest("unexpected certificate type '%d'", cert.CertType)
+		return
 	}
 
-	var err error
 	// Sign certificate.
-	cert, err = sshutil.CreateCertificate(cert, signer)
-	if err != nil {
-		measure(false)
+	if cert, err = sshutil.CreateCertificate(cert, signer); err != nil {
+		err = errs.Wrap(http.StatusInternalServerError, err, "signSSH: error signing certificate")
 
-		return nil, errs.Wrap(http.StatusInternalServerError, err, "signSSH: error signing certificate")
+		return
 	}
 
 	// Apply validators from provisioner.
 	for _, v := range validators {
-		if err := v.Valid(cert, provisioner.SignSSHOptions{Backdate: backdate}); err != nil {
-			measure(false)
+		if err = v.Valid(cert, provisioner.SignSSHOptions{Backdate: backdate}); err != nil {
+			err = errs.ForbiddenErr(err, "error validating ssh certificate")
 
-			return nil, errs.ForbiddenErr(err, "error validating ssh certificate")
+			return
 		}
 	}
 
-	if err = a.storeRenewedSSHCertificate(prov, oldCert, cert); err != nil && !errors.Is(err, db.ErrNotImplemented) {
-		measure(false)
-
-		return nil, errs.Wrap(http.StatusInternalServerError, err, "rekeySSH; error storing certificate in db")
+	if err = a.storeRenewedSSHCertificate(prov, oldCert, cert); err != nil {
+		if !errors.Is(err, db.ErrNotImplemented) {
+			err = errs.Wrap(http.StatusInternalServerError, err, "rekeySSH; error storing certificate in db")
+		} else {
+			err = nil
+		}
 	}
 
-	measure(true)
-
-	return cert, nil
+	return
 }
 
 func (a *Authority) storeSSHCertificate(prov provisioner.Interface, cert *ssh.Certificate) error {
@@ -735,28 +719,36 @@ func (a *Authority) getAddUserCommand(principal string) string {
 	return strings.ReplaceAll(cmd, "<principal>", principal)
 }
 
-func callEnrichingWebhooksSSH(webhookCtl webhookController, cr sshutil.CertificateRequest) error {
+func (a *Authority) callEnrichingWebhooksSSH(prov provisioner.Interface, webhookCtl webhookController, cr sshutil.CertificateRequest) (err error) {
 	if webhookCtl == nil {
-		return nil
+		return
 	}
-	whEnrichReq, err := webhook.NewRequestBody(
+
+	var whEnrichReq *webhook.RequestBody
+	if whEnrichReq, err = webhook.NewRequestBody(
 		webhook.WithSSHCertificateRequest(cr),
-	)
-	if err != nil {
-		return err
+	); err == nil {
+		err = webhookCtl.Enrich(whEnrichReq)
+
+		a.incrWebhookCounter(prov, err, Meter.SSHEnriched)
 	}
-	return webhookCtl.Enrich(whEnrichReq)
+
+	return
 }
 
-func callAuthorizingWebhooksSSH(webhookCtl webhookController, cert *sshutil.Certificate, certTpl *ssh.Certificate) error {
+func (a *Authority) callAuthorizingWebhooksSSH(prov provisioner.Interface, webhookCtl webhookController, cert *sshutil.Certificate, certTpl *ssh.Certificate) (err error) {
 	if webhookCtl == nil {
-		return nil
+		return
 	}
-	whAuthBody, err := webhook.NewRequestBody(
+
+	var whAuthBody *webhook.RequestBody
+	if whAuthBody, err = webhook.NewRequestBody(
 		webhook.WithSSHCertificate(cert, certTpl),
-	)
-	if err != nil {
-		return err
+	); err == nil {
+		err = webhookCtl.Authorize(whAuthBody)
+
+		a.incrWebhookCounter(prov, err, Meter.SSHAuthorized)
 	}
-	return webhookCtl.Authorize(whAuthBody)
+
+	return
 }

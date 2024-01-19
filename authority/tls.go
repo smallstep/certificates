@@ -92,7 +92,10 @@ func withDefaultASN1DN(def *config.ASN1DN) provisioner.CertificateModifierFunc {
 }
 
 // Sign creates a signed certificate from a certificate signing request.
-func (a *Authority) Sign(csr *x509.CertificateRequest, signOpts provisioner.SignOptions, extraOpts ...provisioner.SignOption) ([]*x509.Certificate, error) {
+func (a *Authority) Sign(csr *x509.CertificateRequest, signOpts provisioner.SignOptions, extraOpts ...provisioner.SignOption) (cert []*x509.Certificate, err error) {
+	var prov provisioner.Interface
+	defer a.incrProvisionerCounter(&prov, &err, Meter.X509Signed)
+
 	var (
 		certOptions    []x509util.Option
 		certValidators []provisioner.CertificateValidator
@@ -100,24 +103,18 @@ func (a *Authority) Sign(csr *x509.CertificateRequest, signOpts provisioner.Sign
 		certEnforcers  []provisioner.CertificateEnforcer
 	)
 
-	opts := []interface{}{errs.WithKeyVal("csr", csr), errs.WithKeyVal("signOptions", signOpts)}
-	if err := csr.CheckSignature(); err != nil {
-		return nil, errs.ApplyOptions(
+	opts := []any{errs.WithKeyVal("csr", csr), errs.WithKeyVal("signOptions", signOpts)}
+	if err = csr.CheckSignature(); err != nil {
+		err = errs.ApplyOptions(
 			errs.BadRequestErr(err, "invalid certificate request"),
 			opts...,
 		)
+
+		return
 	}
 
 	// Set backdate with the configured value
 	signOpts.Backdate = a.config.AuthorityConfig.Backdate.Duration
-
-	var prov provisioner.Interface
-	measure := func(ok bool) {
-		// we don't know whether the provisioner is set in the following for/switch
-		if prov != nil {
-			a.meter.X509Signed(prov.GetName(), ok)
-		}
-	}
 
 	var pInfo *casapi.ProvisionerInfo
 	var attData *provisioner.AttestationData
@@ -138,13 +135,13 @@ func (a *Authority) Sign(csr *x509.CertificateRequest, signOpts provisioner.Sign
 
 		// Validate the given certificate request.
 		case provisioner.CertificateRequestValidator:
-			if err := k.Valid(csr); err != nil {
-				measure(false)
-
-				return nil, errs.ApplyOptions(
+			if err = k.Valid(csr); err != nil {
+				err = errs.ApplyOptions(
 					errs.ForbiddenErr(err, "error validating certificate request"),
 					opts...,
 				)
+
+				return
 			}
 
 		// Validates the unsigned certificate template.
@@ -165,166 +162,168 @@ func (a *Authority) Sign(csr *x509.CertificateRequest, signOpts provisioner.Sign
 
 		// Capture the provisioner's webhook controller
 		case webhookController:
+			// TODO(@azazeal): wrap the webhook controller with functions that mutate the meter
 			webhookCtl = k
 
 		default:
-			measure(false)
+			err = errs.InternalServer("authority.Sign; invalid extra option type %T", append([]any{k}, opts...)...)
 
-			return nil, errs.InternalServer("authority.Sign; invalid extra option type %T", append([]interface{}{k}, opts...)...)
+			return
 		}
 	}
 
-	if err := callEnrichingWebhooksX509(webhookCtl, attData, csr); err != nil {
-		measure(false)
-
-		return nil, errs.ApplyOptions(
+	if err = a.callEnrichingWebhooksX509(prov, webhookCtl, attData, csr); err != nil {
+		err = errs.ApplyOptions(
 			errs.ForbiddenErr(err, err.Error()),
 			errs.WithKeyVal("csr", csr),
 			errs.WithKeyVal("signOptions", signOpts),
 		)
+
+		return
 	}
 
-	cert, err := x509util.NewCertificate(csr, certOptions...)
-	if err != nil {
-		measure(false)
-
+	var crt *x509util.Certificate
+	if crt, err = x509util.NewCertificate(csr, certOptions...); err != nil {
 		var te *x509util.TemplateError
-		if errors.As(err, &te) {
-			return nil, errs.ApplyOptions(
+		switch {
+		case errors.As(err, &te):
+			err = errs.ApplyOptions(
 				errs.BadRequestErr(err, err.Error()),
 				errs.WithKeyVal("csr", csr),
 				errs.WithKeyVal("signOptions", signOpts),
 			)
-		}
-		// explicitly check for unmarshaling errors, which are most probably caused by JSON template (syntax) errors
-		if strings.HasPrefix(err.Error(), "error unmarshaling certificate") {
-			return nil, errs.InternalServerErr(templatingError(err),
+		case strings.HasPrefix(err.Error(), "error unmarshaling certificate"):
+			// explicitly check for unmarshaling errors, which are most probably caused by JSON template (syntax) errors
+			err = errs.InternalServerErr(templatingError(err),
 				errs.WithKeyVal("csr", csr),
 				errs.WithKeyVal("signOptions", signOpts),
 				errs.WithMessage("error applying certificate template"),
 			)
+		default:
+			err = errs.Wrap(http.StatusInternalServerError, err, "authority.Sign", opts...)
 		}
-		return nil, errs.Wrap(http.StatusInternalServerError, err, "authority.Sign", opts...)
+
+		return
 	}
 
 	// Certificate modifiers before validation
-	leaf := cert.GetCertificate()
+	leaf := crt.GetCertificate()
 
 	// Set default subject
-	if err := withDefaultASN1DN(a.config.AuthorityConfig.Template).Modify(leaf, signOpts); err != nil {
-		measure(false)
-
-		return nil, errs.ApplyOptions(
+	if err = withDefaultASN1DN(a.config.AuthorityConfig.Template).Modify(leaf, signOpts); err != nil {
+		err = errs.ApplyOptions(
 			errs.ForbiddenErr(err, "error creating certificate"),
 			opts...,
 		)
+
+		return
 	}
 
 	for _, m := range certModifiers {
-		if err := m.Modify(leaf, signOpts); err != nil {
-			measure(false)
-
-			return nil, errs.ApplyOptions(
+		if err = m.Modify(leaf, signOpts); err != nil {
+			err = errs.ApplyOptions(
 				errs.ForbiddenErr(err, "error creating certificate"),
 				opts...,
 			)
+
+			return
 		}
 	}
 
 	// Certificate validation.
 	for _, v := range certValidators {
-		if err := v.Valid(leaf, signOpts); err != nil {
-			measure(false)
-
-			return nil, errs.ApplyOptions(
+		if err = v.Valid(leaf, signOpts); err != nil {
+			err = errs.ApplyOptions(
 				errs.ForbiddenErr(err, "error validating certificate"),
 				opts...,
 			)
+
+			return
 		}
 	}
 
 	// Certificate modifiers after validation
 	for _, m := range certEnforcers {
-		if err := m.Enforce(leaf); err != nil {
-			measure(false)
-
-			return nil, errs.ApplyOptions(
+		if err = m.Enforce(leaf); err != nil {
+			err = errs.ApplyOptions(
 				errs.ForbiddenErr(err, "error creating certificate"),
 				opts...,
 			)
+
+			return
 		}
 	}
 
 	// Process injected modifiers after validation
 	for _, m := range a.x509Enforcers {
-		if err := m.Enforce(leaf); err != nil {
-			measure(false)
-
-			return nil, errs.ApplyOptions(
+		if err = m.Enforce(leaf); err != nil {
+			err = errs.ApplyOptions(
 				errs.ForbiddenErr(err, "error creating certificate"),
 				opts...,
 			)
+
+			return
 		}
 	}
 
 	// Check if authority is allowed to sign the certificate
-	if err := a.isAllowedToSignX509Certificate(leaf); err != nil {
-		measure(false)
-
+	if err = a.isAllowedToSignX509Certificate(leaf); err != nil {
 		var ee *errs.Error
 		if errors.As(err, &ee) {
-			return nil, errs.ApplyOptions(ee, opts...)
+			err = errs.ApplyOptions(ee, opts...)
+		} else {
+			err = errs.InternalServerErr(err,
+				errs.WithKeyVal("csr", csr),
+				errs.WithKeyVal("signOptions", signOpts),
+				errs.WithMessage("error creating certificate"),
+			)
 		}
-		return nil, errs.InternalServerErr(err,
-			errs.WithKeyVal("csr", csr),
-			errs.WithKeyVal("signOptions", signOpts),
-			errs.WithMessage("error creating certificate"),
-		)
+
+		return
 	}
 
 	// Send certificate to webhooks for authorization
-	if err := callAuthorizingWebhooksX509(webhookCtl, cert, leaf, attData); err != nil {
-		measure(false)
-
-		return nil, errs.ApplyOptions(
+	if err = a.callAuthorizingWebhooksX509(prov, webhookCtl, crt, leaf, attData); err != nil {
+		err = errs.ApplyOptions(
 			errs.ForbiddenErr(err, "error creating certificate"),
 			opts...,
 		)
+
+		return
 	}
 
 	// Sign certificate
 	lifetime := leaf.NotAfter.Sub(leaf.NotBefore.Add(signOpts.Backdate))
-	resp, err := a.x509CAService.CreateCertificate(&casapi.CreateCertificateRequest{
+
+	var resp *casapi.CreateCertificateResponse
+	if resp, err = a.x509CAService.CreateCertificate(&casapi.CreateCertificateRequest{
 		Template:    leaf,
 		CSR:         csr,
 		Lifetime:    lifetime,
 		Backdate:    signOpts.Backdate,
 		Provisioner: pInfo,
-	})
-	if err != nil {
-		measure(false)
+	}); err != nil {
+		err = errs.Wrap(http.StatusInternalServerError, err, "authority.Sign; error creating certificate", opts...)
 
-		return nil, errs.Wrap(http.StatusInternalServerError, err, "authority.Sign; error creating certificate", opts...)
+		return
 	}
 
-	fullchain := append([]*x509.Certificate{resp.Certificate}, resp.CertificateChain...)
+	cert = append([]*x509.Certificate{resp.Certificate}, resp.CertificateChain...)
 
 	// Wrap provisioner with extra information.
 	prov = wrapProvisioner(prov, attData)
 
 	// Store certificate in the db.
-	if err = a.storeCertificate(prov, fullchain); err != nil {
+	if err = a.storeCertificate(prov, cert); err != nil {
 		if !errors.Is(err, db.ErrNotImplemented) {
-			measure(false)
-
-			return nil, errs.Wrap(http.StatusInternalServerError, err,
+			err = errs.Wrap(http.StatusInternalServerError, err,
 				"authority.Sign; error storing certificate in db", opts...)
+		} else {
+			err = nil
 		}
 	}
 
-	measure(true)
-
-	return fullchain, nil
+	return
 }
 
 // isAllowedToSignX509Certificate checks if the Authority is allowed
@@ -371,23 +370,24 @@ func (a *Authority) Rekey(oldCert *x509.Certificate, pk crypto.PublicKey) ([]*x5
 // 'AuthorityKeyId' (which may have changed), 'SubjectKeyId' (different in case
 // of rekey), and 'NotBefore/NotAfter' (the validity duration of the new
 // certificate should be equal to the old one, but starting 'now').
-func (a *Authority) RenewContext(ctx context.Context, oldCert *x509.Certificate, pk crypto.PublicKey) ([]*x509.Certificate, error) {
+func (a *Authority) RenewContext(ctx context.Context, oldCert *x509.Certificate, pk crypto.PublicKey) (cert []*x509.Certificate, err error) {
+	var prov provisioner.Interface
+	if pk == nil {
+		defer a.incrProvisionerCounter(&prov, &err, Meter.X509Renewed)
+	} else {
+		defer a.incrProvisionerCounter(&prov, &err, Meter.X509Rekeyed)
+	}
+
 	isRekey := (pk != nil)
 	opts := []errs.Option{
 		errs.WithKeyVal("serialNumber", oldCert.SerialNumber.String()),
 	}
 
 	// Check step provisioner extensions
-	prov, err := a.authorizeRenew(ctx, oldCert)
-	if err != nil {
-		return nil, errs.StatusCodeError(http.StatusInternalServerError, err, opts...)
-	}
-	measure := func(ok bool) {
-		if pk == nil {
-			a.meter.X509Renewed(prov.GetName(), ok)
-		} else {
-			a.meter.X509Rekeyed(prov.GetName(), ok)
-		}
+	if prov, err = a.authorizeRenew(ctx, oldCert); err != nil {
+		err = errs.StatusCodeError(http.StatusInternalServerError, err, opts...)
+
+		return
 	}
 
 	// Durations
@@ -457,47 +457,48 @@ func (a *Authority) RenewContext(ctx context.Context, oldCert *x509.Certificate,
 	//
 	// TODO(hslatman,maraino): consider adding policies too and consider if
 	// RenewSSH should check policies.
-	if err := a.constraintsEngine.ValidateCertificate(newCert); err != nil {
-		measure(false)
-
+	if err = a.constraintsEngine.ValidateCertificate(newCert); err != nil {
 		var ee *errs.Error
-		if errors.As(err, &ee) {
-			return nil, errs.StatusCodeError(ee.StatusCode(), err, opts...)
+		switch {
+		case errors.As(err, &ee):
+			err = errs.StatusCodeError(ee.StatusCode(), err, opts...)
+		default:
+			err = errs.InternalServerErr(err,
+				errs.WithKeyVal("serialNumber", oldCert.SerialNumber.String()),
+				errs.WithMessage("error renewing certificate"),
+			)
 		}
-		return nil, errs.InternalServerErr(err,
-			errs.WithKeyVal("serialNumber", oldCert.SerialNumber.String()),
-			errs.WithMessage("error renewing certificate"),
-		)
+
+		return
 	}
 
 	// The token can optionally be in the context. If the CA is running in RA
 	// mode, this can be used to renew a certificate.
 	token, _ := TokenFromContext(ctx)
 
-	resp, err := a.x509CAService.RenewCertificate(&casapi.RenewCertificateRequest{
+	var resp *casapi.RenewCertificateResponse
+	if resp, err = a.x509CAService.RenewCertificate(&casapi.RenewCertificateRequest{
 		Template: newCert,
 		Lifetime: lifetime,
 		Backdate: backdate,
 		Token:    token,
-	})
-	if err != nil {
-		measure(false)
+	}); err != nil {
+		err = errs.StatusCodeError(http.StatusInternalServerError, err, opts...)
 
-		return nil, errs.StatusCodeError(http.StatusInternalServerError, err, opts...)
+		return
 	}
 
-	fullchain := append([]*x509.Certificate{resp.Certificate}, resp.CertificateChain...)
-	if err = a.storeRenewedCertificate(oldCert, fullchain); err != nil {
-		if !errors.Is(err, db.ErrNotImplemented) {
-			measure(false)
+	cert = append([]*x509.Certificate{resp.Certificate}, resp.CertificateChain...)
 
-			return nil, errs.StatusCodeError(http.StatusInternalServerError, err, opts...)
+	if err = a.storeRenewedCertificate(oldCert, cert); err != nil {
+		if !errors.Is(err, db.ErrNotImplemented) {
+			err = errs.StatusCodeError(http.StatusInternalServerError, err, opts...)
+		} else {
+			err = nil
 		}
 	}
 
-	measure(true)
-
-	return fullchain, nil
+	return
 }
 
 // storeCertificate allows to use an extension of the db.AuthDB interface that
@@ -1003,42 +1004,52 @@ func templatingError(err error) error {
 	return errors.Wrap(cause, "error applying certificate template")
 }
 
-func callEnrichingWebhooksX509(webhookCtl webhookController, attData *provisioner.AttestationData, csr *x509.CertificateRequest) error {
+func (a *Authority) callEnrichingWebhooksX509(prov provisioner.Interface, webhookCtl webhookController, attData *provisioner.AttestationData, csr *x509.CertificateRequest) (err error) {
 	if webhookCtl == nil {
-		return nil
+		return
 	}
+
 	var attested *webhook.AttestationData
 	if attData != nil {
 		attested = &webhook.AttestationData{
 			PermanentIdentifier: attData.PermanentIdentifier,
 		}
 	}
-	whEnrichReq, err := webhook.NewRequestBody(
+
+	var whEnrichReq *webhook.RequestBody
+	if whEnrichReq, err = webhook.NewRequestBody(
 		webhook.WithX509CertificateRequest(csr),
 		webhook.WithAttestationData(attested),
-	)
-	if err != nil {
-		return err
+	); err == nil {
+		err = webhookCtl.Enrich(whEnrichReq)
+
+		a.incrWebhookCounter(prov, err, Meter.X509Enriched)
 	}
-	return webhookCtl.Enrich(whEnrichReq)
+
+	return
 }
 
-func callAuthorizingWebhooksX509(webhookCtl webhookController, cert *x509util.Certificate, leaf *x509.Certificate, attData *provisioner.AttestationData) error {
+func (a *Authority) callAuthorizingWebhooksX509(prov provisioner.Interface, webhookCtl webhookController, cert *x509util.Certificate, leaf *x509.Certificate, attData *provisioner.AttestationData) (err error) {
 	if webhookCtl == nil {
-		return nil
+		return
 	}
+
 	var attested *webhook.AttestationData
 	if attData != nil {
 		attested = &webhook.AttestationData{
 			PermanentIdentifier: attData.PermanentIdentifier,
 		}
 	}
-	whAuthBody, err := webhook.NewRequestBody(
+
+	var whAuthBody *webhook.RequestBody
+	if whAuthBody, err = webhook.NewRequestBody(
 		webhook.WithX509Certificate(cert, leaf),
 		webhook.WithAttestationData(attested),
-	)
-	if err != nil {
-		return err
+	); err == nil {
+		err = webhookCtl.Authorize(whAuthBody)
+
+		a.incrWebhookCounter(prov, err, Meter.X509Authorized)
 	}
-	return webhookCtl.Authorize(whAuthBody)
+
+	return
 }
