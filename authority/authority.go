@@ -129,6 +129,7 @@ func New(cfg *config.Config, opts ...Option) (*Authority, error) {
 		config:       cfg,
 		certificates: new(sync.Map),
 		validateSCEP: true,
+		meter:        noopMeter{},
 	}
 
 	// Apply options.
@@ -145,10 +146,6 @@ func New(cfg *config.Config, opts ...Option) (*Authority, error) {
 		}
 	}
 
-	if a.meter == nil {
-		a.meter = noopMeter{}
-	}
-
 	return a, nil
 }
 
@@ -158,6 +155,7 @@ func NewEmbedded(opts ...Option) (*Authority, error) {
 	a := &Authority{
 		config:       &config.Config{},
 		certificates: new(sync.Map),
+		meter:        noopMeter{},
 	}
 
 	// Apply options.
