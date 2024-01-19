@@ -289,9 +289,7 @@ func (a *Authority) Sign(csr *x509.CertificateRequest, signOpts provisioner.Sign
 		}
 	}
 
-	if h := a.meter; h != nil {
-		h.X509Signed(prov.GetName())
-	}
+	a.meter.X509Signed(prov.GetName())
 
 	return fullchain, nil
 }
@@ -451,9 +449,7 @@ func (a *Authority) RenewContext(ctx context.Context, oldCert *x509.Certificate,
 		}
 	}
 
-	if h := a.meter; h != nil {
-		h.X509Renewed(prov.GetName())
-	}
+	a.meter.X509Renewed(prov.GetName())
 
 	return fullchain, nil
 }
