@@ -83,32 +83,36 @@ type signatures struct {
 
 // SSHRekeyed implements [authority.Meter] for [Meter].
 func (m *Meter) SSHRekeyed(provisioner string, success bool) {
-	m.ssh.rekeyed.WithLabelValues(provisioner, strconv.FormatBool(success)).Inc()
+	m.count(m.ssh.rekeyed, provisioner, success)
 }
 
 // SSHRenewed implements [authority.Meter] for [Meter].
 func (m *Meter) SSHRenewed(provisioner string, success bool) {
-	m.ssh.renewed.WithLabelValues(provisioner, strconv.FormatBool(success)).Inc()
+	m.count(m.ssh.renewed, provisioner, success)
 }
 
 // SSHSigned implements [authority.Meter] for [Meter].
 func (m *Meter) SSHSigned(provisioner string, success bool) {
-	m.ssh.signed.WithLabelValues(provisioner, strconv.FormatBool(success)).Inc()
+	m.count(m.ssh.signed, provisioner, success)
 }
 
 // X509Rekeyed implements [authority.Meter] for [Meter].
 func (m *Meter) X509Rekeyed(provisioner string, success bool) {
-	m.x509.rekeyed.WithLabelValues(provisioner, strconv.FormatBool(success)).Inc()
+	m.count(m.x509.rekeyed, provisioner, success)
 }
 
 // X509Renewed implements [authority.Meter] for [Meter].
 func (m *Meter) X509Renewed(provisioner string, success bool) {
-	m.x509.renewed.WithLabelValues(provisioner, strconv.FormatBool(success)).Inc()
+	m.count(m.x509.renewed, provisioner, success)
 }
 
 // X509Signed implements [authority.Meter] for [Meter].
 func (m *Meter) X509Signed(provisioner string, success bool) {
-	m.x509.signed.WithLabelValues(provisioner, strconv.FormatBool(success)).Inc()
+	m.count(m.x509.signed, provisioner, success)
+}
+
+func (*Meter) count(cv *prometheus.CounterVec, provisioner string, success bool) {
+	cv.WithLabelValues(provisioner, strconv.FormatBool(success)).Inc()
 }
 
 func newCounterVec(subsystem, name, help string, labels ...string) *prometheus.CounterVec {

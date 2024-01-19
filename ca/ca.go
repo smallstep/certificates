@@ -166,7 +166,7 @@ func (ca *CA) Init(cfg *config.Config) (*CA, error) {
 	}
 
 	var meter *metrix.Meter
-	if ca.config.MetricsAddr != "" {
+	if ca.config.MetricsAddress != "" {
 		meter = metrix.New()
 
 		opts = append(opts, authority.WithMeter(meter))
@@ -328,7 +328,7 @@ func (ca *CA) Init(cfg *config.Config) (*CA, error) {
 	}
 
 	if meter != nil {
-		ca.metricsSrv = server.New(ca.config.MetricsAddr, meter, nil)
+		ca.metricsSrv = server.New(ca.config.MetricsAddress, meter, nil)
 		ca.metricsSrv.BaseContext = func(net.Listener) context.Context {
 			return baseContext
 		}

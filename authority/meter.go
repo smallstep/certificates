@@ -24,12 +24,9 @@ type Meter interface {
 // noopMeter implements a noop [Meter].
 type noopMeter struct{}
 
-func (noopMeter) X509Signed(string, bool) {}
-
+func (noopMeter) SSHRekeyed(string, bool)  {}
+func (noopMeter) SSHRenewed(string, bool)  {}
+func (noopMeter) SSHSigned(string, bool)   {}
+func (noopMeter) X509Rekeyed(string, bool) {}
 func (noopMeter) X509Renewed(string, bool) {}
-
-func (noopMeter) SSHSigned(string, bool) {}
-
-func (noopMeter) SSHRenewed(string, bool) {}
-
-func (noopMeter) SSHRekeyed(string, bool) {}
+func (noopMeter) X509Signed(string, bool)  {}
