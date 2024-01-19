@@ -162,6 +162,13 @@ func (a *Authority) SignSSH(_ context.Context, key ssh.PublicKey, opts provision
 	opts.Backdate = a.config.AuthorityConfig.Backdate.Duration
 
 	var prov provisioner.Interface
+	measure := func(ok bool) {
+		// we don't know whether the provisioner is set in the following for/switch
+		if prov != nil {
+			a.meter.SSHSigned(prov.GetName(), ok)
+		}
+	}
+
 	var webhookCtl webhookController
 	for _, op := range signOpts {
 		switch o := op.(type) {
@@ -192,6 +199,8 @@ func (a *Authority) SignSSH(_ context.Context, key ssh.PublicKey, opts provision
 			webhookCtl = o
 
 		default:
+			measure(false)
+
 			return nil, errs.InternalServer("authority.SignSSH: invalid extra option type %T", o)
 		}
 	}
@@ -206,6 +215,8 @@ func (a *Authority) SignSSH(_ context.Context, key ssh.PublicKey, opts provision
 
 	// Call enriching webhooks
 	if err := callEnrichingWebhooksSSH(webhookCtl, cr); err != nil {
+		measure(false)
+
 		return nil, errs.ApplyOptions(
 			errs.ForbiddenErr(err, err.Error()),
 			errs.WithKeyVal("signOptions", signOpts),
@@ -215,6 +226,8 @@ func (a *Authority) SignSSH(_ context.Context, key ssh.PublicKey, opts provision
 	// Create certificate from template.
 	certificate, err := sshutil.NewCertificate(cr, certOptions...)
 	if err != nil {
+		measure(false)
+
 		var te *sshutil.TemplateError
 		if errors.As(err, &te) {
 			return nil, errs.ApplyOptions(
@@ -238,12 +251,16 @@ func (a *Authority) SignSSH(_ context.Context, key ssh.PublicKey, opts provision
 	// Use SignSSHOptions to modify the certificate validity. It will be later
 	// checked or set if not defined.
 	if err := opts.ModifyValidity(certTpl); err != nil {
+		measure(false)
+
 		return nil, errs.BadRequestErr(err, err.Error())
 	}
 
 	// Use provisioner modifiers.
 	for _, m := range mods {
 		if err := m.Modify(certTpl, opts); err != nil {
+			measure(false)
+
 			return nil, errs.ForbiddenErr(err, "error creating ssh certificate")
 		}
 	}
@@ -253,20 +270,28 @@ func (a *Authority) SignSSH(_ context.Context, key ssh.PublicKey, opts provision
 	switch certTpl.CertType {
 	case ssh.UserCert:
 		if a.sshCAUserCertSignKey == nil {
+			measure(false)
+
 			return nil, errs.NotImplemented("authority.SignSSH: user certificate signing is not enabled")
 		}
 		signer = a.sshCAUserCertSignKey
 	case ssh.HostCert:
 		if a.sshCAHostCertSignKey == nil {
+			measure(false)
+
 			return nil, errs.NotImplemented("authority.SignSSH: host certificate signing is not enabled")
 		}
 		signer = a.sshCAHostCertSignKey
 	default:
+		measure(false)
+
 		return nil, errs.InternalServer("authority.SignSSH: unexpected ssh certificate type: %d", certTpl.CertType)
 	}
 
 	// Check if authority is allowed to sign the certificate
 	if err := a.isAllowedToSignSSHCertificate(certTpl); err != nil {
+		measure(false)
+
 		var ee *errs.Error
 		if errors.As(err, &ee) {
 			return nil, ee
@@ -278,6 +303,8 @@ func (a *Authority) SignSSH(_ context.Context, key ssh.PublicKey, opts provision
 
 	// Send certificate to webhooks for authorization
 	if err := callAuthorizingWebhooksSSH(webhookCtl, certificate, certTpl); err != nil {
+		measure(false)
+
 		return nil, errs.ApplyOptions(
 			errs.ForbiddenErr(err, "authority.SignSSH: error signing certificate"),
 		)
@@ -286,21 +313,27 @@ func (a *Authority) SignSSH(_ context.Context, key ssh.PublicKey, opts provision
 	// Sign certificate.
 	cert, err := sshutil.CreateCertificate(certTpl, signer)
 	if err != nil {
+		measure(false)
+
 		return nil, errs.Wrap(http.StatusInternalServerError, err, "authority.SignSSH: error signing certificate")
 	}
 
 	// User provisioners validators.
 	for _, v := range validators {
 		if err := v.Valid(cert, opts); err != nil {
+			measure(false)
+
 			return nil, errs.ForbiddenErr(err, "error validating ssh certificate")
 		}
 	}
 
 	if err = a.storeSSHCertificate(prov, cert); err != nil && !errors.Is(err, db.ErrNotImplemented) {
+		measure(false)
+
 		return nil, errs.Wrap(http.StatusInternalServerError, err, "authority.SignSSH: error storing certificate in db")
 	}
 
-	a.meter.SSHSigned(prov.GetName())
+	measure(true)
 
 	return cert, nil
 }
@@ -322,6 +355,12 @@ func (a *Authority) RenewSSH(ctx context.Context, oldCert *ssh.Certificate) (*ss
 
 	// Attempt to extract the provisioner from the token.
 	var prov provisioner.Interface
+	measure := func(ok bool) {
+		if prov != nil {
+			a.meter.SSHRenewed(prov.GetName(), ok)
+		}
+	}
+
 	if token, ok := provisioner.TokenFromContext(ctx); ok {
 		prov, _, _ = a.getProvisionerFromToken(token)
 	}
@@ -350,29 +389,39 @@ func (a *Authority) RenewSSH(ctx context.Context, oldCert *ssh.Certificate) (*ss
 	switch certTpl.CertType {
 	case ssh.UserCert:
 		if a.sshCAUserCertSignKey == nil {
+			measure(false)
+
 			return nil, errs.NotImplemented("renewSSH: user certificate signing is not enabled")
 		}
 		signer = a.sshCAUserCertSignKey
 	case ssh.HostCert:
 		if a.sshCAHostCertSignKey == nil {
+			measure(false)
+
 			return nil, errs.NotImplemented("renewSSH: host certificate signing is not enabled")
 		}
 		signer = a.sshCAHostCertSignKey
 	default:
+		measure(false)
+
 		return nil, errs.InternalServer("renewSSH: unexpected ssh certificate type: %d", certTpl.CertType)
 	}
 
 	// Sign certificate.
 	cert, err := sshutil.CreateCertificate(certTpl, signer)
 	if err != nil {
+		measure(false)
+
 		return nil, errs.Wrap(http.StatusInternalServerError, err, "signSSH: error signing certificate")
 	}
 
 	if err = a.storeRenewedSSHCertificate(prov, oldCert, cert); err != nil && !errors.Is(err, db.ErrNotImplemented) {
+		measure(false)
+
 		return nil, errs.Wrap(http.StatusInternalServerError, err, "renewSSH: error storing certificate in db")
 	}
 
-	// TODO(@azazeal): SSH renew trigger
+	measure(true)
 
 	return cert, nil
 }
@@ -382,6 +431,13 @@ func (a *Authority) RekeySSH(ctx context.Context, oldCert *ssh.Certificate, pub 
 	var validators []provisioner.SSHCertValidator
 
 	var prov provisioner.Interface
+	measure := func(ok bool) {
+		// we don't know whether the provisioner is set in the following for/switch
+		if prov != nil {
+			a.meter.SSHRekeyed(prov.GetName(), ok)
+		}
+	}
+
 	for _, op := range signOpts {
 		switch o := op.(type) {
 		// Capture current provisioner
@@ -391,15 +447,21 @@ func (a *Authority) RekeySSH(ctx context.Context, oldCert *ssh.Certificate, pub 
 		case provisioner.SSHCertValidator:
 			validators = append(validators, o)
 		default:
+			measure(false)
+
 			return nil, errs.InternalServer("rekeySSH; invalid extra option type %T", o)
 		}
 	}
 
 	if oldCert.ValidAfter == 0 || oldCert.ValidBefore == 0 {
+		measure(false)
+
 		return nil, errs.BadRequest("cannot rekey a certificate without validity period")
 	}
 
 	if err := a.authorizeSSHCertificate(ctx, oldCert); err != nil {
+		measure(false)
+
 		return nil, err
 	}
 
@@ -427,15 +489,21 @@ func (a *Authority) RekeySSH(ctx context.Context, oldCert *ssh.Certificate, pub 
 	switch cert.CertType {
 	case ssh.UserCert:
 		if a.sshCAUserCertSignKey == nil {
+			measure(false)
+
 			return nil, errs.NotImplemented("rekeySSH; user certificate signing is not enabled")
 		}
 		signer = a.sshCAUserCertSignKey
 	case ssh.HostCert:
 		if a.sshCAHostCertSignKey == nil {
+			measure(false)
+
 			return nil, errs.NotImplemented("rekeySSH; host certificate signing is not enabled")
 		}
 		signer = a.sshCAHostCertSignKey
 	default:
+		measure(false)
+
 		return nil, errs.BadRequest("unexpected certificate type '%d'", cert.CertType)
 	}
 
@@ -443,19 +511,27 @@ func (a *Authority) RekeySSH(ctx context.Context, oldCert *ssh.Certificate, pub 
 	// Sign certificate.
 	cert, err = sshutil.CreateCertificate(cert, signer)
 	if err != nil {
+		measure(false)
+
 		return nil, errs.Wrap(http.StatusInternalServerError, err, "signSSH: error signing certificate")
 	}
 
 	// Apply validators from provisioner.
 	for _, v := range validators {
 		if err := v.Valid(cert, provisioner.SignSSHOptions{Backdate: backdate}); err != nil {
+			measure(false)
+
 			return nil, errs.ForbiddenErr(err, "error validating ssh certificate")
 		}
 	}
 
 	if err = a.storeRenewedSSHCertificate(prov, oldCert, cert); err != nil && !errors.Is(err, db.ErrNotImplemented) {
+		measure(false)
+
 		return nil, errs.Wrap(http.StatusInternalServerError, err, "rekeySSH; error storing certificate in db")
 	}
+
+	measure(true)
 
 	return cert, nil
 }

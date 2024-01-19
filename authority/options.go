@@ -384,6 +384,10 @@ func readCertificateBundle(pemCerts []byte) ([]*x509.Certificate, error) {
 
 // WithMeter is an option that sets the authority's [Meter] to the provided one.
 func WithMeter(m Meter) Option {
+	if m == nil {
+		m = noopMeter{}
+	}
+
 	return func(a *Authority) error {
 		a.meter = m
 		return nil

@@ -112,6 +112,13 @@ func (a *Authority) Sign(csr *x509.CertificateRequest, signOpts provisioner.Sign
 	signOpts.Backdate = a.config.AuthorityConfig.Backdate.Duration
 
 	var prov provisioner.Interface
+	measure := func(ok bool) {
+		// we don't know whether the provisioner is set in the following for/switch
+		if prov != nil {
+			a.meter.X509Signed(prov.GetName(), ok)
+		}
+	}
+
 	var pInfo *casapi.ProvisionerInfo
 	var attData *provisioner.AttestationData
 	var webhookCtl webhookController
@@ -159,11 +166,15 @@ func (a *Authority) Sign(csr *x509.CertificateRequest, signOpts provisioner.Sign
 			webhookCtl = k
 
 		default:
+			measure(false)
+
 			return nil, errs.InternalServer("authority.Sign; invalid extra option type %T", append([]interface{}{k}, opts...)...)
 		}
 	}
 
 	if err := callEnrichingWebhooksX509(webhookCtl, attData, csr); err != nil {
+		measure(false)
+
 		return nil, errs.ApplyOptions(
 			errs.ForbiddenErr(err, err.Error()),
 			errs.WithKeyVal("csr", csr),
@@ -173,6 +184,8 @@ func (a *Authority) Sign(csr *x509.CertificateRequest, signOpts provisioner.Sign
 
 	cert, err := x509util.NewCertificate(csr, certOptions...)
 	if err != nil {
+		measure(false)
+
 		var te *x509util.TemplateError
 		if errors.As(err, &te) {
 			return nil, errs.ApplyOptions(
@@ -197,6 +210,8 @@ func (a *Authority) Sign(csr *x509.CertificateRequest, signOpts provisioner.Sign
 
 	// Set default subject
 	if err := withDefaultASN1DN(a.config.AuthorityConfig.Template).Modify(leaf, signOpts); err != nil {
+		measure(false)
+
 		return nil, errs.ApplyOptions(
 			errs.ForbiddenErr(err, "error creating certificate"),
 			opts...,
@@ -205,6 +220,8 @@ func (a *Authority) Sign(csr *x509.CertificateRequest, signOpts provisioner.Sign
 
 	for _, m := range certModifiers {
 		if err := m.Modify(leaf, signOpts); err != nil {
+			measure(false)
+
 			return nil, errs.ApplyOptions(
 				errs.ForbiddenErr(err, "error creating certificate"),
 				opts...,
@@ -215,6 +232,8 @@ func (a *Authority) Sign(csr *x509.CertificateRequest, signOpts provisioner.Sign
 	// Certificate validation.
 	for _, v := range certValidators {
 		if err := v.Valid(leaf, signOpts); err != nil {
+			measure(false)
+
 			return nil, errs.ApplyOptions(
 				errs.ForbiddenErr(err, "error validating certificate"),
 				opts...,
@@ -225,6 +244,8 @@ func (a *Authority) Sign(csr *x509.CertificateRequest, signOpts provisioner.Sign
 	// Certificate modifiers after validation
 	for _, m := range certEnforcers {
 		if err := m.Enforce(leaf); err != nil {
+			measure(false)
+
 			return nil, errs.ApplyOptions(
 				errs.ForbiddenErr(err, "error creating certificate"),
 				opts...,
@@ -235,6 +256,8 @@ func (a *Authority) Sign(csr *x509.CertificateRequest, signOpts provisioner.Sign
 	// Process injected modifiers after validation
 	for _, m := range a.x509Enforcers {
 		if err := m.Enforce(leaf); err != nil {
+			measure(false)
+
 			return nil, errs.ApplyOptions(
 				errs.ForbiddenErr(err, "error creating certificate"),
 				opts...,
@@ -244,6 +267,8 @@ func (a *Authority) Sign(csr *x509.CertificateRequest, signOpts provisioner.Sign
 
 	// Check if authority is allowed to sign the certificate
 	if err := a.isAllowedToSignX509Certificate(leaf); err != nil {
+		measure(false)
+
 		var ee *errs.Error
 		if errors.As(err, &ee) {
 			return nil, errs.ApplyOptions(ee, opts...)
@@ -257,6 +282,8 @@ func (a *Authority) Sign(csr *x509.CertificateRequest, signOpts provisioner.Sign
 
 	// Send certificate to webhooks for authorization
 	if err := callAuthorizingWebhooksX509(webhookCtl, cert, leaf, attData); err != nil {
+		measure(false)
+
 		return nil, errs.ApplyOptions(
 			errs.ForbiddenErr(err, "error creating certificate"),
 			opts...,
@@ -273,6 +300,8 @@ func (a *Authority) Sign(csr *x509.CertificateRequest, signOpts provisioner.Sign
 		Provisioner: pInfo,
 	})
 	if err != nil {
+		measure(false)
+
 		return nil, errs.Wrap(http.StatusInternalServerError, err, "authority.Sign; error creating certificate", opts...)
 	}
 
@@ -284,12 +313,14 @@ func (a *Authority) Sign(csr *x509.CertificateRequest, signOpts provisioner.Sign
 	// Store certificate in the db.
 	if err = a.storeCertificate(prov, fullchain); err != nil {
 		if !errors.Is(err, db.ErrNotImplemented) {
+			measure(false)
+
 			return nil, errs.Wrap(http.StatusInternalServerError, err,
 				"authority.Sign; error storing certificate in db", opts...)
 		}
 	}
 
-	a.meter.X509Signed(prov.GetName())
+	measure(true)
 
 	return fullchain, nil
 }
@@ -348,6 +379,13 @@ func (a *Authority) RenewContext(ctx context.Context, oldCert *x509.Certificate,
 	prov, err := a.authorizeRenew(ctx, oldCert)
 	if err != nil {
 		return nil, errs.StatusCodeError(http.StatusInternalServerError, err, opts...)
+	}
+	measure := func(ok bool) {
+		if pk == nil {
+			a.meter.X509Renewed(prov.GetName(), ok)
+		} else {
+			a.meter.X509Rekeyed(prov.GetName(), ok)
+		}
 	}
 
 	// Durations
@@ -418,6 +456,8 @@ func (a *Authority) RenewContext(ctx context.Context, oldCert *x509.Certificate,
 	// TODO(hslatman,maraino): consider adding policies too and consider if
 	// RenewSSH should check policies.
 	if err := a.constraintsEngine.ValidateCertificate(newCert); err != nil {
+		measure(false)
+
 		var ee *errs.Error
 		if errors.As(err, &ee) {
 			return nil, errs.StatusCodeError(ee.StatusCode(), err, opts...)
@@ -439,17 +479,21 @@ func (a *Authority) RenewContext(ctx context.Context, oldCert *x509.Certificate,
 		Token:    token,
 	})
 	if err != nil {
+		measure(false)
+
 		return nil, errs.StatusCodeError(http.StatusInternalServerError, err, opts...)
 	}
 
 	fullchain := append([]*x509.Certificate{resp.Certificate}, resp.CertificateChain...)
 	if err = a.storeRenewedCertificate(oldCert, fullchain); err != nil {
 		if !errors.Is(err, db.ErrNotImplemented) {
+			measure(false)
+
 			return nil, errs.StatusCodeError(http.StatusInternalServerError, err, opts...)
 		}
 	}
 
-	a.meter.X509Renewed(prov.GetName())
+	measure(true)
 
 	return fullchain, nil
 }
