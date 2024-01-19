@@ -49,7 +49,12 @@ func (n *NewOrderRequest) Validate() error {
 			if id.Value == "" {
 				return acme.NewError(acme.ErrorMalformedType, "permanent identifier cannot be empty")
 			}
-		case acme.WireID:
+		case acme.WireUser:
+			_, err := wire.ParseID([]byte(id.Value))
+			if err != nil {
+				return acme.WrapError(acme.ErrorMalformedType, err, "failed parsing Wire ID")
+			}
+		case acme.WireDevice:
 			wireID, err := wire.ParseID([]byte(id.Value))
 			if err != nil {
 				return acme.WrapError(acme.ErrorMalformedType, err, "failed parsing Wire ID")
@@ -273,10 +278,27 @@ func newAuthorization(ctx context.Context, az *acme.Authorization) error {
 		}
 
 		var target string
-		if az.Identifier.Type == acme.WireID {
+		if az.Identifier.Type == acme.WireUser {
+			wireOptions, err := prov.GetOptions().GetWireOptions()
+			if err != nil {
+				return acme.WrapErrorISE(err, "failed getting Wire options")
+			}
+			var targetProvider interface{ EvaluateTarget(string) (string, error) }
+			switch typ {
+			case acme.WIREOIDC01:
+				targetProvider = wireOptions.GetOIDCOptions()
+			default:
+				return acme.NewError(acme.ErrorMalformedType, "unsupported type %q", typ)
+			}
+
+			target, err = targetProvider.EvaluateTarget("")
+			if err != nil {
+				return acme.WrapError(acme.ErrorMalformedType, err, "invalid Go template registered for 'target'")
+			}
+		} else if az.Identifier.Type == acme.WireDevice {
 			wireID, err := wire.ParseID([]byte(az.Identifier.Value))
 			if err != nil {
-				return acme.WrapError(acme.ErrorMalformedType, err, "failed parsing WireID")
+				return acme.WrapError(acme.ErrorMalformedType, err, "failed parsing WireUser")
 			}
 			clientID, err := wire.ParseClientID(wireID.ClientID)
 			if err != nil {
@@ -288,8 +310,6 @@ func newAuthorization(ctx context.Context, az *acme.Authorization) error {
 			}
 			var targetProvider interface{ EvaluateTarget(string) (string, error) }
 			switch typ {
-			case acme.WIREOIDC01:
-				targetProvider = wireOptions.GetOIDCOptions()
 			case acme.WIREDPOP01:
 				targetProvider = wireOptions.GetDPOPOptions()
 			default:
@@ -440,8 +460,10 @@ func challengeTypes(az *acme.Authorization) []acme.ChallengeType {
 		}
 	case acme.PermanentIdentifier:
 		chTypes = []acme.ChallengeType{acme.DEVICEATTEST01}
-	case acme.WireID:
-		chTypes = []acme.ChallengeType{acme.WIREOIDC01, acme.WIREDPOP01}
+	case acme.WireUser:
+		chTypes = []acme.ChallengeType{acme.WIREOIDC01}
+	case acme.WireDevice:
+		chTypes = []acme.ChallengeType{acme.WIREDPOP01}
 	default:
 		chTypes = []acme.ChallengeType{}
 	}

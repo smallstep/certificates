@@ -31,8 +31,10 @@ const (
 	// PermanentIdentifier is the ACME permanent-identifier identifier type
 	// defined in https://datatracker.ietf.org/doc/html/draft-bweeks-acme-device-attest-00
 	PermanentIdentifier IdentifierType = "permanent-identifier"
-	// WireID is the Wire user identifier type
-	WireID IdentifierType = "wireapp-id"
+	// WireUser is the Wire user identifier type
+	WireUser IdentifierType = "wireapp-user"
+	// WireDevice is the Wire device identifier type
+	WireDevice IdentifierType = "wireapp-device"
 )
 
 // Identifier encodes the type that an order pertains to.
@@ -322,22 +324,22 @@ func (o *Order) Finalize(ctx context.Context, db DB, csr *x509.CertificateReques
 }
 
 // containsWireIdentifiers checks if [Order] contains ACME
-// identifiers for the WireID type.
+// identifiers for the WireUser type.
 func (o *Order) containsWireIdentifiers() bool {
 	for _, i := range o.Identifiers {
-		if i.Type == WireID {
+		if i.Type == WireUser || i.Type == WireDevice {
 			return true
 		}
 	}
 	return false
 }
 
-// createWireSubject creates the subject for an [Order] with WireID identifiers.
+// createWireSubject creates the subject for an [Order] with WireUser identifiers.
 func createWireSubject(o *Order, csr *x509.CertificateRequest) (subject x509util.Subject, err error) {
-	wireIDs, otherIDs := 0, 0
+	wireUserIDs, wireDeviceIDs, otherIDs := 0, 0, 0
 	for _, identifier := range o.Identifiers {
 		switch identifier.Type {
-		case WireID:
+		case WireUser:
 			wireID, err := wire.ParseID([]byte(identifier.Value))
 			if err != nil {
 				return subject, NewErrorISE("unmarshal wireID: %s", err)
@@ -357,7 +359,7 @@ func createWireSubject(o *Order, csr *x509.CertificateRequest) (subject x509util
 				}
 			}
 			if !foundDisplayName {
-				return subject, NewErrorISE("CSR must contain the display name in 2.16.840.1.113730.3.1.241 OID")
+				return subject, NewErrorISE("CSR must contain the display name in '2.16.840.1.113730.3.1.241' OID")
 			}
 
 			if len(csr.Subject.Organization) == 0 || !strings.EqualFold(csr.Subject.Organization[0], wireID.Domain) {
@@ -365,14 +367,16 @@ func createWireSubject(o *Order, csr *x509.CertificateRequest) (subject x509util
 			}
 			subject.CommonName = wireID.Name
 			subject.Organization = []string{wireID.Domain}
-			wireIDs++
+			wireUserIDs++
+		case WireDevice:
+			wireDeviceIDs++
 		default:
 			otherIDs++
 		}
 	}
 
-	if wireIDs > 0 && otherIDs > 0 || wireIDs > 1 {
-		return subject, NewErrorISE("at most one WireID can be signed along with no other ID, found %d WireIDs and %d other IDs", wireIDs, otherIDs)
+	if otherIDs > 0 || wireUserIDs != 1 && wireDeviceIDs != 1 {
+		return subject, NewErrorISE("there must only be 1 WireUser & 1 WireDevice identifiers")
 	}
 
 	return
@@ -385,10 +389,10 @@ func (o *Order) sans(csr *x509.CertificateRequest) ([]x509util.SubjectAlternativ
 	}
 
 	// order the DNS names and IP addresses, so that they can be compared against the canonicalized CSR
-	orderNames := make([]string, numberOfIdentifierType(DNS, o.Identifiers)+2*numberOfIdentifierType(WireID, o.Identifiers))
+	orderNames := make([]string, numberOfIdentifierType(DNS, o.Identifiers))
 	orderIPs := make([]net.IP, numberOfIdentifierType(IP, o.Identifiers))
 	orderPIDs := make([]string, numberOfIdentifierType(PermanentIdentifier, o.Identifiers))
-	tmpOrderURIs := make([]*url.URL, 2*numberOfIdentifierType(WireID, o.Identifiers))
+	tmpOrderURIs := make([]*url.URL, numberOfIdentifierType(WireUser, o.Identifiers)+numberOfIdentifierType(WireDevice, o.Identifiers))
 	indexDNS, indexIP, indexPID, indexURI := 0, 0, 0, 0
 	for _, n := range o.Identifiers {
 		switch n.Type {
@@ -401,7 +405,18 @@ func (o *Order) sans(csr *x509.CertificateRequest) ([]x509util.SubjectAlternativ
 		case PermanentIdentifier:
 			orderPIDs[indexPID] = n.Value
 			indexPID++
-		case WireID:
+		case WireUser:
+			wireID, err := wire.ParseID([]byte(n.Value))
+			if err != nil {
+				return sans, NewErrorISE("unsupported identifier value in order: %s", n.Value)
+			}
+			handle, err := url.Parse(wireID.Handle)
+			if err != nil {
+				return sans, NewErrorISE("handle must be a URI: %s", wireID.Handle)
+			}
+			tmpOrderURIs[indexURI] = handle
+			indexURI++
+		case WireDevice:
 			wireID, err := wire.ParseID([]byte(n.Value))
 			if err != nil {
 				return sans, NewErrorISE("unsupported identifier value in order: %s", n.Value)
@@ -411,12 +426,6 @@ func (o *Order) sans(csr *x509.CertificateRequest) ([]x509util.SubjectAlternativ
 				return sans, NewErrorISE("clientId must be a URI: %s", wireID.ClientID)
 			}
 			tmpOrderURIs[indexURI] = clientID
-			indexURI++
-			handle, err := url.Parse(wireID.Handle)
-			if err != nil {
-				return sans, NewErrorISE("handle must be a URI: %s", wireID.Handle)
-			}
-			tmpOrderURIs[indexURI] = handle
 			indexURI++
 		default:
 			return sans, NewErrorISE("unsupported identifier type in order: %s", n.Type)
