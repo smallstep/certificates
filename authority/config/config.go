@@ -83,7 +83,7 @@ type Config struct {
 	Templates        *templates.Templates `json:"templates,omitempty"`
 	CommonName       string               `json:"commonName,omitempty"`
 	CRL              *CRLConfig           `json:"crl,omitempty"`
-	MetricsAddr      string               `json:"metricsAddress,omitempty"`
+	MetricsAddress   string               `json:"metricsAddress,omitempty"`
 	SkipValidation   bool                 `json:"-"`
 
 	// Keeps record of the filename the Config is read from
@@ -328,7 +328,7 @@ func (c *Config) Validate() error {
 		return errors.Errorf("invalid address %s", c.Address)
 	}
 
-	if addr := c.MetricsAddr; addr != "" {
+	if addr := c.MetricsAddress; addr != "" {
 		if _, _, err := net.SplitHostPort(addr); err != nil {
 			return errors.Errorf("invalid metrics address %s", c.Address)
 		}

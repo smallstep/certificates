@@ -139,6 +139,8 @@ func (a *Authority) Sign(csr *x509.CertificateRequest, signOpts provisioner.Sign
 		// Validate the given certificate request.
 		case provisioner.CertificateRequestValidator:
 			if err := k.Valid(csr); err != nil {
+				measure(false)
+
 				return nil, errs.ApplyOptions(
 					errs.ForbiddenErr(err, "error validating certificate request"),
 					opts...,
