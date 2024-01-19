@@ -11,6 +11,12 @@ type Meter interface {
 	// X509Rekeyed is called whenever a X509 certificate is rekeyed.
 	X509Rekeyed(provisioner string, success bool)
 
+	// X509Authorized is called whenever a X509 authoring webhook is called.
+	X509Authorized(provisioner string, success bool)
+
+	// X509Enriched is called whenever a X509 enriching webhook is called.
+	X509Enriched(provisioner string, success bool)
+
 	// SSHSigned is called whenever a SSH CSR is signed.
 	SSHSigned(provisioner string, success bool)
 
@@ -19,14 +25,24 @@ type Meter interface {
 
 	// SSHRekeyed is called whenever a SSH certificate is rekeyed.
 	SSHRekeyed(provisioner string, success bool)
+
+	// SSHAuthorized is called whenever a SSH authoring webhook is called.
+	SSHAuthorized(provisioner string, success bool)
+
+	// SSHEnriched is called whenever a SSH enriching webhook is called.
+	SSHEnriched(provisioner string, success bool)
 }
 
 // noopMeter implements a noop [Meter].
 type noopMeter struct{}
 
-func (noopMeter) SSHRekeyed(string, bool)  {}
-func (noopMeter) SSHRenewed(string, bool)  {}
-func (noopMeter) SSHSigned(string, bool)   {}
-func (noopMeter) X509Rekeyed(string, bool) {}
-func (noopMeter) X509Renewed(string, bool) {}
-func (noopMeter) X509Signed(string, bool)  {}
+func (noopMeter) SSHRekeyed(string, bool)     {}
+func (noopMeter) SSHRenewed(string, bool)     {}
+func (noopMeter) SSHSigned(string, bool)      {}
+func (noopMeter) SSHAuthorized(string, bool)  {}
+func (noopMeter) SSHEnriched(string, bool)    {}
+func (noopMeter) X509Rekeyed(string, bool)    {}
+func (noopMeter) X509Renewed(string, bool)    {}
+func (noopMeter) X509Signed(string, bool)     {}
+func (noopMeter) X509Authorized(string, bool) {}
+func (noopMeter) X509Enriched(string, bool)   {}

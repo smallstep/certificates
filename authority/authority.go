@@ -967,3 +967,23 @@ func (a *Authority) startCRLGenerator() error {
 
 	return nil
 }
+
+//nolint:gocritic // used in defered statements
+func (a *Authority) incrProvisionerCounter(p *provisioner.Interface, err *error, count func(Meter, string, bool)) {
+	var name string
+	if prov := *p; prov != nil {
+		name = prov.GetName()
+	}
+
+	count(a.meter, name, err == nil || *err == nil)
+}
+
+//nolint:gocritic // used in defered statements
+func (a *Authority) incrWebhookCounter(prov provisioner.Interface, err error, count func(Meter, string, bool)) {
+	var name string
+	if prov != nil {
+		name = prov.GetName()
+	}
+
+	count(a.meter, name, err == nil)
+}
