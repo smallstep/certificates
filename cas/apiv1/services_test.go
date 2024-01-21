@@ -13,6 +13,7 @@ func TestType_String(t *testing.T) {
 		{"default", "", "softcas"},
 		{"SoftCAS", SoftCAS, "softcas"},
 		{"CloudCAS", CloudCAS, "cloudcas"},
+		{"ExternalCAS", ExternalCAS, "externalcas"},
 		{"UnknownCAS", "UnknownCAS", "unknowncas"},
 	}
 	for _, tt := range tests {

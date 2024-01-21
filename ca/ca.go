@@ -24,6 +24,7 @@ import (
 	"github.com/smallstep/certificates/api"
 	"github.com/smallstep/certificates/authority"
 	"github.com/smallstep/certificates/authority/admin"
+	"github.com/smallstep/certificates/cas/apiv1"
 	adminAPI "github.com/smallstep/certificates/authority/admin/api"
 	"github.com/smallstep/certificates/authority/config"
 	"github.com/smallstep/certificates/db"
@@ -46,6 +47,7 @@ type options struct {
 	sshHostPassword []byte
 	sshUserPassword []byte
 	database        db.AuthDB
+	x509CAService	apiv1.CertificateAuthorityService
 }
 
 func (o *options) apply(opts []Option) {
@@ -62,6 +64,13 @@ type Option func(o *options)
 func WithConfigFile(name string) Option {
 	return func(o *options) {
 		o.configFile = name
+	}
+}
+
+// WithX509CAService provides the x509CAService to be used for signing x509 requests
+func WithX509CAService(svc apiv1.CertificateAuthorityService) Option {
+	return func(o *options) {
+		o.x509CAService = svc
 	}
 }
 
@@ -161,6 +170,10 @@ func (ca *CA) Init(cfg *config.Config) (*CA, error) {
 
 	if ca.opts.quiet {
 		opts = append(opts, authority.WithQuietInit())
+	}
+
+	if ca.opts.x509CAService != nil {
+		opts = append(opts, authority.WithX509CAService(ca.opts.x509CAService))
 	}
 
 	webhookTransport := http.DefaultTransport.(*http.Transport).Clone()

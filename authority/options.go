@@ -167,6 +167,15 @@ func WithKeyManager(k kms.KeyManager) Option {
 	}
 }
 
+// WithX509CAService allows the consumer to provide an externally implemented
+// API implementation of apiv1.CertificateAuthorityService
+func WithX509CAService(svc casapi.CertificateAuthorityService) Option {
+	return func(a *Authority) error {
+		a.x509CAService = svc
+		return nil
+	}
+}
+
 // WithX509Signer defines the signer used to sign X509 certificates.
 func WithX509Signer(crt *x509.Certificate, s crypto.Signer) Option {
 	return WithX509SignerChain([]*x509.Certificate{crt}, s)
