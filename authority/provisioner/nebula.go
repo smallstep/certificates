@@ -389,7 +389,7 @@ func (v nebulaSANsValidator) Valid(req *x509.CertificateRequest) error {
 		}
 	}
 	if len(req.URIs) > 0 {
-		if err := urisValidator(uris).Valid(req); err != nil {
+		if err := newURIsValidator(context.Background(), uris).Valid(req); err != nil {
 			return err
 		}
 	}

@@ -177,7 +177,7 @@ func (a *Authority) AuthorizeAdminToken(r *http.Request, token string) (*linkedc
 	if !adminFound {
 		return nil, admin.NewError(admin.ErrorUnauthorizedType,
 			"adminHandler.authorizeToken; unable to load admin with subject(s) %s and provisioner '%s'",
-			adminSANs, claims.Issuer)
+			adminSANs, prov.GetName())
 	}
 
 	if strings.HasPrefix(r.URL.Path, "/admin/admins") && (r.Method != "GET") && adm.Type != linkedca.Admin_SUPER_ADMIN {
@@ -214,7 +214,7 @@ func (a *Authority) Authorize(ctx context.Context, token string) ([]provisioner.
 	var opts = []interface{}{errs.WithKeyVal("token", token)}
 
 	switch m := provisioner.MethodFromContext(ctx); m {
-	case provisioner.SignMethod:
+	case provisioner.SignMethod, provisioner.SignIdentityMethod:
 		signOpts, err := a.authorizeSign(ctx, token)
 		return signOpts, errs.Wrap(http.StatusInternalServerError, err, "authority.Authorize", opts...)
 	case provisioner.RevokeMethod:

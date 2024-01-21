@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"net/http"
 
-	"github.com/go-chi/chi"
+	"github.com/go-chi/chi/v5"
 
 	"go.step.sm/crypto/sshutil"
 	"go.step.sm/crypto/x509util"

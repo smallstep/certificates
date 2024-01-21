@@ -176,7 +176,7 @@ func (c *ACMEClient) post(payload []byte, url string, headerOps ...withHeaderOpt
 	}
 	signed, err := signer.Sign(payload)
 	if err != nil {
-		return nil, errors.Errorf("error signing payload: %s", strings.TrimPrefix(err.Error(), "square/go-jose: "))
+		return nil, errors.Errorf("error signing payload: %s", jose.TrimPrefix(err))
 	}
 	raw, err := serialize(signed)
 	if err != nil {

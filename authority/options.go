@@ -18,6 +18,7 @@ import (
 	"github.com/smallstep/certificates/cas"
 	casapi "github.com/smallstep/certificates/cas/apiv1"
 	"github.com/smallstep/certificates/db"
+	"github.com/smallstep/certificates/scep"
 )
 
 // Option sets options to the Authority.
@@ -201,6 +202,17 @@ func WithX509SignerFunc(fn func() ([]*x509.Certificate, crypto.Signer, error)) O
 			return err
 		}
 		a.x509CAService = srv
+		return nil
+	}
+}
+
+// WithFullSCEPOptions defines the options used for SCEP support.
+//
+// This feature is EXPERIMENTAL and might change at any time.
+func WithFullSCEPOptions(options *scep.Options) Option {
+	return func(a *Authority) error {
+		a.scepOptions = options
+		a.validateSCEP = false
 		return nil
 	}
 }

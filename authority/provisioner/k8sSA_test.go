@@ -97,7 +97,7 @@ func TestK8sSA_authorizeToken(t *testing.T) {
 				p:     p,
 				token: tok,
 				code:  http.StatusUnauthorized,
-				err:   errors.New("k8ssa.authorizeToken; invalid k8sSA token claims: square/go-jose/jwt: validation failed, invalid issuer claim (iss)"),
+				err:   errors.New("k8ssa.authorizeToken; invalid k8sSA token claims: go-jose/go-jose/jwt: validation failed, invalid issuer claim (iss)"),
 			}
 		},
 		"ok": func(t *testing.T) test {

@@ -460,7 +460,8 @@ func TestX5C_AuthorizeSign(t *testing.T) {
 	for name, tt := range tests {
 		t.Run(name, func(t *testing.T) {
 			tc := tt(t)
-			if opts, err := tc.p.AuthorizeSign(context.Background(), tc.token); err != nil {
+			ctx := NewContextWithMethod(context.Background(), SignIdentityMethod)
+			if opts, err := tc.p.AuthorizeSign(ctx, tc.token); err != nil {
 				if assert.NotNil(t, tc.err) {
 					var sc render.StatusCodedError
 					if assert.True(t, errors.As(err, &sc), "error does not implement StatusCodedError interface") {
@@ -489,8 +490,9 @@ func TestX5C_AuthorizeSign(t *testing.T) {
 							case commonNameValidator:
 								assert.Equals(t, string(v), "foo")
 							case defaultPublicKeyValidator:
-							case defaultSANsValidator:
-								assert.Equals(t, []string(v), tc.sans)
+							case *defaultSANsValidator:
+								assert.Equals(t, v.sans, tc.sans)
+								assert.Equals(t, MethodFromContext(v.ctx), SignIdentityMethod)
 							case *validityValidator:
 								assert.Equals(t, v.min, tc.p.ctl.Claimer.MinTLSCertDuration())
 								assert.Equals(t, v.max, tc.p.ctl.Claimer.MaxTLSCertDuration())

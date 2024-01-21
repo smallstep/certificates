@@ -12,12 +12,13 @@ import (
 	"net/url"
 	"strings"
 
-	"github.com/go-chi/chi"
-	microscep "github.com/micromdm/scep/v2/scep"
-	"go.mozilla.org/pkcs7"
+	"github.com/go-chi/chi/v5"
+	"github.com/smallstep/pkcs7"
+	smallscep "github.com/smallstep/scep"
 
 	"github.com/smallstep/certificates/api"
 	"github.com/smallstep/certificates/api/log"
+	"github.com/smallstep/certificates/authority"
 	"github.com/smallstep/certificates/authority/provisioner"
 	"github.com/smallstep/certificates/scep"
 )
@@ -150,11 +151,14 @@ func decodeRequest(r *http.Request) (request, error) {
 	defer r.Body.Close()
 
 	method := r.Method
-	query := r.URL.Query()
+	query, err := url.ParseQuery(r.URL.RawQuery)
+	if err != nil {
+		return request{}, fmt.Errorf("failed parsing URL query: %w", err)
+	}
 
-	var operation string
-	if _, ok := query["operation"]; ok {
-		operation = query.Get("operation")
+	operation := query.Get("operation")
+	if operation == "" {
+		return request{}, errors.New("no operation provided")
 	}
 
 	switch method {
@@ -166,14 +170,10 @@ func decodeRequest(r *http.Request) (request, error) {
 				Message:   []byte{},
 			}, nil
 		case opnPKIOperation:
-			var message string
-			if _, ok := query["message"]; ok {
-				message = query.Get("message")
-			}
-			// TODO: verify this; right type of encoding? Needs additional transformations?
-			decodedMessage, err := base64.StdEncoding.DecodeString(message)
+			message := query.Get("message")
+			decodedMessage, err := decodeMessage(message, r)
 			if err != nil {
-				return request{}, err
+				return request{}, fmt.Errorf("failed decoding message: %w", err)
 			}
 			return request{
 				Operation: operation,
@@ -185,7 +185,7 @@ func decodeRequest(r *http.Request) (request, error) {
 	case http.MethodPost:
 		body, err := io.ReadAll(io.LimitReader(r.Body, maxPayloadSize))
 		if err != nil {
-			return request{}, err
+			return request{}, fmt.Errorf("failed reading request body: %w", err)
 		}
 		return request{
 			Operation: operation,
@@ -194,6 +194,77 @@ func decodeRequest(r *http.Request) (request, error) {
 	default:
 		return request{}, fmt.Errorf("unsupported method: %s", method)
 	}
+}
+
+func decodeMessage(message string, r *http.Request) ([]byte, error) {
+	if message == "" {
+		return nil, errors.New("message must not be empty")
+	}
+
+	// decode the message, which should be base64 standard encoded. Any characters that
+	// were escaped in the original query, were unescaped as part of url.ParseQuery, so
+	// that doesn't need to be performed here. Return early if successful.
+	decodedMessage, err := base64.StdEncoding.DecodeString(message)
+	if err == nil {
+		return decodedMessage, nil
+	}
+
+	// only interested in corrupt input errors below this. This type of error is the
+	// most likely to return, but better safe than sorry.
+	var cie base64.CorruptInputError
+	if !errors.As(err, &cie) {
+		return nil, fmt.Errorf("failed base64 decoding message: %w", err)
+	}
+
+	// the below code is a workaround for macOS when it sends a GET PKIOperation, which seems to result
+	// in a query with the '+' and '/' not being percent encoded; only the padding ('=') is encoded.
+	// When that is unescaped in the code before this, this results in invalid base64. The workaround
+	// is to obtain the original query, extract the message, apply transformation(s) to make it valid
+	// base64 and try decoding it again. If it succeeds, the happy path can be followed with the patched
+	// message. Otherwise we still return an error.
+	rawQuery, err := parseRawQuery(r.URL.RawQuery)
+	if err != nil {
+		return nil, fmt.Errorf("failed to parse raw query: %w", err)
+	}
+
+	rawMessage := rawQuery.Get("message")
+	if rawMessage == "" {
+		return nil, errors.New("no message in raw query")
+	}
+
+	rawMessage = strings.ReplaceAll(rawMessage, "%3D", "=") // apparently the padding arrives encoded; the others (+, /) not?
+	decodedMessage, err = base64.StdEncoding.DecodeString(rawMessage)
+	if err != nil {
+		return nil, fmt.Errorf("failed base64 decoding raw message: %w", err)
+	}
+
+	return decodedMessage, nil
+}
+
+// parseRawQuery parses a URL query into url.Values. It skips
+// unescaping keys and values. This code is based on url.ParseQuery.
+func parseRawQuery(query string) (url.Values, error) {
+	m := make(url.Values)
+	err := parseRawQueryWithoutUnescaping(m, query)
+	return m, err
+}
+
+// parseRawQueryWithoutUnescaping parses the raw query into url.Values, skipping
+// unescaping of the parts. This code is based on url.parseQuery.
+func parseRawQueryWithoutUnescaping(m url.Values, query string) (err error) {
+	for query != "" {
+		var key string
+		key, query, _ = strings.Cut(query, "&")
+		if strings.Contains(key, ";") {
+			return errors.New("invalid semicolon separator in query")
+		}
+		if key == "" {
+			continue
+		}
+		key, value, _ := strings.Cut(key, "=")
+		m[key] = append(m[key], value)
+	}
+	return err
 }
 
 // lookupProvisioner loads the provisioner associated with the request.
@@ -208,7 +279,7 @@ func lookupProvisioner(next http.HandlerFunc) http.HandlerFunc {
 		}
 
 		ctx := r.Context()
-		auth := scep.MustFromContext(ctx)
+		auth := authority.MustFromContext(ctx)
 		p, err := auth.LoadProvisionerByName(provisionerName)
 		if err != nil {
 			fail(w, err)
@@ -221,7 +292,7 @@ func lookupProvisioner(next http.HandlerFunc) http.HandlerFunc {
 			return
 		}
 
-		ctx = context.WithValue(ctx, scep.ProvisionerContextKey, scep.Provisioner(prov))
+		ctx = scep.NewProvisionerContext(ctx, scep.Provisioner(prov))
 		next(w, r.WithContext(ctx))
 	}
 }
@@ -249,7 +320,7 @@ func GetCACert(ctx context.Context) (Response, error) {
 		// create degenerate pkcs7 certificate structure, according to
 		// https://tools.ietf.org/html/rfc8894#section-4.2.1.2, because
 		// not signed or encrypted data has to be returned.
-		data, err := microscep.DegenerateCertificates(certs)
+		data, err := smallscep.DegenerateCertificates(certs)
 		if err != nil {
 			return Response{}, err
 		}
@@ -274,16 +345,16 @@ func GetCACaps(ctx context.Context) (Response, error) {
 
 // PKIOperation performs PKI operations and returns a SCEP response
 func PKIOperation(ctx context.Context, req request) (Response, error) {
-	// parse the message using microscep implementation
-	microMsg, err := microscep.ParsePKIMessage(req.Message)
+	// parse the message using smallscep implementation
+	microMsg, err := smallscep.ParsePKIMessage(req.Message)
 	if err != nil {
 		// return the error, because we can't use the msg for creating a CertRep
 		return Response{}, err
 	}
 
-	// this is essentially doing the same as microscep.ParsePKIMessage, but
+	// this is essentially doing the same as smallscep.ParsePKIMessage, but
 	// gives us access to the p7 itself in scep.PKIMessage. Essentially a small
-	// wrapper for the microscep implementation.
+	// wrapper for the smallscep implementation.
 	p7, err := pkcs7.Parse(microMsg.Raw)
 	if err != nil {
 		return Response{}, err
@@ -313,12 +384,12 @@ func PKIOperation(ctx context.Context, req request) (Response, error) {
 	// even if using the renewal flow as described in the README.md. MicroMDM SCEP client also only does PKCSreq by default, unless
 	// a certificate exists; then it will use RenewalReq. Adding the challenge check here may be a small breaking change for clients.
 	// We'll have to see how it works out.
-	if msg.MessageType == microscep.PKCSReq || msg.MessageType == microscep.RenewalReq {
-		if err := auth.ValidateChallenge(ctx, challengePassword, transactionID); err != nil {
+	if msg.MessageType == smallscep.PKCSReq || msg.MessageType == smallscep.RenewalReq {
+		if err := auth.ValidateChallenge(ctx, csr, challengePassword, transactionID); err != nil {
 			if errors.Is(err, provisioner.ErrSCEPChallengeInvalid) {
-				return createFailureResponse(ctx, csr, msg, microscep.BadRequest, err)
+				return createFailureResponse(ctx, csr, msg, smallscep.BadRequest, err)
 			}
-			return createFailureResponse(ctx, csr, msg, microscep.BadRequest, errors.New("failed validating challenge password"))
+			return createFailureResponse(ctx, csr, msg, smallscep.BadRequest, errors.New("failed validating challenge password"))
 		}
 	}
 
@@ -332,7 +403,16 @@ func PKIOperation(ctx context.Context, req request) (Response, error) {
 
 	certRep, err := auth.SignCSR(ctx, csr, msg)
 	if err != nil {
-		return createFailureResponse(ctx, csr, msg, microscep.BadRequest, fmt.Errorf("error when signing new certificate: %w", err))
+		if notifyErr := auth.NotifyFailure(ctx, csr, transactionID, 0, err.Error()); notifyErr != nil {
+			// TODO(hs): ignore this error case? It's not critical if the notification fails; but logging it might be good
+			_ = notifyErr
+		}
+		return createFailureResponse(ctx, csr, msg, smallscep.BadRequest, fmt.Errorf("error when signing new certificate: %w", err))
+	}
+
+	if notifyErr := auth.NotifySuccess(ctx, csr, certRep.Certificate, transactionID); notifyErr != nil {
+		// TODO(hs): ignore this error case? It's not critical if the notification fails; but logging it might be good
+		_ = notifyErr
 	}
 
 	res := Response{
@@ -368,7 +448,7 @@ func fail(w http.ResponseWriter, err error) {
 	http.Error(w, err.Error(), http.StatusInternalServerError)
 }
 
-func createFailureResponse(ctx context.Context, csr *x509.CertificateRequest, msg *scep.PKIMessage, info microscep.FailInfo, failError error) (Response, error) {
+func createFailureResponse(ctx context.Context, csr *x509.CertificateRequest, msg *scep.PKIMessage, info smallscep.FailInfo, failError error) (Response, error) {
 	auth := scep.MustFromContext(ctx)
 	certRepMsg, err := auth.CreateFailureResponse(ctx, csr, msg, scep.FailInfoName(info), failError.Error())
 	if err != nil {

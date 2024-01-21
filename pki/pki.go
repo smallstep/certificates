@@ -319,7 +319,10 @@ type PKI struct {
 func New(o apiv1.Options, opts ...Option) (*PKI, error) {
 	// TODO(hs): invoking `New` with a context active will use values from
 	// that CA context while generating the context. Thay may or may not
-	// be fully expected and/or what we want. Check that.
+	// be fully expected and/or what we want. This specific behavior was
+	// changed after not relying on the `init` inside of `step`, resulting in
+	// the default context being active if `step.Init` isn't called explicitly.
+	// It can still result in surprising results, though.
 	currentCtx := step.Contexts().GetCurrent()
 	caService, err := cas.New(context.Background(), o)
 	if err != nil {
@@ -330,7 +333,7 @@ func New(o apiv1.Options, opts ...Option) (*PKI, error) {
 	if o.IsCreator {
 		creator, ok := caService.(apiv1.CertificateAuthorityCreator)
 		if !ok {
-			return nil, errors.Errorf("cas type '%s' does not implements CertificateAuthorityCreator", o.Type)
+			return nil, errors.Errorf("cas type %q does not implement CertificateAuthorityCreator", o.Type)
 		}
 		caCreator = creator
 	}
@@ -850,9 +853,16 @@ func (p *PKI) GenerateConfig(opt ...ConfigOption) (*authconfig.Config, error) {
 
 		// Add default ACME provisioner if enabled
 		if p.options.enableACME {
+			// To prevent name clashes for the default ACME provisioner, we append "-1" to
+			// the name if it already exists. See https://github.com/smallstep/cli/issues/1018
+			// for the reason.
+			acmeProvisionerName := "acme"
+			if p.options.provisioner == acmeProvisionerName {
+				acmeProvisionerName = fmt.Sprintf("%s-1", acmeProvisionerName)
+			}
 			provisioners = append(provisioners, &provisioner.ACME{
 				Type: "ACME",
-				Name: "acme",
+				Name: acmeProvisionerName,
 			})
 		}
 
@@ -867,10 +877,16 @@ func (p *PKI) GenerateConfig(opt ...ConfigOption) (*authconfig.Config, error) {
 				EnableSSHCA: &enableSSHCA,
 			}
 
-			// Add default SSHPOP provisioner
+			// Add default SSHPOP provisioner. To prevent name clashes for the default
+			// SSHPOP provisioner, we append "-1" to the name if it already exists.
+			// See https://github.com/smallstep/cli/issues/1018 for the reason.
+			sshProvisionerName := "sshpop"
+			if p.options.provisioner == sshProvisionerName {
+				sshProvisionerName = fmt.Sprintf("%s-1", sshProvisionerName)
+			}
 			provisioners = append(provisioners, &provisioner.SSHPOP{
 				Type: "SSHPOP",
-				Name: "sshpop",
+				Name: sshProvisionerName,
 				Claims: &provisioner.Claims{
 					EnableSSHCA: &enableSSHCA,
 				},
@@ -910,10 +926,13 @@ func (p *PKI) GenerateConfig(opt ...ConfigOption) (*authconfig.Config, error) {
 			if err != nil {
 				return nil, err
 			}
+			defer _db.Shutdown() // free DB resources; unlock BadgerDB file
+
 			adminDB, err := admindb.New(_db.(nosql.DB), admin.DefaultAuthorityID)
 			if err != nil {
 				return nil, err
 			}
+
 			// Add all the provisioners to the db.
 			var adminID string
 			for i, p := range provisioners {

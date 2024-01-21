@@ -21,7 +21,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/go-chi/chi"
+	"github.com/go-chi/chi/v5"
 	"github.com/google/go-cmp/cmp"
 	"github.com/pkg/errors"
 	"golang.org/x/crypto/ocsp"
@@ -1279,7 +1279,7 @@ func Test_wrapUnauthorizedError(t *testing.T) {
 			}
 		},
 		"wrap-subject": func(t *testing.T) test {
-			acmeErr := acme.NewError(acme.ErrorUnauthorizedType, "verification of jws using certificate public key failed: square/go-jose: error in cryptographic primitive")
+			acmeErr := acme.NewError(acme.ErrorUnauthorizedType, "verification of jws using certificate public key failed: go-jose/go-jose: error in cryptographic primitive")
 			acmeErr.Status = http.StatusForbidden
 			acmeErr.Detail = "No authorization provided for name test.example.com"
 			cert := &x509.Certificate{
@@ -1288,7 +1288,7 @@ func Test_wrapUnauthorizedError(t *testing.T) {
 				},
 			}
 			return test{
-				err:                     errors.New("square/go-jose: error in cryptographic primitive"),
+				err:                     errors.New("go-jose/go-jose: error in cryptographic primitive"),
 				cert:                    cert,
 				unauthorizedIdentifiers: []acme.Identifier{},
 				msg:                     "verification of jws using certificate public key failed",

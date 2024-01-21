@@ -58,10 +58,10 @@ func Test_x5cIssuer_SignToken(t *testing.T) {
 		RA *raInfo `json:"ra"`
 	}
 	type claims struct {
-		Aud  []string   `json:"aud"`
-		Sub  string     `json:"sub"`
-		Sans []string   `json:"sans"`
-		Step stepClaims `json:"step"`
+		Aud  jose.Audience `json:"aud"`
+		Sub  string        `json:"sub"`
+		Sans []string      `json:"sans"`
+		Step stepClaims    `json:"step"`
 	}
 	tests := []struct {
 		name    string
@@ -132,9 +132,9 @@ func Test_x5cIssuer_RevokeToken(t *testing.T) {
 		subject string
 	}
 	type claims struct {
-		Aud  []string `json:"aud"`
-		Sub  string   `json:"sub"`
-		Sans []string `json:"sans"`
+		Aud  jose.Audience `json:"aud"`
+		Sub  string        `json:"sub"`
+		Sans []string      `json:"sans"`
 	}
 	tests := []struct {
 		name    string

@@ -6,8 +6,8 @@ import (
 	"reflect"
 	"testing"
 
+	"github.com/go-jose/go-jose/v3"
 	"github.com/stretchr/testify/assert"
-	"gopkg.in/square/go-jose.v2"
 
 	"go.step.sm/linkedca"
 

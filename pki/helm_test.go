@@ -85,6 +85,13 @@ func TestPKI_WriteHelmTemplate(t *testing.T) {
 				wantErr:  false,
 			}
 		},
+		"ok/with-acme-and-duplicate-provisioner-name": func(t *testing.T) test {
+			return test{
+				pki:      preparePKI(t, WithProvisioner("acme"), WithACME()),
+				testFile: "testdata/helm/with-acme-and-duplicate-provisioner-name.yml",
+				wantErr:  false,
+			}
+		},
 		"ok/with-admin": func(t *testing.T) test {
 			return test{
 				pki:      preparePKI(t, WithAdmin()),
@@ -96,6 +103,13 @@ func TestPKI_WriteHelmTemplate(t *testing.T) {
 			return test{
 				pki:      preparePKI(t, WithSSH()),
 				testFile: "testdata/helm/with-ssh.yml",
+				wantErr:  false,
+			}
+		},
+		"ok/with-ssh-and-duplicate-provisioner-name": func(t *testing.T) test {
+			return test{
+				pki:      preparePKI(t, WithProvisioner("sshpop"), WithSSH()),
+				testFile: "testdata/helm/with-ssh-and-duplicate-provisioner-name.yml",
 				wantErr:  false,
 			}
 		},

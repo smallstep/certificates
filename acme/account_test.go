@@ -25,7 +25,7 @@ func TestKeyToID(t *testing.T) {
 			jwk.Key = "foo"
 			return test{
 				jwk: jwk,
-				err: NewErrorISE("error generating jwk thumbprint: square/go-jose: unknown key type 'string'"),
+				err: NewErrorISE("error generating jwk thumbprint: go-jose/go-jose: unknown key type 'string'"),
 			}
 		},
 		"ok": func(t *testing.T) test {
