@@ -456,7 +456,7 @@ func deviceAttest01Validate(ctx context.Context, ch *Challenge, db DB, jwk *jose
 
 		// Update attestation key fingerprint to compare against the CSR
 		az.Fingerprint = data.Fingerprint
-		az.ExtraIdentifiers = []string{data.SerialNumber}
+		az.ExtraIdentifiers = []string{data.SerialNumber, p.AttObj}
 
 	case "tpm":
 		data, err := doTPMAttestationFormat(ctx, prov, ch, jwk, &att)
