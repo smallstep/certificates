@@ -316,7 +316,7 @@ func (a *Authority) Sign(csr *x509.CertificateRequest, signOpts provisioner.Sign
 	// Store certificate in the db.
 	if err = a.storeCertificate(prov, cert); err != nil {
 		if !errors.Is(err, db.ErrNotImplemented) {
-			err = errs.Wrap(http.StatusInternalServerError, err,
+			cert, err = nil, errs.Wrap(http.StatusInternalServerError, err,
 				"authority.Sign; error storing certificate in db", opts...)
 		} else {
 			err = nil
@@ -492,7 +492,7 @@ func (a *Authority) RenewContext(ctx context.Context, oldCert *x509.Certificate,
 
 	if err = a.storeRenewedCertificate(oldCert, cert); err != nil {
 		if !errors.Is(err, db.ErrNotImplemented) {
-			err = errs.StatusCodeError(http.StatusInternalServerError, err, opts...)
+			cert, err = nil, errs.StatusCodeError(http.StatusInternalServerError, err, opts...)
 		} else {
 			err = nil
 		}
