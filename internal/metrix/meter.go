@@ -27,6 +27,10 @@ func New() (m *Meter) {
 		),
 		ssh:  newProvisioner("ssh"),
 		x509: newProvisioner("x509"),
+		kms: &kms{
+			signed: prometheus.NewCounter(prometheus.CounterOpts(opts("kms", "signed", "Number of KMS-backed signatures"))),
+			errors: prometheus.NewCounter(prometheus.CounterOpts(opts("kms", "errors", "Number of KMS-related errors"))),
+		},
 	}
 
 	reg := prometheus.NewRegistry()
@@ -39,6 +43,8 @@ func New() (m *Meter) {
 		m.x509.rekeyed,
 		m.x509.renewed,
 		m.x509.signed,
+		m.kms.signed,
+		m.kms.errors,
 	)
 
 	h := promhttp.HandlerFor(reg, promhttp.HandlerOpts{
@@ -61,6 +67,7 @@ type Meter struct {
 	uptime prometheus.GaugeFunc
 	ssh    *provisioner
 	x509   *provisioner
+	kms    *kms
 }
 
 // SSHRekeyed implements [authority.Meter] for [Meter].
@@ -117,6 +124,16 @@ func count(cv *prometheus.CounterVec, provisioner string, success bool) {
 	cv.WithLabelValues(provisioner, strconv.FormatBool(success)).Inc()
 }
 
+// KMSSigned implements [authority.Meter] for [Meter].
+func (m *Meter) KMSSigned() {
+	m.kms.signed.Inc()
+}
+
+// KMSErrors implements [authority.Meter] for [Meter].
+func (m *Meter) KMSError() {
+	m.kms.errors.Inc()
+}
+
 // provisioner wraps the counters exported by provisioners.
 type provisioner struct {
 	rekeyed *prometheus.CounterVec
@@ -150,6 +167,11 @@ func newProvisioner(subsystem string) *provisioner {
 			"success",
 		),
 	}
+}
+
+type kms struct {
+	signed prometheus.Counter
+	errors prometheus.Counter
 }
 
 func newCounterVec(subsystem, name, help string, labels ...string) *prometheus.CounterVec {

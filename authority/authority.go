@@ -8,6 +8,7 @@ import (
 	"crypto/sha256"
 	"crypto/x509"
 	"encoding/hex"
+	"io"
 	"log"
 	"net/http"
 	"strings"
@@ -138,6 +139,9 @@ func New(cfg *config.Config, opts ...Option) (*Authority, error) {
 			return nil, err
 		}
 	}
+	if a.keyManager != nil {
+		a.keyManager = &instrumentedKeyManager{a.keyManager, a.meter}
+	}
 
 	if !a.skipInit {
 		// Initialize authority from options or configuration.
@@ -163,6 +167,9 @@ func NewEmbedded(opts ...Option) (*Authority, error) {
 		if err := fn(a); err != nil {
 			return nil, err
 		}
+	}
+	if a.keyManager != nil {
+		a.keyManager = &instrumentedKeyManager{a.keyManager, a.meter}
 	}
 
 	// Validate required options
@@ -342,6 +349,8 @@ func (a *Authority) init() error {
 		if err != nil {
 			return err
 		}
+
+		a.keyManager = &instrumentedKeyManager{a.keyManager, a.meter}
 	}
 
 	// Initialize linkedca client if necessary. On a linked RA, the issuer
@@ -981,4 +990,32 @@ func (a *Authority) incrWebhookCounter(prov provisioner.Interface, err error, co
 	}
 
 	count(a.meter, name, err == nil)
+}
+
+type instrumentedKeyManager struct {
+	kms.KeyManager
+	meter Meter
+}
+
+func (i *instrumentedKeyManager) CreateSigner(req *kmsapi.CreateSignerRequest) (s crypto.Signer, err error) {
+	if s, err = i.KeyManager.CreateSigner(req); err == nil {
+		s = &instrumentedKMSSigner{s, i.meter}
+	}
+
+	return
+}
+
+type instrumentedKMSSigner struct {
+	crypto.Signer
+	meter Meter
+}
+
+func (i *instrumentedKMSSigner) Sign(rand io.Reader, digest []byte, opts crypto.SignerOpts) (signature []byte, err error) {
+	if signature, err = i.Signer.Sign(rand, digest, opts); err != nil {
+		i.meter.KMSError()
+	} else {
+		i.meter.KMSSigned()
+	}
+
+	return
 }

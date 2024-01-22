@@ -31,6 +31,12 @@ type Meter interface {
 
 	// SSHEnriched is called whenever a SSH enriching webhook is called.
 	SSHEnriched(provisioner string, success bool)
+
+	// KMSSigned is called per KMS signer signature.
+	KMSSigned()
+
+	// KMSSigned is called per KMS signer signature error.
+	KMSError()
 }
 
 // noopMeter implements a noop [Meter].
@@ -46,3 +52,5 @@ func (noopMeter) X509Renewed(string, bool)    {}
 func (noopMeter) X509Signed(string, bool)     {}
 func (noopMeter) X509Authorized(string, bool) {}
 func (noopMeter) X509Enriched(string, bool)   {}
+func (noopMeter) KMSSigned()                  {}
+func (noopMeter) KMSError()                   {}
