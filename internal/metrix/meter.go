@@ -2,7 +2,6 @@
 package metrix
 
 import (
-	"math"
 	"net/http"
 	"strconv"
 	"time"
@@ -23,7 +22,7 @@ func New() (m *Meter) {
 				"Number of seconds since service start",
 			)),
 			func() float64 {
-				return math.Round(time.Since(initializedAt).Seconds())
+				return float64(time.Since(initializedAt) / time.Second)
 			},
 		),
 		ssh:  newProvisioner("ssh"),
