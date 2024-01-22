@@ -968,16 +968,7 @@ func (a *Authority) startCRLGenerator() error {
 func (a *Authority) incrProvisionerCounter(prov *provisioner.Interface, err *error, count func(Meter, string, bool)) {
 	var name string
 	if p := *prov; p != nil {
-		// TODO(@azazeal): ???
-
-		switch x := p.(type) {
-		case *wrappedProvisioner:
-			if x.Interface != nil {
-				name = x.GetName()
-			}
-		default:
-			name = x.GetName()
-		}
+		name = p.GetName()
 	}
 
 	count(a.meter, name, *err == nil)
@@ -986,16 +977,7 @@ func (a *Authority) incrProvisionerCounter(prov *provisioner.Interface, err *err
 func (a *Authority) incrWebhookCounter(prov provisioner.Interface, err error, count func(Meter, string, bool)) {
 	var name string
 	if prov != nil {
-		// TODO(@azazeal): ???
-
-		switch x := prov.(type) {
-		case *wrappedProvisioner:
-			if x.Interface != nil {
-				name = x.GetName()
-			}
-		default:
-			name = x.GetName()
-		}
+		name = prov.GetName()
 	}
 
 	count(a.meter, name, err == nil)
