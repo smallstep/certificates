@@ -319,7 +319,7 @@ func (a *Authority) SignSSH(_ context.Context, key ssh.PublicKey, opts provision
 	// User provisioners validators.
 	for _, v := range validators {
 		if err = v.Valid(cert, opts); err != nil {
-			err = errs.ForbiddenErr(err, "error validating ssh certificate")
+			cert, err = nil, errs.ForbiddenErr(err, "error validating ssh certificate")
 
 			return
 		}
@@ -327,7 +327,8 @@ func (a *Authority) SignSSH(_ context.Context, key ssh.PublicKey, opts provision
 
 	if err = a.storeSSHCertificate(prov, cert); err != nil {
 		if !errors.Is(err, db.ErrNotImplemented) {
-			err = errs.Wrap(http.StatusInternalServerError, err, "authority.SignSSH: error storing certificate in db")
+			cert, err = nil, errs.Wrap(http.StatusInternalServerError, err,
+				"authority.SignSSH: error storing certificate in db")
 		} else {
 			err = nil
 		}
@@ -412,7 +413,8 @@ func (a *Authority) RenewSSH(ctx context.Context, oldCert *ssh.Certificate) (cer
 
 	if err = a.storeRenewedSSHCertificate(prov, oldCert, cert); err != nil {
 		if !errors.Is(err, db.ErrNotImplemented) {
-			err = errs.Wrap(http.StatusInternalServerError, err, "renewSSH: error storing certificate in db")
+			cert, err = nil, errs.Wrap(http.StatusInternalServerError, err,
+				"renewSSH: error storing certificate in db")
 		} else {
 			err = nil
 		}
@@ -505,7 +507,7 @@ func (a *Authority) RekeySSH(ctx context.Context, oldCert *ssh.Certificate, pub 
 	// Apply validators from provisioner.
 	for _, v := range validators {
 		if err = v.Valid(cert, provisioner.SignSSHOptions{Backdate: backdate}); err != nil {
-			err = errs.ForbiddenErr(err, "error validating ssh certificate")
+			cert, err = nil, errs.ForbiddenErr(err, "error validating ssh certificate")
 
 			return
 		}
@@ -513,7 +515,8 @@ func (a *Authority) RekeySSH(ctx context.Context, oldCert *ssh.Certificate, pub 
 
 	if err = a.storeRenewedSSHCertificate(prov, oldCert, cert); err != nil {
 		if !errors.Is(err, db.ErrNotImplemented) {
-			err = errs.Wrap(http.StatusInternalServerError, err, "rekeySSH; error storing certificate in db")
+			cert, err = nil, errs.Wrap(http.StatusInternalServerError, err,
+				"rekeySSH; error storing certificate in db")
 		} else {
 			err = nil
 		}
