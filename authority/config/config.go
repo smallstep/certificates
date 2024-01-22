@@ -330,7 +330,7 @@ func (c *Config) Validate() error {
 
 	if addr := c.MetricsAddress; addr != "" {
 		if _, _, err := net.SplitHostPort(addr); err != nil {
-			return errors.Errorf("invalid metrics address %s", c.Address)
+			return errors.Errorf("invalid metrics address %q", c.Address)
 		}
 	}
 
