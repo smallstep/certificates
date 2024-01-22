@@ -162,7 +162,6 @@ func (a *Authority) Sign(csr *x509.CertificateRequest, signOpts provisioner.Sign
 
 		// Capture the provisioner's webhook controller
 		case webhookController:
-			// TODO(@azazeal): wrap the webhook controller with functions that mutate the meter
 			webhookCtl = k
 
 		default:
@@ -310,8 +309,10 @@ func (a *Authority) Sign(csr *x509.CertificateRequest, signOpts provisioner.Sign
 
 	cert = append([]*x509.Certificate{resp.Certificate}, resp.CertificateChain...)
 
-	// Wrap provisioner with extra information.
-	prov = wrapProvisioner(prov, attData)
+	// Wrap provisioner with extra information, if not nil
+	if prov != nil {
+		prov = wrapProvisioner(prov, attData)
+	}
 
 	// Store certificate in the db.
 	if err = a.storeCertificate(prov, cert); err != nil {
