@@ -154,7 +154,7 @@ func newProvisioner(subsystem string) *provisioner {
 			"provisioner",
 			"success",
 		),
-		signed: newCounterVec(subsystem, "signed_total", "Number of CSRs signed",
+		signed: newCounterVec(subsystem, "signed_total", "Number of certificates signed",
 			"provisioner",
 			"success",
 		),
