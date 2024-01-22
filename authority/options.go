@@ -388,8 +388,9 @@ func WithMeter(m Meter) Option {
 		m = noopMeter{}
 	}
 
-	return func(a *Authority) error {
+	return func(a *Authority) (_ error) {
 		a.meter = m
-		return nil
+
+		return
 	}
 }

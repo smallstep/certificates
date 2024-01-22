@@ -105,7 +105,7 @@ type Authority struct {
 	// If true, do not output initialization logs
 	quietInit bool
 
-	// When not nil, called whenever applicable.
+	// Called whenever applicable, in order to instrument the authority.
 	meter Meter
 }
 
@@ -185,10 +185,6 @@ func NewEmbedded(opts ...Option) (*Authority, error) {
 		if err := a.init(); err != nil {
 			return nil, err
 		}
-	}
-
-	if a.meter == nil {
-		a.meter = noopMeter{}
 	}
 
 	return a, nil
@@ -969,16 +965,15 @@ func (a *Authority) startCRLGenerator() error {
 }
 
 //nolint:gocritic // used in defered statements
-func (a *Authority) incrProvisionerCounter(p *provisioner.Interface, err *error, count func(Meter, string, bool)) {
+func (a *Authority) incrProvisionerCounter(prov *provisioner.Interface, err *error, count func(Meter, string, bool)) {
 	var name string
-	if prov := *p; prov != nil {
-		name = prov.GetName()
+	if p := *prov; p != nil {
+		name = p.GetName()
 	}
 
-	count(a.meter, name, err == nil || *err == nil)
+	count(a.meter, name, *err == nil)
 }
 
-//nolint:gocritic // used in defered statements
 func (a *Authority) incrWebhookCounter(prov provisioner.Interface, err error, count func(Meter, string, bool)) {
 	var name string
 	if prov != nil {
