@@ -1024,7 +1024,7 @@ func (a *Authority) callEnrichingWebhooksX509(prov provisioner.Interface, webhoo
 	); err == nil {
 		err = webhookCtl.Enrich(whEnrichReq)
 
-		a.incrWebhookCounter(prov, err, Meter.X509Enriched)
+		a.incrWebhookCounter(prov, err, Meter.X509WebhookEnriched)
 	}
 
 	return
@@ -1049,7 +1049,7 @@ func (a *Authority) callAuthorizingWebhooksX509(prov provisioner.Interface, webh
 	); err == nil {
 		err = webhookCtl.Authorize(whAuthBody)
 
-		a.incrWebhookCounter(prov, err, Meter.X509Authorized)
+		a.incrWebhookCounter(prov, err, Meter.X509WebhookAuthorized)
 	}
 
 	return

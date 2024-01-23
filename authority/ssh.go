@@ -733,7 +733,7 @@ func (a *Authority) callEnrichingWebhooksSSH(prov provisioner.Interface, webhook
 	); err == nil {
 		err = webhookCtl.Enrich(whEnrichReq)
 
-		a.incrWebhookCounter(prov, err, Meter.SSHEnriched)
+		a.incrWebhookCounter(prov, err, Meter.SSHWebhookEnriched)
 	}
 
 	return
@@ -750,7 +750,7 @@ func (a *Authority) callAuthorizingWebhooksSSH(prov provisioner.Interface, webho
 	); err == nil {
 		err = webhookCtl.Authorize(whAuthBody)
 
-		a.incrWebhookCounter(prov, err, Meter.SSHAuthorized)
+		a.incrWebhookCounter(prov, err, Meter.SSHWebhookAuthorized)
 	}
 
 	return

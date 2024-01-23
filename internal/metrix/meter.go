@@ -86,13 +86,13 @@ func (m *Meter) SSHSigned(provisioner string, success bool) {
 }
 
 // SSHAuthorized implements [authority.Meter] for [Meter].
-func (m *Meter) SSHAuthorized(provisioner string, success bool) {
-	count(m.ssh.authorized, provisioner, success)
+func (m *Meter) SSHWebhookAuthorized(provisioner string, success bool) {
+	count(m.ssh.webhookAuthorized, provisioner, success)
 }
 
 // SSHEnriched implements [authority.Meter] for [Meter].
-func (m *Meter) SSHEnriched(provisioner string, success bool) {
-	count(m.ssh.enriched, provisioner, success)
+func (m *Meter) SSHWebhookEnriched(provisioner string, success bool) {
+	count(m.ssh.webhookEnriched, provisioner, success)
 }
 
 // X509Rekeyed implements [authority.Meter] for [Meter].
@@ -111,13 +111,13 @@ func (m *Meter) X509Signed(provisioner string, success bool) {
 }
 
 // X509Authorized implements [authority.Meter] for [Meter].
-func (m *Meter) X509Authorized(provisioner string, success bool) {
-	count(m.x509.authorized, provisioner, success)
+func (m *Meter) X509WebhookAuthorized(provisioner string, success bool) {
+	count(m.x509.webhookAuthorized, provisioner, success)
 }
 
 // X509Enriched implements [authority.Meter] for [Meter].
-func (m *Meter) X509Enriched(provisioner string, success bool) {
-	count(m.x509.enriched, provisioner, success)
+func (m *Meter) X509WebhookEnriched(provisioner string, success bool) {
+	count(m.x509.webhookEnriched, provisioner, success)
 }
 
 func count(cv *prometheus.CounterVec, provisioner string, success bool) {
@@ -140,8 +140,8 @@ type provisioner struct {
 	renewed *prometheus.CounterVec
 	signed  *prometheus.CounterVec
 
-	authorized *prometheus.CounterVec
-	enriched   *prometheus.CounterVec
+	webhookAuthorized *prometheus.CounterVec
+	webhookEnriched   *prometheus.CounterVec
 }
 
 func newProvisioner(subsystem string) *provisioner {
@@ -158,11 +158,11 @@ func newProvisioner(subsystem string) *provisioner {
 			"provisioner",
 			"success",
 		),
-		authorized: newCounterVec(subsystem, "authorized_total", "Number of authorizing webhooks called",
+		webhookAuthorized: newCounterVec(subsystem, "webhook_authorized_total", "Number of authorizing webhooks called",
 			"provisioner",
 			"success",
 		),
-		enriched: newCounterVec(subsystem, "enriched_total", "Number of enriching webhooks called",
+		webhookEnriched: newCounterVec(subsystem, "webhook_enriched_total", "Number of enriching webhooks called",
 			"provisioner",
 			"success",
 		),

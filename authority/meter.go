@@ -11,11 +11,11 @@ type Meter interface {
 	// X509Rekeyed is called whenever an X509 certificate is rekeyed.
 	X509Rekeyed(provisioner string, success bool)
 
-	// X509Authorized is called whenever an X509 authoring webhook is called.
-	X509Authorized(provisioner string, success bool)
+	// X509WebhookAuthorized is called whenever an X509 authoring webhook is called.
+	X509WebhookAuthorized(provisioner string, success bool)
 
-	// X509Enriched is called whenever an X509 enriching webhook is called.
-	X509Enriched(provisioner string, success bool)
+	// X509WebhookEnriched is called whenever an X509 enriching webhook is called.
+	X509WebhookEnriched(provisioner string, success bool)
 
 	// SSHSigned is called whenever an SSH certificate is signed.
 	SSHSigned(provisioner string, success bool)
@@ -26,11 +26,11 @@ type Meter interface {
 	// SSHRekeyed is called whenever an SSH certificate is rekeyed.
 	SSHRekeyed(provisioner string, success bool)
 
-	// SSHAuthorized is called whenever an SSH authoring webhook is called.
-	SSHAuthorized(provisioner string, success bool)
+	// SSHWebhookAuthorized is called whenever an SSH authoring webhook is called.
+	SSHWebhookAuthorized(provisioner string, success bool)
 
-	// SSHEnriched is called whenever an SSH enriching webhook is called.
-	SSHEnriched(provisioner string, success bool)
+	// SSHWebhookEnriched is called whenever an SSH enriching webhook is called.
+	SSHWebhookEnriched(provisioner string, success bool)
 
 	// KMSSigned is called per KMS signer signature.
 	KMSSigned()
@@ -42,15 +42,15 @@ type Meter interface {
 // noopMeter implements a noop [Meter].
 type noopMeter struct{}
 
-func (noopMeter) SSHRekeyed(string, bool)     {}
-func (noopMeter) SSHRenewed(string, bool)     {}
-func (noopMeter) SSHSigned(string, bool)      {}
-func (noopMeter) SSHAuthorized(string, bool)  {}
-func (noopMeter) SSHEnriched(string, bool)    {}
-func (noopMeter) X509Rekeyed(string, bool)    {}
-func (noopMeter) X509Renewed(string, bool)    {}
-func (noopMeter) X509Signed(string, bool)     {}
-func (noopMeter) X509Authorized(string, bool) {}
-func (noopMeter) X509Enriched(string, bool)   {}
-func (noopMeter) KMSSigned()                  {}
-func (noopMeter) KMSError()                   {}
+func (noopMeter) SSHRekeyed(string, bool)            {}
+func (noopMeter) SSHRenewed(string, bool)            {}
+func (noopMeter) SSHSigned(string, bool)             {}
+func (noopMeter) SSHWebhookAuthorized(string, bool)  {}
+func (noopMeter) SSHWebhookEnriched(string, bool)    {}
+func (noopMeter) X509Rekeyed(string, bool)           {}
+func (noopMeter) X509Renewed(string, bool)           {}
+func (noopMeter) X509Signed(string, bool)            {}
+func (noopMeter) X509WebhookAuthorized(string, bool) {}
+func (noopMeter) X509WebhookEnriched(string, bool)   {}
+func (noopMeter) KMSSigned()                         {}
+func (noopMeter) KMSError()                          {}
