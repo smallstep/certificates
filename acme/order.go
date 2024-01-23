@@ -324,7 +324,7 @@ func (o *Order) Finalize(ctx context.Context, db DB, csr *x509.CertificateReques
 }
 
 // containsWireIdentifiers checks if [Order] contains ACME
-// identifiers for the WireUser type.
+// identifiers for the WireUser or WireDevice types.
 func (o *Order) containsWireIdentifiers() bool {
 	for _, i := range o.Identifiers {
 		if i.Type == WireUser || i.Type == WireDevice {
