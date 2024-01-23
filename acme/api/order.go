@@ -278,7 +278,8 @@ func newAuthorization(ctx context.Context, az *acme.Authorization) error {
 		}
 
 		var target string
-		if az.Identifier.Type == acme.WireUser {
+		switch az.Identifier.Type {
+		case acme.WireUser:
 			wireOptions, err := prov.GetOptions().GetWireOptions()
 			if err != nil {
 				return acme.WrapErrorISE(err, "failed getting Wire options")
@@ -295,7 +296,7 @@ func newAuthorization(ctx context.Context, az *acme.Authorization) error {
 			if err != nil {
 				return acme.WrapError(acme.ErrorMalformedType, err, "invalid Go template registered for 'target'")
 			}
-		} else if az.Identifier.Type == acme.WireDevice {
+		case acme.WireDevice:
 			wireID, err := wire.ParseID([]byte(az.Identifier.Value))
 			if err != nil {
 				return acme.WrapError(acme.ErrorMalformedType, err, "failed parsing WireUser")
