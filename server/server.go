@@ -27,25 +27,25 @@ type Server struct {
 
 // New creates a new HTTP/HTTPS server configured with the passed
 // address, http.Handler and tls.Config.
-func New(addr string, handler http.Handler, tlsConfig *tls.Config) *Server {
+func New(addr string, handler http.Handler, tlsConfig *tls.Config, httpTimeout time.Duration) *Server {
 	return &Server{
 		reloadCh:   make(chan net.Listener),
 		shutdownCh: make(chan struct{}),
-		Server:     newHTTPServer(addr, handler, tlsConfig),
+		Server:     newHTTPServer(addr, handler, tlsConfig, httpTimeout),
 	}
 }
 
 // newHTTPServer creates a new http.Server with the TCP address, handler and
 // tls.Config.
-func newHTTPServer(addr string, handler http.Handler, tlsConfig *tls.Config) *http.Server {
+func newHTTPServer(addr string, handler http.Handler, tlsConfig *tls.Config, httpTimeout time.Duration) *http.Server {
 	return &http.Server{
 		Addr:              addr,
 		Handler:           handler,
 		TLSConfig:         tlsConfig,
-		WriteTimeout:      15 * time.Second,
-		ReadTimeout:       15 * time.Second,
-		ReadHeaderTimeout: 15 * time.Second,
-		IdleTimeout:       15 * time.Second,
+		WriteTimeout:      httpTimeout,
+		ReadTimeout:       httpTimeout,
+		ReadHeaderTimeout: httpTimeout,
+		IdleTimeout:       httpTimeout,
 		ErrorLog:          log.New(os.Stderr, "", log.Ldate|log.Ltime|log.Llongfile),
 	}
 }

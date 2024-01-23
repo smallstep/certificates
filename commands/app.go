@@ -10,6 +10,7 @@ import (
 	"path/filepath"
 	"strconv"
 	"strings"
+	"time"
 	"unicode"
 
 	"github.com/pkg/errors"
@@ -73,6 +74,13 @@ certificate issuer private key used in the RA mode.`,
 			Usage:  "the <name> of the authority's context.",
 			EnvVar: "STEP_CA_CONTEXT",
 		},
+		cli.DurationFlag{
+			Name:   "http-timeout",
+			Usage:  "the (shared) duration for HTTP timeouts (experimental).",
+			EnvVar: "STEP_CA_HTTP_TIMEOUT",
+			Value:  15 * time.Second,
+			Hidden: true,
+		},
 		cli.IntFlag{
 			Name: "acme-http-port",
 			Usage: `the <port> used on http-01 challenges. It can be changed for testing purposes.
@@ -105,6 +113,7 @@ func appAction(ctx *cli.Context) error {
 	resolver := ctx.String("resolver")
 	token := ctx.String("token")
 	quiet := ctx.Bool("quiet")
+	httpTimeout := ctx.Duration("http-timeout")
 
 	if ctx.NArg() > 1 {
 		return errs.TooManyArguments(ctx)
@@ -251,7 +260,8 @@ To get a linked authority token:
 		ca.WithSSHUserPassword(sshUserPassword),
 		ca.WithIssuerPassword(issuerPassword),
 		ca.WithLinkedCAToken(token),
-		ca.WithQuiet(quiet))
+		ca.WithQuiet(quiet),
+		ca.WithHTTPTimeout(httpTimeout))
 	if err != nil {
 		fatal(err)
 	}

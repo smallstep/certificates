@@ -41,6 +41,7 @@ type options struct {
 	configFile      string
 	linkedCAToken   string
 	quiet           bool
+	httpTimeout     time.Duration
 	password        []byte
 	issuerPassword  []byte
 	sshHostPassword []byte
@@ -115,6 +116,13 @@ func WithLinkedCAToken(token string) Option {
 func WithQuiet(quiet bool) Option {
 	return func(o *options) {
 		o.quiet = quiet
+	}
+}
+
+// WithHTTPTimeout sets the http timeout flag.
+func WithHTTPTimeout(httpTimeout time.Duration) Option {
+	return func(o *options) {
+		o.httpTimeout = httpTimeout
 	}
 }
 
@@ -300,7 +308,7 @@ func (ca *CA) Init(cfg *config.Config) (*CA, error) {
 	// Create context with all the necessary values.
 	baseContext := buildContext(auth, scepAuthority, acmeDB, acmeLinker)
 
-	ca.srv = server.New(cfg.Address, handler, tlsConfig)
+	ca.srv = server.New(cfg.Address, handler, tlsConfig, ca.opts.httpTimeout)
 	ca.srv.BaseContext = func(net.Listener) context.Context {
 		return baseContext
 	}
@@ -312,7 +320,7 @@ func (ca *CA) Init(cfg *config.Config) (*CA, error) {
 		// http.Servers handling the HTTP and HTTPS handler? The latter
 		// will probably introduce more complexity in terms of graceful
 		// reload.
-		ca.insecureSrv = server.New(cfg.InsecureAddress, insecureHandler, nil)
+		ca.insecureSrv = server.New(cfg.InsecureAddress, insecureHandler, nil, ca.opts.httpTimeout)
 		ca.insecureSrv.BaseContext = func(net.Listener) context.Context {
 			return baseContext
 		}
