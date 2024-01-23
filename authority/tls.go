@@ -94,7 +94,7 @@ func withDefaultASN1DN(def *config.ASN1DN) provisioner.CertificateModifierFunc {
 // Sign creates a signed certificate from a certificate signing request.
 func (a *Authority) Sign(csr *x509.CertificateRequest, signOpts provisioner.SignOptions, extraOpts ...provisioner.SignOption) (cert []*x509.Certificate, err error) {
 	var prov provisioner.Interface
-	defer a.incrProvisionerCounter(&prov, &err, Meter.X509Signed)
+	defer func() { a.meter.X509Signed(prov, err) }()
 
 	var (
 		certOptions    []x509util.Option
@@ -374,9 +374,9 @@ func (a *Authority) Rekey(oldCert *x509.Certificate, pk crypto.PublicKey) ([]*x5
 func (a *Authority) RenewContext(ctx context.Context, oldCert *x509.Certificate, pk crypto.PublicKey) (cert []*x509.Certificate, err error) {
 	var prov provisioner.Interface
 	if pk == nil {
-		defer a.incrProvisionerCounter(&prov, &err, Meter.X509Renewed)
+		defer func() { a.meter.X509Renewed(prov, err) }()
 	} else {
-		defer a.incrProvisionerCounter(&prov, &err, Meter.X509Rekeyed)
+		defer func() { a.meter.X509Rekeyed(prov, err) }()
 	}
 
 	isRekey := (pk != nil)
@@ -1024,7 +1024,7 @@ func (a *Authority) callEnrichingWebhooksX509(prov provisioner.Interface, webhoo
 	); err == nil {
 		err = webhookCtl.Enrich(whEnrichReq)
 
-		a.incrWebhookCounter(prov, err, Meter.X509WebhookEnriched)
+		a.meter.X509WebhookEnriched(prov, err)
 	}
 
 	return
@@ -1049,7 +1049,7 @@ func (a *Authority) callAuthorizingWebhooksX509(prov provisioner.Interface, webh
 	); err == nil {
 		err = webhookCtl.Authorize(whAuthBody)
 
-		a.incrWebhookCounter(prov, err, Meter.X509WebhookAuthorized)
+		a.meter.X509WebhookAuthorized(prov, err)
 	}
 
 	return

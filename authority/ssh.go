@@ -148,7 +148,7 @@ func (a *Authority) GetSSHBastion(ctx context.Context, user, hostname string) (*
 // SignSSH creates a signed SSH certificate with the given public key and options.
 func (a *Authority) SignSSH(_ context.Context, key ssh.PublicKey, opts provisioner.SignSSHOptions, signOpts ...provisioner.SignOption) (cert *ssh.Certificate, err error) {
 	var prov provisioner.Interface
-	defer a.incrProvisionerCounter(&prov, &err, Meter.SSHSigned)
+	defer func() { a.meter.SSHSigned(prov, err) }()
 
 	var (
 		certOptions []sshutil.Option
@@ -345,7 +345,7 @@ func (a *Authority) isAllowedToSignSSHCertificate(cert *ssh.Certificate) error {
 // RenewSSH creates a signed SSH certificate using the old SSH certificate as a template.
 func (a *Authority) RenewSSH(ctx context.Context, oldCert *ssh.Certificate) (cert *ssh.Certificate, err error) {
 	var prov provisioner.Interface
-	defer a.incrProvisionerCounter(&prov, &err, Meter.SSHRenewed)
+	defer func() { a.meter.SSHRenewed(prov, err) }()
 
 	if oldCert.ValidAfter == 0 || oldCert.ValidBefore == 0 {
 		err = errs.BadRequest("cannot renew a certificate without validity period")
@@ -426,7 +426,7 @@ func (a *Authority) RenewSSH(ctx context.Context, oldCert *ssh.Certificate) (cer
 // RekeySSH creates a signed SSH certificate using the old SSH certificate as a template.
 func (a *Authority) RekeySSH(ctx context.Context, oldCert *ssh.Certificate, pub ssh.PublicKey, signOpts ...provisioner.SignOption) (cert *ssh.Certificate, err error) {
 	var prov provisioner.Interface
-	defer a.incrProvisionerCounter(&prov, &err, Meter.SSHRekeyed)
+	defer func() { a.meter.SSHRekeyed(prov, err) }()
 
 	var validators []provisioner.SSHCertValidator
 
@@ -733,7 +733,7 @@ func (a *Authority) callEnrichingWebhooksSSH(prov provisioner.Interface, webhook
 	); err == nil {
 		err = webhookCtl.Enrich(whEnrichReq)
 
-		a.incrWebhookCounter(prov, err, Meter.SSHWebhookEnriched)
+		a.meter.SSHWebhookEnriched(prov, err)
 	}
 
 	return
@@ -750,7 +750,7 @@ func (a *Authority) callAuthorizingWebhooksSSH(prov provisioner.Interface, webho
 	); err == nil {
 		err = webhookCtl.Authorize(whAuthBody)
 
-		a.incrWebhookCounter(prov, err, Meter.SSHWebhookAuthorized)
+		a.meter.SSHWebhookAuthorized(prov, err)
 	}
 
 	return

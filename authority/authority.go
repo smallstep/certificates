@@ -8,7 +8,6 @@ import (
 	"crypto/sha256"
 	"crypto/x509"
 	"encoding/hex"
-	"io"
 	"log"
 	"net/http"
 	"strings"
@@ -971,51 +970,4 @@ func (a *Authority) startCRLGenerator() error {
 	}()
 
 	return nil
-}
-
-//nolint:gocritic // used in defered statements
-func (a *Authority) incrProvisionerCounter(prov *provisioner.Interface, err *error, count func(Meter, string, bool)) {
-	var name string
-	if p := *prov; p != nil {
-		name = p.GetName()
-	}
-
-	count(a.meter, name, *err == nil)
-}
-
-func (a *Authority) incrWebhookCounter(prov provisioner.Interface, err error, count func(Meter, string, bool)) {
-	var name string
-	if prov != nil {
-		name = prov.GetName()
-	}
-
-	count(a.meter, name, err == nil)
-}
-
-type instrumentedKeyManager struct {
-	kms.KeyManager
-	meter Meter
-}
-
-func (i *instrumentedKeyManager) CreateSigner(req *kmsapi.CreateSignerRequest) (s crypto.Signer, err error) {
-	if s, err = i.KeyManager.CreateSigner(req); err == nil {
-		s = &instrumentedKMSSigner{s, i.meter}
-	}
-
-	return
-}
-
-type instrumentedKMSSigner struct {
-	crypto.Signer
-	meter Meter
-}
-
-func (i *instrumentedKMSSigner) Sign(rand io.Reader, digest []byte, opts crypto.SignerOpts) (signature []byte, err error) {
-	if signature, err = i.Signer.Sign(rand, digest, opts); err != nil {
-		i.meter.KMSError()
-	} else {
-		i.meter.KMSSigned()
-	}
-
-	return
 }
