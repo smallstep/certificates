@@ -234,7 +234,11 @@ func TestWireIntegration(t *testing.T) {
 		nor := &NewOrderRequest{
 			Identifiers: []acme.Identifier{
 				{
-					Type:  "wireapp-id",
+					Type:  "wireapp-user",
+					Value: `{"name": "Smith, Alice M (QA)", "domain": "example.com", "handle": "wireapp://%40alice.smith.qa@example.com"}`,
+				},
+				{
+					Type:  "wireapp-device",
 					Value: `{"name": "Smith, Alice M (QA)", "domain": "example.com", "client-id": "wireapp://lJGYPz0ZRq2kvc_XpdaDlA!ed416ce8ecdd9fad@example.com", "handle": "wireapp://%40alice.smith.qa@example.com"}`,
 				},
 			},

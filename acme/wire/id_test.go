@@ -7,19 +7,43 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-func TestParseID(t *testing.T) {
-	ok := `{"name": "Alice Smith", "domain": "wire.com", "client-id": "wireapp://CzbfFjDOQrenCbDxVmgnFw!594930e9d50bb175@wire.com", "handle": "wireapp://%40alice_wire@wire.com"}`
+func TestParseUserID(t *testing.T) {
+	ok := `{"name": "Alice Smith", "domain": "wire.com", "handle": "wireapp://%40alice_wire@wire.com"}`
 	tests := []struct {
 		name        string
 		data        []byte
-		wantWireID  ID
+		wantWireID  UserID
 		expectedErr error
 	}{
-		{name: "ok", data: []byte(ok), wantWireID: ID{Name: "Alice Smith", Domain: "wire.com", ClientID: "wireapp://CzbfFjDOQrenCbDxVmgnFw!594930e9d50bb175@wire.com", Handle: "wireapp://%40alice_wire@wire.com"}},
+		{name: "ok", data: []byte(ok), wantWireID: UserID{Name: "Alice Smith", Domain: "wire.com", Handle: "wireapp://%40alice_wire@wire.com"}},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			gotWireID, err := ParseID(tt.data)
+			gotWireID, err := ParseUserID(tt.data)
+			if tt.expectedErr != nil {
+				assert.EqualError(t, err, tt.expectedErr.Error())
+				return
+			}
+
+			assert.NoError(t, err)
+			assert.Equal(t, tt.wantWireID, gotWireID)
+		})
+	}
+}
+
+func TestParseDeviceID(t *testing.T) {
+	ok := `{"name": "device", "domain": "wire.com", "client-id": "wireapp://CzbfFjDOQrenCbDxVmgnFw!594930e9d50bb175@wire.com", "handle": "wireapp://%40alice_wire@wire.com"}`
+	tests := []struct {
+		name        string
+		data        []byte
+		wantWireID  DeviceID
+		expectedErr error
+	}{
+		{name: "ok", data: []byte(ok), wantWireID: DeviceID{Name: "device", Domain: "wire.com", ClientID: "wireapp://CzbfFjDOQrenCbDxVmgnFw!594930e9d50bb175@wire.com", Handle: "wireapp://%40alice_wire@wire.com"}},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			gotWireID, err := ParseDeviceID(tt.data)
 			if tt.expectedErr != nil {
 				assert.EqualError(t, err, tt.expectedErr.Error())
 				return
