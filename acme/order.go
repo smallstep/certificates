@@ -376,7 +376,7 @@ func createWireSubject(o *Order, csr *x509.CertificateRequest) (subject x509util
 	}
 
 	if otherIDs > 0 || wireUserIDs != 1 && wireDeviceIDs != 1 {
-		return subject, NewErrorISE("there must only be 1 WireUser & 1 WireDevice identifiers")
+		return subject, NewErrorISE("order must have exactly one WireUser and WireDevice identifier")
 	}
 
 	return
