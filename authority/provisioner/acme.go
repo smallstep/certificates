@@ -11,8 +11,6 @@ import (
 
 	"github.com/pkg/errors"
 	"go.step.sm/linkedca"
-
-	"github.com/smallstep/certificates/acme/wire"
 )
 
 // ACMEChallenge represents the supported acme challenges.
@@ -252,11 +250,12 @@ func (p *ACME) AuthorizeOrderIdentifier(_ context.Context, identifier ACMEIdenti
 	case DNS:
 		err = x509Policy.IsDNSAllowed(identifier.Value)
 	case WireID:
-		var wireID wire.ID
-		if wireID, err = wire.ParseID([]byte(identifier.Value)); err != nil {
-			return fmt.Errorf("failed parsing Wire SANs: %w", err)
-		}
-		err = x509Policy.AreSANsAllowed([]string{wireID.ClientID, wireID.Handle})
+		// TODO: parse the value as user or device ID
+		// var wireID wire.ID
+		// if wireID, err = wire.ParseID([]byte(identifier.Value)); err != nil {
+		// 	return fmt.Errorf("failed parsing Wire SANs: %w", err)
+		// }
+		// err = x509Policy.AreSANsAllowed([]string{wireID.ClientID, wireID.Handle})
 	default:
 		err = fmt.Errorf("invalid ACME identifier type '%s' provided", identifier.Type)
 	}

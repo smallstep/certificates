@@ -50,12 +50,12 @@ func (n *NewOrderRequest) Validate() error {
 				return acme.NewError(acme.ErrorMalformedType, "permanent identifier cannot be empty")
 			}
 		case acme.WireUser:
-			_, err := wire.ParseID([]byte(id.Value))
+			_, err := wire.ParseUserID([]byte(id.Value))
 			if err != nil {
 				return acme.WrapError(acme.ErrorMalformedType, err, "failed parsing Wire ID")
 			}
 		case acme.WireDevice:
-			wireID, err := wire.ParseID([]byte(id.Value))
+			wireID, err := wire.ParseDeviceID([]byte(id.Value))
 			if err != nil {
 				return acme.WrapError(acme.ErrorMalformedType, err, "failed parsing Wire ID")
 			}
@@ -297,7 +297,7 @@ func newAuthorization(ctx context.Context, az *acme.Authorization) error {
 				return acme.WrapError(acme.ErrorMalformedType, err, "invalid Go template registered for 'target'")
 			}
 		case acme.WireDevice:
-			wireID, err := wire.ParseID([]byte(az.Identifier.Value))
+			wireID, err := wire.ParseDeviceID([]byte(az.Identifier.Value))
 			if err != nil {
 				return acme.WrapError(acme.ErrorMalformedType, err, "failed parsing WireUser")
 			}

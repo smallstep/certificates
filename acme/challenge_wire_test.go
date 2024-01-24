@@ -100,7 +100,7 @@ MCowBQYDK2VwAyEA5c+4NKZSNQcR1T8qN6SjwgdPZQ0Ge12Ylx/YeGAJ35k=
 					Type:   "urn:ietf:params:acme:error:serverInternal",
 					Detail: "The server experienced an internal error",
 					Status: 500,
-					Err:    errors.New(`error unmarshalling challenge data: json: cannot unmarshal number into Go value of type wire.ID`),
+					Err:    errors.New(`error unmarshalling challenge data: json: cannot unmarshal number into Go value of type wire.DeviceID`),
 				},
 			}
 		},
@@ -1096,7 +1096,7 @@ MCowBQYDK2VwAyEA5c+4NKZSNQcR1T8qN6SjwgdPZQ0Ge12Ylx/YeGAJ35k=
 					Type:   "urn:ietf:params:acme:error:serverInternal",
 					Detail: "The server experienced an internal error",
 					Status: 500,
-					Err:    errors.New(`error unmarshalling challenge data: json: cannot unmarshal number into Go value of type wire.ID`),
+					Err:    errors.New(`error unmarshalling challenge data: json: cannot unmarshal number into Go value of type wire.UserID`),
 				},
 			}
 		},
@@ -2030,7 +2030,7 @@ MCowBQYDK2VwAyEAB2IYqBWXAouDt3WcCZgCM3t9gumMEKMlgMsGenSu+fA=
 	require.True(t, ok)
 
 	issuer := "http://wire.com:19983/clients/7a41cf5b79683410/access-token"
-	wireID := wire.ID{
+	wireID := wire.DeviceID{
 		ClientID: "wireapp://guVX5xeFS3eTatmXBIyA4A!7a41cf5b79683410@wire.com",
 		Handle:   "wireapp://%40alice_wire@wire.com",
 	}
@@ -2127,7 +2127,7 @@ MCowBQYDK2VwAyEA5c+4NKZSNQcR1T8qN6SjwgdPZQ0Ge12Ylx/YeGAJ35k=
 	idToken, err := verifier.Verify(ctx, idTokenString)
 	require.NoError(t, err)
 
-	wireID := wire.ID{
+	wireID := wire.UserID{
 		Name:   "Alice Smith",
 		Handle: "wireapp://%40alice_wire@wire.com",
 	}

@@ -340,7 +340,7 @@ func createWireSubject(o *Order, csr *x509.CertificateRequest) (subject x509util
 	for _, identifier := range o.Identifiers {
 		switch identifier.Type {
 		case WireUser:
-			wireID, err := wire.ParseID([]byte(identifier.Value))
+			wireID, err := wire.ParseUserID([]byte(identifier.Value))
 			if err != nil {
 				return subject, NewErrorISE("unmarshal wireID: %s", err)
 			}
@@ -406,7 +406,7 @@ func (o *Order) sans(csr *x509.CertificateRequest) ([]x509util.SubjectAlternativ
 			orderPIDs[indexPID] = n.Value
 			indexPID++
 		case WireUser:
-			wireID, err := wire.ParseID([]byte(n.Value))
+			wireID, err := wire.ParseUserID([]byte(n.Value))
 			if err != nil {
 				return sans, NewErrorISE("unsupported identifier value in order: %s", n.Value)
 			}
@@ -417,7 +417,7 @@ func (o *Order) sans(csr *x509.CertificateRequest) ([]x509util.SubjectAlternativ
 			tmpOrderURIs[indexURI] = handle
 			indexURI++
 		case WireDevice:
-			wireID, err := wire.ParseID([]byte(n.Value))
+			wireID, err := wire.ParseDeviceID([]byte(n.Value))
 			if err != nil {
 				return sans, NewErrorISE("unsupported identifier value in order: %s", n.Value)
 			}

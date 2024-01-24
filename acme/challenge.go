@@ -373,7 +373,7 @@ func wireOIDC01Validate(ctx context.Context, ch *Challenge, db DB, jwk *jose.JSO
 		return WrapError(ErrorMalformedType, err, "error unmarshalling Wire OIDC challenge payload")
 	}
 
-	wireID, err := wire.ParseID([]byte(ch.Value))
+	wireID, err := wire.ParseUserID([]byte(ch.Value))
 	if err != nil {
 		return WrapErrorISE(err, "error unmarshalling challenge data")
 	}
@@ -451,7 +451,7 @@ func wireOIDC01Validate(ctx context.Context, ch *Challenge, db DB, jwk *jose.JSO
 	return nil
 }
 
-func validateWireOIDCClaims(o *wireprovisioner.OIDCOptions, token *oidc.IDToken, wireID wire.ID) (map[string]any, error) {
+func validateWireOIDCClaims(o *wireprovisioner.OIDCOptions, token *oidc.IDToken, wireID wire.UserID) (map[string]any, error) {
 	var m map[string]any
 	if err := token.Claims(&m); err != nil {
 		return nil, fmt.Errorf("failed extracting OIDC ID token claims: %w", err)
@@ -500,7 +500,7 @@ func wireDPOP01Validate(ctx context.Context, ch *Challenge, db DB, accountJWK *j
 		return WrapError(ErrorMalformedType, err, "error unmarshalling Wire DPoP challenge payload")
 	}
 
-	wireID, err := wire.ParseID([]byte(ch.Value))
+	wireID, err := wire.ParseDeviceID([]byte(ch.Value))
 	if err != nil {
 		return WrapErrorISE(err, "error unmarshalling challenge data")
 	}
@@ -598,7 +598,7 @@ type wireVerifyParams struct {
 	dpopKeyID string
 	issuer    string
 	audience  string
-	wireID    wire.ID
+	wireID    wire.DeviceID
 	chToken   string
 	t         time.Time
 }
