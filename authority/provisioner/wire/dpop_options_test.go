@@ -13,7 +13,7 @@ func TestDPOPOptions_EvaluateTarget(t *testing.T) {
 	tu := "http://wire.com:15958/clients/{{.DeviceID}}/access-token"
 	target, err := template.New("DeviceID").Parse(tu)
 	require.NoError(t, err)
-	fail := "https://acme.elna.wire.link/clients/{{.DeviceId}}/access-token" //
+	fail := "https:/wire.com:15958/clients/{{.DeviceId}}/access-token"
 	failTarget, err := template.New("DeviceID").Parse(fail)
 	require.NoError(t, err)
 	type fields struct {
@@ -36,7 +36,7 @@ func TestDPOPOptions_EvaluateTarget(t *testing.T) {
 			name: "fail/empty", fields: fields{target: target}, args: args{deviceID: ""}, expectedErr: errors.New("deviceID must not be empty"),
 		},
 		{
-			name: "fail/template", fields: fields{target: failTarget}, args: args{deviceID: "bla"}, expectedErr: errors.New(`failed executing dpop template: template: DeviceID:1:38: executing "DeviceID" at <.DeviceId>: can't evaluate field DeviceId in type struct { DeviceID string }`),
+			name: "fail/template", fields: fields{target: failTarget}, args: args{deviceID: "bla"}, expectedErr: errors.New(`failed executing dpop template: template: DeviceID:1:32: executing "DeviceID" at <.DeviceId>: can't evaluate field DeviceId in type struct { DeviceID string }`),
 		},
 	}
 	for _, tt := range tests {
