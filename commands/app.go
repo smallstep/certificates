@@ -251,7 +251,8 @@ To get a linked authority token:
 		ca.WithSSHUserPassword(sshUserPassword),
 		ca.WithIssuerPassword(issuerPassword),
 		ca.WithLinkedCAToken(token),
-		ca.WithQuiet(quiet))
+		ca.WithQuiet(quiet),
+	)
 	if err != nil {
 		fatal(err)
 	}
