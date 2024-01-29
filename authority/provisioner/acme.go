@@ -10,9 +10,8 @@ import (
 	"time"
 
 	"github.com/pkg/errors"
-	"go.step.sm/linkedca"
-
 	"github.com/smallstep/certificates/acme/wire"
+	"go.step.sm/linkedca"
 )
 
 // ACMEChallenge represents the supported acme challenges.
@@ -224,8 +223,10 @@ const (
 	IP ACMEIdentifierType = "ip"
 	// DNS is the ACME dns identifier type
 	DNS ACMEIdentifierType = "dns"
-	// WireID is the Wire user identifier type
-	WireID ACMEIdentifierType = "wireapp-id"
+	// WireUser is the Wire user identifier type
+	WireUser ACMEIdentifierType = "wireapp-user"
+	// WireDevice is the Wire device identifier type
+	WireDevice ACMEIdentifierType = "wireapp-device"
 )
 
 // ACMEIdentifier encodes ACME Order Identifiers
@@ -251,12 +252,18 @@ func (p *ACME) AuthorizeOrderIdentifier(_ context.Context, identifier ACMEIdenti
 		err = x509Policy.IsIPAllowed(net.ParseIP(identifier.Value))
 	case DNS:
 		err = x509Policy.IsDNSAllowed(identifier.Value)
-	case WireID:
-		var wireID wire.ID
-		if wireID, err = wire.ParseID([]byte(identifier.Value)); err != nil {
+	case WireUser:
+		var wireID wire.UserID
+		if wireID, err = wire.ParseUserID([]byte(identifier.Value)); err != nil {
 			return fmt.Errorf("failed parsing Wire SANs: %w", err)
 		}
-		err = x509Policy.AreSANsAllowed([]string{wireID.ClientID, wireID.Handle})
+		err = x509Policy.AreSANsAllowed([]string{wireID.Handle})
+	case WireDevice:
+		var wireID wire.DeviceID
+		if wireID, err = wire.ParseDeviceID([]byte(identifier.Value)); err != nil {
+			return fmt.Errorf("failed parsing Wire SANs: %w", err)
+		}
+		err = x509Policy.AreSANsAllowed([]string{wireID.ClientID})
 	default:
 		err = fmt.Errorf("invalid ACME identifier type '%s' provided", identifier.Type)
 	}

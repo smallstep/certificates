@@ -8,15 +8,26 @@ import (
 	"go.step.sm/crypto/kms/uri"
 )
 
-type ID struct {
+type UserID struct {
+	Name   string `json:"name,omitempty"`
+	Domain string `json:"domain,omitempty"`
+	Handle string `json:"handle,omitempty"`
+}
+
+type DeviceID struct {
 	Name     string `json:"name,omitempty"`
 	Domain   string `json:"domain,omitempty"`
 	ClientID string `json:"client-id,omitempty"`
 	Handle   string `json:"handle,omitempty"`
 }
 
-func ParseID(data []byte) (wireID ID, err error) {
-	err = json.Unmarshal(data, &wireID)
+func ParseUserID(data []byte) (id UserID, err error) {
+	err = json.Unmarshal(data, &id)
+	return
+}
+
+func ParseDeviceID(data []byte) (id DeviceID, err error) {
+	err = json.Unmarshal(data, &id)
 	return
 }
 
