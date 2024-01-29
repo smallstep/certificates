@@ -107,7 +107,8 @@ type ACME struct {
 	RequireEAB bool `json:"requireEAB,omitempty"`
 	// Challenges contains the enabled challenges for this provisioner. If this
 	// value is not set the default http-01, dns-01 and tls-alpn-01 challenges
-	// will be enabled, device-attest-01 will be disabled.
+	// will be enabled, device-attest-01, wire-oidc-01 and wire-dpop-01 will be
+	// disabled.
 	Challenges []ACMEChallenge `json:"challenges,omitempty"`
 	// AttestationFormats contains the enabled attestation formats for this
 	// provisioner. If this value is not set the default apple, step and tpm
@@ -219,10 +220,24 @@ func (p *ACME) Init(config Config) (err error) {
 	return
 }
 
+// initializeWireOptions initializes the options for the ACME Wire
+// integration. It'll return early if no Wire challenge types are
+// enabled.
 func (p *ACME) initializeWireOptions() error {
+	hasWireChallenges := false
+	for _, c := range p.Challenges {
+		if c == WIREOIDC_01 || c == WIREDPOP_01 {
+			hasWireChallenges = true
+			break
+		}
+	}
+	if !hasWireChallenges {
+		return nil
+	}
+
 	w := p.GetOptions().GetWireOptions()
 	if w == nil {
-		return nil
+		return errors.New("no Wire options available")
 	}
 
 	if err := w.Validate(); err != nil {
