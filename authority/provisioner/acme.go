@@ -211,8 +211,25 @@ func (p *ACME) Init(config Config) (err error) {
 		}
 	}
 
+	if err := p.initializeWireOptions(); err != nil {
+		return fmt.Errorf("failed initializing Wire options: %w", err)
+	}
+
 	p.ctl, err = NewController(p, p.Claims, config, p.Options)
 	return
+}
+
+func (p *ACME) initializeWireOptions() error {
+	w := p.GetOptions().GetWireOptions()
+	if w == nil {
+		return nil
+	}
+
+	if err := w.Validate(); err != nil {
+		return fmt.Errorf("failed validating Wire options: %w", err)
+	}
+
+	return nil
 }
 
 // ACMEIdentifierType encodes ACME Identifier types

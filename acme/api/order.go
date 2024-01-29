@@ -280,9 +280,9 @@ func newAuthorization(ctx context.Context, az *acme.Authorization) error {
 		var target string
 		switch az.Identifier.Type {
 		case acme.WireUser:
-			wireOptions, err := prov.GetOptions().GetWireOptions()
-			if err != nil {
-				return acme.WrapErrorISE(err, "failed getting Wire options")
+			wireOptions := prov.GetOptions().GetWireOptions()
+			if wireOptions == nil {
+				return acme.NewErrorISE("failed getting Wire options")
 			}
 			var targetProvider interface{ EvaluateTarget(string) (string, error) }
 			switch typ {
@@ -305,9 +305,9 @@ func newAuthorization(ctx context.Context, az *acme.Authorization) error {
 			if err != nil {
 				return acme.WrapError(acme.ErrorMalformedType, err, "failed parsing ClientID")
 			}
-			wireOptions, err := prov.GetOptions().GetWireOptions()
-			if err != nil {
-				return acme.WrapErrorISE(err, "failed getting Wire options")
+			wireOptions := prov.GetOptions().GetWireOptions()
+			if wireOptions == nil {
+				return acme.NewErrorISE("failed getting Wire options")
 			}
 			var targetProvider interface{ EvaluateTarget(string) (string, error) }
 			switch typ {
