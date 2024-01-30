@@ -34,7 +34,7 @@ func (n *NewOrderRequest) Validate() error {
 	if len(n.Identifiers) == 0 {
 		return acme.NewError(acme.ErrorMalformedType, "identifiers list cannot be empty")
 	}
-	for _, id := range n.Identifiers {
+	for index, id := range n.Identifiers {
 		switch id.Type {
 		case acme.IP:
 			if net.ParseIP(id.Value) == nil {
@@ -50,17 +50,49 @@ func (n *NewOrderRequest) Validate() error {
 				return acme.NewError(acme.ErrorMalformedType, "permanent identifier cannot be empty")
 			}
 		case acme.WireUser:
-			_, err := wire.ParseUserID([]byte(id.Value))
+			userId, err := wire.ParseUserID([]byte(id.Value))
 			if err != nil {
 				return acme.WrapError(acme.ErrorMalformedType, err, "failed parsing Wire ID")
+			}
+
+			var otherIndex = (index + 1) % 2
+			var otherId = n.Identifiers[otherIndex]
+			deviceId, err := wire.ParseDeviceID([]byte(otherId.Value))
+			if err != nil {
+				return acme.WrapError(acme.ErrorMalformedType, err, "failed parsing Wire ID")
+			}
+			if userId.Handle == "" || userId.Handle != deviceId.Handle {
+				return acme.WrapError(acme.ErrorMalformedType, err, "Wire identifiers 'handle' mismatch")
+			}
+			if userId.Name == "" || userId.Name != deviceId.Name {
+				return acme.WrapError(acme.ErrorMalformedType, err, "Wire identifiers 'name' mismatch")
+			}
+			if userId.Domain == "" || userId.Domain != deviceId.Domain {
+				return acme.WrapError(acme.ErrorMalformedType, err, "Wire identifiers 'domain' mismatch")
 			}
 		case acme.WireDevice:
-			wireID, err := wire.ParseDeviceID([]byte(id.Value))
+			deviceId, err := wire.ParseDeviceID([]byte(id.Value))
 			if err != nil {
 				return acme.WrapError(acme.ErrorMalformedType, err, "failed parsing Wire ID")
 			}
-			if _, err := wire.ParseClientID(wireID.ClientID); err != nil {
-				return acme.WrapError(acme.ErrorMalformedType, err, "invalid Wire client ID %q", wireID.ClientID)
+			if _, err := wire.ParseClientID(deviceId.ClientID); err != nil {
+				return acme.WrapError(acme.ErrorMalformedType, err, "invalid Wire client ID %q", deviceId.ClientID)
+			}
+
+			var otherIndex = (index + 1) % 2
+			var otherId = n.Identifiers[otherIndex]
+			userId, err := wire.ParseDeviceID([]byte(otherId.Value))
+			if err != nil {
+				return acme.WrapError(acme.ErrorMalformedType, err, "failed parsing Wire ID")
+			}
+			if deviceId.Handle == "" || deviceId.Handle != userId.Handle {
+				return acme.WrapError(acme.ErrorMalformedType, err, "Wire identifiers 'handle' mismatch")
+			}
+			if deviceId.Name == "" || deviceId.Name != userId.Name {
+				return acme.WrapError(acme.ErrorMalformedType, err, "Wire identifiers 'name' mismatch")
+			}
+			if deviceId.Domain == "" || deviceId.Domain != userId.Domain {
+				return acme.WrapError(acme.ErrorMalformedType, err, "Wire identifiers 'domain' mismatch")
 			}
 		default:
 			return acme.NewError(acme.ErrorMalformedType, "identifier type unsupported: %s", id.Type)
