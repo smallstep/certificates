@@ -721,6 +721,14 @@ func parseAndVerifyWireAccessToken(v wireVerifyParams) (*wireAccessToken, *wireD
 		return nil, nil, fmt.Errorf("invalid Wire client handle %q", handle)
 	}
 
+	name, ok := dpopToken["name"].(string)
+	if !ok {
+		return nil, nil, fmt.Errorf("invalid display name in Wire DPoP token")
+	}
+	if name == "" || name != v.wireID.Name {
+		return nil, nil, fmt.Errorf("invalid Wire client display name %q", handle)
+	}
+
 	return &accessToken, &dpopToken, nil
 }
 
