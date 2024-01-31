@@ -15,12 +15,13 @@ import (
 )
 
 type Provider struct {
-	IssuerURL   string   `json:"issuer,omitempty"`
-	AuthURL     string   `json:"authorization_endpoint,omitempty"`
-	TokenURL    string   `json:"token_endpoint,omitempty"`
-	JWKSURL     string   `json:"jwks_uri,omitempty"`
-	UserInfoURL string   `json:"userinfo_endpoint,omitempty"`
-	Algorithms  []string `json:"id_token_signing_alg_values_supported,omitempty"`
+	DiscoveryBaseURL string   `json:"discoveryBaseUrl,omitempty"` // TODO: probably safe to change to our usual configuration style
+	IssuerURL        string   `json:"issuer,omitempty"`
+	AuthURL          string   `json:"authorization_endpoint,omitempty"`
+	TokenURL         string   `json:"token_endpoint,omitempty"`
+	JWKSURL          string   `json:"jwks_uri,omitempty"`
+	UserInfoURL      string   `json:"userinfo_endpoint,omitempty"`
+	Algorithms       []string `json:"id_token_signing_alg_values_supported,omitempty"`
 }
 
 type Config struct {
@@ -43,13 +44,29 @@ type OIDCOptions struct {
 	target             *template.Template
 	transform          *template.Template
 	oidcProviderConfig *oidc.ProviderConfig
+	provider           *oidc.Provider
 	verifier           *oidc.IDTokenVerifier
 }
 
 func (o *OIDCOptions) GetVerifier(ctx context.Context) (*oidc.IDTokenVerifier, error) {
 	if o.verifier == nil {
-		provider := o.oidcProviderConfig.NewProvider(ctx) // TODO: support the OIDC discovery flow
-		o.verifier = provider.Verifier(o.getConfig())
+		switch {
+		case o.Provider.DiscoveryBaseURL != "":
+			// creates a new OIDC provider using automatic discovery and the default HTTP client
+			if provider, err := oidc.NewProvider(ctx, o.Provider.DiscoveryBaseURL); err != nil {
+				return nil, fmt.Errorf("failed creating new OIDC provider using discovery: %w", err)
+			} else {
+				o.provider = provider
+			}
+		default:
+			o.provider = o.oidcProviderConfig.NewProvider(ctx)
+		}
+
+		if o.provider == nil {
+			return nil, errors.New("no OIDC provider available")
+		}
+
+		o.verifier = o.provider.Verifier(o.getConfig())
 	}
 
 	return o.verifier, nil

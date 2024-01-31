@@ -244,6 +244,11 @@ func (p *ACME) initializeWireOptions() error {
 		return fmt.Errorf("failed validating Wire options: %w", err)
 	}
 
+	// at this point the Wire options have been validated, and (mostly)
+	// initialized. Remote keys will be loaded upon the first verification,
+	// currently.
+	// TODO(hs): can/should we "prime" the underlying remote keyset?
+
 	return nil
 }
 
