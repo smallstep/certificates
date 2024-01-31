@@ -383,7 +383,11 @@ func wireOIDC01Validate(ctx context.Context, ch *Challenge, db DB, jwk *jose.JSO
 	}
 
 	oidcOptions := wireOptions.GetOIDCOptions()
-	verifier := oidcOptions.GetProvider(ctx).Verifier(oidcOptions.GetConfig())
+	verifier, err := oidcOptions.GetVerifier(ctx)
+	if err != nil {
+		return WrapErrorISE(err, "no OIDC verifier available")
+	}
+
 	idToken, err := verifier.Verify(ctx, oidcPayload.IDToken)
 	if err != nil {
 		return storeError(ctx, db, ch, true, WrapError(ErrorRejectedIdentifierType, err,

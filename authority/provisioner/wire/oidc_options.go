@@ -40,19 +40,22 @@ type OIDCOptions struct {
 	Config            *Config   `json:"config,omitempty"`
 	TransformTemplate string    `json:"transform,omitempty"`
 
-	oidcProviderConfig *oidc.ProviderConfig
 	target             *template.Template
 	transform          *template.Template
+	oidcProviderConfig *oidc.ProviderConfig
+	verifier           *oidc.IDTokenVerifier
 }
 
-func (o *OIDCOptions) GetProvider(ctx context.Context) *oidc.Provider {
-	if o == nil || o.Provider == nil || o.oidcProviderConfig == nil {
-		return nil
+func (o *OIDCOptions) GetVerifier(ctx context.Context) (*oidc.IDTokenVerifier, error) {
+	if o.verifier == nil {
+		provider := o.oidcProviderConfig.NewProvider(ctx) // TODO: support the OIDC discovery flow
+		o.verifier = provider.Verifier(o.getConfig())
 	}
-	return o.oidcProviderConfig.NewProvider(ctx)
+
+	return o.verifier, nil
 }
 
-func (o *OIDCOptions) GetConfig() *oidc.Config {
+func (o *OIDCOptions) getConfig() *oidc.Config {
 	if o == nil || o.Config == nil {
 		return &oidc.Config{}
 	}
@@ -105,6 +108,9 @@ func parseTransform(transformTemplate string) (*template.Template, error) {
 }
 
 func (o *OIDCOptions) EvaluateTarget(deviceID string) (string, error) {
+	if deviceID == "" {
+		return "", errors.New("deviceID must not be empty")
+	}
 	buf := new(bytes.Buffer)
 	if err := o.target.Execute(buf, struct{ DeviceID string }{DeviceID: deviceID}); err != nil {
 		return "", fmt.Errorf("failed executing OIDC template: %w", err)
