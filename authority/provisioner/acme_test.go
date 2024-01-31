@@ -1,6 +1,3 @@
-//go:build !go1.18
-// +build !go1.18
-
 package provisioner
 
 import (
@@ -16,6 +13,8 @@ import (
 
 	"github.com/smallstep/assert"
 	"github.com/smallstep/certificates/api/render"
+	"github.com/smallstep/certificates/authority/provisioner/wire"
+	sassert "github.com/stretchr/testify/assert"
 )
 
 func TestACMEChallenge_Validate(t *testing.T) {
@@ -90,19 +89,22 @@ func TestACME_Init(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	fakeWireDPoPKey := []byte(`-----BEGIN PUBLIC KEY-----
+MCowBQYDK2VwAyEA5c+4NKZSNQcR1T8qN6SjwgdPZQ0Ge12Ylx/YeGAJ35k=
+-----END PUBLIC KEY-----`)
 
 	type ProvisionerValidateTest struct {
 		p   *ACME
 		err error
 	}
 	tests := map[string]func(*testing.T) ProvisionerValidateTest{
-		"fail-empty": func(t *testing.T) ProvisionerValidateTest {
+		"fail/empty": func(t *testing.T) ProvisionerValidateTest {
 			return ProvisionerValidateTest{
 				p:   &ACME{},
 				err: errors.New("provisioner type cannot be empty"),
 			}
 		},
-		"fail-empty-name": func(t *testing.T) ProvisionerValidateTest {
+		"fail/empty-name": func(t *testing.T) ProvisionerValidateTest {
 			return ProvisionerValidateTest{
 				p: &ACME{
 					Type: "ACME",
@@ -110,60 +112,108 @@ func TestACME_Init(t *testing.T) {
 				err: errors.New("provisioner name cannot be empty"),
 			}
 		},
-		"fail-empty-type": func(t *testing.T) ProvisionerValidateTest {
+		"fail/empty-type": func(t *testing.T) ProvisionerValidateTest {
 			return ProvisionerValidateTest{
 				p:   &ACME{Name: "foo"},
 				err: errors.New("provisioner type cannot be empty"),
 			}
 		},
-		"fail-bad-claims": func(t *testing.T) ProvisionerValidateTest {
+		"fail/bad-claims": func(t *testing.T) ProvisionerValidateTest {
 			return ProvisionerValidateTest{
-				p:   &ACME{Name: "foo", Type: "bar", Claims: &Claims{DefaultTLSDur: &Duration{0}}},
+				p:   &ACME{Name: "foo", Type: "ACME", Claims: &Claims{DefaultTLSDur: &Duration{0}}},
 				err: errors.New("claims: MinTLSCertDuration must be greater than 0"),
 			}
 		},
-		"fail-bad-challenge": func(t *testing.T) ProvisionerValidateTest {
+		"fail/bad-challenge": func(t *testing.T) ProvisionerValidateTest {
 			return ProvisionerValidateTest{
-				p:   &ACME{Name: "foo", Type: "bar", Challenges: []ACMEChallenge{HTTP_01, "zar"}},
+				p:   &ACME{Name: "foo", Type: "ACME", Challenges: []ACMEChallenge{HTTP_01, "zar"}},
 				err: errors.New("acme challenge \"zar\" is not supported"),
 			}
 		},
-		"fail-bad-attestation-format": func(t *testing.T) ProvisionerValidateTest {
+		"fail/bad-attestation-format": func(t *testing.T) ProvisionerValidateTest {
 			return ProvisionerValidateTest{
-				p:   &ACME{Name: "foo", Type: "bar", AttestationFormats: []ACMEAttestationFormat{APPLE, "zar"}},
+				p:   &ACME{Name: "foo", Type: "ACME", AttestationFormats: []ACMEAttestationFormat{APPLE, "zar"}},
 				err: errors.New("acme attestation format \"zar\" is not supported"),
 			}
 		},
-		"fail-parse-attestation-roots": func(t *testing.T) ProvisionerValidateTest {
+		"fail/parse-attestation-roots": func(t *testing.T) ProvisionerValidateTest {
 			return ProvisionerValidateTest{
-				p:   &ACME{Name: "foo", Type: "bar", AttestationRoots: []byte("-----BEGIN CERTIFICATE-----\nZm9v\n-----END CERTIFICATE-----")},
+				p:   &ACME{Name: "foo", Type: "ACME", AttestationRoots: []byte("-----BEGIN CERTIFICATE-----\nZm9v\n-----END CERTIFICATE-----")},
 				err: errors.New("error parsing attestationRoots: malformed certificate"),
 			}
 		},
-		"fail-empty-attestation-roots": func(t *testing.T) ProvisionerValidateTest {
+		"fail/empty-attestation-roots": func(t *testing.T) ProvisionerValidateTest {
 			return ProvisionerValidateTest{
-				p:   &ACME{Name: "foo", Type: "bar", AttestationRoots: []byte("\n")},
+				p:   &ACME{Name: "foo", Type: "ACME", AttestationRoots: []byte("\n")},
 				err: errors.New("error parsing attestationRoots: no certificates found"),
+			}
+		},
+		"fail/wire-missing-options": func(t *testing.T) ProvisionerValidateTest {
+			return ProvisionerValidateTest{
+				p: &ACME{
+					Name:       "foo",
+					Type:       "ACME",
+					Challenges: []ACMEChallenge{WIREOIDC_01, WIREDPOP_01},
+				},
+				err: errors.New("failed initializing Wire options: no Wire options available"),
+			}
+		},
+		"fail/wire-validate-options": func(t *testing.T) ProvisionerValidateTest {
+			return ProvisionerValidateTest{
+				p: &ACME{
+					Name:       "foo",
+					Type:       "ACME",
+					Challenges: []ACMEChallenge{WIREOIDC_01, WIREDPOP_01},
+					Options: &Options{
+						Wire: &wire.Options{
+							OIDC: &wire.OIDCOptions{},
+							DPOP: &wire.DPOPOptions{
+								SigningKey: fakeWireDPoPKey,
+							},
+						},
+					},
+				},
+				err: errors.New("failed initializing Wire options: failed validating Wire options: failed initializing OIDC options: provider not set"),
 			}
 		},
 		"ok": func(t *testing.T) ProvisionerValidateTest {
 			return ProvisionerValidateTest{
-				p: &ACME{Name: "foo", Type: "bar"},
+				p: &ACME{Name: "foo", Type: "ACME"},
 			}
 		},
-		"ok attestation": func(t *testing.T) ProvisionerValidateTest {
+		"ok/attestation": func(t *testing.T) ProvisionerValidateTest {
 			return ProvisionerValidateTest{
 				p: &ACME{
 					Name:               "foo",
-					Type:               "bar",
+					Type:               "ACME",
 					Challenges:         []ACMEChallenge{DNS_01, DEVICE_ATTEST_01},
 					AttestationFormats: []ACMEAttestationFormat{APPLE, STEP},
 					AttestationRoots:   bytes.Join([][]byte{appleCA, yubicoCA}, []byte("\n")),
 				},
 			}
 		},
+		"ok/wire": func(t *testing.T) ProvisionerValidateTest {
+			return ProvisionerValidateTest{
+				p: &ACME{
+					Name:       "foo",
+					Type:       "ACME",
+					Challenges: []ACMEChallenge{WIREOIDC_01, WIREDPOP_01},
+					Options: &Options{
+						Wire: &wire.Options{
+							OIDC: &wire.OIDCOptions{
+								Provider: &wire.Provider{
+									IssuerURL: "https://issuer.example.com",
+								},
+							},
+							DPOP: &wire.DPOPOptions{
+								SigningKey: fakeWireDPoPKey,
+							},
+						},
+					},
+				},
+			}
+		},
 	}
-
 	config := Config{
 		Claims:    globalProvisionerClaims,
 		Audiences: testAudiences,
@@ -173,13 +223,12 @@ func TestACME_Init(t *testing.T) {
 			tc := get(t)
 			t.Log(string(tc.p.AttestationRoots))
 			err := tc.p.Init(config)
-			if err != nil {
-				if assert.NotNil(t, tc.err) {
-					assert.Equals(t, tc.err.Error(), err.Error())
-				}
-			} else {
-				assert.Nil(t, tc.err)
+			if tc.err != nil {
+				sassert.EqualError(t, err, tc.err.Error())
+				return
 			}
+
+			sassert.NoError(t, err)
 		})
 	}
 }
