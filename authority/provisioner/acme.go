@@ -247,7 +247,11 @@ func (p *ACME) initializeWireOptions() error {
 	// at this point the Wire options have been validated, and (mostly)
 	// initialized. Remote keys will be loaded upon the first verification,
 	// currently.
-	// TODO(hs): can/should we "prime" the underlying remote keyset?
+	// TODO(hs): can/should we "prime" the underlying remote keyset, to verify
+	// auto discovery works as expected? Because of the current way provisioners
+	// are initialized, doing that as part of the initialization isn't the best
+	// time to do it, because it could result in operations not resulting in the
+	// expected result in all cases.
 
 	return nil
 }
