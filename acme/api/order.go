@@ -299,7 +299,7 @@ func newAuthorization(ctx context.Context, az *acme.Authorization) error {
 		case acme.WireDevice:
 			wireID, err := wire.ParseDeviceID([]byte(az.Identifier.Value))
 			if err != nil {
-				return acme.WrapError(acme.ErrorMalformedType, err, "failed parsing WireUser")
+				return acme.WrapError(acme.ErrorMalformedType, err, "failed parsing WireDevice")
 			}
 			clientID, err := wire.ParseClientID(wireID.ClientID)
 			if err != nil {
