@@ -30,7 +30,7 @@ func (o *DPOPOptions) EvaluateTarget(deviceID string) (string, error) {
 	}
 	buf := new(bytes.Buffer)
 	if err := o.target.Execute(buf, struct{ DeviceID string }{DeviceID: deviceID}); err != nil {
-		return "", fmt.Errorf("failed executing dpop template: %w", err)
+		return "", fmt.Errorf("failed executing DPoP template: %w", err)
 	}
 	return buf.String(), nil
 }

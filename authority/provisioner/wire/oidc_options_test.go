@@ -1,6 +1,7 @@
 package wire
 
 import (
+	"errors"
 	"testing"
 	"text/template"
 
@@ -115,6 +116,57 @@ func TestOIDCOptions_Transform(t *testing.T) {
 				return
 			}
 
+			assert.Equal(t, tt.want, got)
+		})
+	}
+}
+
+func TestOIDCOptions_EvaluateTarget(t *testing.T) {
+	tu := "http://target.example.com/{{.DeviceID}}"
+	target, err := template.New("DeviceID").Parse(tu)
+	require.NoError(t, err)
+	empty := "http://target.example.com"
+	emptyTarget, err := template.New("DeviceID").Parse(empty)
+	require.NoError(t, err)
+	fail := "https:/wire.com:15958/clients/{{.DeviceId}}/access-token"
+	failTarget, err := template.New("DeviceID").Parse(fail)
+	require.NoError(t, err)
+	type fields struct {
+		target *template.Template
+	}
+	type args struct {
+		deviceID string
+	}
+	tests := []struct {
+		name        string
+		fields      fields
+		args        args
+		want        string
+		expectedErr error
+	}{
+		{
+			name: "ok", fields: fields{target: target}, args: args{deviceID: "deviceID"}, want: "http://target.example.com/deviceID",
+		},
+		{
+			name: "ok/empty", fields: fields{target: emptyTarget}, args: args{deviceID: ""}, want: "http://target.example.com",
+		},
+		{
+			name: "fail/template", fields: fields{target: failTarget}, args: args{deviceID: "bla"}, expectedErr: errors.New(`failed executing OIDC template: template: DeviceID:1:32: executing "DeviceID" at <.DeviceId>: can't evaluate field DeviceId in type struct { DeviceID string }`),
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			o := &OIDCOptions{
+				target: tt.fields.target,
+			}
+			got, err := o.EvaluateTarget(tt.args.deviceID)
+			if tt.expectedErr != nil {
+				assert.EqualError(t, err, tt.expectedErr.Error())
+				assert.Empty(t, got)
+				return
+			}
+
+			assert.NoError(t, err)
 			assert.Equal(t, tt.want, got)
 		})
 	}

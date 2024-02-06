@@ -36,7 +36,7 @@ func TestDPOPOptions_EvaluateTarget(t *testing.T) {
 			name: "fail/empty", fields: fields{target: target}, args: args{deviceID: ""}, expectedErr: errors.New("deviceID must not be empty"),
 		},
 		{
-			name: "fail/template", fields: fields{target: failTarget}, args: args{deviceID: "bla"}, expectedErr: errors.New(`failed executing dpop template: template: DeviceID:1:32: executing "DeviceID" at <.DeviceId>: can't evaluate field DeviceId in type struct { DeviceID string }`),
+			name: "fail/template", fields: fields{target: failTarget}, args: args{deviceID: "bla"}, expectedErr: errors.New(`failed executing DPoP template: template: DeviceID:1:32: executing "DeviceID" at <.DeviceId>: can't evaluate field DeviceId in type struct { DeviceID string }`),
 		},
 	}
 	for _, tt := range tests {

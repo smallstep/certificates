@@ -125,9 +125,6 @@ func parseTransform(transformTemplate string) (*template.Template, error) {
 }
 
 func (o *OIDCOptions) EvaluateTarget(deviceID string) (string, error) {
-	if deviceID == "" {
-		return "", errors.New("deviceID must not be empty")
-	}
 	buf := new(bytes.Buffer)
 	if err := o.target.Execute(buf, struct{ DeviceID string }{DeviceID: deviceID}); err != nil {
 		return "", fmt.Errorf("failed executing OIDC template: %w", err)
