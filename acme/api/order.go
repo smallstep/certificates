@@ -284,15 +284,7 @@ func newAuthorization(ctx context.Context, az *acme.Authorization) error {
 			if wireOptions == nil {
 				return acme.NewErrorISE("failed getting Wire options")
 			}
-			var targetProvider interface{ EvaluateTarget(string) (string, error) }
-			switch typ {
-			case acme.WIREOIDC01:
-				targetProvider = wireOptions.GetOIDCOptions()
-			default:
-				return acme.NewError(acme.ErrorMalformedType, "unsupported type %q", typ)
-			}
-
-			target, err = targetProvider.EvaluateTarget("")
+			target, err = wireOptions.GetOIDCOptions().EvaluateTarget("")
 			if err != nil {
 				return acme.WrapError(acme.ErrorMalformedType, err, "invalid Go template registered for 'target'")
 			}
@@ -309,15 +301,7 @@ func newAuthorization(ctx context.Context, az *acme.Authorization) error {
 			if wireOptions == nil {
 				return acme.NewErrorISE("failed getting Wire options")
 			}
-			var targetProvider interface{ EvaluateTarget(string) (string, error) }
-			switch typ {
-			case acme.WIREDPOP01:
-				targetProvider = wireOptions.GetDPOPOptions()
-			default:
-				return acme.NewError(acme.ErrorMalformedType, "unsupported type %q", typ)
-			}
-
-			target, err = targetProvider.EvaluateTarget(clientID.DeviceID)
+			target, err = wireOptions.GetDPOPOptions().EvaluateTarget(clientID.DeviceID)
 			if err != nil {
 				return acme.WrapError(acme.ErrorMalformedType, err, "invalid Go template registered for 'target'")
 			}
