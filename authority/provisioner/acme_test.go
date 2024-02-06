@@ -155,7 +155,18 @@ MCowBQYDK2VwAyEA5c+4NKZSNQcR1T8qN6SjwgdPZQ0Ge12Ylx/YeGAJ35k=
 					Type:       "ACME",
 					Challenges: []ACMEChallenge{WIREOIDC_01, WIREDPOP_01},
 				},
-				err: errors.New("failed initializing Wire options: no Wire options available"),
+				err: errors.New("failed initializing Wire options: failed getting Wire options: no options available"),
+			}
+		},
+		"fail/wire-missing-wire-options": func(t *testing.T) ProvisionerValidateTest {
+			return ProvisionerValidateTest{
+				p: &ACME{
+					Name:       "foo",
+					Type:       "ACME",
+					Challenges: []ACMEChallenge{WIREOIDC_01, WIREDPOP_01},
+					Options:    &Options{},
+				},
+				err: errors.New("failed initializing Wire options: failed getting Wire options: no Wire options available"),
 			}
 		},
 		"fail/wire-validate-options": func(t *testing.T) ProvisionerValidateTest {

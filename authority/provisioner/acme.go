@@ -235,9 +235,9 @@ func (p *ACME) initializeWireOptions() error {
 		return nil
 	}
 
-	w := p.GetOptions().GetWireOptions()
-	if w == nil {
-		return errors.New("no Wire options available")
+	w, err := p.GetOptions().GetWireOptions()
+	if err != nil {
+		return fmt.Errorf("failed getting Wire options: %w", err)
 	}
 
 	if err := w.Validate(); err != nil {
@@ -295,13 +295,13 @@ func (p *ACME) AuthorizeOrderIdentifier(_ context.Context, identifier ACMEIdenti
 		err = x509Policy.IsDNSAllowed(identifier.Value)
 	case WireUser:
 		var wireID wire.UserID
-		if wireID, err = wire.ParseUserID([]byte(identifier.Value)); err != nil {
+		if wireID, err = wire.ParseUserID(identifier.Value); err != nil {
 			return fmt.Errorf("failed parsing Wire SANs: %w", err)
 		}
 		err = x509Policy.AreSANsAllowed([]string{wireID.Handle})
 	case WireDevice:
 		var wireID wire.DeviceID
-		if wireID, err = wire.ParseDeviceID([]byte(identifier.Value)); err != nil {
+		if wireID, err = wire.ParseDeviceID(identifier.Value); err != nil {
 			return fmt.Errorf("failed parsing Wire SANs: %w", err)
 		}
 		err = x509Policy.AreSANsAllowed([]string{wireID.ClientID})

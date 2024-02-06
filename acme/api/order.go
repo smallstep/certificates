@@ -84,12 +84,12 @@ func (n *NewOrderRequest) validateWireIdentifiers() error {
 		return fmt.Errorf("expected exactly one Wire DeviceID identifier, got %d", len(deviceIdentifiers))
 	}
 
-	wireUserID, err := wire.ParseUserID([]byte(userIdentifiers[0].Value))
+	wireUserID, err := wire.ParseUserID(userIdentifiers[0].Value)
 	if err != nil {
 		return fmt.Errorf("failed parsing Wire UserID: %w", err)
 	}
 
-	wireDeviceID, err := wire.ParseDeviceID([]byte(deviceIdentifiers[0].Value))
+	wireDeviceID, err := wire.ParseDeviceID(deviceIdentifiers[0].Value)
 	if err != nil {
 		return fmt.Errorf("failed parsing Wire DeviceID: %w", err)
 	}
@@ -337,16 +337,16 @@ func newAuthorization(ctx context.Context, az *acme.Authorization) error {
 		var target string
 		switch az.Identifier.Type {
 		case acme.WireUser:
-			wireOptions := prov.GetOptions().GetWireOptions()
-			if wireOptions == nil {
-				return acme.NewErrorISE("failed getting Wire options")
+			wireOptions, err := prov.GetOptions().GetWireOptions()
+			if err != nil {
+				return acme.WrapErrorISE(err, "failed getting Wire options")
 			}
-			target, err = wireOptions.GetOIDCOptions().EvaluateTarget("")
+			target, err = wireOptions.GetOIDCOptions().EvaluateTarget("") // TODO(hs): determine if required by Wire
 			if err != nil {
 				return acme.WrapError(acme.ErrorMalformedType, err, "invalid Go template registered for 'target'")
 			}
 		case acme.WireDevice:
-			wireID, err := wire.ParseDeviceID([]byte(az.Identifier.Value))
+			wireID, err := wire.ParseDeviceID(az.Identifier.Value)
 			if err != nil {
 				return acme.WrapError(acme.ErrorMalformedType, err, "failed parsing WireDevice")
 			}
@@ -354,9 +354,9 @@ func newAuthorization(ctx context.Context, az *acme.Authorization) error {
 			if err != nil {
 				return acme.WrapError(acme.ErrorMalformedType, err, "failed parsing ClientID")
 			}
-			wireOptions := prov.GetOptions().GetWireOptions()
-			if wireOptions == nil {
-				return acme.NewErrorISE("failed getting Wire options")
+			wireOptions, err := prov.GetOptions().GetWireOptions()
+			if err != nil {
+				return acme.WrapErrorISE(err, "failed getting Wire options")
 			}
 			target, err = wireOptions.GetDPOPOptions().EvaluateTarget(clientID.DeviceID)
 			if err != nil {

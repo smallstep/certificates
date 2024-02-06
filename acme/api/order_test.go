@@ -699,7 +699,7 @@ MCowBQYDK2VwAyEA5c+4NKZSNQcR1T8qN6SjwgdPZQ0Ge12Ylx/YeGAJ35k=
 				az:   az,
 				err: &acme.Error{
 					Type:   "urn:ietf:params:acme:error:serverInternal",
-					Err:    errors.New("failed getting Wire options"),
+					Err:    errors.New("failed getting Wire options: no Wire options available"),
 					Detail: "The server experienced an internal error",
 					Status: 500,
 				},
@@ -765,7 +765,7 @@ MCowBQYDK2VwAyEA5c+4NKZSNQcR1T8qN6SjwgdPZQ0Ge12Ylx/YeGAJ35k=
 				az:   az,
 				err: &acme.Error{
 					Type:   "urn:ietf:params:acme:error:serverInternal",
-					Err:    errors.New("failed getting Wire options"),
+					Err:    errors.New("failed getting Wire options: no Wire options available"),
 					Detail: "The server experienced an internal error",
 					Status: 500,
 				},

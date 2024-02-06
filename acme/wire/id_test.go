@@ -15,19 +15,19 @@ func TestParseUserID(t *testing.T) {
 	emptyDomain := `{"name": "Alice Smith", "domain": "", "handle": "wireapp://%40alice_wire@wire.com"}`
 	tests := []struct {
 		name       string
-		data       []byte
+		value      string
 		wantWireID UserID
 		wantErr    bool
 	}{
-		{name: "ok", data: []byte(ok), wantWireID: UserID{Name: "Alice Smith", Domain: "wire.com", Handle: "wireapp://%40alice_wire@wire.com"}},
-		{name: "fail/json", data: []byte(failJSON), wantErr: true},
-		{name: "fail/empty-handle", data: []byte(emptyHandle), wantErr: true},
-		{name: "fail/empty-name", data: []byte(emptyName), wantErr: true},
-		{name: "fail/empty-domain", data: []byte(emptyDomain), wantErr: true},
+		{name: "ok", value: ok, wantWireID: UserID{Name: "Alice Smith", Domain: "wire.com", Handle: "wireapp://%40alice_wire@wire.com"}},
+		{name: "fail/json", value: failJSON, wantErr: true},
+		{name: "fail/empty-handle", value: emptyHandle, wantErr: true},
+		{name: "fail/empty-name", value: emptyName, wantErr: true},
+		{name: "fail/empty-domain", value: emptyDomain, wantErr: true},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			gotWireID, err := ParseUserID(tt.data)
+			gotWireID, err := ParseUserID(tt.value)
 			if tt.wantErr {
 				assert.Error(t, err)
 				return
@@ -48,20 +48,20 @@ func TestParseDeviceID(t *testing.T) {
 	emptyClientID := `{"name": "device", "domain": "wire.com", "client-id": "", "handle": "wireapp://%40alice_wire@wire.com"}`
 	tests := []struct {
 		name       string
-		data       []byte
+		value      string
 		wantWireID DeviceID
 		wantErr    bool
 	}{
-		{name: "ok", data: []byte(ok), wantWireID: DeviceID{Name: "device", Domain: "wire.com", ClientID: "wireapp://CzbfFjDOQrenCbDxVmgnFw!594930e9d50bb175@wire.com", Handle: "wireapp://%40alice_wire@wire.com"}},
-		{name: "fail/json", data: []byte(failJSON), wantErr: true},
-		{name: "fail/empty-handle", data: []byte(emptyHandle), wantErr: true},
-		{name: "fail/empty-name", data: []byte(emptyName), wantErr: true},
-		{name: "fail/empty-domain", data: []byte(emptyDomain), wantErr: true},
-		{name: "fail/empty-client-id", data: []byte(emptyClientID), wantErr: true},
+		{name: "ok", value: ok, wantWireID: DeviceID{Name: "device", Domain: "wire.com", ClientID: "wireapp://CzbfFjDOQrenCbDxVmgnFw!594930e9d50bb175@wire.com", Handle: "wireapp://%40alice_wire@wire.com"}},
+		{name: "fail/json", value: failJSON, wantErr: true},
+		{name: "fail/empty-handle", value: emptyHandle, wantErr: true},
+		{name: "fail/empty-name", value: emptyName, wantErr: true},
+		{name: "fail/empty-domain", value: emptyDomain, wantErr: true},
+		{name: "fail/empty-client-id", value: emptyClientID, wantErr: true},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			gotWireID, err := ParseDeviceID(tt.data)
+			gotWireID, err := ParseDeviceID(tt.value)
 			if tt.wantErr {
 				assert.Error(t, err)
 				return

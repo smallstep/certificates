@@ -53,12 +53,16 @@ func (o *Options) GetSSHOptions() *SSHOptions {
 	return o.SSH
 }
 
-// GetWireOptions returns the SSH options.
-func (o *Options) GetWireOptions() *wire.Options {
+// GetWireOptions returns the Wire options if available. It
+// returns an error if they're not available.
+func (o *Options) GetWireOptions() (*wire.Options, error) {
 	if o == nil {
-		return nil
+		return nil, errors.New("no options available")
 	}
-	return o.Wire
+	if o.Wire == nil {
+		return nil, errors.New("no Wire options available")
+	}
+	return o.Wire, nil
 }
 
 // GetWebhooks returns the webhooks options.

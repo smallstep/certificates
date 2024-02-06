@@ -362,9 +362,9 @@ func wireOIDC01Validate(ctx context.Context, ch *Challenge, db DB, jwk *jose.JSO
 	if !ok {
 		return NewErrorISE("missing provisioner")
 	}
-	wireOptions := prov.GetOptions().GetWireOptions()
-	if wireOptions == nil {
-		return NewErrorISE("no Wire options available")
+	wireOptions, err := prov.GetOptions().GetWireOptions()
+	if err != nil {
+		return WrapErrorISE(err, "failed getting Wire options")
 	}
 	linker, ok := LinkerFromContext(ctx)
 	if !ok {
@@ -372,12 +372,11 @@ func wireOIDC01Validate(ctx context.Context, ch *Challenge, db DB, jwk *jose.JSO
 	}
 
 	var oidcPayload wireOidcPayload
-	err := json.Unmarshal(payload, &oidcPayload)
-	if err != nil {
+	if err := json.Unmarshal(payload, &oidcPayload); err != nil {
 		return WrapError(ErrorMalformedType, err, "error unmarshalling Wire OIDC challenge payload")
 	}
 
-	wireID, err := wire.ParseUserID([]byte(ch.Value))
+	wireID, err := wire.ParseUserID(ch.Value)
 	if err != nil {
 		return WrapErrorISE(err, "error unmarshalling challenge data")
 	}
@@ -493,9 +492,9 @@ func wireDPOP01Validate(ctx context.Context, ch *Challenge, db DB, accountJWK *j
 	if !ok {
 		return NewErrorISE("missing provisioner")
 	}
-	wireOptions := prov.GetOptions().GetWireOptions()
-	if wireOptions == nil {
-		return NewErrorISE("no Wire options available")
+	wireOptions, err := prov.GetOptions().GetWireOptions()
+	if err != nil {
+		return WrapErrorISE(err, "failed getting Wire options")
 	}
 	linker, ok := LinkerFromContext(ctx)
 	if !ok {
@@ -507,7 +506,7 @@ func wireDPOP01Validate(ctx context.Context, ch *Challenge, db DB, accountJWK *j
 		return WrapError(ErrorMalformedType, err, "error unmarshalling Wire DPoP challenge payload")
 	}
 
-	wireID, err := wire.ParseDeviceID([]byte(ch.Value))
+	wireID, err := wire.ParseDeviceID(ch.Value)
 	if err != nil {
 		return WrapErrorISE(err, "error unmarshalling challenge data")
 	}
@@ -728,7 +727,7 @@ func parseAndVerifyWireAccessToken(v wireVerifyParams) (*wireAccessToken, *wireD
 		return nil, nil, fmt.Errorf("invalid display name in Wire DPoP token")
 	}
 	if name == "" || name != v.wireID.Name {
-		return nil, nil, fmt.Errorf("invalid Wire client display name %q", handle)
+		return nil, nil, fmt.Errorf("invalid Wire client display name %q", name)
 	}
 
 	return &accessToken, &dpopToken, nil
