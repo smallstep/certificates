@@ -15,13 +15,13 @@ import (
 )
 
 type Provider struct {
-	DiscoveryBaseURL string   `json:"discoveryBaseUrl,omitempty"` // TODO: probably safe to change to our usual configuration style
-	IssuerURL        string   `json:"issuer,omitempty"`
-	AuthURL          string   `json:"authorization_endpoint,omitempty"`
-	TokenURL         string   `json:"token_endpoint,omitempty"`
-	JWKSURL          string   `json:"jwks_uri,omitempty"`
-	UserInfoURL      string   `json:"userinfo_endpoint,omitempty"`
-	Algorithms       []string `json:"id_token_signing_alg_values_supported,omitempty"`
+	DiscoveryBaseURL string   `json:"discoveryBaseUrl,omitempty"`
+	IssuerURL        string   `json:"issuerUrl,omitempty"`
+	AuthURL          string   `json:"authorizationUrl,omitempty"`
+	TokenURL         string   `json:"tokenUrl,omitempty"`
+	JWKSURL          string   `json:"jwksUrl,omitempty"`
+	UserInfoURL      string   `json:"userInfoUrl,omitempty"`
+	Algorithms       []string `json:"signatureAlgorithms,omitempty"`
 }
 
 type Config struct {
@@ -94,13 +94,15 @@ func (o *OIDCOptions) validateAndInitialize() (err error) {
 	if o.Provider == nil {
 		return errors.New("provider not set")
 	}
-	if o.Provider.IssuerURL == "" {
-		return errors.New("issuer URL must not be empty")
+	if o.Provider.IssuerURL == "" && o.Provider.DiscoveryBaseURL == "" {
+		return errors.New("either OIDC discovery or issuer URL must be set")
 	}
 
-	o.oidcProviderConfig, err = toOIDCProviderConfig(o.Provider)
-	if err != nil {
-		return fmt.Errorf("failed creationg OIDC provider config: %w", err)
+	if o.Provider.DiscoveryBaseURL == "" {
+		o.oidcProviderConfig, err = toOIDCProviderConfig(o.Provider)
+		if err != nil {
+			return fmt.Errorf("failed creationg OIDC provider config: %w", err)
+		}
 	}
 
 	o.target, err = template.New("DeviceID").Parse(o.Provider.IssuerURL)
