@@ -5,6 +5,7 @@ import (
 	"crypto/x509"
 	"encoding/base64"
 	"encoding/json"
+	"fmt"
 	"net"
 	"net/http"
 	"strings"
@@ -49,28 +50,84 @@ func (n *NewOrderRequest) Validate() error {
 			if id.Value == "" {
 				return acme.NewError(acme.ErrorMalformedType, "permanent identifier cannot be empty")
 			}
-		case acme.WireUser:
-			_, err := wire.ParseUserID([]byte(id.Value))
-			if err != nil {
-				return acme.WrapError(acme.ErrorMalformedType, err, "failed parsing Wire ID")
-			}
-		case acme.WireDevice:
-			wireID, err := wire.ParseDeviceID([]byte(id.Value))
-			if err != nil {
-				return acme.WrapError(acme.ErrorMalformedType, err, "failed parsing Wire ID")
-			}
-			if _, err := wire.ParseClientID(wireID.ClientID); err != nil {
-				return acme.WrapError(acme.ErrorMalformedType, err, "invalid Wire client ID %q", wireID.ClientID)
-			}
+		case acme.WireUser, acme.WireDevice:
+			// validation of Wire identifiers is performed in `validateWireIdentifiers`, but
+			// marked here as known and supported types.
+			continue
 		default:
 			return acme.NewError(acme.ErrorMalformedType, "identifier type unsupported: %s", id.Type)
 		}
+	}
 
-		// TODO(hs): add some validations for DNS domains?
-		// TODO(hs): combine the errors from this with allow/deny policy, like example error in https://datatracker.ietf.org/doc/html/rfc8555#section-6.7.1
+	if err := n.validateWireIdentifiers(); err != nil {
+		return acme.WrapError(acme.ErrorMalformedType, err, "failed validating Wire identifiers")
+	}
+
+	// TODO(hs): add some validations for DNS domains?
+	// TODO(hs): combine the errors from this with allow/deny policy, like example error in https://datatracker.ietf.org/doc/html/rfc8555#section-6.7.1
+
+	return nil
+}
+
+func (n *NewOrderRequest) validateWireIdentifiers() error {
+	if !n.hasWireIdentifiers() {
+		return nil
+	}
+
+	userIdentifiers := identifiersOfType(acme.WireUser, n.Identifiers)
+	deviceIdentifiers := identifiersOfType(acme.WireDevice, n.Identifiers)
+
+	if len(userIdentifiers) != 1 {
+		return fmt.Errorf("expected exactly one Wire UserID identifier; got %d", len(userIdentifiers))
+	}
+	if len(deviceIdentifiers) != 1 {
+		return fmt.Errorf("expected exactly one Wire DeviceID identifier, got %d", len(deviceIdentifiers))
+	}
+
+	wireUserID, err := wire.ParseUserID([]byte(userIdentifiers[0].Value))
+	if err != nil {
+		return fmt.Errorf("failed parsing Wire UserID: %w", err)
+	}
+
+	wireDeviceID, err := wire.ParseDeviceID([]byte(deviceIdentifiers[0].Value))
+	if err != nil {
+		return fmt.Errorf("failed parsing Wire DeviceID: %w", err)
+	}
+	if _, err := wire.ParseClientID(wireDeviceID.ClientID); err != nil {
+		return fmt.Errorf("invalid Wire client ID %q: %w", wireDeviceID.ClientID, err)
+	}
+
+	switch {
+	case wireUserID.Domain != wireDeviceID.Domain:
+		return fmt.Errorf("UserID domain %q does not match DeviceID domain %q", wireUserID.Domain, wireDeviceID.Domain)
+	case wireUserID.Name != wireDeviceID.Name:
+		return fmt.Errorf("UserID name %q does not match DeviceID name %q", wireUserID.Name, wireDeviceID.Name)
+	case wireUserID.Handle != wireDeviceID.Handle:
+		return fmt.Errorf("UserID handle %q does not match DeviceID handle %q", wireUserID.Handle, wireDeviceID.Handle)
 	}
 
 	return nil
+}
+
+// hasWireIdentifiers returns whether the [NewOrderRequest] contains
+// Wire identifiers.
+func (n *NewOrderRequest) hasWireIdentifiers() bool {
+	for _, i := range n.Identifiers {
+		if i.Type == acme.WireUser || i.Type == acme.WireDevice {
+			return true
+		}
+	}
+	return false
+}
+
+// identifiersOfType returns the Identifiers that are of type typ.
+func identifiersOfType(typ acme.IdentifierType, ids []acme.Identifier) (result []acme.Identifier) {
+	for _, id := range ids {
+		if id.Type == typ {
+			result = append(result, id)
+		}
+	}
+	return
 }
 
 // FinalizeRequest captures the body for a Finalize order request.

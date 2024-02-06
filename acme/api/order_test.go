@@ -27,6 +27,7 @@ import (
 	"github.com/smallstep/certificates/authority/provisioner/wire"
 
 	sassert "github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestNewOrderRequest_Validate(t *testing.T) {
@@ -103,30 +104,33 @@ func TestNewOrderRequest_Validate(t *testing.T) {
 			return test{
 				nor: &NewOrderRequest{
 					Identifiers: []acme.Identifier{
-						{Type: "wireapp-device", Value: "{}"},
+						{Type: "wireapp-user", Value: `{"name": "Alice Smith", "domain": "wire.com", "handle": "wireapp://%40alice_wire@wire.com"}`},
+						{Type: "wireapp-device", Value: `{"name": "Smith, Alice M (QA)", "domain": "example.com", "client-id": "example.com", "handle": "wireapp://%40alice.smith.qa@example.com"}`},
 					},
 				},
-				err: acme.NewError(acme.ErrorMalformedType, `invalid Wire client ID "": invalid Wire client ID URI "": error parsing : scheme is missing`),
+				err: acme.NewError(acme.ErrorMalformedType, `failed validating Wire identifiers: invalid Wire client ID "example.com": invalid Wire client ID URI "example.com": error parsing example.com: scheme is missing`),
 			}
 		},
 		"fail/bad-identifier/wireapp-wrong-scheme": func(t *testing.T) test {
 			return test{
 				nor: &NewOrderRequest{
 					Identifiers: []acme.Identifier{
+						{Type: "wireapp-user", Value: `{"name": "Alice Smith", "domain": "wire.com", "handle": "wireapp://%40alice_wire@wire.com"}`},
 						{Type: "wireapp-device", Value: `{"name": "Smith, Alice M (QA)", "domain": "example.com", "client-id": "nowireapp://example.com", "handle": "wireapp://%40alice.smith.qa@example.com"}`},
 					},
 				},
-				err: acme.NewError(acme.ErrorMalformedType, `invalid Wire client ID "nowireapp://example.com": invalid Wire client ID scheme "nowireapp"; expected "wireapp"`),
+				err: acme.NewError(acme.ErrorMalformedType, `failed validating Wire identifiers: invalid Wire client ID "nowireapp://example.com": invalid Wire client ID scheme "nowireapp"; expected "wireapp"`),
 			}
 		},
 		"fail/bad-identifier/wireapp-invalid-user-parts": func(t *testing.T) test {
 			return test{
 				nor: &NewOrderRequest{
 					Identifiers: []acme.Identifier{
+						{Type: "wireapp-user", Value: `{"name": "Alice Smith", "domain": "wire.com", "handle": "wireapp://%40alice_wire@wire.com"}`},
 						{Type: "wireapp-device", Value: `{"name": "Smith, Alice M (QA)", "domain": "example.com", "client-id": "wireapp://user-device@example.com", "handle": "wireapp://%40alice.smith.qa@example.com"}`},
 					},
 				},
-				err: acme.NewError(acme.ErrorMalformedType, `invalid Wire client ID "wireapp://user-device@example.com": invalid Wire client ID username "user-device"`),
+				err: acme.NewError(acme.ErrorMalformedType, `failed validating Wire identifiers: invalid Wire client ID "wireapp://user-device@example.com": invalid Wire client ID username "user-device"`),
 			}
 		},
 		"ok": func(t *testing.T) test {
@@ -207,27 +211,13 @@ func TestNewOrderRequest_Validate(t *testing.T) {
 				naf: naf,
 			}
 		},
-		"ok/wireapp-user": func(t *testing.T) test {
+		"ok/wireapp": func(t *testing.T) test {
 			nbf := time.Now().UTC().Add(time.Minute)
 			naf := time.Now().UTC().Add(5 * time.Minute)
 			return test{
 				nor: &NewOrderRequest{
 					Identifiers: []acme.Identifier{
 						{Type: "wireapp-user", Value: `{"name": "Smith, Alice M (QA)", "domain": "example.com", "handle": "wireapp://%40alice.smith.qa@example.com"}`},
-					},
-					NotAfter:  naf,
-					NotBefore: nbf,
-				},
-				nbf: nbf,
-				naf: naf,
-			}
-		},
-		"ok/wireapp-device": func(t *testing.T) test {
-			nbf := time.Now().UTC().Add(time.Minute)
-			naf := time.Now().UTC().Add(5 * time.Minute)
-			return test{
-				nor: &NewOrderRequest{
-					Identifiers: []acme.Identifier{
 						{Type: "wireapp-device", Value: `{"name": "Smith, Alice M (QA)", "domain": "example.com", "client-id": "wireapp://lJGYPz0ZRq2kvc_XpdaDlA!ed416ce8ecdd9fad@example.com", "handle": "wireapp://%40alice.smith.qa@example.com"}`},
 					},
 					NotAfter:  naf,
@@ -241,30 +231,30 @@ func TestNewOrderRequest_Validate(t *testing.T) {
 	for name, run := range tests {
 		tc := run(t)
 		t.Run(name, func(t *testing.T) {
-			if err := tc.nor.Validate(); err != nil {
-				if assert.NotNil(t, err) {
-					var ae *acme.Error
-					if assert.True(t, errors.As(err, &ae)) {
-						assert.HasPrefix(t, ae.Error(), tc.err.Error())
-						assert.Equals(t, ae.StatusCode(), tc.err.StatusCode())
-						assert.Equals(t, ae.Type, tc.err.Type)
-					}
+			err := tc.nor.Validate()
+			if tc.err != nil {
+				assert.Error(t, err)
+				var ae *acme.Error
+				if assert.True(t, errors.As(err, &ae)) {
+					assert.HasPrefix(t, ae.Error(), tc.err.Error())
+					assert.Equals(t, ae.StatusCode(), tc.err.StatusCode())
+					assert.Equals(t, ae.Type, tc.err.Type)
 				}
+				return
+			}
+
+			assert.NoError(t, err)
+			if tc.nbf.IsZero() {
+				assert.True(t, tc.nor.NotBefore.Before(time.Now().Add(time.Minute)))
+				assert.True(t, tc.nor.NotBefore.After(time.Now().Add(-time.Minute)))
 			} else {
-				if assert.Nil(t, tc.err) {
-					if tc.nbf.IsZero() {
-						assert.True(t, tc.nor.NotBefore.Before(time.Now().Add(time.Minute)))
-						assert.True(t, tc.nor.NotBefore.After(time.Now().Add(-time.Minute)))
-					} else {
-						assert.Equals(t, tc.nor.NotBefore, tc.nbf)
-					}
-					if tc.naf.IsZero() {
-						assert.True(t, tc.nor.NotAfter.Before(time.Now().Add(24*time.Hour)))
-						assert.True(t, tc.nor.NotAfter.After(time.Now().Add(24*time.Hour-time.Minute)))
-					} else {
-						assert.Equals(t, tc.nor.NotAfter, tc.naf)
-					}
-				}
+				assert.Equals(t, tc.nor.NotBefore, tc.nbf)
+			}
+			if tc.naf.IsZero() {
+				assert.True(t, tc.nor.NotAfter.Before(time.Now().Add(24*time.Hour)))
+				assert.True(t, tc.nor.NotAfter.After(time.Now().Add(24*time.Hour-time.Minute)))
+			} else {
+				assert.Equals(t, tc.nor.NotAfter, tc.naf)
 			}
 		})
 	}
@@ -1907,112 +1897,7 @@ MCowBQYDK2VwAyEA5c+4NKZSNQcR1T8qN6SjwgdPZQ0Ge12Ylx/YeGAJ35k=
 				},
 			}
 		},
-		"ok/default-naf-nbf-wireapp-user": func(t *testing.T) test {
-			acmeWireProv := newWireProvisionerWithOptions(t, &provisioner.Options{
-				Wire: &wire.Options{
-					OIDC: &wire.OIDCOptions{
-						Provider: &wire.Provider{
-							IssuerURL:   "https://issuer.example.com",
-							AuthURL:     "",
-							TokenURL:    "",
-							JWKSURL:     "",
-							UserInfoURL: "",
-							Algorithms:  []string{"ES256"},
-						},
-						Config: &wire.Config{
-							ClientID:                   "integration test",
-							SignatureAlgorithms:        []string{"ES256"},
-							SkipClientIDCheck:          true,
-							SkipExpiryCheck:            true,
-							SkipIssuerCheck:            true,
-							InsecureSkipSignatureCheck: true,
-							Now:                        time.Now,
-						},
-						TransformTemplate: "https://target.example.com",
-					},
-					DPOP: &wire.DPOPOptions{
-						SigningKey: []byte(fakeWireSigningKey),
-					},
-				},
-			})
-			acc := &acme.Account{ID: "accID"}
-			nor := &NewOrderRequest{
-				Identifiers: []acme.Identifier{
-					{Type: "wireapp-user", Value: `{"name": "Alice Smith", "handle": "wireapp://%40alice.smith.qa@example.com"}`},
-				},
-			}
-			b, err := json.Marshal(nor)
-			assert.FatalError(t, err)
-			ctx := acme.NewProvisionerContext(context.Background(), acmeWireProv)
-			ctx = context.WithValue(ctx, accContextKey, acc)
-			ctx = context.WithValue(ctx, payloadContextKey, &payloadInfo{value: b})
-			var (
-				ch1   **acme.Challenge
-				az1ID *string
-			)
-			return test{
-				ctx:        ctx,
-				statusCode: 201,
-				nor:        nor,
-				ca:         &mockCA{},
-				db: &acme.MockDB{
-					MockCreateChallenge: func(ctx context.Context, ch *acme.Challenge) error {
-						ch.ID = "wireapp-oidc"
-						assert.Equals(t, ch.Type, acme.WIREOIDC01)
-						ch1 = &ch
-						assert.Equals(t, ch.AccountID, "accID")
-						assert.NotEquals(t, ch.Token, "")
-						assert.Equals(t, ch.Status, acme.StatusPending)
-						assert.Equals(t, ch.Value, `{"name": "Alice Smith", "handle": "wireapp://%40alice.smith.qa@example.com"}`)
-						return nil
-					},
-					MockCreateAuthorization: func(ctx context.Context, az *acme.Authorization) error {
-						az.ID = "az1ID"
-						az1ID = &az.ID
-						assert.Equals(t, az.AccountID, "accID")
-						assert.NotEquals(t, az.Token, "")
-						assert.Equals(t, az.Status, acme.StatusPending)
-						assert.Equals(t, az.Identifier, nor.Identifiers[0])
-						assert.Equals(t, az.Challenges, []*acme.Challenge{*ch1})
-						assert.Equals(t, az.Wildcard, false)
-						return nil
-					},
-					MockCreateOrder: func(ctx context.Context, o *acme.Order) error {
-						o.ID = "ordID"
-						assert.Equals(t, o.AccountID, "accID")
-						assert.Equals(t, o.ProvisionerID, prov.GetID())
-						assert.Equals(t, o.Status, acme.StatusPending)
-						assert.Equals(t, o.Identifiers, nor.Identifiers)
-						assert.Equals(t, o.AuthorizationIDs, []string{*az1ID})
-						return nil
-					},
-					MockGetExternalAccountKeyByAccountID: func(ctx context.Context, provisionerID, accountID string) (*acme.ExternalAccountKey, error) {
-						assert.Equals(t, prov.GetID(), provisionerID)
-						assert.Equals(t, "accID", accountID)
-						return nil, nil
-					},
-				},
-				vr: func(t *testing.T, o *acme.Order) {
-					now := clock.Now()
-					testBufferDur := 5 * time.Second
-					orderExpiry := now.Add(defaultOrderExpiry)
-					expNbf := now.Add(-defaultOrderBackdate)
-					expNaf := now.Add(prov.DefaultTLSCertDuration())
-
-					assert.Equals(t, o.ID, "ordID")
-					assert.Equals(t, o.Status, acme.StatusPending)
-					assert.Equals(t, o.Identifiers, nor.Identifiers)
-					assert.Equals(t, o.AuthorizationURLs, []string{fmt.Sprintf("%s/acme/%s/authz/az1ID", baseURL.String(), escProvName)})
-					assert.True(t, o.NotBefore.Add(-testBufferDur).Before(expNbf))
-					assert.True(t, o.NotBefore.Add(testBufferDur).After(expNbf))
-					assert.True(t, o.NotAfter.Add(-testBufferDur).Before(expNaf))
-					assert.True(t, o.NotAfter.Add(testBufferDur).After(expNaf))
-					assert.True(t, o.ExpiresAt.Add(-testBufferDur).Before(orderExpiry))
-					assert.True(t, o.ExpiresAt.Add(testBufferDur).After(orderExpiry))
-				},
-			}
-		},
-		"ok/default-naf-nbf-wireapp-device": func(t *testing.T) test {
+		"ok/default-naf-nbf-wireapp": func(t *testing.T) test {
 			acmeWireProv := newWireProvisionerWithOptions(t, &provisioner.Options{
 				Wire: &wire.Options{
 					OIDC: &wire.OIDCOptions{
@@ -2042,7 +1927,8 @@ MCowBQYDK2VwAyEA5c+4NKZSNQcR1T8qN6SjwgdPZQ0Ge12Ylx/YeGAJ35k=
 			acc := &acme.Account{ID: "accID"}
 			nor := &NewOrderRequest{
 				Identifiers: []acme.Identifier{
-					{Type: "wireapp-device", Value: `{"client-id": "wireapp://user!client@domain"}`},
+					{Type: "wireapp-user", Value: `{"name": "Smith, Alice M (QA)", "domain": "example.com", "handle": "wireapp://%40alice_wire@wire.com"}`},
+					{Type: "wireapp-device", Value: `{"name": "Smith, Alice M (QA)", "domain": "example.com", "client-id": "wireapp://lJGYPz0ZRq2kvc_XpdaDlA!ed416ce8ecdd9fad@example.com", "handle": "wireapp://%40alice_wire@wire.com"}`},
 				},
 			}
 			b, err := json.Marshal(nor)
@@ -2051,8 +1937,9 @@ MCowBQYDK2VwAyEA5c+4NKZSNQcR1T8qN6SjwgdPZQ0Ge12Ylx/YeGAJ35k=
 			ctx = context.WithValue(ctx, accContextKey, acc)
 			ctx = context.WithValue(ctx, payloadContextKey, &payloadInfo{value: b})
 			var (
-				ch1   **acme.Challenge
-				az1ID *string
+				ch1, ch2         **acme.Challenge
+				az1ID, az2ID     *string
+				chCount, azCount = 0, 0
 			)
 			return test{
 				ctx:        ctx,
@@ -2061,23 +1948,49 @@ MCowBQYDK2VwAyEA5c+4NKZSNQcR1T8qN6SjwgdPZQ0Ge12Ylx/YeGAJ35k=
 				ca:         &mockCA{},
 				db: &acme.MockDB{
 					MockCreateChallenge: func(ctx context.Context, ch *acme.Challenge) error {
-						ch.ID = "wireapp-dpop"
-						assert.Equals(t, ch.Type, acme.WIREDPOP01)
-						ch1 = &ch
+						switch chCount {
+						case 0:
+							assert.Equals(t, ch.Type, acme.WIREOIDC01)
+							assert.Equals(t, ch.Value, `{"name": "Smith, Alice M (QA)", "domain": "example.com", "handle": "wireapp://%40alice_wire@wire.com"}`)
+							ch.ID = "wireapp-oidc"
+							ch1 = &ch
+						case 1:
+							assert.Equals(t, ch.Type, acme.WIREDPOP01)
+							assert.Equals(t, ch.Value, `{"name": "Smith, Alice M (QA)", "domain": "example.com", "client-id": "wireapp://lJGYPz0ZRq2kvc_XpdaDlA!ed416ce8ecdd9fad@example.com", "handle": "wireapp://%40alice_wire@wire.com"}`)
+							ch.ID = "wireapp-dpop"
+							ch2 = &ch
+						default:
+							require.Fail(t, "test logic error")
+						}
+						chCount++
 						assert.Equals(t, ch.AccountID, "accID")
 						assert.NotEquals(t, ch.Token, "")
 						assert.Equals(t, ch.Status, acme.StatusPending)
-						assert.Equals(t, ch.Value, `{"client-id": "wireapp://user!client@domain"}`)
+
+						_, _ = ch1, ch2
+
 						return nil
 					},
 					MockCreateAuthorization: func(ctx context.Context, az *acme.Authorization) error {
-						az.ID = "az1ID"
-						az1ID = &az.ID
+						switch azCount {
+						case 0:
+							az.ID = "az1ID"
+							az1ID = &az.ID
+							assert.Equals(t, az.Identifier, nor.Identifiers[0])
+							assert.Equals(t, az.Challenges, []*acme.Challenge{*ch1})
+						case 1:
+							az.ID = "az2ID"
+							az2ID = &az.ID
+							assert.Equals(t, az.Identifier, nor.Identifiers[1])
+							assert.Equals(t, az.Challenges, []*acme.Challenge{*ch2})
+						default:
+							require.Fail(t, "test logic error")
+						}
+						azCount++
+
 						assert.Equals(t, az.AccountID, "accID")
 						assert.NotEquals(t, az.Token, "")
 						assert.Equals(t, az.Status, acme.StatusPending)
-						assert.Equals(t, az.Identifier, nor.Identifiers[0])
-						assert.Equals(t, az.Challenges, []*acme.Challenge{*ch1})
 						assert.Equals(t, az.Wildcard, false)
 						return nil
 					},
@@ -2087,7 +2000,7 @@ MCowBQYDK2VwAyEA5c+4NKZSNQcR1T8qN6SjwgdPZQ0Ge12Ylx/YeGAJ35k=
 						assert.Equals(t, o.ProvisionerID, prov.GetID())
 						assert.Equals(t, o.Status, acme.StatusPending)
 						assert.Equals(t, o.Identifiers, nor.Identifiers)
-						assert.Equals(t, o.AuthorizationIDs, []string{*az1ID})
+						assert.Equals(t, o.AuthorizationIDs, []string{*az1ID, *az2ID})
 						return nil
 					},
 					MockGetExternalAccountKeyByAccountID: func(ctx context.Context, provisionerID, accountID string) (*acme.ExternalAccountKey, error) {
@@ -2106,7 +2019,10 @@ MCowBQYDK2VwAyEA5c+4NKZSNQcR1T8qN6SjwgdPZQ0Ge12Ylx/YeGAJ35k=
 					assert.Equals(t, o.ID, "ordID")
 					assert.Equals(t, o.Status, acme.StatusPending)
 					assert.Equals(t, o.Identifiers, nor.Identifiers)
-					assert.Equals(t, o.AuthorizationURLs, []string{fmt.Sprintf("%s/acme/%s/authz/az1ID", baseURL.String(), escProvName)})
+					assert.Equals(t, o.AuthorizationURLs, []string{
+						fmt.Sprintf("%s/acme/%s/authz/az1ID", baseURL.String(), escProvName),
+						fmt.Sprintf("%s/acme/%s/authz/az2ID", baseURL.String(), escProvName),
+					})
 					assert.True(t, o.NotBefore.Add(-testBufferDur).Before(expNbf))
 					assert.True(t, o.NotBefore.Add(testBufferDur).After(expNbf))
 					assert.True(t, o.NotAfter.Add(-testBufferDur).Before(expNaf))
