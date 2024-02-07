@@ -47,7 +47,25 @@ MCowBQYDK2VwAyEA5c+4NKZSNQcR1T8qN6SjwgdPZQ0Ge12Ylx/YeGAJ35k=
 			}
 		},
 		"fail/no-linker": func(t *testing.T) test {
-			ctx := NewProvisionerContext(context.Background(), newWireProvisionerWithOptions(t, &provisioner.Options{}))
+			ctx := NewProvisionerContext(context.Background(), newWireProvisionerWithOptions(t, &provisioner.Options{
+				Wire: &wireprovisioner.Options{
+					OIDC: &wireprovisioner.OIDCOptions{
+						Provider: &wireprovisioner.Provider{
+							IssuerURL:  "https://issuer.example.com",
+							Algorithms: []string{"ES256"},
+						},
+						Config: &wireprovisioner.Config{
+							ClientID:            "test",
+							SignatureAlgorithms: []string{"ES256"},
+							Now:                 time.Now,
+						},
+						TransformTemplate: "",
+					},
+					DPOP: &wireprovisioner.DPOPOptions{
+						SigningKey: []byte(fakeKey),
+					},
+				},
+			}))
 			return test{
 				ctx: ctx,
 				expectedErr: &Error{
@@ -59,7 +77,25 @@ MCowBQYDK2VwAyEA5c+4NKZSNQcR1T8qN6SjwgdPZQ0Ge12Ylx/YeGAJ35k=
 			}
 		},
 		"fail/unmarshal": func(t *testing.T) test {
-			ctx := NewProvisionerContext(context.Background(), newWireProvisionerWithOptions(t, &provisioner.Options{}))
+			ctx := NewProvisionerContext(context.Background(), newWireProvisionerWithOptions(t, &provisioner.Options{
+				Wire: &wireprovisioner.Options{
+					OIDC: &wireprovisioner.OIDCOptions{
+						Provider: &wireprovisioner.Provider{
+							IssuerURL:  "https://issuer.example.com",
+							Algorithms: []string{"ES256"},
+						},
+						Config: &wireprovisioner.Config{
+							ClientID:            "test",
+							SignatureAlgorithms: []string{"ES256"},
+							Now:                 time.Now,
+						},
+						TransformTemplate: "",
+					},
+					DPOP: &wireprovisioner.DPOPOptions{
+						SigningKey: []byte(fakeKey),
+					},
+				},
+			}))
 			ctx = NewLinkerContext(ctx, NewLinker("ca.example.com", "acme"))
 			return test{
 				ctx:     ctx,
@@ -82,7 +118,25 @@ MCowBQYDK2VwAyEA5c+4NKZSNQcR1T8qN6SjwgdPZQ0Ge12Ylx/YeGAJ35k=
 			}
 		},
 		"fail/wire-parse-id": func(t *testing.T) test {
-			ctx := NewProvisionerContext(context.Background(), newWireProvisionerWithOptions(t, &provisioner.Options{}))
+			ctx := NewProvisionerContext(context.Background(), newWireProvisionerWithOptions(t, &provisioner.Options{
+				Wire: &wireprovisioner.Options{
+					OIDC: &wireprovisioner.OIDCOptions{
+						Provider: &wireprovisioner.Provider{
+							IssuerURL:  "https://issuer.example.com",
+							Algorithms: []string{"ES256"},
+						},
+						Config: &wireprovisioner.Config{
+							ClientID:            "test",
+							SignatureAlgorithms: []string{"ES256"},
+							Now:                 time.Now,
+						},
+						TransformTemplate: "",
+					},
+					DPOP: &wireprovisioner.DPOPOptions{
+						SigningKey: []byte(fakeKey),
+					},
+				},
+			}))
 			ctx = NewLinkerContext(ctx, NewLinker("ca.example.com", "acme"))
 			return test{
 				ctx:     ctx,
@@ -105,7 +159,25 @@ MCowBQYDK2VwAyEA5c+4NKZSNQcR1T8qN6SjwgdPZQ0Ge12Ylx/YeGAJ35k=
 			}
 		},
 		"fail/wire-parse-client-id": func(t *testing.T) test {
-			ctx := NewProvisionerContext(context.Background(), newWireProvisionerWithOptions(t, &provisioner.Options{}))
+			ctx := NewProvisionerContext(context.Background(), newWireProvisionerWithOptions(t, &provisioner.Options{
+				Wire: &wireprovisioner.Options{
+					OIDC: &wireprovisioner.OIDCOptions{
+						Provider: &wireprovisioner.Provider{
+							IssuerURL:  "https://issuer.example.com",
+							Algorithms: []string{"ES256"},
+						},
+						Config: &wireprovisioner.Config{
+							ClientID:            "test",
+							SignatureAlgorithms: []string{"ES256"},
+							Now:                 time.Now,
+						},
+						TransformTemplate: "",
+					},
+					DPOP: &wireprovisioner.DPOPOptions{
+						SigningKey: []byte(fakeKey),
+					},
+				},
+			}))
 			ctx = NewLinkerContext(ctx, NewLinker("ca.example.com", "acme"))
 			valueBytes, err := json.Marshal(struct {
 				Name     string `json:"name,omitempty"`
@@ -136,41 +208,6 @@ MCowBQYDK2VwAyEA5c+4NKZSNQcR1T8qN6SjwgdPZQ0Ge12Ylx/YeGAJ35k=
 					Detail: "The server experienced an internal error",
 					Status: 500,
 					Err:    errors.New(`error parsing device id: invalid Wire client ID username "594930e9d50bb175"`),
-				},
-			}
-		},
-		"fail/no-wire-options": func(t *testing.T) test {
-			ctx := NewProvisionerContext(context.Background(), newWireProvisionerWithOptions(t, &provisioner.Options{}))
-			ctx = NewLinkerContext(ctx, NewLinker("ca.example.com", "acme"))
-			valueBytes, err := json.Marshal(struct {
-				Name     string `json:"name,omitempty"`
-				Domain   string `json:"domain,omitempty"`
-				ClientID string `json:"client-id,omitempty"`
-				Handle   string `json:"handle,omitempty"`
-			}{
-				Name:     "Alice Smith",
-				Domain:   "wire.com",
-				ClientID: "wireapp://CzbfFjDOQrenCbDxVmgnFw!594930e9d50bb175@wire.com",
-				Handle:   "wireapp://%40alice_wire@wire.com",
-			})
-			require.NoError(t, err)
-			return test{
-				ctx:     ctx,
-				payload: []byte("{}"),
-				ch: &Challenge{
-					ID:              "chID",
-					AuthorizationID: "azID",
-					AccountID:       "accID",
-					Token:           "token",
-					Type:            "wire-dpop-01",
-					Status:          StatusPending,
-					Value:           string(valueBytes),
-				},
-				expectedErr: &Error{
-					Type:   "urn:ietf:params:acme:error:serverInternal",
-					Detail: "The server experienced an internal error",
-					Status: 500,
-					Err:    errors.New(`failed getting Wire options: no Wire options available`),
 				},
 			}
 		},
@@ -269,6 +306,7 @@ MCowBQYDK2VwAyEA5c+4NKZSNQcR1T8qN6SjwgdPZQ0Ge12Ylx/YeGAJ35k=
 				Handle    string `json:"handle,omitempty"`
 				Nonce     string `json:"nonce,omitempty"`
 				HTU       string `json:"htu,omitempty"`
+				Name      string `json:"name,omitempty"`
 			}{
 				Claims: jose.Claims{
 					Subject:  "wireapp://CzbfFjDOQrenCbDxVmgnFw!594930e9d50bb175@wire.com",
@@ -278,6 +316,7 @@ MCowBQYDK2VwAyEA5c+4NKZSNQcR1T8qN6SjwgdPZQ0Ge12Ylx/YeGAJ35k=
 				Handle:    "wireapp://%40alice_wire@wire.com",
 				Nonce:     "nonce",
 				HTU:       "http://issuer.example.com",
+				Name:      "Alice Smith",
 			})
 			require.NoError(t, err)
 			dpop, err := dpopSigner.Sign(dpopBytes)
@@ -413,6 +452,7 @@ MCowBQYDK2VwAyEA5c+4NKZSNQcR1T8qN6SjwgdPZQ0Ge12Ylx/YeGAJ35k=
 				Handle    string `json:"handle,omitempty"`
 				Nonce     string `json:"nonce,omitempty"`
 				HTU       string `json:"htu,omitempty"`
+				Name      string `json:"name,omitempty"`
 			}{
 				Claims: jose.Claims{
 					Subject:  "wireapp://CzbfFjDOQrenCbDxVmgnFw!594930e9d50bb175@wire.com",
@@ -422,6 +462,7 @@ MCowBQYDK2VwAyEA5c+4NKZSNQcR1T8qN6SjwgdPZQ0Ge12Ylx/YeGAJ35k=
 				Handle:    "wireapp://%40alice_wire@wire.com",
 				Nonce:     "nonce",
 				HTU:       "http://issuer.example.com",
+				Name:      "Alice Smith",
 			})
 			require.NoError(t, err)
 			dpop, err := dpopSigner.Sign(dpopBytes)
@@ -561,6 +602,7 @@ MCowBQYDK2VwAyEA5c+4NKZSNQcR1T8qN6SjwgdPZQ0Ge12Ylx/YeGAJ35k=
 				Handle    string `json:"handle,omitempty"`
 				Nonce     string `json:"nonce,omitempty"`
 				HTU       string `json:"htu,omitempty"`
+				Name      string `json:"name,omitempty"`
 			}{
 				Claims: jose.Claims{
 					Subject:  "wireapp://CzbfFjDOQrenCbDxVmgnFw!594930e9d50bb175@wire.com",
@@ -570,6 +612,7 @@ MCowBQYDK2VwAyEA5c+4NKZSNQcR1T8qN6SjwgdPZQ0Ge12Ylx/YeGAJ35k=
 				Handle:    "wireapp://%40alice_wire@wire.com",
 				Nonce:     "nonce",
 				HTU:       "http://issuer.example.com",
+				Name:      "Alice Smith",
 			})
 			require.NoError(t, err)
 			dpop, err := dpopSigner.Sign(dpopBytes)
@@ -709,6 +752,7 @@ MCowBQYDK2VwAyEA5c+4NKZSNQcR1T8qN6SjwgdPZQ0Ge12Ylx/YeGAJ35k=
 				Handle    string `json:"handle,omitempty"`
 				Nonce     string `json:"nonce,omitempty"`
 				HTU       string `json:"htu,omitempty"`
+				Name      string `json:"name,omitempty"`
 			}{
 				Claims: jose.Claims{
 					Subject:  "wireapp://CzbfFjDOQrenCbDxVmgnFw!594930e9d50bb175@wire.com",
@@ -718,6 +762,7 @@ MCowBQYDK2VwAyEA5c+4NKZSNQcR1T8qN6SjwgdPZQ0Ge12Ylx/YeGAJ35k=
 				Handle:    "wireapp://%40alice_wire@wire.com",
 				Nonce:     "nonce",
 				HTU:       "http://issuer.example.com",
+				Name:      "Alice Smith",
 			})
 			require.NoError(t, err)
 			dpop, err := dpopSigner.Sign(dpopBytes)
@@ -864,6 +909,7 @@ MCowBQYDK2VwAyEA5c+4NKZSNQcR1T8qN6SjwgdPZQ0Ge12Ylx/YeGAJ35k=
 				Handle    string `json:"handle,omitempty"`
 				Nonce     string `json:"nonce,omitempty"`
 				HTU       string `json:"htu,omitempty"`
+				Name      string `json:"name,omitempty"`
 			}{
 				Claims: jose.Claims{
 					Subject:  "wireapp://CzbfFjDOQrenCbDxVmgnFw!594930e9d50bb175@wire.com",
@@ -873,6 +919,7 @@ MCowBQYDK2VwAyEA5c+4NKZSNQcR1T8qN6SjwgdPZQ0Ge12Ylx/YeGAJ35k=
 				Handle:    "wireapp://%40alice_wire@wire.com",
 				Nonce:     "nonce",
 				HTU:       "http://issuer.example.com",
+				Name:      "Alice Smith",
 			})
 			require.NoError(t, err)
 			dpop, err := dpopSigner.Sign(dpopBytes)
@@ -1037,7 +1084,25 @@ MCowBQYDK2VwAyEA5c+4NKZSNQcR1T8qN6SjwgdPZQ0Ge12Ylx/YeGAJ35k=
 			}
 		},
 		"fail/no-linker": func(t *testing.T) test {
-			ctx := NewProvisionerContext(context.Background(), newWireProvisionerWithOptions(t, &provisioner.Options{}))
+			ctx := NewProvisionerContext(context.Background(), newWireProvisionerWithOptions(t, &provisioner.Options{
+				Wire: &wireprovisioner.Options{
+					OIDC: &wireprovisioner.OIDCOptions{
+						Provider: &wireprovisioner.Provider{
+							IssuerURL:  "https://issuer.example.com",
+							Algorithms: []string{"ES256"},
+						},
+						Config: &wireprovisioner.Config{
+							ClientID:            "test",
+							SignatureAlgorithms: []string{"ES256"},
+							Now:                 time.Now,
+						},
+						TransformTemplate: "",
+					},
+					DPOP: &wireprovisioner.DPOPOptions{
+						SigningKey: []byte(fakeKey),
+					},
+				},
+			}))
 			return test{
 				ctx: ctx,
 				expectedErr: &Error{
@@ -1049,7 +1114,25 @@ MCowBQYDK2VwAyEA5c+4NKZSNQcR1T8qN6SjwgdPZQ0Ge12Ylx/YeGAJ35k=
 			}
 		},
 		"fail/unmarshal": func(t *testing.T) test {
-			ctx := NewProvisionerContext(context.Background(), newWireProvisionerWithOptions(t, &provisioner.Options{}))
+			ctx := NewProvisionerContext(context.Background(), newWireProvisionerWithOptions(t, &provisioner.Options{
+				Wire: &wireprovisioner.Options{
+					OIDC: &wireprovisioner.OIDCOptions{
+						Provider: &wireprovisioner.Provider{
+							IssuerURL:  "https://issuer.example.com",
+							Algorithms: []string{"ES256"},
+						},
+						Config: &wireprovisioner.Config{
+							ClientID:            "test",
+							SignatureAlgorithms: []string{"ES256"},
+							Now:                 time.Now,
+						},
+						TransformTemplate: "",
+					},
+					DPOP: &wireprovisioner.DPOPOptions{
+						SigningKey: []byte(fakeKey),
+					},
+				},
+			}))
 			ctx = NewLinkerContext(ctx, NewLinker("ca.example.com", "acme"))
 			return test{
 				ctx:     ctx,
@@ -1078,7 +1161,25 @@ MCowBQYDK2VwAyEA5c+4NKZSNQcR1T8qN6SjwgdPZQ0Ge12Ylx/YeGAJ35k=
 			}
 		},
 		"fail/wire-parse-id": func(t *testing.T) test {
-			ctx := NewProvisionerContext(context.Background(), newWireProvisionerWithOptions(t, &provisioner.Options{}))
+			ctx := NewProvisionerContext(context.Background(), newWireProvisionerWithOptions(t, &provisioner.Options{
+				Wire: &wireprovisioner.Options{
+					OIDC: &wireprovisioner.OIDCOptions{
+						Provider: &wireprovisioner.Provider{
+							IssuerURL:  "https://issuer.example.com",
+							Algorithms: []string{"ES256"},
+						},
+						Config: &wireprovisioner.Config{
+							ClientID:            "test",
+							SignatureAlgorithms: []string{"ES256"},
+							Now:                 time.Now,
+						},
+						TransformTemplate: "",
+					},
+					DPOP: &wireprovisioner.DPOPOptions{
+						SigningKey: []byte(fakeKey),
+					},
+				},
+			}))
 			ctx = NewLinkerContext(ctx, NewLinker("ca.example.com", "acme"))
 			return test{
 				ctx:     ctx,
@@ -1097,41 +1198,6 @@ MCowBQYDK2VwAyEA5c+4NKZSNQcR1T8qN6SjwgdPZQ0Ge12Ylx/YeGAJ35k=
 					Detail: "The server experienced an internal error",
 					Status: 500,
 					Err:    errors.New(`error unmarshalling challenge data: json: cannot unmarshal number into Go value of type wire.UserID`),
-				},
-			}
-		},
-		"fail/no-wire-options": func(t *testing.T) test {
-			ctx := NewProvisionerContext(context.Background(), newWireProvisionerWithOptions(t, &provisioner.Options{}))
-			ctx = NewLinkerContext(ctx, NewLinker("ca.example.com", "acme"))
-			valueBytes, err := json.Marshal(struct {
-				Name     string `json:"name,omitempty"`
-				Domain   string `json:"domain,omitempty"`
-				ClientID string `json:"client-id,omitempty"`
-				Handle   string `json:"handle,omitempty"`
-			}{
-				Name:     "Alice Smith",
-				Domain:   "wire.com",
-				ClientID: "wireapp://CzbfFjDOQrenCbDxVmgnFw!594930e9d50bb175@wire.com",
-				Handle:   "wireapp://%40alice_wire@wire.com",
-			})
-			require.NoError(t, err)
-			return test{
-				ctx:     ctx,
-				payload: []byte("{}"),
-				ch: &Challenge{
-					ID:              "chID",
-					AuthorizationID: "azID",
-					AccountID:       "accID",
-					Token:           "token",
-					Type:            "wire-oidc-01",
-					Status:          StatusPending,
-					Value:           string(valueBytes),
-				},
-				expectedErr: &Error{
-					Type:   "urn:ietf:params:acme:error:serverInternal",
-					Detail: "The server experienced an internal error",
-					Status: 500,
-					Err:    errors.New(`failed getting Wire options: no Wire options available`),
 				},
 			}
 		},
@@ -2122,8 +2188,8 @@ MCowBQYDK2VwAyEA5c+4NKZSNQcR1T8qN6SjwgdPZQ0Ge12Ylx/YeGAJ35k=
 	idTokenString := `eyJhbGciOiJSUzI1NiIsImtpZCI6IjZhNDZlYzQ3YTQzYWI1ZTc4NzU3MzM5NWY1MGY4ZGQ5MWI2OTM5MzcifQ.eyJpc3MiOiJodHRwOi8vZGV4OjE1ODE4L2RleCIsInN1YiI6IkNqcDNhWEpsWVhCd09pOHZTMmh0VjBOTFpFTlRXakoyT1dWTWFHRk9XVlp6WnlFeU5UZzFNVEpoT0RRek5qTXhaV1V6UUhkcGNtVXVZMjl0RWdSc1pHRnciLCJhdWQiOiJ3aXJlYXBwIiwiZXhwIjoxNzA1MDkxNTYyLCJpYXQiOjE3MDUwMDUxNjIsIm5vbmNlIjoib0VjUzBRQUNXLVIyZWkxS09wUmZ2QSIsImF0X2hhc2giOiJoYzk0NmFwS25FeEV5TDVlSzJZMzdRIiwiY19oYXNoIjoidmRubFp2V1d1bVd1Z2NYR1JpOU5FUSIsIm5hbWUiOiJ3aXJlYXBwOi8vJTQwYWxpY2Vfd2lyZUB3aXJlLmNvbSIsInByZWZlcnJlZF91c2VybmFtZSI6IkFsaWNlIFNtaXRoIn0.aEBhWJugBJ9J_0L_4odUCg8SR8HMXVjd__X8uZRo42BSJQQO7-wdpy0jU3S4FOX9fQKr68wD61gS_QsnhfiT7w9U36mLpxaYlNVDCYfpa-gklVFit_0mjUOukXajTLK6H527TGiSss8z22utc40ckS1SbZa2BzKu3yOcqnFHUQwQc5sLYfpRABTB6WBoYFtnWDzdpyWJDaOzz7lfKYv2JBnf9vV8u8SYm-6gNKgtiQ3UUnjhIVUjdfHet2BMvmV2ooZ8V441RULCzKKG_sWZba-D_k_TOnSholGobtUOcKHlmVlmfUe8v7kuyBdhbPcembfgViaNldLQGKZjZfgvLg`
 	ctx := context.Background()
 	o := opts.GetOIDCOptions()
-	c := o.GetConfig()
-	verifier := o.GetProvider(ctx).Verifier(c)
+	verifier, err := o.GetVerifier(ctx)
+	require.NoError(t, err)
 	idToken, err := verifier.Verify(ctx, idTokenString)
 	require.NoError(t, err)
 

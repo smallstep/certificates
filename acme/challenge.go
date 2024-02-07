@@ -362,29 +362,31 @@ func wireOIDC01Validate(ctx context.Context, ch *Challenge, db DB, jwk *jose.JSO
 	if !ok {
 		return NewErrorISE("missing provisioner")
 	}
+	wireOptions, err := prov.GetOptions().GetWireOptions()
+	if err != nil {
+		return WrapErrorISE(err, "failed getting Wire options")
+	}
 	linker, ok := LinkerFromContext(ctx)
 	if !ok {
 		return NewErrorISE("missing linker")
 	}
 
 	var oidcPayload wireOidcPayload
-	err := json.Unmarshal(payload, &oidcPayload)
-	if err != nil {
+	if err := json.Unmarshal(payload, &oidcPayload); err != nil {
 		return WrapError(ErrorMalformedType, err, "error unmarshalling Wire OIDC challenge payload")
 	}
 
-	wireID, err := wire.ParseUserID([]byte(ch.Value))
+	wireID, err := wire.ParseUserID(ch.Value)
 	if err != nil {
 		return WrapErrorISE(err, "error unmarshalling challenge data")
 	}
 
-	wireOptions, err := prov.GetOptions().GetWireOptions()
+	oidcOptions := wireOptions.GetOIDCOptions()
+	verifier, err := oidcOptions.GetVerifier(ctx)
 	if err != nil {
-		return WrapErrorISE(err, "failed getting Wire options")
+		return WrapErrorISE(err, "no OIDC verifier available")
 	}
 
-	oidcOptions := wireOptions.GetOIDCOptions()
-	verifier := oidcOptions.GetProvider(ctx).Verifier(oidcOptions.GetConfig())
 	idToken, err := verifier.Verify(ctx, oidcPayload.IDToken)
 	if err != nil {
 		return storeError(ctx, db, ch, true, WrapError(ErrorRejectedIdentifierType, err,
@@ -490,6 +492,10 @@ func wireDPOP01Validate(ctx context.Context, ch *Challenge, db DB, accountJWK *j
 	if !ok {
 		return NewErrorISE("missing provisioner")
 	}
+	wireOptions, err := prov.GetOptions().GetWireOptions()
+	if err != nil {
+		return WrapErrorISE(err, "failed getting Wire options")
+	}
 	linker, ok := LinkerFromContext(ctx)
 	if !ok {
 		return NewErrorISE("missing linker")
@@ -500,7 +506,7 @@ func wireDPOP01Validate(ctx context.Context, ch *Challenge, db DB, accountJWK *j
 		return WrapError(ErrorMalformedType, err, "error unmarshalling Wire DPoP challenge payload")
 	}
 
-	wireID, err := wire.ParseDeviceID([]byte(ch.Value))
+	wireID, err := wire.ParseDeviceID(ch.Value)
 	if err != nil {
 		return WrapErrorISE(err, "error unmarshalling challenge data")
 	}
@@ -508,11 +514,6 @@ func wireDPOP01Validate(ctx context.Context, ch *Challenge, db DB, accountJWK *j
 	clientID, err := wire.ParseClientID(wireID.ClientID)
 	if err != nil {
 		return WrapErrorISE(err, "error parsing device id")
-	}
-
-	wireOptions, err := prov.GetOptions().GetWireOptions()
-	if err != nil {
-		return WrapErrorISE(err, "failed getting Wire options")
 	}
 
 	dpopOptions := wireOptions.GetDPOPOptions()
@@ -719,6 +720,14 @@ func parseAndVerifyWireAccessToken(v wireVerifyParams) (*wireAccessToken, *wireD
 	}
 	if handle == "" || handle != v.wireID.Handle {
 		return nil, nil, fmt.Errorf("invalid Wire client handle %q", handle)
+	}
+
+	name, ok := dpopToken["name"].(string)
+	if !ok {
+		return nil, nil, fmt.Errorf("invalid display name in Wire DPoP token")
+	}
+	if name == "" || name != v.wireID.Name {
+		return nil, nil, fmt.Errorf("invalid Wire client display name %q", name)
 	}
 
 	return &accessToken, &dpopToken, nil

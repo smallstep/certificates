@@ -2,6 +2,7 @@ package wire
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"strings"
 
@@ -21,13 +22,39 @@ type DeviceID struct {
 	Handle   string `json:"handle,omitempty"`
 }
 
-func ParseUserID(data []byte) (id UserID, err error) {
-	err = json.Unmarshal(data, &id)
+func ParseUserID(value string) (id UserID, err error) {
+	if err = json.Unmarshal([]byte(value), &id); err != nil {
+		return
+	}
+
+	switch {
+	case id.Handle == "":
+		err = errors.New("handle must not be empty")
+	case id.Name == "":
+		err = errors.New("name must not be empty")
+	case id.Domain == "":
+		err = errors.New("domain must not be empty")
+	}
+
 	return
 }
 
-func ParseDeviceID(data []byte) (id DeviceID, err error) {
-	err = json.Unmarshal(data, &id)
+func ParseDeviceID(value string) (id DeviceID, err error) {
+	if err = json.Unmarshal([]byte(value), &id); err != nil {
+		return
+	}
+
+	switch {
+	case id.Handle == "":
+		err = errors.New("handle must not be empty")
+	case id.Name == "":
+		err = errors.New("name must not be empty")
+	case id.Domain == "":
+		err = errors.New("domain must not be empty")
+	case id.ClientID == "":
+		err = errors.New("client-id must not be empty")
+	}
+
 	return
 }
 

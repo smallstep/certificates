@@ -55,7 +55,7 @@ MCowBQYDK2VwAyEA5c+4NKZSNQcR1T8qN6SjwgdPZQ0Ge12Ylx/YeGAJ35k=
 				},
 				DPOP: &DPOPOptions{},
 			},
-			expectedErr: errors.New("failed initializing OIDC options: issuer URL must not be empty"),
+			expectedErr: errors.New("failed initializing OIDC options: either OIDC discovery or issuer URL must be set"),
 		},
 		{
 			name: "fail/invalid-issuer-url",

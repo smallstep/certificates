@@ -3,6 +3,7 @@ package wire
 import (
 	"bytes"
 	"crypto"
+	"errors"
 	"fmt"
 	"text/template"
 
@@ -24,9 +25,12 @@ func (o *DPOPOptions) GetSigningKey() crypto.PublicKey {
 }
 
 func (o *DPOPOptions) EvaluateTarget(deviceID string) (string, error) {
+	if deviceID == "" {
+		return "", errors.New("deviceID must not be empty")
+	}
 	buf := new(bytes.Buffer)
 	if err := o.target.Execute(buf, struct{ DeviceID string }{DeviceID: deviceID}); err != nil {
-		return "", fmt.Errorf("failed executing dpop template: %w", err)
+		return "", fmt.Errorf("failed executing DPoP template: %w", err)
 	}
 	return buf.String(), nil
 }

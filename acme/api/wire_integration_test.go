@@ -25,6 +25,7 @@ import (
 	"github.com/smallstep/certificates/acme"
 	"github.com/smallstep/certificates/acme/db/nosql"
 	"github.com/smallstep/certificates/authority"
+	"github.com/smallstep/certificates/authority/config"
 	"github.com/smallstep/certificates/authority/provisioner"
 	"github.com/smallstep/certificates/authority/provisioner/wire"
 	nosqlDB "github.com/smallstep/nosql"
@@ -42,16 +43,23 @@ const (
 )
 
 func newWireProvisionerWithOptions(t *testing.T, options *provisioner.Options) *provisioner.ACME {
-	p := newProvWithOptions(options)
-	a, ok := p.(*provisioner.ACME)
-	if !ok {
-		t.Fatal("not a valid ACME provisioner")
+	t.Helper()
+	prov := &provisioner.ACME{
+		Type:    "ACME",
+		Name:    "test@acme-<test>provisioner.com",
+		Options: options,
+		Challenges: []provisioner.ACMEChallenge{
+			provisioner.WIREOIDC_01,
+			provisioner.WIREDPOP_01,
+		},
 	}
-	a.Challenges = []provisioner.ACMEChallenge{
-		provisioner.WIREOIDC_01,
-		provisioner.WIREDPOP_01,
-	}
-	return a
+
+	err := prov.Init(provisioner.Config{
+		Claims: config.GlobalProvisionerClaims,
+	})
+	require.NoError(t, err)
+
+	return prov
 }
 
 // TODO(hs): replace with test CA server + acmez based test client for

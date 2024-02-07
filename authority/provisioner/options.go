@@ -2,7 +2,6 @@ package provisioner
 
 import (
 	"encoding/json"
-	"fmt"
 	"strings"
 
 	"github.com/pkg/errors"
@@ -54,16 +53,14 @@ func (o *Options) GetSSHOptions() *SSHOptions {
 	return o.SSH
 }
 
-// GetWireOptions returns the SSH options.
+// GetWireOptions returns the Wire options if available. It
+// returns an error if they're not available.
 func (o *Options) GetWireOptions() (*wire.Options, error) {
 	if o == nil {
 		return nil, errors.New("no options available")
 	}
 	if o.Wire == nil {
 		return nil, errors.New("no Wire options available")
-	}
-	if err := o.Wire.Validate(); err != nil {
-		return nil, fmt.Errorf("failed validating Wire options: %w", err)
 	}
 	return o.Wire, nil
 }

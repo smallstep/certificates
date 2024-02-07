@@ -15,12 +15,13 @@ import (
 )
 
 type Provider struct {
-	IssuerURL   string   `json:"issuer,omitempty"`
-	AuthURL     string   `json:"authorization_endpoint,omitempty"`
-	TokenURL    string   `json:"token_endpoint,omitempty"`
-	JWKSURL     string   `json:"jwks_uri,omitempty"`
-	UserInfoURL string   `json:"userinfo_endpoint,omitempty"`
-	Algorithms  []string `json:"id_token_signing_alg_values_supported,omitempty"`
+	DiscoveryBaseURL string   `json:"discoveryBaseUrl,omitempty"`
+	IssuerURL        string   `json:"issuerUrl,omitempty"`
+	AuthURL          string   `json:"authorizationUrl,omitempty"`
+	TokenURL         string   `json:"tokenUrl,omitempty"`
+	JWKSURL          string   `json:"jwksUrl,omitempty"`
+	UserInfoURL      string   `json:"userInfoUrl,omitempty"`
+	Algorithms       []string `json:"signatureAlgorithms,omitempty"`
 }
 
 type Config struct {
@@ -40,19 +41,38 @@ type OIDCOptions struct {
 	Config            *Config   `json:"config,omitempty"`
 	TransformTemplate string    `json:"transform,omitempty"`
 
-	oidcProviderConfig *oidc.ProviderConfig
 	target             *template.Template
 	transform          *template.Template
+	oidcProviderConfig *oidc.ProviderConfig
+	provider           *oidc.Provider
+	verifier           *oidc.IDTokenVerifier
 }
 
-func (o *OIDCOptions) GetProvider(ctx context.Context) *oidc.Provider {
-	if o == nil || o.Provider == nil || o.oidcProviderConfig == nil {
-		return nil
+func (o *OIDCOptions) GetVerifier(ctx context.Context) (*oidc.IDTokenVerifier, error) {
+	if o.verifier == nil {
+		switch {
+		case o.Provider.DiscoveryBaseURL != "":
+			// creates a new OIDC provider using automatic discovery and the default HTTP client
+			provider, err := oidc.NewProvider(ctx, o.Provider.DiscoveryBaseURL)
+			if err != nil {
+				return nil, fmt.Errorf("failed creating new OIDC provider using discovery: %w", err)
+			}
+			o.provider = provider
+		default:
+			o.provider = o.oidcProviderConfig.NewProvider(ctx)
+		}
+
+		if o.provider == nil {
+			return nil, errors.New("no OIDC provider available")
+		}
+
+		o.verifier = o.provider.Verifier(o.getConfig())
 	}
-	return o.oidcProviderConfig.NewProvider(ctx)
+
+	return o.verifier, nil
 }
 
-func (o *OIDCOptions) GetConfig() *oidc.Config {
+func (o *OIDCOptions) getConfig() *oidc.Config {
 	if o == nil || o.Config == nil {
 		return &oidc.Config{}
 	}
@@ -74,13 +94,15 @@ func (o *OIDCOptions) validateAndInitialize() (err error) {
 	if o.Provider == nil {
 		return errors.New("provider not set")
 	}
-	if o.Provider.IssuerURL == "" {
-		return errors.New("issuer URL must not be empty")
+	if o.Provider.IssuerURL == "" && o.Provider.DiscoveryBaseURL == "" {
+		return errors.New("either OIDC discovery or issuer URL must be set")
 	}
 
-	o.oidcProviderConfig, err = toOIDCProviderConfig(o.Provider)
-	if err != nil {
-		return fmt.Errorf("failed creationg OIDC provider config: %w", err)
+	if o.Provider.DiscoveryBaseURL == "" {
+		o.oidcProviderConfig, err = toOIDCProviderConfig(o.Provider)
+		if err != nil {
+			return fmt.Errorf("failed creationg OIDC provider config: %w", err)
+		}
 	}
 
 	o.target, err = template.New("DeviceID").Parse(o.Provider.IssuerURL)
