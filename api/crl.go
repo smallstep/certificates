@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/smallstep/certificates/api/render"
+	"github.com/smallstep/certificates/errs"
 )
 
 // CRL is an HTTP handler that returns the current CRL in DER or PEM format
@@ -16,7 +17,17 @@ func CRL(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	w.Header().Add("Expires", crlInfo.ExpiresAt.Format(time.RFC1123))
+	if crlInfo == nil {
+		render.Error(w, errs.New(http.StatusInternalServerError, "no CRL available"))
+		return
+	}
+
+	expires := crlInfo.ExpiresAt
+	if expires.IsZero() {
+		expires = time.Now()
+	}
+
+	w.Header().Add("Expires", expires.Format(time.RFC1123))
 
 	_, formatAsPEM := r.URL.Query()["pem"]
 	if formatAsPEM {

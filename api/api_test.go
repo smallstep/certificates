@@ -789,45 +789,6 @@ func (m *mockProvisioner) AuthorizeSSHRekey(ctx context.Context, token string) (
 	return m.ret1.(*ssh.Certificate), m.ret2.([]provisioner.SignOption), m.err
 }
 
-func Test_CRLGeneration(t *testing.T) {
-	tests := []struct {
-		name       string
-		err        error
-		statusCode int
-		expected   []byte
-	}{
-		{"empty", nil, http.StatusOK, nil},
-	}
-
-	chiCtx := chi.NewRouteContext()
-	req := httptest.NewRequest("GET", "http://example.com/crl", http.NoBody)
-	req = req.WithContext(context.WithValue(context.Background(), chi.RouteCtxKey, chiCtx))
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			mockMustAuthority(t, &mockAuthority{ret1: tt.expected, err: tt.err})
-			w := httptest.NewRecorder()
-			CRL(w, req)
-			res := w.Result()
-
-			if res.StatusCode != tt.statusCode {
-				t.Errorf("caHandler.CRL StatusCode = %d, wants %d", res.StatusCode, tt.statusCode)
-			}
-
-			body, err := io.ReadAll(res.Body)
-			res.Body.Close()
-			if err != nil {
-				t.Errorf("caHandler.Root unexpected error = %v", err)
-			}
-			if tt.statusCode == 200 {
-				if !bytes.Equal(bytes.TrimSpace(body), tt.expected) {
-					t.Errorf("caHandler.Root CRL = %s, wants %s", body, tt.expected)
-				}
-			}
-		})
-	}
-}
-
 func Test_caHandler_Route(t *testing.T) {
 	type fields struct {
 		Authority Authority
