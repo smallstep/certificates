@@ -200,7 +200,7 @@ type mockAuthority struct {
 	getEncryptedKey              func(kid string) (string, error)
 	getRoots                     func() ([]*x509.Certificate, error)
 	getFederation                func() ([]*x509.Certificate, error)
-	getCRL                       func() ([]byte, error)
+	getCRL                       func() (*authority.CertificateRevocationListInfo, error)
 	signSSH                      func(ctx context.Context, key ssh.PublicKey, opts provisioner.SignSSHOptions, signOpts ...provisioner.SignOption) (*ssh.Certificate, error)
 	signSSHAddUser               func(ctx context.Context, key ssh.PublicKey, cert *ssh.Certificate) (*ssh.Certificate, error)
 	renewSSH                     func(ctx context.Context, cert *ssh.Certificate) (*ssh.Certificate, error)
@@ -214,12 +214,12 @@ type mockAuthority struct {
 	version                      func() authority.Version
 }
 
-func (m *mockAuthority) GetCertificateRevocationList() ([]byte, error) {
+func (m *mockAuthority) GetCertificateRevocationList() (*authority.CertificateRevocationListInfo, error) {
 	if m.getCRL != nil {
 		return m.getCRL()
 	}
 
-	return m.ret1.([]byte), m.err
+	return m.ret1.(*authority.CertificateRevocationListInfo), m.err
 }
 
 // TODO: remove once Authorize is deprecated.

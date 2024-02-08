@@ -696,9 +696,17 @@ func (a *Authority) revokeSSH(crt *ssh.Certificate, rci *db.RevokedCertificateIn
 	return a.db.RevokeSSH(rci)
 }
 
+// CertificateRevocationListInfo contains a CRL in DER format and associated metadata.
+type CertificateRevocationListInfo struct {
+	Number    int64
+	ExpiresAt time.Time
+	Duration  time.Duration
+	Data      []byte
+}
+
 // GetCertificateRevocationList will return the currently generated CRL from the DB, or a not implemented
 // error if the underlying AuthDB does not support CRLs
-func (a *Authority) GetCertificateRevocationList() ([]byte, error) {
+func (a *Authority) GetCertificateRevocationList() (*CertificateRevocationListInfo, error) {
 	if !a.config.CRL.IsEnabled() {
 		return nil, errs.Wrap(http.StatusNotFound, errors.Errorf("Certificate Revocation Lists are not enabled"), "authority.GetCertificateRevocationList")
 	}
@@ -713,7 +721,12 @@ func (a *Authority) GetCertificateRevocationList() ([]byte, error) {
 		return nil, errs.Wrap(http.StatusInternalServerError, err, "authority.GetCertificateRevocationList")
 	}
 
-	return crlInfo.DER, nil
+	return &CertificateRevocationListInfo{
+		Number:    crlInfo.Number,
+		ExpiresAt: crlInfo.ExpiresAt,
+		Duration:  crlInfo.Duration,
+		Data:      crlInfo.DER,
+	}, nil
 }
 
 // GenerateCertificateRevocationList generates a DER representation of a signed CRL and stores it in the
