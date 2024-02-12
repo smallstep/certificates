@@ -24,7 +24,7 @@ require (
 	github.com/prometheus/client_golang v1.18.0
 	github.com/rs/xid v1.5.0
 	github.com/sirupsen/logrus v1.9.3
-	github.com/slackhq/nebula v1.6.1
+	github.com/slackhq/nebula v1.8.2
 	github.com/smallstep/assert v0.0.0-20200723003110-82e2b9b3b262
 	github.com/smallstep/go-attestation v0.4.4-0.20240109183208-413678f90935
 	github.com/smallstep/nosql v0.6.0
@@ -36,7 +36,7 @@ require (
 	go.step.sm/crypto v0.43.0
 	go.step.sm/linkedca v0.20.1
 	golang.org/x/crypto v0.19.0
-	golang.org/x/exp v0.0.0-20230310171629-522b1b587ee0
+	golang.org/x/exp v0.0.0-20230425010034-47ecfdc1ba53
 	golang.org/x/net v0.21.0
 	google.golang.org/api v0.160.0
 	google.golang.org/grpc v1.61.0
