@@ -3,7 +3,7 @@ module github.com/smallstep/certificates
 go 1.20
 
 require (
-	cloud.google.com/go/longrunning v0.5.4
+	cloud.google.com/go/longrunning v0.5.5
 	cloud.google.com/go/security v1.15.5
 	github.com/Masterminds/sprig/v3 v3.2.3
 	github.com/dgraph-io/badger v1.6.2
@@ -44,7 +44,7 @@ require (
 )
 
 require (
-	cloud.google.com/go v0.111.0 // indirect
+	cloud.google.com/go v0.112.0 // indirect
 	cloud.google.com/go/compute v1.23.3 // indirect
 	cloud.google.com/go/compute/metadata v0.2.3 // indirect
 	cloud.google.com/go/iam v1.1.5 // indirect
@@ -163,6 +163,6 @@ require (
 	google.golang.org/appengine v1.6.8 // indirect
 	google.golang.org/genproto v0.0.0-20240116215550-a9fa1716bcac // indirect
 	google.golang.org/genproto/googleapis/api v0.0.0-20240125205218-1f4bbc51befe // indirect
-	google.golang.org/genproto/googleapis/rpc v0.0.0-20240116215550-a9fa1716bcac // indirect
+	google.golang.org/genproto/googleapis/rpc v0.0.0-20240125205218-1f4bbc51befe // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 )
