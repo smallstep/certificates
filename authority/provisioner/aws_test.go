@@ -896,5 +896,5 @@ func TestAWS_HardcodedCertificates(t *testing.T) {
 		assert.True(t, cert.NotAfter.After(time.Now()))
 		certs = append(certs, cert)
 	}
-	assert.Len(t, 14, certs, "expected 14 certificates in aws_certificates.pem")
+	assert.Len(t, 15, certs, "expected 14 certificates in aws_certificates.pem")
 }
