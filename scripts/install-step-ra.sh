@@ -181,6 +181,9 @@ fi
 if [ -z "$CA_PROVISIONER_JWK_PASSWORD_FILE" ]; then
     read -s -p "Enter the CA Provisioner Password: " CA_PROVISIONER_JWK_PASSWORD < /dev/tty
     printf "%b" "\n"
+elif [ -x "$CA_PROVISIONER_JWK_PASSWORD_FILE" ]; then
+    echo "Running executable password file: ${CA_PROVISIONER_JWK_PASSWORD_FILE}"
+    CA_PROVISIONER_JWK_PASSWORD=$(/bin/bash ${CA_PROVISIONER_JWK_PASSWORD_FILE})
 fi
 
 echo "Installing 'step-ca' in /usr/bin..."
