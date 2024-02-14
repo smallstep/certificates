@@ -46,7 +46,7 @@ type options struct {
 	sshHostPassword []byte
 	sshUserPassword []byte
 	database        db.AuthDB
-	tlsConfig		*tls.Config
+	tlsConfig       *tls.Config
 }
 
 func (o *options) apply(opts []Option) {
@@ -108,7 +108,7 @@ func WithDatabase(d db.AuthDB) Option {
 // WithTLSConfig sets the TLS configuration to be used by the HTTP(s) server
 // spun by step-ca.
 func WithTLSConfig(t *tls.Config) Option {
-	return func(o* options) {
+	return func(o *options) {
 		o.tlsConfig = t
 	}
 }
