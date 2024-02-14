@@ -876,7 +876,7 @@ func TestAuthority_authorizeRenew(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			tc := genTestCase(t)
 
-			err := tc.auth.authorizeRenew(context.Background(), tc.cert)
+			_, err := tc.auth.authorizeRenew(context.Background(), tc.cert)
 			if err != nil {
 				if assert.NotNil(t, tc.err) {
 					var sc render.StatusCodedError
