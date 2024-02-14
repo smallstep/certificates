@@ -18,7 +18,7 @@ func CRL(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if crlInfo == nil {
-		render.Error(w, errs.New(http.StatusInternalServerError, "no CRL available"))
+		render.Error(w, errs.New(http.StatusNotFound, "no CRL available"))
 		return
 	}
 

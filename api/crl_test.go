@@ -45,7 +45,7 @@ func Test_CRL(t *testing.T) {
 		{"ok/empty", "http://example.com/crl", nil, http.StatusOK, &authority.CertificateRevocationListInfo{Data: nil}, nil, http.Header{"Content-Type": []string{"application/pkix-crl"}, "Content-Disposition": []string{`attachment; filename="crl.der"`}}, ""},
 		{"ok/empty-pem", "http://example.com/crl?pem=true", nil, http.StatusOK, &authority.CertificateRevocationListInfo{Data: nil}, emptyPEMData, http.Header{"Content-Type": []string{"application/x-pem-file"}, "Content-Disposition": []string{`attachment; filename="crl.pem"`}}, ""},
 		{"fail/internal", "http://example.com/crl", errs.Wrap(http.StatusInternalServerError, errors.New("failure"), "authority.GetCertificateRevocationList"), http.StatusInternalServerError, nil, nil, http.Header{}, `{"status":500,"message":"The certificate authority encountered an Internal Server Error. Please see the certificate authority logs for more info."}`},
-		{"fail/nil", "http://example.com/crl", nil, http.StatusInternalServerError, nil, nil, http.Header{}, `{"status":500,"message":"no CRL available"}`},
+		{"fail/nil", "http://example.com/crl", nil, http.StatusNotFound, nil, nil, http.Header{}, `{"status":404,"message":"no CRL available"}`},
 	}
 
 	for _, tt := range tests {
