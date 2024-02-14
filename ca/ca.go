@@ -26,7 +26,9 @@ import (
 	"github.com/smallstep/certificates/authority/admin"
 	adminAPI "github.com/smallstep/certificates/authority/admin/api"
 	"github.com/smallstep/certificates/authority/config"
+	"github.com/smallstep/certificates/cas/apiv1"
 	"github.com/smallstep/certificates/db"
+	"github.com/smallstep/certificates/internal/metrix"
 	"github.com/smallstep/certificates/logging"
 	"github.com/smallstep/certificates/monitoring"
 	"github.com/smallstep/certificates/scep"
@@ -46,6 +48,7 @@ type options struct {
 	sshHostPassword []byte
 	sshUserPassword []byte
 	database        db.AuthDB
+	x509CAService   apiv1.CertificateAuthorityService
 	tlsConfig       *tls.Config
 }
 
@@ -63,6 +66,13 @@ type Option func(o *options)
 func WithConfigFile(name string) Option {
 	return func(o *options) {
 		o.configFile = name
+	}
+}
+
+// WithX509CAService provides the x509CAService to be used for signing x509 requests
+func WithX509CAService(svc apiv1.CertificateAuthorityService) Option {
+	return func(o *options) {
+		o.x509CAService = svc
 	}
 }
 
@@ -134,6 +144,7 @@ type CA struct {
 	config      *config.Config
 	srv         *server.Server
 	insecureSrv *server.Server
+	metricsSrv  *server.Server
 	opts        *options
 	renewer     *TLSRenewer
 	compactStop chan struct{}
@@ -170,6 +181,16 @@ func (ca *CA) Init(cfg *config.Config) (*CA, error) {
 
 	if ca.opts.quiet {
 		opts = append(opts, authority.WithQuietInit())
+	}
+
+	if ca.opts.x509CAService != nil {
+		opts = append(opts, authority.WithX509CAService(ca.opts.x509CAService))
+	}
+
+	var meter *metrix.Meter
+	if ca.config.MetricsAddress != "" {
+		meter = metrix.New()
+		opts = append(opts, authority.WithMeter(meter))
 	}
 
 	webhookTransport := http.DefaultTransport.(*http.Transport).Clone()
@@ -338,6 +359,13 @@ func (ca *CA) Init(cfg *config.Config) (*CA, error) {
 		}
 	}
 
+	if meter != nil {
+		ca.metricsSrv = server.New(ca.config.MetricsAddress, meter, nil)
+		ca.metricsSrv.BaseContext = func(net.Listener) context.Context {
+			return baseContext
+		}
+	}
+
 	return ca, nil
 }
 
@@ -424,6 +452,14 @@ func (ca *CA) Run() error {
 		}()
 	}
 
+	if ca.metricsSrv != nil {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			errs <- ca.metricsSrv.ListenAndServe()
+		}()
+	}
+
 	wg.Add(1)
 	go func() {
 		defer wg.Done()
@@ -500,6 +536,13 @@ func (ca *CA) Reload() error {
 		if err = ca.insecureSrv.Reload(newCA.insecureSrv); err != nil {
 			logContinue("Reload failed because insecure server could not be replaced.")
 			return errors.Wrap(err, "error reloading insecure server")
+		}
+	}
+
+	if ca.metricsSrv != nil {
+		if err = ca.metricsSrv.Reload(newCA.metricsSrv); err != nil {
+			logContinue("Reload failed because metrics server could not be replaced.")
+			return errors.Wrap(err, "error reloading metrics server")
 		}
 	}
 
