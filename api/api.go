@@ -54,7 +54,7 @@ type Authority interface {
 	GetRoots() ([]*x509.Certificate, error)
 	GetFederation() ([]*x509.Certificate, error)
 	Version() authority.Version
-	GetCertificateRevocationList() ([]byte, error)
+	GetCertificateRevocationList() (*authority.CertificateRevocationListInfo, error)
 }
 
 // mustAuthority will be replaced on unit tests.

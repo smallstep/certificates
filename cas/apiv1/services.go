@@ -53,6 +53,8 @@ const (
 	StepCAS = "stepcas"
 	// VaultCAS is a CertificateAuthorityService using Hasicorp Vault PKI.
 	VaultCAS = "vaultcas"
+	// ExternalCAS is a CertificateAuthorityService using an external injected CA implementation
+	ExternalCAS = "externalcas"
 )
 
 // String returns a string from the type. It will always return the lower case

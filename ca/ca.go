@@ -26,6 +26,7 @@ import (
 	"github.com/smallstep/certificates/authority/admin"
 	adminAPI "github.com/smallstep/certificates/authority/admin/api"
 	"github.com/smallstep/certificates/authority/config"
+	"github.com/smallstep/certificates/cas/apiv1"
 	"github.com/smallstep/certificates/db"
 	"github.com/smallstep/certificates/internal/metrix"
 	"github.com/smallstep/certificates/logging"
@@ -47,6 +48,8 @@ type options struct {
 	sshHostPassword []byte
 	sshUserPassword []byte
 	database        db.AuthDB
+	x509CAService   apiv1.CertificateAuthorityService
+	tlsConfig       *tls.Config
 }
 
 func (o *options) apply(opts []Option) {
@@ -63,6 +66,13 @@ type Option func(o *options)
 func WithConfigFile(name string) Option {
 	return func(o *options) {
 		o.configFile = name
+	}
+}
+
+// WithX509CAService provides the x509CAService to be used for signing x509 requests
+func WithX509CAService(svc apiv1.CertificateAuthorityService) Option {
+	return func(o *options) {
+		o.x509CAService = svc
 	}
 }
 
@@ -102,6 +112,14 @@ func WithIssuerPassword(password []byte) Option {
 func WithDatabase(d db.AuthDB) Option {
 	return func(o *options) {
 		o.database = d
+	}
+}
+
+// WithTLSConfig sets the TLS configuration to be used by the HTTP(s) server
+// spun by step-ca.
+func WithTLSConfig(t *tls.Config) Option {
+	return func(o *options) {
+		o.tlsConfig = t
 	}
 }
 
@@ -165,10 +183,13 @@ func (ca *CA) Init(cfg *config.Config) (*CA, error) {
 		opts = append(opts, authority.WithQuietInit())
 	}
 
+	if ca.opts.x509CAService != nil {
+		opts = append(opts, authority.WithX509CAService(ca.opts.x509CAService))
+	}
+
 	var meter *metrix.Meter
 	if ca.config.MetricsAddress != "" {
 		meter = metrix.New()
-
 		opts = append(opts, authority.WithMeter(meter))
 	}
 
@@ -181,9 +202,20 @@ func (ca *CA) Init(cfg *config.Config) (*CA, error) {
 	}
 	ca.auth = auth
 
-	tlsConfig, clientTLSConfig, err := ca.getTLSConfig(auth)
-	if err != nil {
-		return nil, err
+	var tlsConfig *tls.Config
+	var clientTLSConfig *tls.Config
+	if ca.opts.tlsConfig != nil {
+		// try using the tls Configuration supplied by the caller
+		log.Print("Using tls configuration supplied by the application")
+		tlsConfig = ca.opts.tlsConfig
+		clientTLSConfig = ca.opts.tlsConfig
+	} else {
+		// default to using the step-ca x509 Signer Interface
+		log.Print("Building new tls configuration using step-ca x509 Signer Interface")
+		tlsConfig, clientTLSConfig, err = ca.getTLSConfig(auth)
+		if err != nil {
+			return nil, err
+		}
 	}
 
 	webhookTransport.TLSClientConfig = clientTLSConfig
@@ -445,7 +477,10 @@ func (ca *CA) Run() error {
 // Stop stops the CA calling to the server Shutdown method.
 func (ca *CA) Stop() error {
 	close(ca.compactStop)
-	ca.renewer.Stop()
+	if ca.renewer != nil {
+		ca.renewer.Stop()
+	}
+
 	if err := ca.auth.Shutdown(); err != nil {
 		log.Printf("error stopping ca.Authority: %+v\n", err)
 	}
@@ -520,7 +555,10 @@ func (ca *CA) Reload() error {
 	// 2. Safely shutdown any internal resources (e.g. key manager)
 	// 3. Replace ca properties
 	// Do not replace ca.srv
-	ca.renewer.Stop()
+	if ca.renewer != nil {
+		ca.renewer.Stop()
+	}
+
 	ca.auth.CloseForReload()
 	ca.auth = newCA.auth
 	ca.config = newCA.config
