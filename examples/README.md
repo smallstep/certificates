@@ -184,7 +184,7 @@ resp, err := client.Get("https://localhost:8443")
 ```
 
 We will demonstrate the mTLS configuration in a different example. In this
-example for we will configure the server to only verify client certificates
+example we will configure the server to only verify client certificates
 if they are provided.
 
 To being with let's start the Step CA:
