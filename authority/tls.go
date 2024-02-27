@@ -91,14 +91,23 @@ func withDefaultASN1DN(def *config.ASN1DN) provisioner.CertificateModifierFunc {
 	}
 }
 
-// Sign creates a signed certificate from a certificate signing request.
+// Sign creates a signed certificate from a certificate signing request. It
+// creates a new context.Context, and calls into SignWithContext.
+//
+// Deprecated: Use authority.SignWithContext with an actual context.Context.
 func (a *Authority) Sign(csr *x509.CertificateRequest, signOpts provisioner.SignOptions, extraOpts ...provisioner.SignOption) ([]*x509.Certificate, error) {
-	chain, prov, err := a.signX509(csr, signOpts, extraOpts...)
+	return a.SignWithContext(context.Background(), csr, signOpts, extraOpts...)
+}
+
+// SignWithContext creates a signed certificate from a certificate signing
+// request, taking the provided context.Context.
+func (a *Authority) SignWithContext(ctx context.Context, csr *x509.CertificateRequest, signOpts provisioner.SignOptions, extraOpts ...provisioner.SignOption) ([]*x509.Certificate, error) {
+	chain, prov, err := a.signX509(ctx, csr, signOpts, extraOpts...)
 	a.meter.X509Signed(prov, err)
 	return chain, err
 }
 
-func (a *Authority) signX509(csr *x509.CertificateRequest, signOpts provisioner.SignOptions, extraOpts ...provisioner.SignOption) ([]*x509.Certificate, provisioner.Interface, error) {
+func (a *Authority) signX509(ctx context.Context, csr *x509.CertificateRequest, signOpts provisioner.SignOptions, extraOpts ...provisioner.SignOption) ([]*x509.Certificate, provisioner.Interface, error) {
 	var (
 		certOptions    []x509util.Option
 		certValidators []provisioner.CertificateValidator
@@ -171,7 +180,7 @@ func (a *Authority) signX509(csr *x509.CertificateRequest, signOpts provisioner.
 		}
 	}
 
-	if err := a.callEnrichingWebhooksX509(prov, webhookCtl, attData, csr); err != nil {
+	if err := a.callEnrichingWebhooksX509(ctx, prov, webhookCtl, attData, csr); err != nil {
 		return nil, prov, errs.ApplyOptions(
 			errs.ForbiddenErr(err, err.Error()),
 			errs.WithKeyVal("csr", csr),
@@ -265,7 +274,7 @@ func (a *Authority) signX509(csr *x509.CertificateRequest, signOpts provisioner.
 	}
 
 	// Send certificate to webhooks for authorization
-	if err := a.callAuthorizingWebhooksX509(prov, webhookCtl, crt, leaf, attData); err != nil {
+	if err := a.callAuthorizingWebhooksX509(ctx, prov, webhookCtl, crt, leaf, attData); err != nil {
 		return nil, prov, errs.ApplyOptions(
 			errs.ForbiddenErr(err, "error creating certificate"),
 			opts...,
@@ -986,7 +995,7 @@ func templatingError(err error) error {
 	return errors.Wrap(cause, "error applying certificate template")
 }
 
-func (a *Authority) callEnrichingWebhooksX509(prov provisioner.Interface, webhookCtl webhookController, attData *provisioner.AttestationData, csr *x509.CertificateRequest) (err error) {
+func (a *Authority) callEnrichingWebhooksX509(ctx context.Context, prov provisioner.Interface, webhookCtl webhookController, attData *provisioner.AttestationData, csr *x509.CertificateRequest) (err error) {
 	if webhookCtl == nil {
 		return
 	}
@@ -1003,7 +1012,7 @@ func (a *Authority) callEnrichingWebhooksX509(prov provisioner.Interface, webhoo
 		webhook.WithX509CertificateRequest(csr),
 		webhook.WithAttestationData(attested),
 	); err == nil {
-		err = webhookCtl.Enrich(whEnrichReq)
+		err = webhookCtl.Enrich(ctx, whEnrichReq)
 
 		a.meter.X509WebhookEnriched(prov, err)
 	}
@@ -1011,7 +1020,7 @@ func (a *Authority) callEnrichingWebhooksX509(prov provisioner.Interface, webhoo
 	return
 }
 
-func (a *Authority) callAuthorizingWebhooksX509(prov provisioner.Interface, webhookCtl webhookController, cert *x509util.Certificate, leaf *x509.Certificate, attData *provisioner.AttestationData) (err error) {
+func (a *Authority) callAuthorizingWebhooksX509(ctx context.Context, prov provisioner.Interface, webhookCtl webhookController, cert *x509util.Certificate, leaf *x509.Certificate, attData *provisioner.AttestationData) (err error) {
 	if webhookCtl == nil {
 		return
 	}
@@ -1028,7 +1037,7 @@ func (a *Authority) callAuthorizingWebhooksX509(prov provisioner.Interface, webh
 		webhook.WithX509Certificate(cert, leaf),
 		webhook.WithAttestationData(attested),
 	); err == nil {
-		err = webhookCtl.Authorize(whAuthBody)
+		err = webhookCtl.Authorize(ctx, whAuthBody)
 
 		a.meter.X509WebhookAuthorized(prov, err)
 	}

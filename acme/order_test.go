@@ -271,16 +271,16 @@ func TestOrder_UpdateStatus(t *testing.T) {
 }
 
 type mockSignAuth struct {
-	sign                  func(csr *x509.CertificateRequest, signOpts provisioner.SignOptions, extraOpts ...provisioner.SignOption) ([]*x509.Certificate, error)
+	signWithContext       func(ctx context.Context, csr *x509.CertificateRequest, signOpts provisioner.SignOptions, extraOpts ...provisioner.SignOption) ([]*x509.Certificate, error)
 	areSANsAllowed        func(ctx context.Context, sans []string) error
 	loadProvisionerByName func(string) (provisioner.Interface, error)
 	ret1, ret2            interface{}
 	err                   error
 }
 
-func (m *mockSignAuth) Sign(csr *x509.CertificateRequest, signOpts provisioner.SignOptions, extraOpts ...provisioner.SignOption) ([]*x509.Certificate, error) {
-	if m.sign != nil {
-		return m.sign(csr, signOpts, extraOpts...)
+func (m *mockSignAuth) SignWithContext(ctx context.Context, csr *x509.CertificateRequest, signOpts provisioner.SignOptions, extraOpts ...provisioner.SignOption) ([]*x509.Certificate, error) {
+	if m.signWithContext != nil {
+		return m.signWithContext(ctx, csr, signOpts, extraOpts...)
 	} else if m.err != nil {
 		return nil, m.err
 	}
@@ -578,7 +578,7 @@ func TestOrder_Finalize(t *testing.T) {
 					},
 				},
 				ca: &mockSignAuth{
-					sign: func(_csr *x509.CertificateRequest, signOpts provisioner.SignOptions, extraOpts ...provisioner.SignOption) ([]*x509.Certificate, error) {
+					signWithContext: func(_ context.Context, _csr *x509.CertificateRequest, signOpts provisioner.SignOptions, extraOpts ...provisioner.SignOption) ([]*x509.Certificate, error) {
 						assert.Equals(t, _csr, csr)
 						return nil, errors.New("force")
 					},
@@ -628,7 +628,7 @@ func TestOrder_Finalize(t *testing.T) {
 					},
 				},
 				ca: &mockSignAuth{
-					sign: func(_csr *x509.CertificateRequest, signOpts provisioner.SignOptions, extraOpts ...provisioner.SignOption) ([]*x509.Certificate, error) {
+					signWithContext: func(_ context.Context, _csr *x509.CertificateRequest, signOpts provisioner.SignOptions, extraOpts ...provisioner.SignOption) ([]*x509.Certificate, error) {
 						assert.Equals(t, _csr, csr)
 						return []*x509.Certificate{foo, bar, baz}, nil
 					},
@@ -685,7 +685,7 @@ func TestOrder_Finalize(t *testing.T) {
 					},
 				},
 				ca: &mockSignAuth{
-					sign: func(_csr *x509.CertificateRequest, signOpts provisioner.SignOptions, extraOpts ...provisioner.SignOption) ([]*x509.Certificate, error) {
+					signWithContext: func(_ context.Context, _csr *x509.CertificateRequest, signOpts provisioner.SignOptions, extraOpts ...provisioner.SignOption) ([]*x509.Certificate, error) {
 						assert.Equals(t, _csr, csr)
 						return []*x509.Certificate{foo, bar, baz}, nil
 					},
@@ -770,7 +770,7 @@ func TestOrder_Finalize(t *testing.T) {
 					},
 				},
 				ca: &mockSignAuth{
-					sign: func(_csr *x509.CertificateRequest, signOpts provisioner.SignOptions, extraOpts ...provisioner.SignOption) ([]*x509.Certificate, error) {
+					signWithContext: func(_ context.Context, _csr *x509.CertificateRequest, signOpts provisioner.SignOptions, extraOpts ...provisioner.SignOption) ([]*x509.Certificate, error) {
 						assert.Equals(t, _csr, csr)
 						return []*x509.Certificate{leaf, inter, root}, nil
 					},
@@ -863,7 +863,7 @@ func TestOrder_Finalize(t *testing.T) {
 					},
 				},
 				ca: &mockSignAuth{
-					sign: func(_csr *x509.CertificateRequest, signOpts provisioner.SignOptions, extraOpts ...provisioner.SignOption) ([]*x509.Certificate, error) {
+					signWithContext: func(_ context.Context, _csr *x509.CertificateRequest, signOpts provisioner.SignOptions, extraOpts ...provisioner.SignOption) ([]*x509.Certificate, error) {
 						assert.Equals(t, _csr, csr)
 						return []*x509.Certificate{leaf, inter, root}, nil
 					},
@@ -973,7 +973,7 @@ func TestOrder_Finalize(t *testing.T) {
 				// using the mocking functions as a wrapper for actual test helpers generated per test case or per
 				// function that's tested.
 				ca: &mockSignAuth{
-					sign: func(_csr *x509.CertificateRequest, signOpts provisioner.SignOptions, extraOpts ...provisioner.SignOption) ([]*x509.Certificate, error) {
+					signWithContext: func(_ context.Context, _csr *x509.CertificateRequest, signOpts provisioner.SignOptions, extraOpts ...provisioner.SignOption) ([]*x509.Certificate, error) {
 						assert.Equals(t, _csr, csr)
 						return []*x509.Certificate{leaf, inter, root}, nil
 					},
@@ -1044,7 +1044,7 @@ func TestOrder_Finalize(t *testing.T) {
 					},
 				},
 				ca: &mockSignAuth{
-					sign: func(_csr *x509.CertificateRequest, signOpts provisioner.SignOptions, extraOpts ...provisioner.SignOption) ([]*x509.Certificate, error) {
+					signWithContext: func(_ context.Context, _csr *x509.CertificateRequest, signOpts provisioner.SignOptions, extraOpts ...provisioner.SignOption) ([]*x509.Certificate, error) {
 						assert.Equals(t, _csr, csr)
 						return []*x509.Certificate{foo, bar, baz}, nil
 					},
@@ -1108,7 +1108,7 @@ func TestOrder_Finalize(t *testing.T) {
 					},
 				},
 				ca: &mockSignAuth{
-					sign: func(_csr *x509.CertificateRequest, signOpts provisioner.SignOptions, extraOpts ...provisioner.SignOption) ([]*x509.Certificate, error) {
+					signWithContext: func(_ context.Context, _csr *x509.CertificateRequest, signOpts provisioner.SignOptions, extraOpts ...provisioner.SignOption) ([]*x509.Certificate, error) {
 						assert.Equals(t, _csr, csr)
 						return []*x509.Certificate{foo, bar, baz}, nil
 					},
@@ -1175,7 +1175,7 @@ func TestOrder_Finalize(t *testing.T) {
 					},
 				},
 				ca: &mockSignAuth{
-					sign: func(_csr *x509.CertificateRequest, signOpts provisioner.SignOptions, extraOpts ...provisioner.SignOption) ([]*x509.Certificate, error) {
+					signWithContext: func(_ context.Context, _csr *x509.CertificateRequest, signOpts provisioner.SignOptions, extraOpts ...provisioner.SignOption) ([]*x509.Certificate, error) {
 						assert.Equals(t, _csr, csr)
 						return []*x509.Certificate{foo, bar, baz}, nil
 					},

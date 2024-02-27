@@ -1375,7 +1375,7 @@ func TestAuthority_AuthorizeRenewToken(t *testing.T) {
 	}
 
 	generateX5cToken := func(a *Authority, key crypto.Signer, claims jose.Claims, opts ...provisioner.SignOption) (string, *x509.Certificate) {
-		chain, err := a.Sign(csr, provisioner.SignOptions{}, opts...)
+		chain, err := a.SignWithContext(ctx, csr, provisioner.SignOptions{}, opts...)
 		if err != nil {
 			t.Fatal(err)
 		}
