@@ -21,14 +21,27 @@ func NewRequestID() string {
 	return xid.New().String()
 }
 
-// RequestID returns a new middleware that gets the given header and sets it
-// in the context so it can be written in the logger. If the header does not
-// exists or it's the empty string, it uses github.com/rs/xid to create a new
-// one.
+// defaultRequestIDHeader is the header name used for propagating
+// request IDs. If available in an HTTP request, it'll be used instead
+// of the X-Smallstep-Id header.
+const defaultRequestIDHeader = "X-Request-Id"
+
+// RequestID returns a new middleware that obtains the current request ID
+// and sets it in the context. It first tries to read the request ID from
+// the "X-Request-Id" header. If that's not set, it tries to read it from
+// the provided header name. If the header does not exist or its value is
+// the empty string, it uses github.com/rs/xid to create a new one.
 func RequestID(headerName string) func(next http.Handler) http.Handler {
+	if headerName == "" {
+		headerName = defaultTraceIDHeader
+	}
 	return func(next http.Handler) http.Handler {
 		fn := func(w http.ResponseWriter, req *http.Request) {
-			requestID := req.Header.Get(headerName)
+			requestID := req.Header.Get(defaultRequestIDHeader)
+			if requestID == "" {
+				requestID = req.Header.Get(headerName)
+			}
+
 			if requestID == "" {
 				requestID = NewRequestID()
 				req.Header.Set(headerName, requestID)
