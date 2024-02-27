@@ -9,6 +9,7 @@ import (
 	"encoding/base64"
 	"encoding/hex"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -16,8 +17,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/pkg/errors"
-	sassert "github.com/smallstep/assert"
 	"github.com/smallstep/certificates/logging"
 	"github.com/smallstep/certificates/webhook"
 	"github.com/stretchr/testify/assert"
@@ -97,7 +96,7 @@ func TestWebhookController_isCertTypeOK(t *testing.T) {
 	}
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
-			sassert.Equals(t, test.want, test.wc.isCertTypeOK(test.wh))
+			assert.Equal(t, test.want, test.wc.isCertTypeOK(test.wh))
 		})
 	}
 }
@@ -205,8 +204,8 @@ func TestWebhookController_Enrich(t *testing.T) {
 			expectTemplateData: x509util.TemplateData{"Webhooks": map[string]any{"people": map[string]any{"role": "bar"}}},
 			assertRequest: func(t *testing.T, req *webhook.RequestBody) {
 				key, err := x509.MarshalPKIXPublicKey(cert.PublicKey)
-				sassert.FatalError(t, err)
-				sassert.Equals(t, &webhook.X5CCertificate{
+				require.NoError(t, err)
+				assert.Equal(t, &webhook.X5CCertificate{
 					Raw:                cert.Raw,
 					PublicKey:          key,
 					PublicKeyAlgorithm: cert.PublicKeyAlgorithm.String(),
@@ -262,7 +261,7 @@ func TestWebhookController_Enrich(t *testing.T) {
 			if (err != nil) != test.expectErr {
 				t.Fatalf("Got err %v, want %v", err, test.expectErr)
 			}
-			sassert.Equals(t, test.expectTemplateData, test.ctl.TemplateData)
+			assert.Equal(t, test.expectTemplateData, test.ctl.TemplateData)
 			if test.assertRequest != nil {
 				test.assertRequest(t, test.req)
 			}
@@ -326,7 +325,7 @@ func TestWebhookController_Authorize(t *testing.T) {
 			assertRequest: func(t *testing.T, req *webhook.RequestBody) {
 				key, err := x509.MarshalPKIXPublicKey(cert.PublicKey)
 				require.NoError(t, err)
-				sassert.Equals(t, &webhook.X5CCertificate{
+				assert.Equal(t, &webhook.X5CCertificate{
 					Raw:                cert.Raw,
 					PublicKey:          key,
 					PublicKeyAlgorithm: cert.PublicKeyAlgorithm.String(),
@@ -515,8 +514,7 @@ func TestWebhook_Do(t *testing.T) {
 					assert.Equal(t, tc.requestID, r.Header.Get("X-Request-ID"))
 				}
 
-				id := r.Header.Get("X-Smallstep-Webhook-ID")
-				sassert.Equals(t, tc.webhook.ID, id)
+				assert.Equal(t, tc.webhook.ID, r.Header.Get("X-Smallstep-Webhook-ID"))
 
 				sig, err := hex.DecodeString(r.Header.Get("X-Smallstep-Signature"))
 				assert.NoError(t, err)
@@ -529,24 +527,24 @@ func TestWebhook_Do(t *testing.T) {
 				h := hmac.New(sha256.New, secret)
 				h.Write(body)
 				mac := h.Sum(nil)
-				sassert.True(t, hmac.Equal(sig, mac))
+				assert.True(t, hmac.Equal(sig, mac))
 
 				switch {
 				case tc.webhook.BearerToken != "":
 					ah := fmt.Sprintf("Bearer %s", tc.webhook.BearerToken)
-					sassert.Equals(t, ah, r.Header.Get("Authorization"))
+					assert.Equal(t, ah, r.Header.Get("Authorization"))
 				case tc.webhook.BasicAuth.Username != "" || tc.webhook.BasicAuth.Password != "":
 					whReq, err := http.NewRequest("", "", http.NoBody)
-					assert.NoError(t, err)
+					require.NoError(t, err)
 					whReq.SetBasicAuth(tc.webhook.BasicAuth.Username, tc.webhook.BasicAuth.Password)
 					ah := whReq.Header.Get("Authorization")
-					sassert.Equals(t, ah, whReq.Header.Get("Authorization"))
+					assert.Equal(t, ah, whReq.Header.Get("Authorization"))
 				default:
-					sassert.Equals(t, "", r.Header.Get("Authorization"))
+					assert.Equal(t, "", r.Header.Get("Authorization"))
 				}
 
 				if tc.expectPath != "" {
-					sassert.Equals(t, tc.expectPath, r.URL.Path+"?"+r.URL.RawQuery)
+					assert.Equal(t, tc.expectPath, r.URL.Path+"?"+r.URL.RawQuery)
 				}
 
 				if tc.errStatusCode != 0 {
@@ -557,7 +555,6 @@ func TestWebhook_Do(t *testing.T) {
 				reqBody := new(webhook.RequestBody)
 				err = json.Unmarshal(body, reqBody)
 				require.NoError(t, err)
-				// sassert.Equals(t, tc.expectToken, reqBody.Token)
 
 				err = json.NewEncoder(w).Encode(tc.webhookResponse)
 				require.NoError(t, err)
@@ -578,12 +575,12 @@ func TestWebhook_Do(t *testing.T) {
 
 			got, err := tc.webhook.DoWithContext(ctx, http.DefaultClient, reqBody, tc.dataArg)
 			if tc.expectErr != nil {
-				sassert.Equals(t, tc.expectErr.Error(), err.Error())
+				assert.Equal(t, tc.expectErr.Error(), err.Error())
 				return
 			}
 			assert.NoError(t, err)
 
-			sassert.Equals(t, got, &tc.webhookResponse)
+			assert.Equal(t, &tc.webhookResponse, got)
 		})
 	}
 
