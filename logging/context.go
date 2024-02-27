@@ -21,10 +21,10 @@ func NewRequestID() string {
 	return xid.New().String()
 }
 
-// defaultRequestIDHeader is the header name used for propagating
-// request IDs. If available in an HTTP request, it'll be used instead
-// of the X-Smallstep-Id header.
-const defaultRequestIDHeader = "X-Request-Id"
+// requestIDHeader is the header name used for propagating request IDs. If
+// available in an HTTP request, it'll be used instead of the X-Smallstep-Id
+// header. It'll always be used in response and set to the request ID.
+const requestIDHeader = "X-Request-Id"
 
 // RequestID returns a new middleware that obtains the current request ID
 // and sets it in the context. It first tries to read the request ID from
@@ -37,7 +37,7 @@ func RequestID(headerName string) func(next http.Handler) http.Handler {
 	}
 	return func(next http.Handler) http.Handler {
 		fn := func(w http.ResponseWriter, req *http.Request) {
-			requestID := req.Header.Get(defaultRequestIDHeader)
+			requestID := req.Header.Get(requestIDHeader)
 			if requestID == "" {
 				requestID = req.Header.Get(headerName)
 			}
@@ -47,6 +47,10 @@ func RequestID(headerName string) func(next http.Handler) http.Handler {
 				req.Header.Set(headerName, requestID)
 			}
 
+			// immediately set the request ID to be reflected in the response
+			w.Header().Set(requestIDHeader, requestID)
+
+			// continue down the handler chain
 			ctx := WithRequestID(req.Context(), requestID)
 			next.ServeHTTP(w, req.WithContext(ctx))
 		}

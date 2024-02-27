@@ -33,20 +33,21 @@ func TestRequestID(t *testing.T) {
 		{
 			name:       "default-request-id",
 			headerName: defaultTraceIDHeader,
-			handler: func(_ http.ResponseWriter, r *http.Request) {
+			handler: func(w http.ResponseWriter, r *http.Request) {
 				assert.Empty(t, r.Header.Get("X-Smallstep-Id"))
 				assert.Equal(t, "reqID", r.Header.Get("X-Request-Id"))
 				reqID, ok := GetRequestID(r.Context())
 				if assert.True(t, ok) {
 					assert.Equal(t, "reqID", reqID)
 				}
+				assert.Equal(t, "reqID", w.Header().Get("X-Request-Id"))
 			},
 			req: requestWithID,
 		},
 		{
 			name:       "no-request-id",
 			headerName: "X-Request-Id",
-			handler: func(_ http.ResponseWriter, r *http.Request) {
+			handler: func(w http.ResponseWriter, r *http.Request) {
 				assert.Empty(t, r.Header.Get("X-Smallstep-Id"))
 				value := r.Header.Get("X-Request-Id")
 				assert.NotEmpty(t, value)
@@ -54,13 +55,14 @@ func TestRequestID(t *testing.T) {
 				if assert.True(t, ok) {
 					assert.Equal(t, value, reqID)
 				}
+				assert.Equal(t, value, w.Header().Get("X-Request-Id"))
 			},
 			req: requestWithoutID,
 		},
 		{
 			name:       "empty-header-name",
 			headerName: "",
-			handler: func(_ http.ResponseWriter, r *http.Request) {
+			handler: func(w http.ResponseWriter, r *http.Request) {
 				assert.Empty(t, r.Header.Get("X-Request-Id"))
 				value := r.Header.Get("X-Smallstep-Id")
 				assert.NotEmpty(t, value)
@@ -68,19 +70,21 @@ func TestRequestID(t *testing.T) {
 				if assert.True(t, ok) {
 					assert.Equal(t, value, reqID)
 				}
+				assert.Equal(t, value, w.Header().Get("X-Request-Id"))
 			},
 			req: requestWithEmptyHeader,
 		},
 		{
 			name:       "fallback-header-name",
 			headerName: defaultTraceIDHeader,
-			handler: func(_ http.ResponseWriter, r *http.Request) {
+			handler: func(w http.ResponseWriter, r *http.Request) {
 				assert.Empty(t, r.Header.Get("X-Request-Id"))
 				assert.Equal(t, "smallstepID", r.Header.Get("X-Smallstep-Id"))
 				reqID, ok := GetRequestID(r.Context())
 				if assert.True(t, ok) {
 					assert.Equal(t, "smallstepID", reqID)
 				}
+				assert.Equal(t, "smallstepID", w.Header().Get("X-Request-Id"))
 			},
 			req: requestWithSmallstepID,
 		},
