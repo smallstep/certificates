@@ -24,6 +24,7 @@ import (
 	"strings"
 
 	"github.com/pkg/errors"
+	"github.com/rs/xid"
 	"github.com/smallstep/certificates/api"
 	"github.com/smallstep/certificates/authority"
 	"github.com/smallstep/certificates/authority/provisioner"
@@ -83,8 +84,7 @@ func (c *uaClient) GetWithContext(ctx context.Context, u string) (*http.Response
 	if err != nil {
 		return nil, errors.Wrapf(err, "create GET %s request failed", u)
 	}
-	req.Header.Set("User-Agent", UserAgent)
-	return c.Client.Do(req)
+	return c.Do(req)
 }
 
 func (c *uaClient) Post(u, contentType string, body io.Reader) (*http.Response, error) {
@@ -97,12 +97,24 @@ func (c *uaClient) PostWithContext(ctx context.Context, u, contentType string, b
 		return nil, errors.Wrapf(err, "create POST %s request failed", u)
 	}
 	req.Header.Set("Content-Type", contentType)
-	req.Header.Set("User-Agent", UserAgent)
-	return c.Client.Do(req)
+	return c.Do(req)
+}
+
+// requestIDHeader is the header name used for propagating request IDs from
+// the CA client to the CA and back again.
+const requestIDHeader = "X-Request-Id"
+
+// enforceRequestID checks if the X-Request-Id HTTP header is filled. If it's
+// empty, it'll generate a new request ID and set the header.
+func enforceRequestID(r *http.Request) {
+	if r.Header.Get(requestIDHeader) == "" {
+		r.Header.Set(requestIDHeader, xid.New().String())
+	}
 }
 
 func (c *uaClient) Do(req *http.Request) (*http.Response, error) {
 	req.Header.Set("User-Agent", UserAgent)
+	enforceRequestID(req)
 	return c.Client.Do(req)
 }
 
