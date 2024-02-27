@@ -675,14 +675,13 @@ func (a *Authority) callEnrichingWebhooksSSH(ctx context.Context, prov provision
 	if webhookCtl == nil {
 		return
 	}
+	defer func() { a.meter.SSHWebhookEnriched(prov, err) }()
 
 	var whEnrichReq *webhook.RequestBody
 	if whEnrichReq, err = webhook.NewRequestBody(
 		webhook.WithSSHCertificateRequest(cr),
 	); err == nil {
 		err = webhookCtl.Enrich(ctx, whEnrichReq)
-
-		a.meter.SSHWebhookEnriched(prov, err)
 	}
 
 	return
@@ -692,14 +691,13 @@ func (a *Authority) callAuthorizingWebhooksSSH(ctx context.Context, prov provisi
 	if webhookCtl == nil {
 		return
 	}
+	defer func() { a.meter.SSHWebhookAuthorized(prov, err) }()
 
 	var whAuthBody *webhook.RequestBody
 	if whAuthBody, err = webhook.NewRequestBody(
 		webhook.WithSSHCertificate(cert, certTpl),
 	); err == nil {
 		err = webhookCtl.Authorize(ctx, whAuthBody)
-
-		a.meter.SSHWebhookAuthorized(prov, err)
 	}
 
 	return

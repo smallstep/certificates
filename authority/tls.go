@@ -999,6 +999,7 @@ func (a *Authority) callEnrichingWebhooksX509(ctx context.Context, prov provisio
 	if webhookCtl == nil {
 		return
 	}
+	defer func() { a.meter.X509WebhookEnriched(prov, err) }()
 
 	var attested *webhook.AttestationData
 	if attData != nil {
@@ -1013,8 +1014,6 @@ func (a *Authority) callEnrichingWebhooksX509(ctx context.Context, prov provisio
 		webhook.WithAttestationData(attested),
 	); err == nil {
 		err = webhookCtl.Enrich(ctx, whEnrichReq)
-
-		a.meter.X509WebhookEnriched(prov, err)
 	}
 
 	return
@@ -1024,6 +1023,7 @@ func (a *Authority) callAuthorizingWebhooksX509(ctx context.Context, prov provis
 	if webhookCtl == nil {
 		return
 	}
+	defer func() { a.meter.X509WebhookAuthorized(prov, err) }()
 
 	var attested *webhook.AttestationData
 	if attData != nil {
@@ -1038,8 +1038,6 @@ func (a *Authority) callAuthorizingWebhooksX509(ctx context.Context, prov provis
 		webhook.WithAttestationData(attested),
 	); err == nil {
 		err = webhookCtl.Authorize(ctx, whAuthBody)
-
-		a.meter.X509WebhookAuthorized(prov, err)
 	}
 
 	return
