@@ -239,7 +239,7 @@ func (e *testEnforcer) Enforce(cert *x509.Certificate) error {
 	return nil
 }
 
-func TestAuthority_Sign(t *testing.T) {
+func TestAuthority_SignWithContext(t *testing.T) {
 	pub, priv, err := keyutil.GenerateDefaultKeyPair()
 	require.NoError(t, err)
 
@@ -848,7 +848,7 @@ ZYtQ9Ot36qc=
 		t.Run(name, func(t *testing.T) {
 			tc := genTestCase(t)
 
-			certChain, err := tc.auth.Sign(tc.csr, tc.signOpts, tc.extraOpts...)
+			certChain, err := tc.auth.SignWithContext(context.Background(), tc.csr, tc.signOpts, tc.extraOpts...)
 			if err != nil {
 				if assert.NotNil(t, tc.err, fmt.Sprintf("unexpected error: %s", err)) {
 					assert.Nil(t, certChain)
@@ -1797,9 +1797,9 @@ func TestAuthority_constraints(t *testing.T) {
 				t.Fatal(err)
 			}
 
-			_, err = auth.Sign(csr, provisioner.SignOptions{}, templateOption)
+			_, err = auth.SignWithContext(context.Background(), csr, provisioner.SignOptions{}, templateOption)
 			if (err != nil) != tt.wantErr {
-				t.Errorf("Authority.Sign() error = %v, wantErr %v", err, tt.wantErr)
+				t.Errorf("Authority.SignWithContext() error = %v, wantErr %v", err, tt.wantErr)
 			}
 
 			_, err = auth.Renew(cert)

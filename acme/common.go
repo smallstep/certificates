@@ -21,7 +21,6 @@ var clock Clock
 
 // CertificateAuthority is the interface implemented by a CA authority.
 type CertificateAuthority interface {
-	Sign(cr *x509.CertificateRequest, opts provisioner.SignOptions, signOpts ...provisioner.SignOption) ([]*x509.Certificate, error)
 	SignWithContext(ctx context.Context, cr *x509.CertificateRequest, opts provisioner.SignOptions, signOpts ...provisioner.SignOption) ([]*x509.Certificate, error)
 	AreSANsAllowed(ctx context.Context, sans []string) error
 	IsRevoked(sn string) (bool, error)

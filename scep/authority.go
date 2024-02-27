@@ -60,7 +60,6 @@ func MustFromContext(ctx context.Context) *Authority {
 
 // SignAuthority is the interface for a signing authority
 type SignAuthority interface {
-	Sign(cr *x509.CertificateRequest, opts provisioner.SignOptions, signOpts ...provisioner.SignOption) ([]*x509.Certificate, error)
 	SignWithContext(ctx context.Context, cr *x509.CertificateRequest, opts provisioner.SignOptions, signOpts ...provisioner.SignOption) ([]*x509.Certificate, error)
 	LoadProvisionerByName(string) (provisioner.Interface, error)
 }
