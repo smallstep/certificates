@@ -42,9 +42,13 @@ func New() (m *Meter) {
 		m.ssh.rekeyed,
 		m.ssh.renewed,
 		m.ssh.signed,
+		m.ssh.webhookAuthorized,
+		m.ssh.webhookEnriched,
 		m.x509.rekeyed,
 		m.x509.renewed,
 		m.x509.signed,
+		m.x509.webhookAuthorized,
+		m.x509.webhookEnriched,
 		m.kms.signed,
 		m.kms.errors,
 	)
