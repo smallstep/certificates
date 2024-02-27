@@ -10,7 +10,6 @@ import (
 	"os"
 
 	"github.com/pkg/errors"
-	"gopkg.in/square/go-jose.v2/jwt"
 
 	"go.step.sm/cli-utils/step"
 	"go.step.sm/cli-utils/ui"
@@ -146,7 +145,7 @@ func (a *Authority) unsafeLoadProvisionerFromDatabase(crt *x509.Certificate) (pr
 
 // LoadProvisionerByToken returns an interface to the provisioner that
 // provisioned the token.
-func (a *Authority) LoadProvisionerByToken(token *jwt.JSONWebToken, claims *jwt.Claims) (provisioner.Interface, error) {
+func (a *Authority) LoadProvisionerByToken(token *jose.JSONWebToken, claims *jose.Claims) (provisioner.Interface, error) {
 	a.adminMutex.RLock()
 	defer a.adminMutex.RUnlock()
 	p, ok := a.provisioners.LoadByToken(token, claims)
@@ -235,7 +234,7 @@ func (a *Authority) StoreProvisioner(ctx context.Context, prov *linkedca.Provisi
 	}
 
 	if err := certProv.Init(provisionerConfig); err != nil {
-		return admin.WrapError(admin.ErrorBadRequestType, err, "error validating configuration for provisioner %s", prov.Name)
+		return admin.WrapError(admin.ErrorBadRequestType, err, "error validating configuration for provisioner %q", prov.Name)
 	}
 
 	// Store to database -- this will set the ID.
@@ -974,7 +973,7 @@ func ProvisionerToCertificates(p *linkedca.Provisioner) (provisioner.Interface, 
 		}, nil
 	case *linkedca.ProvisionerDetails_SCEP:
 		cfg := d.SCEP
-		return &provisioner.SCEP{
+		s := &provisioner.SCEP{
 			ID:                            p.Id,
 			Type:                          p.Type.String(),
 			Name:                          p.Name,
@@ -982,11 +981,19 @@ func ProvisionerToCertificates(p *linkedca.Provisioner) (provisioner.Interface, 
 			ChallengePassword:             cfg.Challenge,
 			Capabilities:                  cfg.Capabilities,
 			IncludeRoot:                   cfg.IncludeRoot,
+			ExcludeIntermediate:           cfg.ExcludeIntermediate,
 			MinimumPublicKeyLength:        int(cfg.MinimumPublicKeyLength),
 			EncryptionAlgorithmIdentifier: int(cfg.EncryptionAlgorithmIdentifier),
 			Claims:                        claims,
 			Options:                       options,
-		}, nil
+		}
+		if decrypter := cfg.GetDecrypter(); decrypter != nil {
+			s.DecrypterCertificate = decrypter.Certificate
+			s.DecrypterKeyPEM = decrypter.Key
+			s.DecrypterKeyURI = decrypter.KeyUri
+			s.DecrypterKeyPassword = string(decrypter.KeyPassword)
+		}
+		return s, nil
 	case *linkedca.ProvisionerDetails_Nebula:
 		var roots []byte
 		for i, root := range d.Nebula.GetRoots() {
@@ -1241,7 +1248,14 @@ func ProvisionerToLinkedca(p provisioner.Interface) (*linkedca.Provisioner, erro
 						Capabilities:                  p.Capabilities,
 						MinimumPublicKeyLength:        int32(p.MinimumPublicKeyLength),
 						IncludeRoot:                   p.IncludeRoot,
+						ExcludeIntermediate:           p.ExcludeIntermediate,
 						EncryptionAlgorithmIdentifier: int32(p.EncryptionAlgorithmIdentifier),
+						Decrypter: &linkedca.SCEPDecrypter{
+							Certificate: p.DecrypterCertificate,
+							Key:         p.DecrypterKeyPEM,
+							KeyUri:      p.DecrypterKeyURI,
+							KeyPassword: []byte(p.DecrypterKeyPassword),
+						},
 					},
 				},
 			},

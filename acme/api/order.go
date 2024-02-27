@@ -10,7 +10,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/go-chi/chi"
+	"github.com/go-chi/chi/v5"
 
 	"go.step.sm/crypto/randutil"
 	"go.step.sm/crypto/x509util"

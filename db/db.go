@@ -78,11 +78,14 @@ func FromContext(ctx context.Context) (db AuthDB, ok bool) {
 // MustFromContext returns the current database from the given context. It
 // will panic if it's not in the context.
 func MustFromContext(ctx context.Context) AuthDB {
-	if db, ok := FromContext(ctx); !ok {
+	var (
+		db AuthDB
+		ok bool
+	)
+	if db, ok = FromContext(ctx); !ok {
 		panic("authority database is not in the context")
-	} else {
-		return db
 	}
+	return db
 }
 
 // CertificateStorer is an extension of AuthDB that allows to store

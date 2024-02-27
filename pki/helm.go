@@ -1,6 +1,7 @@
 package pki
 
 import (
+	"fmt"
 	"io"
 	"text/template"
 
@@ -49,21 +50,42 @@ func (p *PKI) WriteHelmTemplate(w io.Writer) error {
 	// to what's in p.GenerateConfig(), but that codepath isn't taken when
 	// writing the Helm template. The default JWK provisioner is added earlier in
 	// the process and that's part of the provisioners above.
+	//
+	// To prevent name clashes for the default ACME provisioner, we append "-1" to
+	// the name if it already exists. See https://github.com/smallstep/cli/issues/1018
+	// for the reason.
+	//
 	// TODO(hs): consider refactoring the initialization, so that this becomes
 	// easier to reason about and maintain.
 	if p.options.enableACME {
+		acmeProvisionerName := "acme"
+		for _, prov := range provisioners {
+			if prov.GetName() == acmeProvisionerName {
+				acmeProvisionerName = fmt.Sprintf("%s-1", acmeProvisionerName)
+				break
+			}
+		}
 		provisioners = append(provisioners, &provisioner.ACME{
 			Type: "ACME",
-			Name: "acme",
+			Name: acmeProvisionerName,
 		})
 	}
 
 	// Add default SSHPOP provisioner if enabled. Similar to the above, this is
-	// the same as what happens in p.GenerateConfig().
+	// the same as what happens in p.GenerateConfig(). To prevent name clashes for the
+	// default SSHPOP provisioner, we append "-1" to it if it already exists. See
+	// https://github.com/smallstep/cli/issues/1018 for the reason.
 	if p.options.enableSSH {
+		sshProvisionerName := "sshpop"
+		for _, prov := range provisioners {
+			if prov.GetName() == sshProvisionerName {
+				sshProvisionerName = fmt.Sprintf("%s-1", sshProvisionerName)
+				break
+			}
+		}
 		provisioners = append(provisioners, &provisioner.SSHPOP{
 			Type: "SSHPOP",
-			Name: "sshpop",
+			Name: sshProvisionerName,
 			Claims: &provisioner.Claims{
 				EnableSSHCA: &p.options.enableSSH,
 			},

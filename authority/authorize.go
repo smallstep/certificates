@@ -214,7 +214,7 @@ func (a *Authority) Authorize(ctx context.Context, token string) ([]provisioner.
 	var opts = []interface{}{errs.WithKeyVal("token", token)}
 
 	switch m := provisioner.MethodFromContext(ctx); m {
-	case provisioner.SignMethod:
+	case provisioner.SignMethod, provisioner.SignIdentityMethod:
 		signOpts, err := a.authorizeSign(ctx, token)
 		return signOpts, errs.Wrap(http.StatusInternalServerError, err, "authority.Authorize", opts...)
 	case provisioner.RevokeMethod:
@@ -286,16 +286,16 @@ func (a *Authority) authorizeRevoke(ctx context.Context, token string) error {
 // extra extension cannot be found, authorize the renewal by default.
 //
 // TODO(mariano): should we authorize by default?
-func (a *Authority) authorizeRenew(ctx context.Context, cert *x509.Certificate) error {
+func (a *Authority) authorizeRenew(ctx context.Context, cert *x509.Certificate) (provisioner.Interface, error) {
 	serial := cert.SerialNumber.String()
 	var opts = []interface{}{errs.WithKeyVal("serialNumber", serial)}
 
 	isRevoked, err := a.IsRevoked(serial)
 	if err != nil {
-		return errs.Wrap(http.StatusInternalServerError, err, "authority.authorizeRenew", opts...)
+		return nil, errs.Wrap(http.StatusInternalServerError, err, "authority.authorizeRenew", opts...)
 	}
 	if isRevoked {
-		return errs.Unauthorized("authority.authorizeRenew: certificate has been revoked", opts...)
+		return nil, errs.Unauthorized("authority.authorizeRenew: certificate has been revoked", opts...)
 	}
 	p, err := a.LoadProvisionerByCertificate(cert)
 	if err != nil {
@@ -305,13 +305,13 @@ func (a *Authority) authorizeRenew(ctx context.Context, cert *x509.Certificate) 
 		// returns the noop provisioner if this happens, and it allows
 		// certificate renewals.
 		if p, ok = a.provisioners.LoadByCertificate(cert); !ok {
-			return errs.Unauthorized("authority.authorizeRenew: provisioner not found", opts...)
+			return nil, errs.Unauthorized("authority.authorizeRenew: provisioner not found", opts...)
 		}
 	}
 	if err := p.AuthorizeRenew(ctx, cert); err != nil {
-		return errs.Wrap(http.StatusInternalServerError, err, "authority.authorizeRenew", opts...)
+		return nil, errs.Wrap(http.StatusInternalServerError, err, "authority.authorizeRenew", opts...)
 	}
-	return nil
+	return p, nil
 }
 
 // authorizeSSHCertificate returns an error if the given certificate is revoked.

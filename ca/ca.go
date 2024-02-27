@@ -15,8 +15,8 @@ import (
 	"sync"
 	"time"
 
-	"github.com/go-chi/chi"
-	"github.com/go-chi/chi/middleware"
+	"github.com/go-chi/chi/v5"
+	"github.com/go-chi/chi/v5/middleware"
 	"github.com/pkg/errors"
 	"github.com/smallstep/certificates/acme"
 	acmeAPI "github.com/smallstep/certificates/acme/api"
@@ -26,7 +26,9 @@ import (
 	"github.com/smallstep/certificates/authority/admin"
 	adminAPI "github.com/smallstep/certificates/authority/admin/api"
 	"github.com/smallstep/certificates/authority/config"
+	"github.com/smallstep/certificates/cas/apiv1"
 	"github.com/smallstep/certificates/db"
+	"github.com/smallstep/certificates/internal/metrix"
 	"github.com/smallstep/certificates/logging"
 	"github.com/smallstep/certificates/monitoring"
 	"github.com/smallstep/certificates/scep"
@@ -46,6 +48,8 @@ type options struct {
 	sshHostPassword []byte
 	sshUserPassword []byte
 	database        db.AuthDB
+	x509CAService   apiv1.CertificateAuthorityService
+	tlsConfig       *tls.Config
 }
 
 func (o *options) apply(opts []Option) {
@@ -62,6 +66,13 @@ type Option func(o *options)
 func WithConfigFile(name string) Option {
 	return func(o *options) {
 		o.configFile = name
+	}
+}
+
+// WithX509CAService provides the x509CAService to be used for signing x509 requests
+func WithX509CAService(svc apiv1.CertificateAuthorityService) Option {
+	return func(o *options) {
+		o.x509CAService = svc
 	}
 }
 
@@ -104,6 +115,14 @@ func WithDatabase(d db.AuthDB) Option {
 	}
 }
 
+// WithTLSConfig sets the TLS configuration to be used by the HTTP(s) server
+// spun by step-ca.
+func WithTLSConfig(t *tls.Config) Option {
+	return func(o *options) {
+		o.tlsConfig = t
+	}
+}
+
 // WithLinkedCAToken sets the token used to authenticate with the linkedca.
 func WithLinkedCAToken(token string) Option {
 	return func(o *options) {
@@ -125,6 +144,7 @@ type CA struct {
 	config      *config.Config
 	srv         *server.Server
 	insecureSrv *server.Server
+	metricsSrv  *server.Server
 	opts        *options
 	renewer     *TLSRenewer
 	compactStop chan struct{}
@@ -163,6 +183,16 @@ func (ca *CA) Init(cfg *config.Config) (*CA, error) {
 		opts = append(opts, authority.WithQuietInit())
 	}
 
+	if ca.opts.x509CAService != nil {
+		opts = append(opts, authority.WithX509CAService(ca.opts.x509CAService))
+	}
+
+	var meter *metrix.Meter
+	if ca.config.MetricsAddress != "" {
+		meter = metrix.New()
+		opts = append(opts, authority.WithMeter(meter))
+	}
+
 	webhookTransport := http.DefaultTransport.(*http.Transport).Clone()
 	opts = append(opts, authority.WithWebhookClient(&http.Client{Transport: webhookTransport}))
 
@@ -172,9 +202,20 @@ func (ca *CA) Init(cfg *config.Config) (*CA, error) {
 	}
 	ca.auth = auth
 
-	tlsConfig, clientTLSConfig, err := ca.getTLSConfig(auth)
-	if err != nil {
-		return nil, err
+	var tlsConfig *tls.Config
+	var clientTLSConfig *tls.Config
+	if ca.opts.tlsConfig != nil {
+		// try using the tls Configuration supplied by the caller
+		log.Print("Using tls configuration supplied by the application")
+		tlsConfig = ca.opts.tlsConfig
+		clientTLSConfig = ca.opts.tlsConfig
+	} else {
+		// default to using the step-ca x509 Signer Interface
+		log.Print("Building new tls configuration using step-ca x509 Signer Interface")
+		tlsConfig, clientTLSConfig, err = ca.getTLSConfig(auth)
+		if err != nil {
+			return nil, err
+		}
 	}
 
 	webhookTransport.TLSClientConfig = clientTLSConfig
@@ -250,19 +291,14 @@ func (ca *CA) Init(cfg *config.Config) (*CA, error) {
 
 	var scepAuthority *scep.Authority
 	if ca.shouldServeSCEPEndpoints() {
-		scepPrefix := "scep"
-		scepAuthority, err = scep.New(auth, scep.AuthorityOptions{
-			Service: auth.GetSCEPService(),
-			DNS:     dns,
-			Prefix:  scepPrefix,
-		})
-		if err != nil {
-			return nil, errors.Wrap(err, "error creating SCEP authority")
-		}
+		// get the SCEP authority configuration. Validation is
+		// performed within the authority instantiation process.
+		scepAuthority = auth.GetSCEP()
 
 		// According to the RFC (https://tools.ietf.org/html/rfc8894#section-7.10),
 		// SCEP operations are performed using HTTP, so that's why the API is mounted
 		// to the insecure mux.
+		scepPrefix := "scep"
 		insecureMux.Route("/"+scepPrefix, func(r chi.Router) {
 			scepAPI.Route(r)
 		})
@@ -319,6 +355,13 @@ func (ca *CA) Init(cfg *config.Config) (*CA, error) {
 		// reload.
 		ca.insecureSrv = server.New(cfg.InsecureAddress, insecureHandler, nil)
 		ca.insecureSrv.BaseContext = func(net.Listener) context.Context {
+			return baseContext
+		}
+	}
+
+	if meter != nil {
+		ca.metricsSrv = server.New(ca.config.MetricsAddress, meter, nil)
+		ca.metricsSrv.BaseContext = func(net.Listener) context.Context {
 			return baseContext
 		}
 	}
@@ -409,6 +452,14 @@ func (ca *CA) Run() error {
 		}()
 	}
 
+	if ca.metricsSrv != nil {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			errs <- ca.metricsSrv.ListenAndServe()
+		}()
+	}
+
 	wg.Add(1)
 	go func() {
 		defer wg.Done()
@@ -426,7 +477,10 @@ func (ca *CA) Run() error {
 // Stop stops the CA calling to the server Shutdown method.
 func (ca *CA) Stop() error {
 	close(ca.compactStop)
-	ca.renewer.Stop()
+	if ca.renewer != nil {
+		ca.renewer.Stop()
+	}
+
 	if err := ca.auth.Shutdown(); err != nil {
 		log.Printf("error stopping ca.Authority: %+v\n", err)
 	}
@@ -485,6 +539,13 @@ func (ca *CA) Reload() error {
 		}
 	}
 
+	if ca.metricsSrv != nil {
+		if err = ca.metricsSrv.Reload(newCA.metricsSrv); err != nil {
+			logContinue("Reload failed because metrics server could not be replaced.")
+			return errors.Wrap(err, "error reloading metrics server")
+		}
+	}
+
 	if err = ca.srv.Reload(newCA.srv); err != nil {
 		logContinue("Reload failed because server could not be replaced.")
 		return errors.Wrap(err, "error reloading server")
@@ -494,7 +555,10 @@ func (ca *CA) Reload() error {
 	// 2. Safely shutdown any internal resources (e.g. key manager)
 	// 3. Replace ca properties
 	// Do not replace ca.srv
-	ca.renewer.Stop()
+	if ca.renewer != nil {
+		ca.renewer.Stop()
+	}
+
 	ca.auth.CloseForReload()
 	ca.auth = newCA.auth
 	ca.config = newCA.config
@@ -584,10 +648,10 @@ func (ca *CA) getTLSConfig(auth *authority.Authority) (*tls.Config, *tls.Config,
 
 // shouldServeSCEPEndpoints returns if the CA should be
 // configured with endpoints for SCEP. This is assumed to be
-// true if a SCEPService exists, which is true in case a
-// SCEP provisioner was configured.
+// true if a SCEPService exists, which is true in case at
+// least one SCEP provisioner was configured.
 func (ca *CA) shouldServeSCEPEndpoints() bool {
-	return ca.auth.GetSCEPService() != nil
+	return ca.auth.GetSCEP() != nil
 }
 
 //nolint:unused // useful for debugging

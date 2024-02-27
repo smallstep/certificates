@@ -71,6 +71,8 @@ func (s *StepCAS) CreateCertificate(req *apiv1.CreateCertificateRequest) (*apiv1
 	switch {
 	case req.CSR == nil:
 		return nil, errors.New("createCertificateRequest `csr` cannot be nil")
+	case req.Template == nil:
+		return nil, errors.New("createCertificateRequest `template` cannot be nil")
 	case req.Lifetime == 0:
 		return nil, errors.New("createCertificateRequest `lifetime` cannot be 0")
 	}
@@ -87,7 +89,7 @@ func (s *StepCAS) CreateCertificate(req *apiv1.CreateCertificateRequest) (*apiv1
 		info.ProvisionerName = p.Name
 	}
 
-	cert, chain, err := s.createCertificate(req.CSR, req.Lifetime, info)
+	cert, chain, err := s.createCertificate(req.CSR, req.Template, req.Lifetime, info)
 	if err != nil {
 		return nil, err
 	}
@@ -167,18 +169,18 @@ func (s *StepCAS) GetCertificateAuthority(*apiv1.GetCertificateAuthorityRequest)
 	}, nil
 }
 
-func (s *StepCAS) createCertificate(cr *x509.CertificateRequest, lifetime time.Duration, raInfo *raInfo) (*x509.Certificate, []*x509.Certificate, error) {
-	sans := make([]string, 0, len(cr.DNSNames)+len(cr.EmailAddresses)+len(cr.IPAddresses)+len(cr.URIs))
-	sans = append(sans, cr.DNSNames...)
-	sans = append(sans, cr.EmailAddresses...)
-	for _, ip := range cr.IPAddresses {
+func (s *StepCAS) createCertificate(cr *x509.CertificateRequest, template *x509.Certificate, lifetime time.Duration, raInfo *raInfo) (*x509.Certificate, []*x509.Certificate, error) {
+	sans := make([]string, 0, len(template.DNSNames)+len(template.EmailAddresses)+len(template.IPAddresses)+len(template.URIs))
+	sans = append(sans, template.DNSNames...)
+	sans = append(sans, template.EmailAddresses...)
+	for _, ip := range template.IPAddresses {
 		sans = append(sans, ip.String())
 	}
-	for _, u := range cr.URIs {
+	for _, u := range template.URIs {
 		sans = append(sans, u.String())
 	}
 
-	commonName := cr.Subject.CommonName
+	commonName := template.Subject.CommonName
 	if commonName == "" && len(sans) > 0 {
 		commonName = sans[0]
 	}

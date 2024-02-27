@@ -39,7 +39,6 @@ archives:
     format_overrides:
       - goos: windows
         format: zip
-    wrap_in_directory: "{{ .ProjectName }}_{{ .Version }}"
     files:
       - README.md
       - LICENSE
@@ -48,6 +47,7 @@ archives:
     << : *ARCHIVE
     id: unversioned
     name_template: "{{ .ProjectName }}_{{ .Os }}_{{ .Arch }}{{ if .Arm }}v{{ .Arm }}{{ end }}{{ if .Mips }}_{{ .Mips }}{{ end }}"
+    wrap_in_directory: "{{ .ProjectName }}_{{ .Os }}_{{ .Arch }}{{ if .Arm }}v{{ .Arm }}{{ end }}{{ if .Mips }}_{{ .Mips }}{{ end }}"
 
 
 nfpms:
@@ -164,11 +164,11 @@ release:
 
     ```
     cosign verify-blob \
-      --certificate ~/Downloads/step-ca_darwin_{{ .Version }}_amd64.tar.gz.sig.pem \
-      --signature ~/Downloads/step-ca_darwin_{{ .Version }}_amd64.tar.gz.sig \
-      --certificate-identity-regexp "https://github\.com/smallstep/certificates/.*" \
+      --certificate step-ca_darwin_{{ .Version }}_amd64.tar.gz.sig.pem \
+      --signature step-ca_darwin_{{ .Version }}_amd64.tar.gz.sig \
+      --certificate-identity-regexp "https://github\.com/smallstep/workflows/.*" \
       --certificate-oidc-issuer https://token.actions.githubusercontent.com \
-      ~/Downloads/step-ca_darwin_{{ .Version }}_amd64.tar.gz
+      step-ca_darwin_{{ .Version }}_amd64.tar.gz
     ```
 
     The `checksums.txt` file (in the `Assets` section below) contains a checksum for every artifact in the release.
@@ -298,7 +298,7 @@ winget:
       pull_request:
         # Whether to enable it or not.
         enabled: true
-        #check_boxes: true
+        check_boxes: true
         # Whether to open the PR as a draft or not.
         #
         # Default: false
@@ -327,6 +327,7 @@ scoops:
     repository:
       owner: smallstep
       name: scoop-bucket
+      branch: main
 
     # Git author used to commit to the repository.
     # Defaults are shown.

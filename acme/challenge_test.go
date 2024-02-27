@@ -354,7 +354,7 @@ func TestKeyAuthorization(t *testing.T) {
 			return test{
 				token: "1234",
 				jwk:   jwk,
-				err:   NewErrorISE("error generating JWK thumbprint: square/go-jose: unknown key type 'string'"),
+				err:   NewErrorISE("error generating JWK thumbprint: go-jose/go-jose: unknown key type 'string'"),
 			}
 		},
 		"ok": func(t *testing.T) test {
@@ -1089,7 +1089,7 @@ func TestHTTP01Validate(t *testing.T) {
 					},
 				},
 				jwk: jwk,
-				err: NewErrorISE("error generating JWK thumbprint: square/go-jose: unknown key type 'string'"),
+				err: NewErrorISE("error generating JWK thumbprint: go-jose/go-jose: unknown key type 'string'"),
 			}
 		},
 		"ok/key-auth-mismatch": func(t *testing.T) test {
@@ -1389,7 +1389,7 @@ func TestDNS01Validate(t *testing.T) {
 					},
 				},
 				jwk: jwk,
-				err: NewErrorISE("error generating JWK thumbprint: square/go-jose: unknown key type 'string'"),
+				err: NewErrorISE("error generating JWK thumbprint: go-jose/go-jose: unknown key type 'string'"),
 			}
 		},
 		"fail/key-auth-mismatch-store-error": func(t *testing.T) test {
@@ -2141,7 +2141,7 @@ func TestTLSALPN01Validate(t *testing.T) {
 				},
 				srv: srv,
 				jwk: jwk,
-				err: NewErrorISE("error generating JWK thumbprint: square/go-jose: unknown key type 'string'"),
+				err: NewErrorISE("error generating JWK thumbprint: go-jose/go-jose: unknown key type 'string'"),
 			}
 		},
 		"ok/error-no-extension": func(t *testing.T) test {

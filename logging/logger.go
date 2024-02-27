@@ -3,6 +3,7 @@ package logging
 import (
 	"encoding/json"
 	"net/http"
+	"os"
 	"strings"
 
 	"github.com/pkg/errors"
@@ -38,6 +39,13 @@ func New(name string, raw json.RawMessage) (*Logger, error) {
 	var formatter logrus.Formatter
 	switch strings.ToLower(config.Format) {
 	case "", "text":
+		_, noColor := os.LookupEnv("NO_COLOR")
+		// With EnvironmentOverrideColors set, logrus looks at CLICOLOR and
+		// CLICOLOR_FORCE
+		formatter = &logrus.TextFormatter{
+			DisableColors:             noColor,
+			EnvironmentOverrideColors: true,
+		}
 	case "json":
 		formatter = new(logrus.JSONFormatter)
 	case "common":

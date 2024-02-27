@@ -37,7 +37,6 @@ import (
 	"golang.org/x/net/http2"
 	"google.golang.org/protobuf/encoding/protojson"
 	"google.golang.org/protobuf/proto"
-	"gopkg.in/square/go-jose.v2/jwt"
 )
 
 // DisableIdentity is a global variable to disable the identity.
@@ -1374,7 +1373,7 @@ func (c *Client) RootFingerprintWithContext(ctx context.Context) (string, error)
 // CreateSignRequest is a helper function that given an x509 OTT returns a
 // simple but secure sign request as well as the private key used.
 func CreateSignRequest(ott string) (*api.SignRequest, crypto.PrivateKey, error) {
-	token, err := jwt.ParseSigned(ott)
+	token, err := jose.ParseSigned(ott)
 	if err != nil {
 		return nil, nil, errors.Wrap(err, "error parsing ott")
 	}

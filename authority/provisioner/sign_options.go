@@ -1,6 +1,7 @@
 package provisioner
 
 import (
+	"context"
 	"crypto/ecdsa"
 	"crypto/ed25519"
 	"crypto/rsa"
@@ -233,16 +234,28 @@ func (v emailAddressesValidator) Valid(req *x509.CertificateRequest) error {
 }
 
 // urisValidator validates the URI SANs of a certificate request.
-type urisValidator []*url.URL
+type urisValidator struct {
+	ctx  context.Context
+	uris []*url.URL
+}
+
+func newURIsValidator(ctx context.Context, uris []*url.URL) *urisValidator {
+	return &urisValidator{ctx, uris}
+}
 
 // Valid checks that certificate request IP Addresses match those configured in
 // the bootstrap (token) flow.
 func (v urisValidator) Valid(req *x509.CertificateRequest) error {
+	// SignIdentityMethod does not need to validate URIs.
+	if MethodFromContext(v.ctx) == SignIdentityMethod {
+		return nil
+	}
+
 	if len(req.URIs) == 0 {
 		return nil
 	}
 	want := make(map[string]bool)
-	for _, u := range v {
+	for _, u := range v.uris {
 		want[u.String()] = true
 	}
 	got := make(map[string]bool)
@@ -250,26 +263,33 @@ func (v urisValidator) Valid(req *x509.CertificateRequest) error {
 		got[u.String()] = true
 	}
 	if !reflect.DeepEqual(want, got) {
-		return errs.Forbidden("certificate request does not contain the valid URIs - got %v, want %v", req.URIs, v)
+		return errs.Forbidden("certificate request does not contain the valid URIs - got %v, want %v", req.URIs, v.uris)
 	}
 	return nil
 }
 
 // defaultsSANsValidator stores a set of SANs to eventually validate 1:1 against
 // the SANs in an x509 certificate request.
-type defaultSANsValidator []string
+type defaultSANsValidator struct {
+	ctx  context.Context
+	sans []string
+}
+
+func newDefaultSANsValidator(ctx context.Context, sans []string) *defaultSANsValidator {
+	return &defaultSANsValidator{ctx, sans}
+}
 
 // Valid verifies that the SANs stored in the validator match 1:1 with those
 // requested in the x509 certificate request.
 func (v defaultSANsValidator) Valid(req *x509.CertificateRequest) (err error) {
-	dnsNames, ips, emails, uris := x509util.SplitSANs(v)
+	dnsNames, ips, emails, uris := x509util.SplitSANs(v.sans)
 	if err = dnsNamesValidator(dnsNames).Valid(req); err != nil {
 		return
 	} else if err = emailAddressesValidator(emails).Valid(req); err != nil {
 		return
 	} else if err = ipAddressesValidator(ips).Valid(req); err != nil {
 		return
-	} else if err = urisValidator(uris).Valid(req); err != nil {
+	} else if err = newURIsValidator(v.ctx, uris).Valid(req); err != nil {
 		return
 	}
 	return
