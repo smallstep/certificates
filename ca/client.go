@@ -622,7 +622,7 @@ retry:
 			retried = true
 			goto retry
 		}
-		return nil, readError(resp.Body)
+		return nil, readError(resp)
 	}
 	var version api.VersionResponse
 	if err := readJSON(resp.Body, &version); err != nil {
@@ -652,7 +652,7 @@ retry:
 			retried = true
 			goto retry
 		}
-		return nil, readError(resp.Body)
+		return nil, readError(resp)
 	}
 	var health api.HealthResponse
 	if err := readJSON(resp.Body, &health); err != nil {
@@ -687,7 +687,7 @@ retry:
 			retried = true
 			goto retry
 		}
-		return nil, readError(resp.Body)
+		return nil, readError(resp)
 	}
 	var root api.RootResponse
 	if err := readJSON(resp.Body, &root); err != nil {
@@ -726,7 +726,7 @@ retry:
 			retried = true
 			goto retry
 		}
-		return nil, readError(resp.Body)
+		return nil, readError(resp)
 	}
 	var sign api.SignResponse
 	if err := readJSON(resp.Body, &sign); err != nil {
@@ -765,7 +765,7 @@ retry:
 			retried = true
 			goto retry
 		}
-		return nil, readError(resp.Body)
+		return nil, readError(resp)
 	}
 	var sign api.SignResponse
 	if err := readJSON(resp.Body, &sign); err != nil {
@@ -802,7 +802,7 @@ retry:
 			retried = true
 			goto retry
 		}
-		return nil, readError(resp.Body)
+		return nil, readError(resp)
 	}
 	var sign api.SignResponse
 	if err := readJSON(resp.Body, &sign); err != nil {
@@ -842,7 +842,7 @@ retry:
 			retried = true
 			goto retry
 		}
-		return nil, readError(resp.Body)
+		return nil, readError(resp)
 	}
 	var sign api.SignResponse
 	if err := readJSON(resp.Body, &sign); err != nil {
@@ -883,7 +883,7 @@ retry:
 			retried = true
 			goto retry
 		}
-		return nil, readError(resp.Body)
+		return nil, readError(resp)
 	}
 	var revoke api.RevokeResponse
 	if err := readJSON(resp.Body, &revoke); err != nil {
@@ -926,7 +926,7 @@ retry:
 			retried = true
 			goto retry
 		}
-		return nil, readError(resp.Body)
+		return nil, readError(resp)
 	}
 	var provisioners api.ProvisionersResponse
 	if err := readJSON(resp.Body, &provisioners); err != nil {
@@ -958,7 +958,7 @@ retry:
 			retried = true
 			goto retry
 		}
-		return nil, readError(resp.Body)
+		return nil, readError(resp)
 	}
 	var key api.ProvisionerKeyResponse
 	if err := readJSON(resp.Body, &key); err != nil {
@@ -988,7 +988,7 @@ retry:
 			retried = true
 			goto retry
 		}
-		return nil, readError(resp.Body)
+		return nil, readError(resp)
 	}
 	var roots api.RootsResponse
 	if err := readJSON(resp.Body, &roots); err != nil {
@@ -1018,7 +1018,7 @@ retry:
 			retried = true
 			goto retry
 		}
-		return nil, readError(resp.Body)
+		return nil, readError(resp)
 	}
 	var federation api.FederationResponse
 	if err := readJSON(resp.Body, &federation); err != nil {
@@ -1052,7 +1052,7 @@ retry:
 			retried = true
 			goto retry
 		}
-		return nil, readError(resp.Body)
+		return nil, readError(resp)
 	}
 	var sign api.SSHSignResponse
 	if err := readJSON(resp.Body, &sign); err != nil {
@@ -1086,7 +1086,7 @@ retry:
 			retried = true
 			goto retry
 		}
-		return nil, readError(resp.Body)
+		return nil, readError(resp)
 	}
 	var renew api.SSHRenewResponse
 	if err := readJSON(resp.Body, &renew); err != nil {
@@ -1120,7 +1120,7 @@ retry:
 			retried = true
 			goto retry
 		}
-		return nil, readError(resp.Body)
+		return nil, readError(resp)
 	}
 	var rekey api.SSHRekeyResponse
 	if err := readJSON(resp.Body, &rekey); err != nil {
@@ -1154,7 +1154,7 @@ retry:
 			retried = true
 			goto retry
 		}
-		return nil, readError(resp.Body)
+		return nil, readError(resp)
 	}
 	var revoke api.SSHRevokeResponse
 	if err := readJSON(resp.Body, &revoke); err != nil {
@@ -1184,7 +1184,7 @@ retry:
 			retried = true
 			goto retry
 		}
-		return nil, readError(resp.Body)
+		return nil, readError(resp)
 	}
 	var keys api.SSHRootsResponse
 	if err := readJSON(resp.Body, &keys); err != nil {
@@ -1214,7 +1214,7 @@ retry:
 			retried = true
 			goto retry
 		}
-		return nil, readError(resp.Body)
+		return nil, readError(resp)
 	}
 	var keys api.SSHRootsResponse
 	if err := readJSON(resp.Body, &keys); err != nil {
@@ -1248,7 +1248,7 @@ retry:
 			retried = true
 			goto retry
 		}
-		return nil, readError(resp.Body)
+		return nil, readError(resp)
 	}
 	var cfg api.SSHConfigResponse
 	if err := readJSON(resp.Body, &cfg); err != nil {
@@ -1287,7 +1287,7 @@ retry:
 			retried = true
 			goto retry
 		}
-		return nil, readError(resp.Body)
+		return nil, readError(resp)
 	}
 	var check api.SSHCheckPrincipalResponse
 	if err := readJSON(resp.Body, &check); err != nil {
@@ -1316,7 +1316,7 @@ retry:
 			retried = true
 			goto retry
 		}
-		return nil, readError(resp.Body)
+		return nil, readError(resp)
 	}
 	var hosts api.SSHGetHostsResponse
 	if err := readJSON(resp.Body, &hosts); err != nil {
@@ -1348,7 +1348,7 @@ retry:
 			retried = true
 			goto retry
 		}
-		return nil, readError(resp.Body)
+		return nil, readError(resp)
 	}
 	var bastion api.SSHBastionResponse
 	if err := readJSON(resp.Body, &bastion); err != nil {
@@ -1516,12 +1516,13 @@ func readProtoJSON(r io.ReadCloser, m proto.Message) error {
 	return protojson.Unmarshal(data, m)
 }
 
-func readError(r io.ReadCloser) error {
-	defer r.Close()
+func readError(r *http.Response) error {
+	defer r.Body.Close()
 	apiErr := new(errs.Error)
-	if err := json.NewDecoder(r).Decode(apiErr); err != nil {
+	if err := json.NewDecoder(r.Body).Decode(apiErr); err != nil {
 		return err
 	}
+	apiErr.RequestID = r.Header.Get("X-Request-Id")
 	return apiErr
 }
 
