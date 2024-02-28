@@ -17,7 +17,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/smallstep/certificates/logging"
+	"github.com/smallstep/certificates/internal/requestid"
 	"github.com/smallstep/certificates/webhook"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -101,10 +101,10 @@ func TestWebhookController_isCertTypeOK(t *testing.T) {
 	}
 }
 
-// withRequestID is a helper that calls into [logging.WithRequestID] and returns
-// a new context with the requestID added to the provided context.
+// withRequestID is a helper that calls into [requestid.NewContext] and returns
+// a new context with the requestID added.
 func withRequestID(ctx context.Context, requestID string) context.Context {
-	return logging.WithRequestID(ctx, requestID)
+	return requestid.NewContext(ctx, requestID)
 }
 
 func TestWebhookController_Enrich(t *testing.T) {

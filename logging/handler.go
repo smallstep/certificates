@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/sirupsen/logrus"
+	"github.com/smallstep/certificates/internal/requestid"
 )
 
 // LoggerHandler creates a logger handler
@@ -29,16 +30,15 @@ type options struct {
 
 // NewLoggerHandler returns the given http.Handler with the logger integrated.
 func NewLoggerHandler(name string, logger *Logger, next http.Handler) http.Handler {
-	h := RequestID(logger.GetTraceHeader())
 	onlyTraceHealthEndpoint, _ := strconv.ParseBool(os.Getenv("STEP_LOGGER_ONLY_TRACE_HEALTH_ENDPOINT"))
-	return h(&LoggerHandler{
+	return &LoggerHandler{
 		name:   name,
 		logger: logger.GetImpl(),
 		options: options{
 			onlyTraceHealthEndpoint: onlyTraceHealthEndpoint,
 		},
 		next: next,
-	})
+	}
 }
 
 // ServeHTTP implements the http.Handler and call to the handler to log with a
@@ -54,14 +54,14 @@ func (l *LoggerHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 // writeEntry writes to the Logger writer the request information in the logger.
 func (l *LoggerHandler) writeEntry(w ResponseLogger, r *http.Request, t time.Time, d time.Duration) {
-	var reqID, user string
+	var requestID, userID string
 
 	ctx := r.Context()
-	if v, ok := ctx.Value(RequestIDKey).(string); ok && v != "" {
-		reqID = v
+	if v, ok := requestid.FromContext(ctx); ok {
+		requestID = v
 	}
-	if v, ok := ctx.Value(UserIDKey).(string); ok && v != "" {
-		user = v
+	if v, ok := GetUserID(ctx); ok && v != "" {
+		userID = v
 	}
 
 	// Remote hostname
@@ -85,10 +85,10 @@ func (l *LoggerHandler) writeEntry(w ResponseLogger, r *http.Request, t time.Tim
 	status := w.StatusCode()
 
 	fields := logrus.Fields{
-		"request-id":     reqID,
+		"request-id":     requestID,
 		"remote-address": addr,
 		"name":           l.name,
-		"user-id":        user,
+		"user-id":        userID,
 		"time":           t.Format(time.RFC3339),
 		"duration-ns":    d.Nanoseconds(),
 		"duration":       d.String(),
