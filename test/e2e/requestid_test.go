@@ -113,7 +113,7 @@ func Test_reflectRequestID(t *testing.T) {
 	assert.Nil(t, rootResponse)
 
 	// expect an error when retrieving an invalid root and provided request ID
-	rootResponse, err = caClient.RootWithContext(client.WithRequestID(ctx, "reqID"), "invalid")
+	rootResponse, err = caClient.RootWithContext(client.NewRequestIDContext(ctx, "reqID"), "invalid")
 	if assert.Error(t, err) {
 		apiErr := &errs.Error{}
 		if assert.ErrorAs(t, err, &apiErr) {

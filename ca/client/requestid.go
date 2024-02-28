@@ -4,14 +4,15 @@ import "context"
 
 type requestIDKey struct{}
 
-// WithRequestID returns a new context with the given requestID added to the
+// NewRequestIDContext returns a new context with the given request ID added to the
 // context.
-func WithRequestID(ctx context.Context, requestID string) context.Context {
+func NewRequestIDContext(ctx context.Context, requestID string) context.Context {
 	return context.WithValue(ctx, requestIDKey{}, requestID)
 }
 
-// GetRequestID returns the request id from the context if it exists.
-func GetRequestID(ctx context.Context) (string, bool) {
+// RequestIDFromContext returns the request ID from the context if it exists.
+// and is not empty.
+func RequestIDFromContext(ctx context.Context) (string, bool) {
 	v, ok := ctx.Value(requestIDKey{}).(string)
-	return v, ok
+	return v, ok && v != ""
 }

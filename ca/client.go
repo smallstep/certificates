@@ -109,9 +109,8 @@ const requestIDHeader = "X-Request-Id"
 // empty, the context is searched for a request ID. If that's also empty, a new
 // request ID is generated.
 func enforceRequestID(r *http.Request) {
-	requestID := r.Header.Get(requestIDHeader)
-	if requestID == "" {
-		if reqID, ok := client.GetRequestID(r.Context()); ok && reqID != "" {
+	if requestID := r.Header.Get(requestIDHeader); requestID == "" {
+		if reqID, ok := client.RequestIDFromContext(r.Context()); ok {
 			// TODO(hs): ensure the request ID from the context is fresh, and thus hasn't been
 			// used before by the client (unless it's a retry for the same request)?
 			requestID = reqID
@@ -759,14 +758,14 @@ func (c *Client) Renew(tr http.RoundTripper) (*api.SignResponse, error) {
 func (c *Client) RenewWithContext(ctx context.Context, tr http.RoundTripper) (*api.SignResponse, error) {
 	var retried bool
 	u := c.endpoint.ResolveReference(&url.URL{Path: "/renew"})
-	caClient := &http.Client{Transport: tr}
+	httpClient := &http.Client{Transport: tr}
 retry:
 	req, err := http.NewRequestWithContext(ctx, "POST", u.String(), http.NoBody)
 	if err != nil {
 		return nil, err
 	}
 	req.Header.Set("Content-Type", "application/json")
-	resp, err := caClient.Do(req)
+	resp, err := httpClient.Do(req)
 	if err != nil {
 		return nil, clientError(err)
 	}
@@ -836,14 +835,14 @@ func (c *Client) RekeyWithContext(ctx context.Context, req *api.RekeyRequest, tr
 		return nil, errors.Wrap(err, "error marshaling request")
 	}
 	u := c.endpoint.ResolveReference(&url.URL{Path: "/rekey"})
-	caClient := &http.Client{Transport: tr}
+	httpClient := &http.Client{Transport: tr}
 retry:
 	httpReq, err := http.NewRequestWithContext(ctx, "POST", u.String(), bytes.NewReader(body))
 	if err != nil {
 		return nil, err
 	}
 	httpReq.Header.Set("Content-Type", "application/json")
-	resp, err := caClient.Do(httpReq)
+	resp, err := httpClient.Do(httpReq)
 	if err != nil {
 		return nil, clientError(err)
 	}
@@ -1530,7 +1529,7 @@ func readError(r *http.Response) error {
 	defer r.Body.Close()
 	apiErr := new(errs.Error)
 	if err := json.NewDecoder(r.Body).Decode(apiErr); err != nil {
-		return err
+		return fmt.Errorf("failed decoding CA error response: %w", err)
 	}
 	apiErr.RequestID = r.Header.Get("X-Request-Id")
 	return apiErr
