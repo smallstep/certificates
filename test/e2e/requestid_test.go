@@ -19,6 +19,25 @@ import (
 	"go.step.sm/crypto/pemutil"
 )
 
+// reserveAddress "reserves" a TCP address by opening a listener on a random
+// port and immediately closing it. The address can then be assumed to be
+// available for running a server on.
+func reserveAddress(t *testing.T) string {
+	t.Helper()
+	l, err := net.Listen("tcp", "127.0.0.1:0")
+	if err != nil {
+		if l, err = net.Listen("tcp6", "[::1]:0"); err != nil {
+			require.NoError(t, err, "failed to listen on a port")
+		}
+	}
+
+	address := l.Addr().String()
+	err = l.Close()
+	require.NoError(t, err)
+
+	return address
+}
+
 func Test_reflectRequestID(t *testing.T) {
 	dir := t.TempDir()
 	m, err := minica.New(minica.WithName("Step E2E"))
@@ -37,19 +56,14 @@ func Test_reflectRequestID(t *testing.T) {
 	require.NoError(t, err)
 
 	// get a random address to listen on and connect to; currently no nicer way to get one before starting the server
-	l, err := net.Listen("tcp4", ":0")
-	require.NoError(t, err)
-	randomAddress := l.Addr().String()
-	_, port, err := net.SplitHostPort(l.Addr().String())
-	require.NoError(t, err)
-	err = l.Close()
-	require.NoError(t, err)
+	// TODO(hs): find/implement a nicer way to expose the CA URL, similar to how e.g. httptest.Server exposes it?
+	address := reserveAddress(t)
 
 	cfg := &config.Config{
 		Root:             []string{rootFilepath},
 		IntermediateCert: intermediateCertFilepath,
 		IntermediateKey:  intermediateKeyFilepath,
-		Address:          randomAddress, // reuse the address that was just "reserved"
+		Address:          address, // reuse the address that was just "reserved"
 		DNSNames:         []string{"127.0.0.1", "[::1]", "localhost"},
 		AuthorityConfig: &config.AuthConfig{
 			AuthorityID:    "stepca-test",
@@ -62,7 +76,7 @@ func Test_reflectRequestID(t *testing.T) {
 
 	// instantiate a client for the CA running at the random address
 	caClient, err := ca.NewClient(
-		fmt.Sprintf("https://localhost:%s", port),
+		fmt.Sprintf("https://%s", address),
 		ca.WithRootFile(rootFilepath),
 	)
 	require.NoError(t, err)
@@ -91,7 +105,7 @@ func Test_reflectRequestID(t *testing.T) {
 			assert.Equal(t, "The requested resource could not be found. Please see the certificate authority logs for more info.", apiErr.Err.Error())
 			assert.NotEmpty(t, apiErr.RequestID)
 
-			// TODO: include the below error in the JSON? It's currently only output to the CA logs
+			// TODO: include the below error in the JSON? It's currently only output to the CA logs. Also see https://github.com/smallstep/certificates/pull/759
 			//assert.Equal(t, "/root/invalid was not found: certificate with fingerprint invalid was not found", apiErr.Msg)
 		}
 	}
@@ -105,9 +119,6 @@ func Test_reflectRequestID(t *testing.T) {
 			assert.Equal(t, 404, apiErr.StatusCode())
 			assert.Equal(t, "The requested resource could not be found. Please see the certificate authority logs for more info.", apiErr.Err.Error())
 			assert.Equal(t, "reqID", apiErr.RequestID)
-
-			// TODO: include the below error in the JSON? It's currently only output to the CA logs
-			//assert.Equal(t, "/root/invalid was not found: certificate with fingerprint invalid was not found", apiErr.Msg)
 		}
 	}
 	assert.Nil(t, rootResponse)
