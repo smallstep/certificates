@@ -19,23 +19,22 @@ import (
 	"go.step.sm/crypto/pemutil"
 )
 
-// reserveAddress "reserves" a TCP address by opening a listener on a random
-// port and immediately closing it. The address can then be assumed to be
+// reservePort "reserves" a TCP port by opening a listener on a random
+// port and immediately closing it. The port can then be assumed to be
 // available for running a server on.
-func reserveAddress(t *testing.T) string {
+func reservePort(t *testing.T) (host, port string) {
 	t.Helper()
-	l, err := net.Listen("tcp", "127.0.0.1:0")
-	if err != nil {
-		if l, err = net.Listen("tcp6", "[::1]:0"); err != nil {
-			require.NoError(t, err, "failed to listen on a port")
-		}
-	}
+	l, err := net.Listen("tcp", ":0")
+	require.NoError(t, err)
 
 	address := l.Addr().String()
 	err = l.Close()
 	require.NoError(t, err)
 
-	return address
+	host, port, err = net.SplitHostPort(address)
+	require.NoError(t, err)
+
+	return
 }
 
 func Test_reflectRequestID(t *testing.T) {
@@ -57,13 +56,13 @@ func Test_reflectRequestID(t *testing.T) {
 
 	// get a random address to listen on and connect to; currently no nicer way to get one before starting the server
 	// TODO(hs): find/implement a nicer way to expose the CA URL, similar to how e.g. httptest.Server exposes it?
-	address := reserveAddress(t)
+	host, port := reservePort(t)
 
 	cfg := &config.Config{
 		Root:             []string{rootFilepath},
 		IntermediateCert: intermediateCertFilepath,
 		IntermediateKey:  intermediateKeyFilepath,
-		Address:          address, // reuse the address that was just "reserved"
+		Address:          net.JoinHostPort(host, port), // reuse the address that was just "reserved"
 		DNSNames:         []string{"127.0.0.1", "[::1]", "localhost"},
 		AuthorityConfig: &config.AuthConfig{
 			AuthorityID:    "stepca-test",
@@ -76,7 +75,7 @@ func Test_reflectRequestID(t *testing.T) {
 
 	// instantiate a client for the CA running at the random address
 	caClient, err := ca.NewClient(
-		fmt.Sprintf("https://%s", address),
+		fmt.Sprintf("https://localhost:%s", port),
 		ca.WithRootFile(rootFilepath),
 	)
 	require.NoError(t, err)
@@ -93,8 +92,10 @@ func Test_reflectRequestID(t *testing.T) {
 	// require OK health response as the baseline
 	ctx := context.Background()
 	healthResponse, err := caClient.HealthWithContext(ctx)
-	assert.NoError(t, err)
-	assert.Equal(t, "ok", healthResponse.Status)
+	require.NoError(t, err)
+	if assert.NotNil(t, healthResponse) {
+		require.Equal(t, "ok", healthResponse.Status)
+	}
 
 	// expect an error when retrieving an invalid root
 	rootResponse, err := caClient.RootWithContext(ctx, "invalid")
