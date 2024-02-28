@@ -28,6 +28,7 @@ import (
 	"github.com/smallstep/certificates/api"
 	"github.com/smallstep/certificates/authority"
 	"github.com/smallstep/certificates/authority/provisioner"
+	"github.com/smallstep/certificates/ca/client"
 	"github.com/smallstep/certificates/ca/identity"
 	"github.com/smallstep/certificates/errs"
 	"go.step.sm/cli-utils/step"
@@ -105,10 +106,19 @@ func (c *uaClient) PostWithContext(ctx context.Context, u, contentType string, b
 const requestIDHeader = "X-Request-Id"
 
 // enforceRequestID checks if the X-Request-Id HTTP header is filled. If it's
-// empty, it'll generate a new request ID and set the header.
+// empty, the context is searched for a request ID. If that's also empty, a new
+// request ID is generated.
 func enforceRequestID(r *http.Request) {
-	if r.Header.Get(requestIDHeader) == "" {
-		r.Header.Set(requestIDHeader, xid.New().String())
+	requestID := r.Header.Get(requestIDHeader)
+	if requestID == "" {
+		if reqID, ok := client.GetRequestID(r.Context()); ok && reqID != "" {
+			// TODO(hs): ensure the request ID from the context is fresh, and thus hasn't been
+			// used before by the client (unless it's a retry for the same request)?
+			requestID = reqID
+		} else {
+			requestID = xid.New().String()
+		}
+		r.Header.Set(requestIDHeader, requestID)
 	}
 }
 

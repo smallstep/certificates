@@ -11,6 +11,7 @@ import (
 
 	"github.com/smallstep/certificates/authority/config"
 	"github.com/smallstep/certificates/ca"
+	"github.com/smallstep/certificates/ca/client"
 	"github.com/smallstep/certificates/errs"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -57,8 +58,8 @@ func TestXxx(t *testing.T) {
 	c, err := ca.New(cfg)
 	require.NoError(t, err)
 
-	// instantiate a client for the CA
-	client, err := ca.NewClient(
+	// instantiate a client for the CA running at the random address
+	caClient, err := ca.NewClient(
 		fmt.Sprintf("https://%s", randomAddress),
 		ca.WithRootFile(rootFilepath),
 	)
@@ -75,18 +76,33 @@ func TestXxx(t *testing.T) {
 
 	// require OK health response as the baseline
 	ctx := context.Background()
-	healthResponse, err := client.HealthWithContext(ctx)
+	healthResponse, err := caClient.HealthWithContext(ctx)
 	assert.NoError(t, err)
-	require.Equal(t, "ok", healthResponse.Status)
+	assert.Equal(t, "ok", healthResponse.Status)
 
 	// expect an error when retrieving an invalid root
-	rootResponse, err := client.RootWithContext(ctx, "invalid")
+	rootResponse, err := caClient.RootWithContext(ctx, "invalid")
 	if assert.Error(t, err) {
 		apiErr := &errs.Error{}
 		if assert.ErrorAs(t, err, &apiErr) {
 			assert.Equal(t, 404, apiErr.StatusCode())
 			assert.Equal(t, "The requested resource could not be found. Please see the certificate authority logs for more info.", apiErr.Err.Error())
 			assert.NotEmpty(t, apiErr.RequestID)
+
+			// TODO: include the below error in the JSON? It's currently only output to the CA logs
+			//assert.Equal(t, "/root/invalid was not found: certificate with fingerprint invalid was not found", apiErr.Msg)
+		}
+	}
+	assert.Nil(t, rootResponse)
+
+	// expect an error when retrieving an invalid root and provided request ID
+	rootResponse, err = caClient.RootWithContext(client.WithRequestID(ctx, "reqID"), "invalid")
+	if assert.Error(t, err) {
+		apiErr := &errs.Error{}
+		if assert.ErrorAs(t, err, &apiErr) {
+			assert.Equal(t, 404, apiErr.StatusCode())
+			assert.Equal(t, "The requested resource could not be found. Please see the certificate authority logs for more info.", apiErr.Err.Error())
+			assert.Equal(t, "reqID", apiErr.RequestID)
 
 			// TODO: include the below error in the JSON? It's currently only output to the CA logs
 			//assert.Equal(t, "/root/invalid was not found: certificate with fingerprint invalid was not found", apiErr.Msg)
