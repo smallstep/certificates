@@ -130,7 +130,7 @@ func TestVerifyClientCertIfGiven(t *testing.T) {
 
 //nolint:gosec // test tls config
 func TestAddRootCA(t *testing.T) {
-	cert := parseCertificate(rootPEM)
+	cert := parseCertificate(t, rootPEM)
 	pool := x509.NewCertPool()
 	pool.AddCert(cert)
 
@@ -163,7 +163,7 @@ func TestAddRootCA(t *testing.T) {
 
 //nolint:gosec // test tls config
 func TestAddClientCA(t *testing.T) {
-	cert := parseCertificate(rootPEM)
+	cert := parseCertificate(t, rootPEM)
 	pool := x509.NewCertPool()
 	pool.AddCert(cert)
 
@@ -214,7 +214,7 @@ func TestAddRootsToRootCAs(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	cert := parseCertificate(string(root))
+	cert := parseCertificate(t, string(root))
 	pool := x509.NewCertPool()
 	pool.AddCert(cert)
 
@@ -269,7 +269,7 @@ func TestAddRootsToClientCAs(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	cert := parseCertificate(string(root))
+	cert := parseCertificate(t, string(root))
 	pool := x509.NewCertPool()
 	pool.AddCert(cert)
 
@@ -329,8 +329,8 @@ func TestAddFederationToRootCAs(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	crt1 := parseCertificate(string(root))
-	crt2 := parseCertificate(string(federated))
+	crt1 := parseCertificate(t, string(root))
+	crt2 := parseCertificate(t, string(federated))
 	pool := x509.NewCertPool()
 	pool.AddCert(crt1)
 	pool.AddCert(crt2)
@@ -394,8 +394,8 @@ func TestAddFederationToClientCAs(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	crt1 := parseCertificate(string(root))
-	crt2 := parseCertificate(string(federated))
+	crt1 := parseCertificate(t, string(root))
+	crt2 := parseCertificate(t, string(federated))
 	pool := x509.NewCertPool()
 	pool.AddCert(crt1)
 	pool.AddCert(crt2)
@@ -454,7 +454,7 @@ func TestAddRootsToCAs(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	cert := parseCertificate(string(root))
+	cert := parseCertificate(t, string(root))
 	pool := x509.NewCertPool()
 	pool.AddCert(cert)
 
@@ -514,8 +514,8 @@ func TestAddFederationToCAs(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	crt1 := parseCertificate(string(root))
-	crt2 := parseCertificate(string(federated))
+	crt1 := parseCertificate(t, string(root))
+	crt2 := parseCertificate(t, string(federated))
 	pool := x509.NewCertPool()
 	pool.AddCert(crt1)
 	pool.AddCert(crt2)
