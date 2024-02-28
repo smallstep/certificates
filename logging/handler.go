@@ -10,6 +10,7 @@ import (
 
 	"github.com/sirupsen/logrus"
 	"github.com/smallstep/certificates/internal/requestid"
+	"github.com/smallstep/certificates/internal/userid"
 )
 
 // LoggerHandler creates a logger handler
@@ -60,7 +61,7 @@ func (l *LoggerHandler) writeEntry(w ResponseLogger, r *http.Request, t time.Tim
 	if v, ok := requestid.FromContext(ctx); ok {
 		requestID = v
 	}
-	if v, ok := GetUserID(ctx); ok && v != "" {
+	if v, ok := userid.FromContext(ctx); ok {
 		userID = v
 	}
 
