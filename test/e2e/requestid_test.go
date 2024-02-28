@@ -19,7 +19,7 @@ import (
 	"go.step.sm/crypto/pemutil"
 )
 
-func TestXxx(t *testing.T) {
+func Test_reflectRequestID(t *testing.T) {
 	dir := t.TempDir()
 	m, err := minica.New(minica.WithName("Step E2E"))
 	require.NoError(t, err)
@@ -37,9 +37,11 @@ func TestXxx(t *testing.T) {
 	require.NoError(t, err)
 
 	// get a random address to listen on and connect to; currently no nicer way to get one before starting the server
-	l, err := net.Listen("tcp", "127.0.0.1:0")
+	l, err := net.Listen("tcp4", ":0")
 	require.NoError(t, err)
 	randomAddress := l.Addr().String()
+	_, port, err := net.SplitHostPort(l.Addr().String())
+	require.NoError(t, err)
 	err = l.Close()
 	require.NoError(t, err)
 
@@ -48,7 +50,7 @@ func TestXxx(t *testing.T) {
 		IntermediateCert: intermediateCertFilepath,
 		IntermediateKey:  intermediateKeyFilepath,
 		Address:          randomAddress, // reuse the address that was just "reserved"
-		DNSNames:         []string{"127.0.0.1", "stepca.localhost"},
+		DNSNames:         []string{"127.0.0.1", "[::1]", "localhost"},
 		AuthorityConfig: &config.AuthConfig{
 			AuthorityID:    "stepca-test",
 			DeploymentType: "standalone-test",
@@ -60,7 +62,7 @@ func TestXxx(t *testing.T) {
 
 	// instantiate a client for the CA running at the random address
 	caClient, err := ca.NewClient(
-		fmt.Sprintf("https://%s", randomAddress),
+		fmt.Sprintf("https://localhost:%s", port),
 		ca.WithRootFile(rootFilepath),
 	)
 	require.NoError(t, err)

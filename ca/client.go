@@ -397,8 +397,8 @@ func getTransportFromSHA256(endpoint, sum string) (http.RoundTripper, error) {
 	if err != nil {
 		return nil, err
 	}
-	client := &Client{endpoint: u}
-	root, err := client.Root(sum)
+	caClient := &Client{endpoint: u}
+	root, err := caClient.Root(sum)
 	if err != nil {
 		return nil, err
 	}
@@ -759,14 +759,14 @@ func (c *Client) Renew(tr http.RoundTripper) (*api.SignResponse, error) {
 func (c *Client) RenewWithContext(ctx context.Context, tr http.RoundTripper) (*api.SignResponse, error) {
 	var retried bool
 	u := c.endpoint.ResolveReference(&url.URL{Path: "/renew"})
-	client := &http.Client{Transport: tr}
+	caClient := &http.Client{Transport: tr}
 retry:
 	req, err := http.NewRequestWithContext(ctx, "POST", u.String(), http.NoBody)
 	if err != nil {
 		return nil, err
 	}
 	req.Header.Set("Content-Type", "application/json")
-	resp, err := client.Do(req)
+	resp, err := caClient.Do(req)
 	if err != nil {
 		return nil, clientError(err)
 	}
@@ -836,14 +836,14 @@ func (c *Client) RekeyWithContext(ctx context.Context, req *api.RekeyRequest, tr
 		return nil, errors.Wrap(err, "error marshaling request")
 	}
 	u := c.endpoint.ResolveReference(&url.URL{Path: "/rekey"})
-	client := &http.Client{Transport: tr}
+	caClient := &http.Client{Transport: tr}
 retry:
 	httpReq, err := http.NewRequestWithContext(ctx, "POST", u.String(), bytes.NewReader(body))
 	if err != nil {
 		return nil, err
 	}
 	httpReq.Header.Set("Content-Type", "application/json")
-	resp, err := client.Do(httpReq)
+	resp, err := caClient.Do(httpReq)
 	if err != nil {
 		return nil, clientError(err)
 	}
@@ -875,16 +875,16 @@ func (c *Client) RevokeWithContext(ctx context.Context, req *api.RevokeRequest, 
 	if err != nil {
 		return nil, errors.Wrap(err, "error marshaling request")
 	}
-	var client *uaClient
+	var uaClient *uaClient
 retry:
 	if tr != nil {
-		client = newClient(tr)
+		uaClient = newClient(tr)
 	} else {
-		client = c.client
+		uaClient = c.client
 	}
 
 	u := c.endpoint.ResolveReference(&url.URL{Path: "/revoke"})
-	resp, err := client.PostWithContext(ctx, u.String(), "application/json", bytes.NewReader(body))
+	resp, err := uaClient.PostWithContext(ctx, u.String(), "application/json", bytes.NewReader(body))
 	if err != nil {
 		return nil, clientError(err)
 	}
