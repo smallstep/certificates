@@ -24,7 +24,6 @@ import (
 	"strings"
 
 	"github.com/pkg/errors"
-	"github.com/rs/xid"
 	"github.com/smallstep/certificates/api"
 	"github.com/smallstep/certificates/authority"
 	"github.com/smallstep/certificates/authority/provisioner"
@@ -35,6 +34,7 @@ import (
 	"go.step.sm/crypto/jose"
 	"go.step.sm/crypto/keyutil"
 	"go.step.sm/crypto/pemutil"
+	"go.step.sm/crypto/randutil"
 	"go.step.sm/crypto/x509util"
 	"golang.org/x/net/http2"
 	"google.golang.org/protobuf/encoding/protojson"
@@ -105,6 +105,17 @@ func (c *uaClient) PostWithContext(ctx context.Context, u, contentType string, b
 // the CA client to the CA and back again.
 const requestIDHeader = "X-Request-Id"
 
+// newRequestID generates a new random UUIDv4 request ID. If it fails,
+// the request ID will be the empty string.
+func newRequestID() string {
+	requestID, err := randutil.UUIDv4()
+	if err != nil {
+		return ""
+	}
+
+	return requestID
+}
+
 // enforceRequestID checks if the X-Request-Id HTTP header is filled. If it's
 // empty, the context is searched for a request ID. If that's also empty, a new
 // request ID is generated.
@@ -115,7 +126,7 @@ func enforceRequestID(r *http.Request) {
 			// used before by the client (unless it's a retry for the same request)?
 			requestID = reqID
 		} else {
-			requestID = xid.New().String()
+			requestID = newRequestID()
 		}
 		r.Header.Set(requestIDHeader, requestID)
 	}

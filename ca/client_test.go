@@ -17,6 +17,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/google/uuid"
 	"github.com/smallstep/certificates/api"
 	"github.com/smallstep/certificates/api/read"
 	"github.com/smallstep/certificates/api/render"
@@ -1055,4 +1056,13 @@ func Test_enforceRequestID(t *testing.T) {
 			}
 		})
 	}
+}
+
+func Test_newRequestID(t *testing.T) {
+	requestID := newRequestID()
+	u, err := uuid.Parse(requestID)
+	assert.NoError(t, err)
+	assert.Equal(t, uuid.Version(0x4), u.Version())
+	assert.Equal(t, uuid.RFC4122, u.Variant())
+	assert.Equal(t, requestID, u.String())
 }
