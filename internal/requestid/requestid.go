@@ -5,6 +5,7 @@ import (
 	"net/http"
 
 	"github.com/rs/xid"
+	"go.step.sm/crypto/randutil"
 )
 
 const (
@@ -61,9 +62,16 @@ func (h *Handler) Middleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(fn)
 }
 
-// newRequestID creates a new request ID using github.com/rs/xid.
+// newRequestID generates a new random UUIDv4 request ID. If UUIDv4
+// generation fails, it'll fallback to generating a random ID using
+// github.com/rs/xid.
 func newRequestID() string {
-	return xid.New().String()
+	requestID, err := randutil.UUIDv4()
+	if err != nil {
+		requestID = xid.New().String()
+	}
+
+	return requestID
 }
 
 type requestIDKey struct{}
