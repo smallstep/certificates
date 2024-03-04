@@ -248,7 +248,7 @@ func generateOTT(t *testing.T, jwk *jose.JSONWebKey, subject string) string {
 	return raw
 }
 
-func newAuthorizingServer(t *testing.T, ca *minica.CA) *httptest.Server {
+func newAuthorizingServer(t *testing.T, mca *minica.CA) *httptest.Server {
 	t.Helper()
 
 	key, err := keyutil.GenerateDefaultSigner()
@@ -257,7 +257,7 @@ func newAuthorizingServer(t *testing.T, ca *minica.CA) *httptest.Server {
 	csr, err := x509util.CreateCertificateRequest("127.0.0.1", []string{"127.0.0.1"}, key)
 	require.NoError(t, err)
 
-	crt, err := ca.SignCSR(csr)
+	crt, err := mca.SignCSR(csr)
 	require.NoError(t, err)
 
 	srv := httptest.NewUnstartedServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -270,12 +270,12 @@ func newAuthorizingServer(t *testing.T, ca *minica.CA) *httptest.Server {
 		w.WriteHeader(http.StatusBadRequest)
 	}))
 	trustedRoots := x509.NewCertPool()
-	trustedRoots.AddCert(ca.Root)
+	trustedRoots.AddCert(mca.Root)
 
 	srv.TLS = &tls.Config{
 		Certificates: []tls.Certificate{
 			{
-				Certificate: [][]byte{crt.Raw, ca.Intermediate.Raw},
+				Certificate: [][]byte{crt.Raw, mca.Intermediate.Raw},
 				PrivateKey:  key,
 				Leaf:        crt,
 			},
