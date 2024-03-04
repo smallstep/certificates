@@ -29,6 +29,7 @@ import (
 	"github.com/smallstep/certificates/cas/apiv1"
 	"github.com/smallstep/certificates/db"
 	"github.com/smallstep/certificates/internal/metrix"
+	"github.com/smallstep/certificates/internal/requestid"
 	"github.com/smallstep/certificates/logging"
 	"github.com/smallstep/certificates/monitoring"
 	"github.com/smallstep/certificates/scep"
@@ -329,14 +330,20 @@ func (ca *CA) Init(cfg *config.Config) (*CA, error) {
 	}
 
 	// Add logger if configured
+	var legacyTraceHeader string
 	if len(cfg.Logger) > 0 {
 		logger, err := logging.New("ca", cfg.Logger)
 		if err != nil {
 			return nil, err
 		}
+		legacyTraceHeader = logger.GetTraceHeader()
 		handler = logger.Middleware(handler)
 		insecureHandler = logger.Middleware(insecureHandler)
 	}
+
+	// always use request ID middleware; traceHeader is provided for backwards compatibility (for now)
+	handler = requestid.New(legacyTraceHeader).Middleware(handler)
+	insecureHandler = requestid.New(legacyTraceHeader).Middleware(insecureHandler)
 
 	// Create context with all the necessary values.
 	baseContext := buildContext(auth, scepAuthority, acmeDB, acmeLinker)

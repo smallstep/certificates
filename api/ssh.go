@@ -330,7 +330,7 @@ func SSHSign(w http.ResponseWriter, r *http.Request) {
 			NotAfter:  time.Unix(int64(cert.ValidBefore), 0),
 		})
 
-		certChain, err := a.Sign(cr, provisioner.SignOptions{}, signOpts...)
+		certChain, err := a.SignWithContext(ctx, cr, provisioner.SignOptions{}, signOpts...)
 		if err != nil {
 			render.Error(w, errs.ForbiddenErr(err, "error signing identity certificate"))
 			return

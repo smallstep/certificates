@@ -1,6 +1,7 @@
 package provisioner
 
 import (
+	"context"
 	"crypto/hmac"
 	"crypto/sha256"
 	"crypto/tls"
@@ -8,18 +9,23 @@ import (
 	"encoding/base64"
 	"encoding/hex"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
 	"net/http/httptest"
 	"testing"
+	"time"
 
-	"github.com/pkg/errors"
-	"github.com/smallstep/assert"
-	"github.com/smallstep/certificates/webhook"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+
 	"go.step.sm/crypto/pemutil"
 	"go.step.sm/crypto/x509util"
 	"go.step.sm/linkedca"
+
+	"github.com/smallstep/certificates/internal/requestid"
+	"github.com/smallstep/certificates/webhook"
 )
 
 func TestWebhookController_isCertTypeOK(t *testing.T) {
@@ -92,19 +98,25 @@ func TestWebhookController_isCertTypeOK(t *testing.T) {
 	}
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
-			assert.Equals(t, test.want, test.wc.isCertTypeOK(test.wh))
+			assert.Equal(t, test.want, test.wc.isCertTypeOK(test.wh))
 		})
 	}
 }
 
+// withRequestID is a helper that calls into [requestid.NewContext] and returns
+// a new context with the requestID added.
+func withRequestID(t *testing.T, ctx context.Context, requestID string) context.Context {
+	t.Helper()
+	return requestid.NewContext(ctx, requestID)
+}
+
 func TestWebhookController_Enrich(t *testing.T) {
 	cert, err := pemutil.ReadCertificate("testdata/certs/x5c-leaf.crt", pemutil.WithFirstBlock())
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
 
 	type test struct {
 		ctl                *WebhookController
+		ctx                context.Context
 		req                *webhook.RequestBody
 		responses          []*webhook.ResponseBody
 		expectErr          bool
@@ -129,6 +141,7 @@ func TestWebhookController_Enrich(t *testing.T) {
 				webhooks:     []*Webhook{{Name: "people", Kind: "ENRICHING"}},
 				TemplateData: x509util.TemplateData{},
 			},
+			ctx:                withRequestID(t, context.Background(), "reqID"),
 			req:                &webhook.RequestBody{},
 			responses:          []*webhook.ResponseBody{{Allow: true, Data: map[string]any{"role": "bar"}}},
 			expectErr:          false,
@@ -143,6 +156,7 @@ func TestWebhookController_Enrich(t *testing.T) {
 				},
 				TemplateData: x509util.TemplateData{},
 			},
+			ctx: withRequestID(t, context.Background(), "reqID"),
 			req: &webhook.RequestBody{},
 			responses: []*webhook.ResponseBody{
 				{Allow: true, Data: map[string]any{"role": "bar"}},
@@ -166,6 +180,7 @@ func TestWebhookController_Enrich(t *testing.T) {
 				TemplateData: x509util.TemplateData{},
 				certType:     linkedca.Webhook_X509,
 			},
+			ctx: withRequestID(t, context.Background(), "reqID"),
 			req: &webhook.RequestBody{},
 			responses: []*webhook.ResponseBody{
 				{Allow: true, Data: map[string]any{"role": "bar"}},
@@ -185,14 +200,15 @@ func TestWebhookController_Enrich(t *testing.T) {
 				TemplateData: x509util.TemplateData{},
 				options:      []webhook.RequestBodyOption{webhook.WithX5CCertificate(cert)},
 			},
+			ctx:                withRequestID(t, context.Background(), "reqID"),
 			req:                &webhook.RequestBody{},
 			responses:          []*webhook.ResponseBody{{Allow: true, Data: map[string]any{"role": "bar"}}},
 			expectErr:          false,
 			expectTemplateData: x509util.TemplateData{"Webhooks": map[string]any{"people": map[string]any{"role": "bar"}}},
 			assertRequest: func(t *testing.T, req *webhook.RequestBody) {
 				key, err := x509.MarshalPKIXPublicKey(cert.PublicKey)
-				assert.FatalError(t, err)
-				assert.Equals(t, &webhook.X5CCertificate{
+				require.NoError(t, err)
+				assert.Equal(t, &webhook.X5CCertificate{
 					Raw:                cert.Raw,
 					PublicKey:          key,
 					PublicKeyAlgorithm: cert.PublicKeyAlgorithm.String(),
@@ -207,6 +223,7 @@ func TestWebhookController_Enrich(t *testing.T) {
 				webhooks:     []*Webhook{{Name: "people", Kind: "ENRICHING"}},
 				TemplateData: x509util.TemplateData{},
 			},
+			ctx:                withRequestID(t, context.Background(), "reqID"),
 			req:                &webhook.RequestBody{},
 			responses:          []*webhook.ResponseBody{{Allow: false}},
 			expectErr:          true,
@@ -221,6 +238,7 @@ func TestWebhookController_Enrich(t *testing.T) {
 					PublicKey: []byte("bad"),
 				})},
 			},
+			ctx:                withRequestID(t, context.Background(), "reqID"),
 			req:                &webhook.RequestBody{},
 			responses:          []*webhook.ResponseBody{{Allow: false}},
 			expectErr:          true,
@@ -232,19 +250,21 @@ func TestWebhookController_Enrich(t *testing.T) {
 			for i, wh := range test.ctl.webhooks {
 				var j = i
 				ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+					assert.Equal(t, "reqID", r.Header.Get("X-Request-ID"))
+
 					err := json.NewEncoder(w).Encode(test.responses[j])
-					assert.FatalError(t, err)
+					require.NoError(t, err)
 				}))
 				// nolint: gocritic // defer in loop isn't a memory leak
 				defer ts.Close()
 				wh.URL = ts.URL
 			}
 
-			err := test.ctl.Enrich(test.req)
+			err := test.ctl.Enrich(test.ctx, test.req)
 			if (err != nil) != test.expectErr {
 				t.Fatalf("Got err %v, want %v", err, test.expectErr)
 			}
-			assert.Equals(t, test.expectTemplateData, test.ctl.TemplateData)
+			assert.Equal(t, test.expectTemplateData, test.ctl.TemplateData)
 			if test.assertRequest != nil {
 				test.assertRequest(t, test.req)
 			}
@@ -254,12 +274,11 @@ func TestWebhookController_Enrich(t *testing.T) {
 
 func TestWebhookController_Authorize(t *testing.T) {
 	cert, err := pemutil.ReadCertificate("testdata/certs/x5c-leaf.crt", pemutil.WithFirstBlock())
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
 
 	type test struct {
 		ctl           *WebhookController
+		ctx           context.Context
 		req           *webhook.RequestBody
 		responses     []*webhook.ResponseBody
 		expectErr     bool
@@ -280,6 +299,7 @@ func TestWebhookController_Authorize(t *testing.T) {
 				client:   http.DefaultClient,
 				webhooks: []*Webhook{{Name: "people", Kind: "AUTHORIZING"}},
 			},
+			ctx:       withRequestID(t, context.Background(), "reqID"),
 			req:       &webhook.RequestBody{},
 			responses: []*webhook.ResponseBody{{Allow: true}},
 			expectErr: false,
@@ -290,6 +310,7 @@ func TestWebhookController_Authorize(t *testing.T) {
 				webhooks: []*Webhook{{Name: "people", Kind: "AUTHORIZING", CertType: linkedca.Webhook_X509.String()}},
 				certType: linkedca.Webhook_SSH,
 			},
+			ctx:       withRequestID(t, context.Background(), "reqID"),
 			req:       &webhook.RequestBody{},
 			responses: []*webhook.ResponseBody{{Allow: false}},
 			expectErr: false,
@@ -300,13 +321,14 @@ func TestWebhookController_Authorize(t *testing.T) {
 				webhooks: []*Webhook{{Name: "people", Kind: "AUTHORIZING"}},
 				options:  []webhook.RequestBodyOption{webhook.WithX5CCertificate(cert)},
 			},
+			ctx:       withRequestID(t, context.Background(), "reqID"),
 			req:       &webhook.RequestBody{},
 			responses: []*webhook.ResponseBody{{Allow: true}},
 			expectErr: false,
 			assertRequest: func(t *testing.T, req *webhook.RequestBody) {
 				key, err := x509.MarshalPKIXPublicKey(cert.PublicKey)
-				assert.FatalError(t, err)
-				assert.Equals(t, &webhook.X5CCertificate{
+				require.NoError(t, err)
+				assert.Equal(t, &webhook.X5CCertificate{
 					Raw:                cert.Raw,
 					PublicKey:          key,
 					PublicKeyAlgorithm: cert.PublicKeyAlgorithm.String(),
@@ -320,6 +342,7 @@ func TestWebhookController_Authorize(t *testing.T) {
 				client:   http.DefaultClient,
 				webhooks: []*Webhook{{Name: "people", Kind: "AUTHORIZING"}},
 			},
+			ctx:       withRequestID(t, context.Background(), "reqID"),
 			req:       &webhook.RequestBody{},
 			responses: []*webhook.ResponseBody{{Allow: false}},
 			expectErr: true,
@@ -332,6 +355,7 @@ func TestWebhookController_Authorize(t *testing.T) {
 					PublicKey: []byte("bad"),
 				})},
 			},
+			ctx:       withRequestID(t, context.Background(), "reqID"),
 			req:       &webhook.RequestBody{},
 			responses: []*webhook.ResponseBody{{Allow: false}},
 			expectErr: true,
@@ -342,15 +366,17 @@ func TestWebhookController_Authorize(t *testing.T) {
 			for i, wh := range test.ctl.webhooks {
 				var j = i
 				ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+					assert.Equal(t, "reqID", r.Header.Get("X-Request-ID"))
+
 					err := json.NewEncoder(w).Encode(test.responses[j])
-					assert.FatalError(t, err)
+					require.NoError(t, err)
 				}))
 				// nolint: gocritic // defer in loop isn't a memory leak
 				defer ts.Close()
 				wh.URL = ts.URL
 			}
 
-			err := test.ctl.Authorize(test.req)
+			err := test.ctl.Authorize(test.ctx, test.req)
 			if (err != nil) != test.expectErr {
 				t.Fatalf("Got err %v, want %v", err, test.expectErr)
 			}
@@ -366,6 +392,7 @@ func TestWebhook_Do(t *testing.T) {
 	type test struct {
 		webhook         Webhook
 		dataArg         any
+		requestID       string
 		webhookResponse webhook.ResponseBody
 		expectPath      string
 		errStatusCode   int
@@ -375,6 +402,16 @@ func TestWebhook_Do(t *testing.T) {
 	}
 	tests := map[string]test{
 		"ok": {
+			webhook: Webhook{
+				ID:     "abc123",
+				Secret: "c2VjcmV0Cg==",
+			},
+			requestID: "reqID",
+			webhookResponse: webhook.ResponseBody{
+				Data: map[string]interface{}{"role": "dba"},
+			},
+		},
+		"ok/no-request-id": {
 			webhook: Webhook{
 				ID:     "abc123",
 				Secret: "c2VjcmV0Cg==",
@@ -389,6 +426,7 @@ func TestWebhook_Do(t *testing.T) {
 				Secret:      "c2VjcmV0Cg==",
 				BearerToken: "mytoken",
 			},
+			requestID: "reqID",
 			webhookResponse: webhook.ResponseBody{
 				Data: map[string]interface{}{"role": "dba"},
 			},
@@ -405,6 +443,7 @@ func TestWebhook_Do(t *testing.T) {
 					Password: "mypass",
 				},
 			},
+			requestID: "reqID",
 			webhookResponse: webhook.ResponseBody{
 				Data: map[string]interface{}{"role": "dba"},
 			},
@@ -416,7 +455,8 @@ func TestWebhook_Do(t *testing.T) {
 				URL:    "/users/{{ .username }}?region={{ .region }}",
 				Secret: "c2VjcmV0Cg==",
 			},
-			dataArg: map[string]interface{}{"username": "areed", "region": "central"},
+			requestID: "reqID",
+			dataArg:   map[string]interface{}{"username": "areed", "region": "central"},
 			webhookResponse: webhook.ResponseBody{
 				Data: map[string]interface{}{"role": "dba"},
 			},
@@ -451,6 +491,7 @@ func TestWebhook_Do(t *testing.T) {
 				ID:     "abc123",
 				Secret: "c2VjcmV0Cg==",
 			},
+			requestID: "reqID",
 			webhookResponse: webhook.ResponseBody{
 				Allow: true,
 			},
@@ -463,6 +504,7 @@ func TestWebhook_Do(t *testing.T) {
 			webhookResponse: webhook.ResponseBody{
 				Data: map[string]interface{}{"role": "dba"},
 			},
+			requestID:     "reqID",
 			errStatusCode: 404,
 			serverErrMsg:  "item not found",
 			expectErr:     errors.New("Webhook server responded with 404"),
@@ -471,17 +513,20 @@ func TestWebhook_Do(t *testing.T) {
 	for name, tc := range tests {
 		t.Run(name, func(t *testing.T) {
 			ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-				id := r.Header.Get("X-Smallstep-Webhook-ID")
-				assert.Equals(t, tc.webhook.ID, id)
+				if tc.requestID != "" {
+					assert.Equal(t, tc.requestID, r.Header.Get("X-Request-ID"))
+				}
+
+				assert.Equal(t, tc.webhook.ID, r.Header.Get("X-Smallstep-Webhook-ID"))
 
 				sig, err := hex.DecodeString(r.Header.Get("X-Smallstep-Signature"))
-				assert.FatalError(t, err)
+				assert.NoError(t, err)
 
 				body, err := io.ReadAll(r.Body)
-				assert.FatalError(t, err)
+				assert.NoError(t, err)
 
 				secret, err := base64.StdEncoding.DecodeString(tc.webhook.Secret)
-				assert.FatalError(t, err)
+				assert.NoError(t, err)
 				h := hmac.New(sha256.New, secret)
 				h.Write(body)
 				mac := h.Sum(nil)
@@ -490,19 +535,19 @@ func TestWebhook_Do(t *testing.T) {
 				switch {
 				case tc.webhook.BearerToken != "":
 					ah := fmt.Sprintf("Bearer %s", tc.webhook.BearerToken)
-					assert.Equals(t, ah, r.Header.Get("Authorization"))
+					assert.Equal(t, ah, r.Header.Get("Authorization"))
 				case tc.webhook.BasicAuth.Username != "" || tc.webhook.BasicAuth.Password != "":
 					whReq, err := http.NewRequest("", "", http.NoBody)
-					assert.FatalError(t, err)
+					require.NoError(t, err)
 					whReq.SetBasicAuth(tc.webhook.BasicAuth.Username, tc.webhook.BasicAuth.Password)
 					ah := whReq.Header.Get("Authorization")
-					assert.Equals(t, ah, whReq.Header.Get("Authorization"))
+					assert.Equal(t, ah, whReq.Header.Get("Authorization"))
 				default:
-					assert.Equals(t, "", r.Header.Get("Authorization"))
+					assert.Equal(t, "", r.Header.Get("Authorization"))
 				}
 
 				if tc.expectPath != "" {
-					assert.Equals(t, tc.expectPath, r.URL.Path+"?"+r.URL.RawQuery)
+					assert.Equal(t, tc.expectPath, r.URL.Path+"?"+r.URL.RawQuery)
 				}
 
 				if tc.errStatusCode != 0 {
@@ -512,26 +557,33 @@ func TestWebhook_Do(t *testing.T) {
 
 				reqBody := new(webhook.RequestBody)
 				err = json.Unmarshal(body, reqBody)
-				assert.FatalError(t, err)
-				// assert.Equals(t, tc.expectToken, reqBody.Token)
+				require.NoError(t, err)
 
 				err = json.NewEncoder(w).Encode(tc.webhookResponse)
-				assert.FatalError(t, err)
+				require.NoError(t, err)
 			}))
 			defer ts.Close()
 
 			tc.webhook.URL = ts.URL + tc.webhook.URL
 
 			reqBody, err := webhook.NewRequestBody(webhook.WithX509CertificateRequest(csr))
-			assert.FatalError(t, err)
-			got, err := tc.webhook.Do(http.DefaultClient, reqBody, tc.dataArg)
+			require.NoError(t, err)
+
+			ctx := context.Background()
+			if tc.requestID != "" {
+				ctx = withRequestID(t, ctx, tc.requestID)
+			}
+			ctx, cancel := context.WithTimeout(ctx, time.Second*10)
+			defer cancel()
+
+			got, err := tc.webhook.DoWithContext(ctx, http.DefaultClient, reqBody, tc.dataArg)
 			if tc.expectErr != nil {
-				assert.Equals(t, tc.expectErr.Error(), err.Error())
+				assert.Equal(t, tc.expectErr.Error(), err.Error())
 				return
 			}
-			assert.FatalError(t, err)
+			assert.NoError(t, err)
 
-			assert.Equals(t, got, &tc.webhookResponse)
+			assert.Equal(t, &tc.webhookResponse, got)
 		})
 	}
 
@@ -544,7 +596,7 @@ func TestWebhook_Do(t *testing.T) {
 			URL: ts.URL,
 		}
 		cert, err := tls.LoadX509KeyPair("testdata/certs/foo.crt", "testdata/secrets/foo.key")
-		assert.FatalError(t, err)
+		require.NoError(t, err)
 		transport := http.DefaultTransport.(*http.Transport).Clone()
 		transport.TLSClientConfig = &tls.Config{
 			InsecureSkipVerify: true,
@@ -554,12 +606,19 @@ func TestWebhook_Do(t *testing.T) {
 			Transport: transport,
 		}
 		reqBody, err := webhook.NewRequestBody(webhook.WithX509CertificateRequest(csr))
-		assert.FatalError(t, err)
-		_, err = wh.Do(client, reqBody, nil)
-		assert.FatalError(t, err)
+		require.NoError(t, err)
+
+		ctx, cancel := context.WithTimeout(context.Background(), time.Second*10)
+		defer cancel()
+
+		_, err = wh.DoWithContext(ctx, client, reqBody, nil)
+		require.NoError(t, err)
+
+		ctx, cancel = context.WithTimeout(context.Background(), time.Second*10)
+		defer cancel()
 
 		wh.DisableTLSClientAuth = true
-		_, err = wh.Do(client, reqBody, nil)
-		assert.Error(t, err)
+		_, err = wh.DoWithContext(ctx, client, reqBody, nil)
+		require.Error(t, err)
 	})
 }

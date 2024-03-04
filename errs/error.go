@@ -49,10 +49,11 @@ func WithKeyVal(key string, val interface{}) Option {
 
 // Error represents the CA API errors.
 type Error struct {
-	Status  int
-	Err     error
-	Msg     string
-	Details map[string]interface{}
+	Status    int
+	Err       error
+	Msg       string
+	Details   map[string]interface{}
+	RequestID string `json:"-"`
 }
 
 // ErrorResponse represents an error in JSON format.

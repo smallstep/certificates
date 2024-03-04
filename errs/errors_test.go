@@ -2,8 +2,9 @@ package errs
 
 import (
 	"fmt"
-	"reflect"
 	"testing"
+
+	"github.com/stretchr/testify/assert"
 )
 
 func TestError_MarshalJSON(t *testing.T) {
@@ -27,13 +28,14 @@ func TestError_MarshalJSON(t *testing.T) {
 				Err:    tt.fields.Err,
 			}
 			got, err := e.MarshalJSON()
-			if (err != nil) != tt.wantErr {
-				t.Errorf("Error.MarshalJSON() error = %v, wantErr %v", err, tt.wantErr)
+			if tt.wantErr {
+				assert.Error(t, err)
+				assert.Empty(t, got)
 				return
 			}
-			if !reflect.DeepEqual(got, tt.want) {
-				t.Errorf("Error.MarshalJSON() = %s, want %s", got, tt.want)
-			}
+
+			assert.NoError(t, err)
+			assert.Equal(t, tt.want, got)
 		})
 	}
 }
@@ -54,13 +56,14 @@ func TestError_UnmarshalJSON(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			e := new(Error)
-			if err := e.UnmarshalJSON(tt.args.data); (err != nil) != tt.wantErr {
-				t.Errorf("Error.UnmarshalJSON() error = %v, wantErr %v", err, tt.wantErr)
+			err := e.UnmarshalJSON(tt.args.data)
+			if tt.wantErr {
+				assert.Error(t, err)
+				return
 			}
-			//nolint:govet // best option
-			if !reflect.DeepEqual(tt.expected, e) {
-				t.Errorf("Error.UnmarshalJSON() wants = %+v, got %+v", tt.expected, e)
-			}
+
+			assert.NoError(t, err)
+			assert.Equal(t, tt.expected, e)
 		})
 	}
 }
