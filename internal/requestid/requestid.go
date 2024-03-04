@@ -5,6 +5,7 @@ import (
 	"net/http"
 
 	"github.com/rs/xid"
+
 	"go.step.sm/crypto/randutil"
 )
 
@@ -74,17 +75,17 @@ func newRequestID() string {
 	return requestID
 }
 
-type requestIDKey struct{}
+type contextKey struct{}
 
 // NewContext returns a new context with the given request ID added to the
 // context.
 func NewContext(ctx context.Context, requestID string) context.Context {
-	return context.WithValue(ctx, requestIDKey{}, requestID)
+	return context.WithValue(ctx, contextKey{}, requestID)
 }
 
 // FromContext returns the request ID from the context if it exists and
 // is not the empty value.
 func FromContext(ctx context.Context) (string, bool) {
-	v, ok := ctx.Value(requestIDKey{}).(string)
+	v, ok := ctx.Value(contextKey{}).(string)
 	return v, ok && v != ""
 }

@@ -17,13 +17,15 @@ import (
 	"testing"
 	"time"
 
-	"github.com/smallstep/certificates/internal/requestid"
-	"github.com/smallstep/certificates/webhook"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+
 	"go.step.sm/crypto/pemutil"
 	"go.step.sm/crypto/x509util"
 	"go.step.sm/linkedca"
+
+	"github.com/smallstep/certificates/internal/requestid"
+	"github.com/smallstep/certificates/webhook"
 )
 
 func TestWebhookController_isCertTypeOK(t *testing.T) {
@@ -103,7 +105,8 @@ func TestWebhookController_isCertTypeOK(t *testing.T) {
 
 // withRequestID is a helper that calls into [requestid.NewContext] and returns
 // a new context with the requestID added.
-func withRequestID(ctx context.Context, requestID string) context.Context {
+func withRequestID(t *testing.T, ctx context.Context, requestID string) context.Context {
+	t.Helper()
 	return requestid.NewContext(ctx, requestID)
 }
 
@@ -138,7 +141,7 @@ func TestWebhookController_Enrich(t *testing.T) {
 				webhooks:     []*Webhook{{Name: "people", Kind: "ENRICHING"}},
 				TemplateData: x509util.TemplateData{},
 			},
-			ctx:                withRequestID(context.Background(), "reqID"),
+			ctx:                withRequestID(t, context.Background(), "reqID"),
 			req:                &webhook.RequestBody{},
 			responses:          []*webhook.ResponseBody{{Allow: true, Data: map[string]any{"role": "bar"}}},
 			expectErr:          false,
@@ -153,7 +156,7 @@ func TestWebhookController_Enrich(t *testing.T) {
 				},
 				TemplateData: x509util.TemplateData{},
 			},
-			ctx: withRequestID(context.Background(), "reqID"),
+			ctx: withRequestID(t, context.Background(), "reqID"),
 			req: &webhook.RequestBody{},
 			responses: []*webhook.ResponseBody{
 				{Allow: true, Data: map[string]any{"role": "bar"}},
@@ -177,7 +180,7 @@ func TestWebhookController_Enrich(t *testing.T) {
 				TemplateData: x509util.TemplateData{},
 				certType:     linkedca.Webhook_X509,
 			},
-			ctx: withRequestID(context.Background(), "reqID"),
+			ctx: withRequestID(t, context.Background(), "reqID"),
 			req: &webhook.RequestBody{},
 			responses: []*webhook.ResponseBody{
 				{Allow: true, Data: map[string]any{"role": "bar"}},
@@ -197,7 +200,7 @@ func TestWebhookController_Enrich(t *testing.T) {
 				TemplateData: x509util.TemplateData{},
 				options:      []webhook.RequestBodyOption{webhook.WithX5CCertificate(cert)},
 			},
-			ctx:                withRequestID(context.Background(), "reqID"),
+			ctx:                withRequestID(t, context.Background(), "reqID"),
 			req:                &webhook.RequestBody{},
 			responses:          []*webhook.ResponseBody{{Allow: true, Data: map[string]any{"role": "bar"}}},
 			expectErr:          false,
@@ -220,7 +223,7 @@ func TestWebhookController_Enrich(t *testing.T) {
 				webhooks:     []*Webhook{{Name: "people", Kind: "ENRICHING"}},
 				TemplateData: x509util.TemplateData{},
 			},
-			ctx:                withRequestID(context.Background(), "reqID"),
+			ctx:                withRequestID(t, context.Background(), "reqID"),
 			req:                &webhook.RequestBody{},
 			responses:          []*webhook.ResponseBody{{Allow: false}},
 			expectErr:          true,
@@ -235,7 +238,7 @@ func TestWebhookController_Enrich(t *testing.T) {
 					PublicKey: []byte("bad"),
 				})},
 			},
-			ctx:                withRequestID(context.Background(), "reqID"),
+			ctx:                withRequestID(t, context.Background(), "reqID"),
 			req:                &webhook.RequestBody{},
 			responses:          []*webhook.ResponseBody{{Allow: false}},
 			expectErr:          true,
@@ -296,7 +299,7 @@ func TestWebhookController_Authorize(t *testing.T) {
 				client:   http.DefaultClient,
 				webhooks: []*Webhook{{Name: "people", Kind: "AUTHORIZING"}},
 			},
-			ctx:       withRequestID(context.Background(), "reqID"),
+			ctx:       withRequestID(t, context.Background(), "reqID"),
 			req:       &webhook.RequestBody{},
 			responses: []*webhook.ResponseBody{{Allow: true}},
 			expectErr: false,
@@ -307,7 +310,7 @@ func TestWebhookController_Authorize(t *testing.T) {
 				webhooks: []*Webhook{{Name: "people", Kind: "AUTHORIZING", CertType: linkedca.Webhook_X509.String()}},
 				certType: linkedca.Webhook_SSH,
 			},
-			ctx:       withRequestID(context.Background(), "reqID"),
+			ctx:       withRequestID(t, context.Background(), "reqID"),
 			req:       &webhook.RequestBody{},
 			responses: []*webhook.ResponseBody{{Allow: false}},
 			expectErr: false,
@@ -318,7 +321,7 @@ func TestWebhookController_Authorize(t *testing.T) {
 				webhooks: []*Webhook{{Name: "people", Kind: "AUTHORIZING"}},
 				options:  []webhook.RequestBodyOption{webhook.WithX5CCertificate(cert)},
 			},
-			ctx:       withRequestID(context.Background(), "reqID"),
+			ctx:       withRequestID(t, context.Background(), "reqID"),
 			req:       &webhook.RequestBody{},
 			responses: []*webhook.ResponseBody{{Allow: true}},
 			expectErr: false,
@@ -339,7 +342,7 @@ func TestWebhookController_Authorize(t *testing.T) {
 				client:   http.DefaultClient,
 				webhooks: []*Webhook{{Name: "people", Kind: "AUTHORIZING"}},
 			},
-			ctx:       withRequestID(context.Background(), "reqID"),
+			ctx:       withRequestID(t, context.Background(), "reqID"),
 			req:       &webhook.RequestBody{},
 			responses: []*webhook.ResponseBody{{Allow: false}},
 			expectErr: true,
@@ -352,7 +355,7 @@ func TestWebhookController_Authorize(t *testing.T) {
 					PublicKey: []byte("bad"),
 				})},
 			},
-			ctx:       withRequestID(context.Background(), "reqID"),
+			ctx:       withRequestID(t, context.Background(), "reqID"),
 			req:       &webhook.RequestBody{},
 			responses: []*webhook.ResponseBody{{Allow: false}},
 			expectErr: true,
@@ -568,7 +571,7 @@ func TestWebhook_Do(t *testing.T) {
 
 			ctx := context.Background()
 			if tc.requestID != "" {
-				ctx = withRequestID(context.Background(), tc.requestID)
+				ctx = withRequestID(t, ctx, tc.requestID)
 			}
 			ctx, cancel := context.WithTimeout(ctx, time.Second*10)
 			defer cancel()

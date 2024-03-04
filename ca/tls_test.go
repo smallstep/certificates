@@ -17,27 +17,28 @@ import (
 	"testing"
 	"time"
 
-	"github.com/smallstep/certificates/api"
-	"github.com/smallstep/certificates/authority"
+	"github.com/stretchr/testify/require"
+
 	"go.step.sm/crypto/jose"
 	"go.step.sm/crypto/randutil"
+
+	"github.com/smallstep/certificates/api"
+	"github.com/smallstep/certificates/authority"
 )
 
-func generateOTT(subject string) string {
+func generateOTT(t *testing.T, subject string) string {
+	t.Helper()
 	now := time.Now()
 	jwk, err := jose.ReadKey("testdata/secrets/ott_mariano_priv.jwk", jose.WithPassword([]byte("password")))
-	if err != nil {
-		panic(err)
-	}
+	require.NoError(t, err)
+
 	opts := new(jose.SignerOptions).WithType("JWT").WithHeader("kid", jwk.KeyID)
 	sig, err := jose.NewSigner(jose.SigningKey{Algorithm: jose.ES256, Key: jwk.Key}, opts)
-	if err != nil {
-		panic(err)
-	}
+	require.NoError(t, err)
+
 	id, err := randutil.ASCII(64)
-	if err != nil {
-		panic(err)
-	}
+	require.NoError(t, err)
+
 	cl := struct {
 		jose.Claims
 		SANS []string `json:"sans"`
@@ -53,9 +54,8 @@ func generateOTT(subject string) string {
 		SANS: []string{subject},
 	}
 	raw, err := jose.Signed(sig).Claims(cl).CompactSerialize()
-	if err != nil {
-		panic(err)
-	}
+	require.NoError(t, err)
+
 	return raw
 }
 
@@ -72,32 +72,28 @@ func startTestServer(baseContext context.Context, tlsConfig *tls.Config, handler
 	return srv
 }
 
-func startCATestServer() *httptest.Server {
+func startCATestServer(t *testing.T) *httptest.Server {
 	config, err := authority.LoadConfiguration("testdata/ca.json")
-	if err != nil {
-		panic(err)
-	}
+	require.NoError(t, err)
 	ca, err := New(config)
-	if err != nil {
-		panic(err)
-	}
+	require.NoError(t, err)
 	// Use a httptest.Server instead
 	baseContext := buildContext(ca.auth, nil, nil, nil)
 	srv := startTestServer(baseContext, ca.srv.TLSConfig, ca.srv.Handler)
 	return srv
 }
 
-func sign(domain string) (*Client, *api.SignResponse, crypto.PrivateKey) {
-	srv := startCATestServer()
+func sign(t *testing.T, domain string) (*Client, *api.SignResponse, crypto.PrivateKey) {
+	t.Helper()
+	srv := startCATestServer(t)
 	defer srv.Close()
-	return signDuration(srv, domain, 0)
+	return signDuration(t, srv, domain, 0)
 }
 
-func signDuration(srv *httptest.Server, domain string, duration time.Duration) (*Client, *api.SignResponse, crypto.PrivateKey) {
-	req, pk, err := CreateSignRequest(generateOTT(domain))
-	if err != nil {
-		panic(err)
-	}
+func signDuration(t *testing.T, srv *httptest.Server, domain string, duration time.Duration) (*Client, *api.SignResponse, crypto.PrivateKey) {
+	t.Helper()
+	req, pk, err := CreateSignRequest(generateOTT(t, domain))
+	require.NoError(t, err)
 
 	if duration > 0 {
 		req.NotBefore = api.NewTimeDuration(time.Now())
@@ -105,13 +101,11 @@ func signDuration(srv *httptest.Server, domain string, duration time.Duration) (
 	}
 
 	client, err := NewClient(srv.URL, WithRootFile("testdata/secrets/root_ca.crt"))
-	if err != nil {
-		panic(err)
-	}
+	require.NoError(t, err)
+
 	sr, err := client.Sign(req)
-	if err != nil {
-		panic(err)
-	}
+	require.NoError(t, err)
+
 	return client, sr, pk
 }
 
@@ -145,7 +139,7 @@ func serverHandler(t *testing.T, clientDomain string) http.Handler {
 
 func TestClient_GetServerTLSConfig_http(t *testing.T) {
 	clientDomain := "test.domain"
-	client, sr, pk := sign("127.0.0.1")
+	client, sr, pk := sign(t, "127.0.0.1")
 
 	// Create mTLS server
 	ctx, cancel := context.WithCancel(context.Background())
@@ -212,7 +206,7 @@ func TestClient_GetServerTLSConfig_http(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			client, sr, pk := sign(clientDomain)
+			client, sr, pk := sign(t, clientDomain)
 			cli := tt.getClient(t, client, sr, pk)
 			if cli == nil {
 				return
@@ -246,19 +240,18 @@ func TestClient_GetServerTLSConfig_renew(t *testing.T) {
 	defer reset()
 
 	// Start CA
-	ca := startCATestServer()
+	ca := startCATestServer(t)
 	defer ca.Close()
 
 	clientDomain := "test.domain"
-	client, sr, pk := signDuration(ca, "127.0.0.1", 5*time.Second)
+	client, sr, pk := signDuration(t, ca, "127.0.0.1", 5*time.Second)
 
 	// Start mTLS server
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 	tlsConfig, err := client.GetServerTLSConfig(ctx, sr, pk)
-	if err != nil {
-		t.Fatalf("Client.GetServerTLSConfig() error = %v", err)
-	}
+	require.NoError(t, err)
+
 	srvMTLS := startTestServer(context.Background(), tlsConfig, serverHandler(t, clientDomain))
 	defer srvMTLS.Close()
 
@@ -266,30 +259,26 @@ func TestClient_GetServerTLSConfig_renew(t *testing.T) {
 	ctx, cancel = context.WithCancel(context.Background())
 	defer cancel()
 	tlsConfig, err = client.GetServerTLSConfig(ctx, sr, pk, VerifyClientCertIfGiven())
-	if err != nil {
-		t.Fatalf("Client.GetServerTLSConfig() error = %v", err)
-	}
+	require.NoError(t, err)
+
 	srvTLS := startTestServer(context.Background(), tlsConfig, serverHandler(t, clientDomain))
 	defer srvTLS.Close()
 
 	// Transport
-	client, sr, pk = signDuration(ca, clientDomain, 5*time.Second)
+	client, sr, pk = signDuration(t, ca, clientDomain, 5*time.Second)
 	tr1, err := client.Transport(context.Background(), sr, pk)
-	if err != nil {
-		t.Fatalf("Client.Transport() error = %v", err)
-	}
+	require.NoError(t, err)
+
 	// Transport with tlsConfig
-	client, sr, pk = signDuration(ca, clientDomain, 5*time.Second)
+	client, sr, pk = signDuration(t, ca, clientDomain, 5*time.Second)
 	tlsConfig, err = client.GetClientTLSConfig(context.Background(), sr, pk)
-	if err != nil {
-		t.Fatalf("Client.GetClientTLSConfig() error = %v", err)
-	}
+	require.NoError(t, err)
+
 	tr2 := getDefaultTransport(tlsConfig)
 	// No client cert
 	root, err := RootCertificate(sr)
-	if err != nil {
-		t.Fatalf("RootCertificate() error = %v", err)
-	}
+	require.NoError(t, err)
+
 	tlsConfig = getDefaultTLSConfig(sr)
 	tlsConfig.RootCAs = x509.NewCertPool()
 	tlsConfig.RootCAs.AddCert(root)

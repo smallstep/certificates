@@ -10,6 +10,8 @@ import (
 	"sort"
 	"testing"
 
+	"github.com/stretchr/testify/require"
+
 	"github.com/smallstep/certificates/api"
 )
 
@@ -196,23 +198,17 @@ func TestAddClientCA(t *testing.T) {
 
 //nolint:gosec // test tls config
 func TestAddRootsToRootCAs(t *testing.T) {
-	ca := startCATestServer()
+	ca := startCATestServer(t)
 	defer ca.Close()
 
 	client, err := NewClient(ca.URL, WithRootFile("testdata/secrets/root_ca.crt"))
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
 
 	clientFail, err := NewClient(ca.URL, WithTransport(http.DefaultTransport))
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
 
 	root, err := os.ReadFile("testdata/secrets/root_ca.crt")
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
 
 	cert := parseCertificate(t, string(root))
 	pool := x509.NewCertPool()
@@ -251,23 +247,17 @@ func TestAddRootsToRootCAs(t *testing.T) {
 
 //nolint:gosec // test tls config
 func TestAddRootsToClientCAs(t *testing.T) {
-	ca := startCATestServer()
+	ca := startCATestServer(t)
 	defer ca.Close()
 
 	client, err := NewClient(ca.URL, WithRootFile("testdata/secrets/root_ca.crt"))
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
 
 	clientFail, err := NewClient(ca.URL, WithTransport(http.DefaultTransport))
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
 
 	root, err := os.ReadFile("testdata/secrets/root_ca.crt")
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
 
 	cert := parseCertificate(t, string(root))
 	pool := x509.NewCertPool()
@@ -306,28 +296,20 @@ func TestAddRootsToClientCAs(t *testing.T) {
 
 //nolint:gosec // test tls config
 func TestAddFederationToRootCAs(t *testing.T) {
-	ca := startCATestServer()
+	ca := startCATestServer(t)
 	defer ca.Close()
 
 	client, err := NewClient(ca.URL, WithRootFile("testdata/secrets/root_ca.crt"))
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
 
 	clientFail, err := NewClient(ca.URL, WithTransport(http.DefaultTransport))
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
 
 	root, err := os.ReadFile("testdata/secrets/root_ca.crt")
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
 
 	federated, err := os.ReadFile("testdata/secrets/federated_ca.crt")
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
 
 	crt1 := parseCertificate(t, string(root))
 	crt2 := parseCertificate(t, string(federated))
@@ -371,28 +353,20 @@ func TestAddFederationToRootCAs(t *testing.T) {
 
 //nolint:gosec // test tls config
 func TestAddFederationToClientCAs(t *testing.T) {
-	ca := startCATestServer()
+	ca := startCATestServer(t)
 	defer ca.Close()
 
 	client, err := NewClient(ca.URL, WithRootFile("testdata/secrets/root_ca.crt"))
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
 
 	clientFail, err := NewClient(ca.URL, WithTransport(http.DefaultTransport))
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
 
 	root, err := os.ReadFile("testdata/secrets/root_ca.crt")
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
 
 	federated, err := os.ReadFile("testdata/secrets/federated_ca.crt")
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
 
 	crt1 := parseCertificate(t, string(root))
 	crt2 := parseCertificate(t, string(federated))
@@ -436,23 +410,17 @@ func TestAddFederationToClientCAs(t *testing.T) {
 
 //nolint:gosec // test tls config
 func TestAddRootsToCAs(t *testing.T) {
-	ca := startCATestServer()
+	ca := startCATestServer(t)
 	defer ca.Close()
 
 	client, err := NewClient(ca.URL, WithRootFile("testdata/secrets/root_ca.crt"))
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
 
 	clientFail, err := NewClient(ca.URL, WithTransport(http.DefaultTransport))
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
 
 	root, err := os.ReadFile("testdata/secrets/root_ca.crt")
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
 
 	cert := parseCertificate(t, string(root))
 	pool := x509.NewCertPool()
@@ -491,28 +459,20 @@ func TestAddRootsToCAs(t *testing.T) {
 
 //nolint:gosec // test tls config
 func TestAddFederationToCAs(t *testing.T) {
-	ca := startCATestServer()
+	ca := startCATestServer(t)
 	defer ca.Close()
 
 	client, err := NewClient(ca.URL, WithRootFile("testdata/secrets/root_ca.crt"))
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
 
 	clientFail, err := NewClient(ca.URL, WithTransport(http.DefaultTransport))
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
 
 	root, err := os.ReadFile("testdata/secrets/root_ca.crt")
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
 
 	federated, err := os.ReadFile("testdata/secrets/federated_ca.crt")
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
 
 	crt1 := parseCertificate(t, string(root))
 	crt2 := parseCertificate(t, string(federated))

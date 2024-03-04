@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/sirupsen/logrus"
+
 	"github.com/smallstep/certificates/internal/requestid"
 	"github.com/smallstep/certificates/internal/userid"
 )

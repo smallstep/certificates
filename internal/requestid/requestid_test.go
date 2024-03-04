@@ -19,11 +19,15 @@ func newRequest(t *testing.T) *http.Request {
 func Test_Middleware(t *testing.T) {
 	requestWithID := newRequest(t)
 	requestWithID.Header.Set("X-Request-Id", "reqID")
+
 	requestWithoutID := newRequest(t)
+
 	requestWithEmptyHeader := newRequest(t)
 	requestWithEmptyHeader.Header.Set("X-Request-Id", "")
+
 	requestWithSmallstepID := newRequest(t)
 	requestWithSmallstepID.Header.Set("X-Smallstep-Id", "smallstepID")
+
 	tests := []struct {
 		name        string
 		traceHeader string

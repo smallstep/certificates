@@ -9,6 +9,7 @@ import (
 
 	"github.com/newrelic/go-agent/v3/newrelic"
 	"github.com/pkg/errors"
+
 	"github.com/smallstep/certificates/internal/requestid"
 	"github.com/smallstep/certificates/logging"
 )
