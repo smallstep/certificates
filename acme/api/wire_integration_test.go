@@ -591,7 +591,7 @@ type mockCASigner struct {
 	signer func(*x509.CertificateRequest, provisioner.SignOptions, ...provisioner.SignOption) ([]*x509.Certificate, error)
 }
 
-func (m *mockCASigner) Sign(cr *x509.CertificateRequest, opts provisioner.SignOptions, signOpts ...provisioner.SignOption) ([]*x509.Certificate, error) {
+func (m *mockCASigner) SignWithContext(_ context.Context, cr *x509.CertificateRequest, opts provisioner.SignOptions, signOpts ...provisioner.SignOption) ([]*x509.Certificate, error) {
 	if m.signer == nil {
 		return nil, errors.New("unimplemented")
 	}
