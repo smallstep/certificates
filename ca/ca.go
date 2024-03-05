@@ -482,6 +482,7 @@ func (ca *CA) Run() error {
 	// some part of the configuration not being correct. This case is
 	// handled by stopping the CA in its entirety.
 	if !errors.Is(err, http.ErrServerClosed) {
+		log.Println("shutting down due to startup error ...")
 		if stopErr := ca.Stop(); stopErr != nil {
 			err = fmt.Errorf("failed stopping CA after error occurred: %w: %w", err, stopErr)
 		} else {
