@@ -476,6 +476,19 @@ func (ca *CA) Run() error {
 	// wait till error occurs; ensures the servers keep listening
 	err := <-errs
 
+	// if the error is not the usual HTTP server closed error, it is
+	// highly likely that an error occurred when starting one of the
+	// CA servers, possibly because of a port already being in use or
+	// some part of the configuration not being correct. This case is
+	// handled by stopping the CA in its entirety.
+	if !errors.Is(err, http.ErrServerClosed) {
+		if stopErr := ca.Stop(); stopErr != nil {
+			err = fmt.Errorf("failed stopping CA after error occurred: %w: %w", err, stopErr)
+		} else {
+			err = fmt.Errorf("stopped CA after error occurred: %w", err)
+		}
+	}
+
 	wg.Wait()
 
 	return err
