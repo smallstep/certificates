@@ -4,9 +4,8 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"net/url"
 	"strings"
-
-	"go.step.sm/crypto/kms/uri"
 )
 
 type UserID struct {
@@ -71,7 +70,7 @@ type ClientID struct {
 //
 // where '!' is used as a separator between the user id & device id.
 func ParseClientID(clientID string) (ClientID, error) {
-	clientIDURI, err := uri.Parse(clientID)
+	clientIDURI, err := url.Parse(clientID)
 	if err != nil {
 		return ClientID{}, fmt.Errorf("invalid Wire client ID URI %q: %w", clientID, err)
 	}

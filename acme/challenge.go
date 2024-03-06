@@ -641,19 +641,19 @@ func parseAndVerifyWireAccessToken(v wireVerifyParams) (*wireAccessToken, *wireD
 	}
 
 	if accessToken.Challenge == "" {
-		return nil, nil, errors.New("access token challenge must not be empty")
+		return nil, nil, errors.New("access token challenge 'chal' must not be empty")
 	}
 	if accessToken.Cnf.Kid == "" || accessToken.Cnf.Kid != v.dpopKeyID {
-		return nil, nil, fmt.Errorf("expected kid %q; got %q", v.dpopKeyID, accessToken.Cnf.Kid)
+		return nil, nil, fmt.Errorf("expected 'kid' %q; got %q", v.dpopKeyID, accessToken.Cnf.Kid)
 	}
 	if accessToken.ClientID != v.wireID.ClientID {
-		return nil, nil, fmt.Errorf("invalid Wire client ID %q", accessToken.ClientID)
+		return nil, nil, fmt.Errorf("invalid Wire 'client_id' %q", accessToken.ClientID)
 	}
 	if accessToken.Expiry.Time().After(v.t.Add(time.Hour)) {
-		return nil, nil, fmt.Errorf("'exp' %s is too far into the future", accessToken.Expiry.Time().String())
+		return nil, nil, fmt.Errorf("token expiry 'exp' %s is too far into the future", accessToken.Expiry.Time().String())
 	}
 	if accessToken.Scope != "wire_client_id" {
-		return nil, nil, fmt.Errorf("invalid Wire scope %q", accessToken.Scope)
+		return nil, nil, fmt.Errorf("invalid Wire 'scope' %q", accessToken.Scope)
 	}
 
 	dpopJWT, err := jose.ParseSigned(accessToken.Proof)
@@ -685,7 +685,7 @@ func parseAndVerifyWireAccessToken(v wireVerifyParams) (*wireAccessToken, *wireD
 		return nil, nil, fmt.Errorf("failed DPoP validation: %w", err)
 	}
 	if wireDpop.HTU == "" || wireDpop.HTU != v.issuer { // DPoP doesn't contains "iss" claim, but has it in the "htu" claim
-		return nil, nil, fmt.Errorf("DPoP contains invalid issuer (htu) %q", wireDpop.HTU)
+		return nil, nil, fmt.Errorf("DPoP contains invalid issuer 'htu' %q", wireDpop.HTU)
 	}
 	if wireDpop.Expiry.Time().After(v.t.Add(time.Hour)) {
 		return nil, nil, fmt.Errorf("'exp' %s is too far into the future", wireDpop.Expiry.Time().String())
@@ -694,10 +694,10 @@ func parseAndVerifyWireAccessToken(v wireVerifyParams) (*wireAccessToken, *wireD
 		return nil, nil, fmt.Errorf("DPoP contains invalid Wire client ID %q", wireDpop.ClientID)
 	}
 	if wireDpop.Nonce == "" || wireDpop.Nonce != accessToken.Nonce {
-		return nil, nil, fmt.Errorf("DPoP contains invalid nonce %q", wireDpop.Nonce)
+		return nil, nil, fmt.Errorf("DPoP contains invalid 'nonce' %q", wireDpop.Nonce)
 	}
 	if wireDpop.Challenge == "" || wireDpop.Challenge != accessToken.Challenge {
-		return nil, nil, fmt.Errorf("DPoP contains invalid challenge %q", wireDpop.Challenge)
+		return nil, nil, fmt.Errorf("DPoP contains invalid challenge 'chal' %q", wireDpop.Challenge)
 	}
 
 	// TODO(hs): can we use the wireDpopJwt and map that instead of doing Claims() twice?
@@ -708,26 +708,26 @@ func parseAndVerifyWireAccessToken(v wireVerifyParams) (*wireAccessToken, *wireD
 
 	challenge, ok := dpopToken["chal"].(string)
 	if !ok {
-		return nil, nil, fmt.Errorf("invalid challenge in Wire DPoP token")
+		return nil, nil, fmt.Errorf("invalid challenge 'chal' in Wire DPoP token")
 	}
 	if challenge == "" || challenge != v.chToken {
-		return nil, nil, fmt.Errorf("invalid Wire DPoP challenge %q", challenge)
+		return nil, nil, fmt.Errorf("invalid Wire DPoP challenge 'chal' %q", challenge)
 	}
 
 	handle, ok := dpopToken["handle"].(string)
 	if !ok {
-		return nil, nil, fmt.Errorf("invalid handle in Wire DPoP token")
+		return nil, nil, fmt.Errorf("invalid 'handle' in Wire DPoP token")
 	}
 	if handle == "" || handle != v.wireID.Handle {
-		return nil, nil, fmt.Errorf("invalid Wire client handle %q", handle)
+		return nil, nil, fmt.Errorf("invalid Wire client 'handle' %q", handle)
 	}
 
 	name, ok := dpopToken["name"].(string)
 	if !ok {
-		return nil, nil, fmt.Errorf("invalid display name in Wire DPoP token")
+		return nil, nil, fmt.Errorf("invalid display 'name' in Wire DPoP token")
 	}
 	if name == "" || name != v.wireID.Name {
-		return nil, nil, fmt.Errorf("invalid Wire client display name %q", name)
+		return nil, nil, fmt.Errorf("invalid Wire client display 'name' %q", name)
 	}
 
 	return &accessToken, &dpopToken, nil
