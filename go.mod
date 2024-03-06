@@ -40,7 +40,7 @@ require (
 	golang.org/x/net v0.21.0
 	google.golang.org/api v0.167.0
 	google.golang.org/grpc v1.62.0
-	google.golang.org/protobuf v1.32.0
+	google.golang.org/protobuf v1.33.0
 )
 
 require (
