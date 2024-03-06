@@ -180,7 +180,7 @@ release:
 
     Those were the changes on {{ .Tag }}!
 
-    Come join us on [Discord](https://discord.gg/X2RKGwEbV9) to ask questions, chat about PKI, or get a sneak peak at the freshest PKI memes.
+    Come join us on [Discord](https://discord.gg/X2RKGwEbV9) to ask questions, chat about PKI, or get a sneak peek at the freshest PKI memes.
 
   # You can disable this pipe in order to not upload any artifacts.
   # Defaults to false.
