@@ -15,7 +15,7 @@ import (
 	"time"
 
 	"github.com/pkg/errors"
-	"github.com/smallstep/certificates/internal/requestid"
+	"github.com/smallstep/certificates/middleware/requestid"
 	"github.com/smallstep/certificates/templates"
 	"github.com/smallstep/certificates/webhook"
 	"go.step.sm/linkedca"

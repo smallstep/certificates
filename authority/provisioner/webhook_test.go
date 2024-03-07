@@ -24,7 +24,7 @@ import (
 	"go.step.sm/crypto/x509util"
 	"go.step.sm/linkedca"
 
-	"github.com/smallstep/certificates/internal/requestid"
+	"github.com/smallstep/certificates/middleware/requestid"
 	"github.com/smallstep/certificates/webhook"
 )
 
