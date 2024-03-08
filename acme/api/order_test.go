@@ -108,7 +108,7 @@ func TestNewOrderRequest_Validate(t *testing.T) {
 						{Type: "wireapp-device", Value: `{"name": "Smith, Alice M (QA)", "domain": "example.com", "client-id": "example.com", "handle": "wireapp://%40alice.smith.qa@example.com"}`},
 					},
 				},
-				err: acme.NewError(acme.ErrorMalformedType, `failed validating Wire identifiers: invalid Wire client ID "example.com": invalid Wire client ID URI "example.com": error parsing example.com: scheme is missing`),
+				err: acme.NewError(acme.ErrorMalformedType, `failed validating Wire identifiers: invalid Wire client ID "example.com": invalid Wire client ID scheme ""; expected "wireapp"`),
 			}
 		},
 		"fail/bad-identifier/wireapp-wrong-scheme": func(t *testing.T) test {
@@ -743,7 +743,7 @@ MCowBQYDK2VwAyEA5c+4NKZSNQcR1T8qN6SjwgdPZQ0Ge12Ylx/YeGAJ35k=
 				az:   az,
 				err: &acme.Error{
 					Type:   "urn:ietf:params:acme:error:malformed",
-					Err:    errors.New("failed parsing ClientID: invalid Wire client ID URI \"CzbfFjDOQrenCbDxVmgnFw!594930e9d50bb175@wire.com\": error parsing CzbfFjDOQrenCbDxVmgnFw!594930e9d50bb175@wire.com: scheme is missing"),
+					Err:    errors.New(`failed parsing ClientID: invalid Wire client ID scheme ""; expected "wireapp"`),
 					Detail: "The request message was malformed",
 					Status: 400,
 				},

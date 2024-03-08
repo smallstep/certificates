@@ -81,7 +81,7 @@ func TestParseClientID(t *testing.T) {
 		expectedErr error
 	}{
 		{name: "ok", clientID: "wireapp://CzbfFjDOQrenCbDxVmgnFw!594930e9d50bb175@wire.com", want: ClientID{Scheme: "wireapp", Username: "CzbfFjDOQrenCbDxVmgnFw", DeviceID: "594930e9d50bb175", Domain: "wire.com"}},
-		{name: "fail/uri", clientID: "bla", expectedErr: errors.New(`invalid Wire client ID URI "bla": error parsing bla: scheme is missing`)},
+		{name: "fail/uri", clientID: "bla", expectedErr: errors.New(`invalid Wire client ID scheme ""; expected "wireapp"`)},
 		{name: "fail/scheme", clientID: "not-wireapp://bla.com", expectedErr: errors.New(`invalid Wire client ID scheme "not-wireapp"; expected "wireapp"`)},
 		{name: "fail/username", clientID: "wireapp://user@wire.com", expectedErr: errors.New(`invalid Wire client ID username "user"`)},
 	}
