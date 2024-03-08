@@ -29,8 +29,8 @@ import (
 	"github.com/smallstep/certificates/cas/apiv1"
 	"github.com/smallstep/certificates/db"
 	"github.com/smallstep/certificates/internal/metrix"
-	"github.com/smallstep/certificates/internal/requestid"
 	"github.com/smallstep/certificates/logging"
+	"github.com/smallstep/certificates/middleware/requestid"
 	"github.com/smallstep/certificates/monitoring"
 	"github.com/smallstep/certificates/scep"
 	scepAPI "github.com/smallstep/certificates/scep/api"
@@ -475,6 +475,20 @@ func (ca *CA) Run() error {
 
 	// wait till error occurs; ensures the servers keep listening
 	err := <-errs
+
+	// if the error is not the usual HTTP server closed error, it is
+	// highly likely that an error occurred when starting one of the
+	// CA servers, possibly because of a port already being in use or
+	// some part of the configuration not being correct. This case is
+	// handled by stopping the CA in its entirety.
+	if !errors.Is(err, http.ErrServerClosed) {
+		log.Println("shutting down due to startup error ...")
+		if stopErr := ca.Stop(); stopErr != nil {
+			err = fmt.Errorf("failed stopping CA after error occurred: %w: %w", err, stopErr)
+		} else {
+			err = fmt.Errorf("stopped CA after error occurred: %w", err)
+		}
+	}
 
 	wg.Wait()
 
