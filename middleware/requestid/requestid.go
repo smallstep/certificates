@@ -1,3 +1,4 @@
+// Package requestid provides HTTP request ID functionality
 package requestid
 
 import (
