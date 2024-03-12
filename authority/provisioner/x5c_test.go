@@ -813,7 +813,7 @@ func TestX5C_AuthorizeSSHSign(t *testing.T) {
 							}
 							tot++
 						}
-						if len(tc.claims.Step.SSH.CertType) > 0 {
+						if tc.claims.Step.SSH.CertType != "" {
 							assert.Equals(t, tot, 12)
 						} else {
 							assert.Equals(t, tot, 10)

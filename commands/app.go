@@ -239,7 +239,7 @@ To get a linked authority token:
 	// replace resolver if requested
 	if resolver != "" {
 		net.DefaultResolver.PreferGo = true
-		net.DefaultResolver.Dial = func(ctx context.Context, network, address string) (net.Conn, error) {
+		net.DefaultResolver.Dial = func(_ context.Context, network, _ string) (net.Conn, error) {
 			return net.Dial(network, resolver)
 		}
 	}

@@ -65,6 +65,11 @@ func New(ctx context.Context, opts apiv1.Options) (*StepCAS, error) {
 	}, nil
 }
 
+// Type returns the type of this CertificateAuthorityService.
+func (s *StepCAS) Type() apiv1.Type {
+	return apiv1.StepCAS
+}
+
 // CreateCertificate uses the step-ca sign request with the configured
 // provisioner to get a new certificate from the certificate authority.
 func (s *StepCAS) CreateCertificate(req *apiv1.CreateCertificateRequest) (*apiv1.CreateCertificateResponse, error) {
@@ -73,8 +78,8 @@ func (s *StepCAS) CreateCertificate(req *apiv1.CreateCertificateRequest) (*apiv1
 		return nil, errors.New("createCertificateRequest `csr` cannot be nil")
 	case req.Template == nil:
 		return nil, errors.New("createCertificateRequest `template` cannot be nil")
-	case req.Lifetime == 0:
-		return nil, errors.New("createCertificateRequest `lifetime` cannot be 0")
+	case req.Lifetime < 0:
+		return nil, errors.New("createCertificateRequest `lifetime` cannot less than 0")
 	}
 
 	info := &raInfo{

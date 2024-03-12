@@ -59,7 +59,7 @@ var (
 )
 
 func withDefaultASN1DN(def *config.ASN1DN) provisioner.CertificateModifierFunc {
-	return func(crt *x509.Certificate, opts provisioner.SignOptions) error {
+	return func(crt *x509.Certificate, _ provisioner.SignOptions) error {
 		if def == nil {
 			return errors.New("default ASN1DN template cannot be nil")
 		}
@@ -913,10 +913,16 @@ func (a *Authority) GetTLSCertificate() (*tls.Certificate, error) {
 		return fatal(err)
 	}
 
+	// For StepCAS RA let the lifetime to the provisioner used by the CA.
+	var lifetime time.Duration
+	if casapi.TypeOf(a.x509CAService) != casapi.StepCAS {
+		lifetime = 24 * time.Hour
+	}
+
 	resp, err := a.x509CAService.CreateCertificate(&casapi.CreateCertificateRequest{
 		Template:       certTpl,
 		CSR:            cr,
-		Lifetime:       24 * time.Hour,
+		Lifetime:       lifetime,
 		Backdate:       1 * time.Minute,
 		IsCAServerCert: true,
 	})

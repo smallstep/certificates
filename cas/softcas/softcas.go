@@ -53,6 +53,11 @@ func New(_ context.Context, opts apiv1.Options) (*SoftCAS, error) {
 	}, nil
 }
 
+// Type returns the type of this CertificateAuthorityService.
+func (c *SoftCAS) Type() apiv1.Type {
+	return apiv1.SoftCAS
+}
+
 // CreateCertificate signs a new certificate using Golang or KMS crypto.
 func (c *SoftCAS) CreateCertificate(req *apiv1.CreateCertificateRequest) (*apiv1.CreateCertificateResponse, error) {
 	switch {

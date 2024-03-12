@@ -147,10 +147,10 @@ func validateJWS(next nextHTTP) nextHTTP {
 
 		sig := jws.Signatures[0]
 		uh := sig.Unprotected
-		if len(uh.KeyID) > 0 ||
+		if uh.KeyID != "" ||
 			uh.JSONWebKey != nil ||
-			len(uh.Algorithm) > 0 ||
-			len(uh.Nonce) > 0 ||
+			uh.Algorithm != "" ||
+			uh.Nonce != "" ||
 			len(uh.ExtraHeaders) > 0 {
 			render.Error(w, acme.NewError(acme.ErrorMalformedType, "unprotected header must not be used"))
 			return
@@ -199,7 +199,7 @@ func validateJWS(next nextHTTP) nextHTTP {
 			return
 		}
 
-		if hdr.JSONWebKey != nil && len(hdr.KeyID) > 0 {
+		if hdr.JSONWebKey != nil && hdr.KeyID != "" {
 			render.Error(w, acme.NewError(acme.ErrorMalformedType, "jwk and kid are mutually exclusive"))
 			return
 		}

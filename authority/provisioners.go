@@ -608,19 +608,19 @@ func provisionerWebhookToLinkedca(pwh *provisioner.Webhook) *linkedca.Webhook {
 }
 
 func durationsToCertificates(d *linkedca.Durations) (min, max, def *provisioner.Duration, err error) {
-	if len(d.Min) > 0 {
+	if d.Min != "" {
 		min, err = provisioner.NewDuration(d.Min)
 		if err != nil {
 			return nil, nil, nil, admin.WrapErrorISE(err, "error parsing minimum duration '%s'", d.Min)
 		}
 	}
-	if len(d.Max) > 0 {
+	if d.Max != "" {
 		max, err = provisioner.NewDuration(d.Max)
 		if err != nil {
 			return nil, nil, nil, admin.WrapErrorISE(err, "error parsing maximum duration '%s'", d.Max)
 		}
 	}
-	if len(d.Default) > 0 {
+	if d.Default != "" {
 		def, err = provisioner.NewDuration(d.Default)
 		if err != nil {
 			return nil, nil, nil, admin.WrapErrorISE(err, "error parsing default duration '%s'", d.Default)

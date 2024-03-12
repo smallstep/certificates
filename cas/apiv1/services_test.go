@@ -4,6 +4,24 @@ import (
 	"testing"
 )
 
+type simpleCAS struct{}
+
+func (*simpleCAS) CreateCertificate(req *CreateCertificateRequest) (*CreateCertificateResponse, error) {
+	return nil, NotImplementedError{}
+}
+func (*simpleCAS) RenewCertificate(req *RenewCertificateRequest) (*RenewCertificateResponse, error) {
+	return nil, NotImplementedError{}
+}
+func (*simpleCAS) RevokeCertificate(req *RevokeCertificateRequest) (*RevokeCertificateResponse, error) {
+	return nil, NotImplementedError{}
+}
+
+type fakeCAS struct {
+	simpleCAS
+}
+
+func (*fakeCAS) Type() Type { return SoftCAS }
+
 func TestType_String(t *testing.T) {
 	tests := []struct {
 		name string
@@ -20,6 +38,27 @@ func TestType_String(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			if got := tt.t.String(); got != tt.want {
 				t.Errorf("Type.String() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
+func TestTypeOf(t *testing.T) {
+	type args struct {
+		c CertificateAuthorityService
+	}
+	tests := []struct {
+		name string
+		args args
+		want Type
+	}{
+		{"ok", args{&simpleCAS{}}, ExternalCAS},
+		{"ok with type", args{&fakeCAS{}}, SoftCAS},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := TypeOf(tt.args.c); got != tt.want {
+				t.Errorf("TypeOf() = %v, want %v", got, tt.want)
 			}
 		})
 	}

@@ -110,6 +110,11 @@ func New(ctx context.Context, opts apiv1.Options) (*VaultCAS, error) {
 	}, nil
 }
 
+// Type returns the type of this CertificateAuthorityService.
+func (v *VaultCAS) Type() apiv1.Type {
+	return apiv1.VaultCAS
+}
+
 // CreateCertificate signs a new certificate using Hashicorp Vault.
 func (v *VaultCAS) CreateCertificate(req *apiv1.CreateCertificateRequest) (*apiv1.CreateCertificateResponse, error) {
 	switch {

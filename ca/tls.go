@@ -69,7 +69,7 @@ func init() {
 					GetClientCertificate: id.GetClientCertificateFunc(),
 				},
 			}
-			return func(ctx context.Context, network, address string) (net.Conn, error) {
+			return func(ctx context.Context, _, _ string) (net.Conn, error) {
 				return d.DialContext(ctx, "tcp", net.JoinHostPort(host, port))
 			}
 		}

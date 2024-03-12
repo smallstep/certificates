@@ -203,7 +203,7 @@ func matchURIConstraint(uri *url.URL, constraint string) (bool, error) {
 // domainToReverseLabels converts a textual domain name like foo.example.com to
 // the list of labels in reverse order, e.g. ["com", "example", "foo"].
 func domainToReverseLabels(domain string) (reverseLabels []string, ok bool) {
-	for len(domain) > 0 {
+	for domain != "" {
 		if i := strings.LastIndexByte(domain, '.'); i == -1 {
 			reverseLabels = append(reverseLabels, domain)
 			domain = ""
@@ -316,7 +316,7 @@ func parseRFC2821Mailbox(in string) (mailbox rfc2821Mailbox, ok bool) {
 	} else {
 		// Atom ("." Atom)*
 	NextChar:
-		for len(in) > 0 {
+		for in != "" {
 			// atext from RFC 2822, Section 3.2.4
 			c := in[0]
 
