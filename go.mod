@@ -32,7 +32,7 @@ require (
 	github.com/smallstep/scep v0.0.0-20231024192529-aee96d7ad34d
 	github.com/stretchr/testify v1.9.0
 	github.com/urfave/cli v1.22.14
-	go.step.sm/cli-utils v0.8.0
+	go.step.sm/cli-utils v0.9.0
 	go.step.sm/crypto v0.43.1
 	go.step.sm/linkedca v0.20.1
 	golang.org/x/crypto v0.21.0
