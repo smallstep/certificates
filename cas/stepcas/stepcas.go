@@ -79,7 +79,7 @@ func (s *StepCAS) CreateCertificate(req *apiv1.CreateCertificateRequest) (*apiv1
 	case req.Template == nil:
 		return nil, errors.New("createCertificateRequest `template` cannot be nil")
 	case req.Lifetime < 0:
-		return nil, errors.New("createCertificateRequest `lifetime` cannot less than 0")
+		return nil, errors.New("createCertificateRequest `lifetime` cannot be less than 0")
 	}
 
 	info := &raInfo{

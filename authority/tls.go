@@ -913,7 +913,10 @@ func (a *Authority) GetTLSCertificate() (*tls.Certificate, error) {
 		return fatal(err)
 	}
 
-	// For StepCAS RA let the lifetime to the provisioner used by the CA.
+	// Set the cert lifetime as follows:
+	//   i) If the CA is not a StepCAS RA use 24h, else
+	//  ii) if the CA is a StepCAS RA, leave the lifetime empty and
+	//      let the provisioner of the CA decide the lifetime of the RA cert.
 	var lifetime time.Duration
 	if casapi.TypeOf(a.x509CAService) != casapi.StepCAS {
 		lifetime = 24 * time.Hour
