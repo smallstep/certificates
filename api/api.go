@@ -565,7 +565,7 @@ func LogSSHCertificate(w http.ResponseWriter, cert *ssh.Certificate) {
 func ParseCursor(r *http.Request) (cursor string, limit int, err error) {
 	q := r.URL.Query()
 	cursor = q.Get("cursor")
-	if v := q.Get("limit"); len(v) > 0 {
+	if v := q.Get("limit"); v != "" {
 		limit, err = strconv.Atoi(v)
 		if err != nil {
 			return "", 0, errs.BadRequestErr(err, "limit '%s' is not an integer", v)

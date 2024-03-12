@@ -252,6 +252,23 @@ func TestNew_register(t *testing.T) {
 	}
 }
 
+func TestSoftCAS_Type(t *testing.T) {
+	tests := []struct {
+		name string
+		want apiv1.Type
+	}{
+		{"ok", apiv1.SoftCAS},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			c := &SoftCAS{}
+			if got := c.Type(); got != tt.want {
+				t.Errorf("SoftCAS.Type() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
 func TestSoftCAS_CreateCertificate(t *testing.T) {
 	mockNow(t)
 	// Set rand.Reader to EOF

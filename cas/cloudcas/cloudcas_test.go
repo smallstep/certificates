@@ -443,6 +443,23 @@ func TestNew_real(t *testing.T) {
 	}
 }
 
+func TestCloudCAS_Type(t *testing.T) {
+	tests := []struct {
+		name string
+		want apiv1.Type
+	}{
+		{"ok", apiv1.CloudCAS},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			c := &CloudCAS{}
+			if got := c.Type(); got != tt.want {
+				t.Errorf("CloudCAS.Type() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
 func TestCloudCAS_GetCertificateAuthority(t *testing.T) {
 	root := mustParseCertificate(t, testRootCertificate)
 	type fields struct {
