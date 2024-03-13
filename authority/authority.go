@@ -255,7 +255,10 @@ func (a *Authority) ReloadAdminResources(ctx context.Context) error {
 	provClxn := provisioner.NewCollection(provisionerConfig.Audiences)
 	for _, p := range provList {
 		if err := p.Init(provisionerConfig); err != nil {
-			return err
+			log.Printf("failed to initialize %s provisioner %q: %v\n", p.GetType(), p.GetName(), err)
+			p = provisioner.Disabled{
+				Interface: p, Reason: err,
+			}
 		}
 		if err := provClxn.Store(p); err != nil {
 			return err
