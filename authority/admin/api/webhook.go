@@ -125,6 +125,7 @@ func (war *webhookAdminResponder) CreateProvisionerWebhook(w http.ResponseWriter
 		return
 	}
 
+	w.Header().Set("Cache-Control", "private, no-store")
 	render.ProtoJSONStatus(w, newWebhook, http.StatusCreated)
 }
 
@@ -229,5 +230,7 @@ func (war *webhookAdminResponder) UpdateProvisionerWebhook(w http.ResponseWriter
 		Auth:                 newWebhook.Auth,
 		DisableTlsClientAuth: newWebhook.DisableTlsClientAuth,
 	}
+
+	w.Header().Set("Cache-Control", "private, no-store")
 	render.ProtoJSONStatus(w, whResponse, http.StatusCreated)
 }
