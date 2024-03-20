@@ -33,6 +33,7 @@ import (
 	_ "go.step.sm/crypto/kms/pkcs11"
 	_ "go.step.sm/crypto/kms/softkms"
 	_ "go.step.sm/crypto/kms/sshagentkms"
+	_ "go.step.sm/crypto/kms/tpmkms"
 	_ "go.step.sm/crypto/kms/yubikey"
 
 	// Enabled cas interfaces.
