@@ -269,11 +269,18 @@ func newAuthorization(ctx context.Context, az *acme.Authorization) error {
 			Token:     az.Token,
 			Status:    acme.StatusPending,
 		}
+
 		if err := db.CreateChallenge(ctx, ch); err != nil {
 			return acme.WrapErrorISE(err, "error creating challenge")
 		}
 		az.Challenges = append(az.Challenges, ch)
 	}
+
+	//If no challenges were created, set authorization status as valid.
+	if len(az.Challenges) == 0 {
+		az.Status = acme.StatusValid
+	}
+
 	if err = db.CreateAuthorization(ctx, az); err != nil {
 		return acme.WrapErrorISE(err, "error creating authorization")
 	}
