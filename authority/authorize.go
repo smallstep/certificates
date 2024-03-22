@@ -64,6 +64,10 @@ func (a *Authority) getProvisionerFromToken(token string) (provisioner.Interface
 	if !ok {
 		return nil, nil, fmt.Errorf("provisioner not found or invalid audience (%s)", strings.Join(claims.Audience, ", "))
 	}
+	// If the provisioner is disabled, send an appropriate message to the client
+	if _, ok := p.(provisioner.Disabled); ok {
+		return nil, nil, errs.New(http.StatusUnauthorized, "provisioner %q is disabled due to an initialization error", p.GetName())
+	}
 
 	return p, &claims, nil
 }
