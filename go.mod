@@ -15,7 +15,7 @@ require (
 	github.com/google/go-cmp v0.6.0
 	github.com/google/go-tpm v0.9.0
 	github.com/google/uuid v1.6.0
-	github.com/googleapis/gax-go/v2 v2.12.2
+	github.com/googleapis/gax-go/v2 v2.12.3
 	github.com/hashicorp/vault/api v1.12.1
 	github.com/hashicorp/vault/api/auth/approle v0.6.0
 	github.com/hashicorp/vault/api/auth/kubernetes v0.6.0
@@ -38,7 +38,7 @@ require (
 	golang.org/x/crypto v0.21.0
 	golang.org/x/exp v0.0.0-20230310171629-522b1b587ee0
 	golang.org/x/net v0.22.0
-	google.golang.org/api v0.169.0
+	google.golang.org/api v0.171.0
 	google.golang.org/grpc v1.62.1
 	google.golang.org/protobuf v1.33.0
 )
@@ -154,7 +154,7 @@ require (
 	go.opentelemetry.io/otel v1.24.0 // indirect
 	go.opentelemetry.io/otel/metric v1.24.0 // indirect
 	go.opentelemetry.io/otel/trace v1.24.0 // indirect
-	golang.org/x/oauth2 v0.17.0 // indirect
+	golang.org/x/oauth2 v0.18.0 // indirect
 	golang.org/x/sync v0.6.0 // indirect
 	golang.org/x/sys v0.18.0 // indirect
 	golang.org/x/text v0.14.0 // indirect
@@ -162,6 +162,6 @@ require (
 	google.golang.org/appengine v1.6.8 // indirect
 	google.golang.org/genproto v0.0.0-20240213162025-012b6fc9bca9 // indirect
 	google.golang.org/genproto/googleapis/api v0.0.0-20240311132316-a219d84964c2 // indirect
-	google.golang.org/genproto/googleapis/rpc v0.0.0-20240311132316-a219d84964c2 // indirect
+	google.golang.org/genproto/googleapis/rpc v0.0.0-20240314234333-6e1732d8331c // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 )
