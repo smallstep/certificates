@@ -256,8 +256,8 @@ github.com/hashicorp/go-sockaddr v1.0.2/go.mod h1:rB4wwRAUzs07qva3c5SdrY/NEtAUjG
 github.com/hashicorp/hcl v1.0.0 h1:0Anlzjpi4vEasTeNFn2mLJgTSwt0+6sfsiTG8qcWGx4=
 github.com/hashicorp/hcl v1.0.0/go.mod h1:E5yfLk+7swimpb2L/Alb/PJmXilQ/rhwaUYs4T20WEQ=
 github.com/hashicorp/vault/api v1.12.0/go.mod h1:si+lJCYO7oGkIoNPAN8j3azBLTn9SjMGS+jFaHd1Cck=
-github.com/hashicorp/vault/api v1.12.1 h1:WzGN4X5jrJdNO39g6Sa55djNio3I9DxEBOTmCZE7tm0=
-github.com/hashicorp/vault/api v1.12.1/go.mod h1:1pqP/sErScodde+ybJCyP+ONC4jzEg7Dmawg/QLWo1k=
+github.com/hashicorp/vault/api v1.12.2 h1:7YkCTE5Ni90TcmYHDBExdt4WGJxhpzaHqR6uGbQb/rE=
+github.com/hashicorp/vault/api v1.12.2/go.mod h1:LSGf1NGT1BnvFFnKVtnvcaLBM2Lz+gJdpL6HUYed8KE=
 github.com/hashicorp/vault/api/auth/approle v0.6.0 h1:ELfFFQlTM/e97WJKu1HvNFa7lQ3tlTwwzrR1NJE1V7Y=
 github.com/hashicorp/vault/api/auth/approle v0.6.0/go.mod h1:CCoIl1xBC3lAWpd1HV+0ovk76Z8b8Mdepyk21h3pGk0=
 github.com/hashicorp/vault/api/auth/kubernetes v0.6.0 h1:K8sKGhtTAqGKfzaaYvUSIOAqTOIn3Gk1EsCEAMzZHtM=
