@@ -9,7 +9,9 @@ import (
 
 	"github.com/newrelic/go-agent/v3/newrelic"
 	"github.com/pkg/errors"
+
 	"github.com/smallstep/certificates/logging"
+	"github.com/smallstep/certificates/middleware/requestid"
 )
 
 // Middleware is a function returns another http.Handler that wraps the given
@@ -82,7 +84,7 @@ func newRelicMiddleware(app *newrelic.Application) Middleware {
 			txn.AddAttribute("httpResponseCode", strconv.Itoa(status))
 
 			// Add custom attributes
-			if v, ok := logging.GetRequestID(r.Context()); ok {
+			if v, ok := requestid.FromContext(r.Context()); ok {
 				txn.AddAttribute("request.id", v)
 			}
 

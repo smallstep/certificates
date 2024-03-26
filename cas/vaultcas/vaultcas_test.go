@@ -193,6 +193,23 @@ func TestNew_register(t *testing.T) {
 	}
 }
 
+func TestVaultCAS_Type(t *testing.T) {
+	tests := []struct {
+		name string
+		want apiv1.Type
+	}{
+		{"ok", apiv1.VaultCAS},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			c := &VaultCAS{}
+			if got := c.Type(); got != tt.want {
+				t.Errorf("VaultCAS.Type() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
 func TestVaultCAS_CreateCertificate(t *testing.T) {
 	_, client := testCAHelper(t)
 

@@ -42,7 +42,7 @@ type Authority interface {
 	AuthorizeRenewToken(ctx context.Context, ott string) (*x509.Certificate, error)
 	GetTLSOptions() *config.TLSOptions
 	Root(shasum string) (*x509.Certificate, error)
-	Sign(cr *x509.CertificateRequest, opts provisioner.SignOptions, signOpts ...provisioner.SignOption) ([]*x509.Certificate, error)
+	SignWithContext(ctx context.Context, cr *x509.CertificateRequest, opts provisioner.SignOptions, signOpts ...provisioner.SignOption) ([]*x509.Certificate, error)
 	Renew(peer *x509.Certificate) ([]*x509.Certificate, error)
 	RenewContext(ctx context.Context, peer *x509.Certificate, pk crypto.PublicKey) ([]*x509.Certificate, error)
 	Rekey(peer *x509.Certificate, pk crypto.PublicKey) ([]*x509.Certificate, error)
@@ -54,7 +54,7 @@ type Authority interface {
 	GetRoots() ([]*x509.Certificate, error)
 	GetFederation() ([]*x509.Certificate, error)
 	Version() authority.Version
-	GetCertificateRevocationList() ([]byte, error)
+	GetCertificateRevocationList() (*authority.CertificateRevocationListInfo, error)
 }
 
 // mustAuthority will be replaced on unit tests.
@@ -565,7 +565,7 @@ func LogSSHCertificate(w http.ResponseWriter, cert *ssh.Certificate) {
 func ParseCursor(r *http.Request) (cursor string, limit int, err error) {
 	q := r.URL.Query()
 	cursor = q.Get("cursor")
-	if v := q.Get("limit"); len(v) > 0 {
+	if v := q.Get("limit"); v != "" {
 		limit, err = strconv.Atoi(v)
 		if err != nil {
 			return "", 0, errs.BadRequestErr(err, "limit '%s' is not an integer", v)

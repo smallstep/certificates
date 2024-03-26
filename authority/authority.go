@@ -104,6 +104,9 @@ type Authority struct {
 
 	// If true, do not output initialization logs
 	quietInit bool
+
+	// Called whenever applicable, in order to instrument the authority.
+	meter Meter
 }
 
 // Info contains information about the authority.
@@ -126,6 +129,7 @@ func New(cfg *config.Config, opts ...Option) (*Authority, error) {
 		config:       cfg,
 		certificates: new(sync.Map),
 		validateSCEP: true,
+		meter:        noopMeter{},
 	}
 
 	// Apply options.
@@ -133,6 +137,9 @@ func New(cfg *config.Config, opts ...Option) (*Authority, error) {
 		if err := fn(a); err != nil {
 			return nil, err
 		}
+	}
+	if a.keyManager != nil {
+		a.keyManager = &instrumentedKeyManager{a.keyManager, a.meter}
 	}
 
 	if !a.skipInit {
@@ -151,6 +158,7 @@ func NewEmbedded(opts ...Option) (*Authority, error) {
 	a := &Authority{
 		config:       &config.Config{},
 		certificates: new(sync.Map),
+		meter:        noopMeter{},
 	}
 
 	// Apply options.
@@ -158,6 +166,9 @@ func NewEmbedded(opts ...Option) (*Authority, error) {
 		if err := fn(a); err != nil {
 			return nil, err
 		}
+	}
+	if a.keyManager != nil {
+		a.keyManager = &instrumentedKeyManager{a.keyManager, a.meter}
 	}
 
 	// Validate required options
@@ -337,6 +348,8 @@ func (a *Authority) init() error {
 		if err != nil {
 			return err
 		}
+
+		a.keyManager = &instrumentedKeyManager{a.keyManager, a.meter}
 	}
 
 	// Initialize linkedca client if necessary. On a linked RA, the issuer

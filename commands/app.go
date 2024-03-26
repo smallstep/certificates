@@ -239,7 +239,7 @@ To get a linked authority token:
 	// replace resolver if requested
 	if resolver != "" {
 		net.DefaultResolver.PreferGo = true
-		net.DefaultResolver.Dial = func(ctx context.Context, network, address string) (net.Conn, error) {
+		net.DefaultResolver.Dial = func(_ context.Context, network, _ string) (net.Conn, error) {
 			return net.Dial(network, resolver)
 		}
 	}
@@ -251,7 +251,8 @@ To get a linked authority token:
 		ca.WithSSHUserPassword(sshUserPassword),
 		ca.WithIssuerPassword(issuerPassword),
 		ca.WithLinkedCAToken(token),
-		ca.WithQuiet(quiet))
+		ca.WithQuiet(quiet),
+	)
 	if err != nil {
 		fatal(err)
 	}

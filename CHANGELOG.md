@@ -36,7 +36,7 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
 
 - Generation of first provisioner name on `step ca init` in (smallstep/certificates#1566)
 - Processing of SCEP Get PKIOperation requests in (smallstep/certificates#1570)
-- Support for signing identity certificate during SSH sign by skipping URI validation in  (smallstep/certificates#1572)
+- Support for signing identity certificate during SSH sign by skipping URI validation in (smallstep/certificates#1572)
 - Dependency on `micromdm/scep` and `go.mozilla.org/pkcs7` to use Smallstep forks in (smallstep/certificates#1600)
 - Make the Common Name validator for JWK provisioners accept values from SANs too in (smallstep/certificates#1609)
 

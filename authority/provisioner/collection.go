@@ -125,7 +125,7 @@ func (c *Collection) LoadByToken(token *jose.JSONWebToken, claims *jose.Claims) 
 	}
 
 	// Try with azp (OIDC)
-	if len(payload.AuthorizedParty) > 0 {
+	if payload.AuthorizedParty != "" {
 		if p, ok := c.LoadByTokenID(payload.AuthorizedParty); ok {
 			return p, ok
 		}

@@ -53,6 +53,8 @@ const (
 	StepCAS = "stepcas"
 	// VaultCAS is a CertificateAuthorityService using Hasicorp Vault PKI.
 	VaultCAS = "vaultcas"
+	// ExternalCAS is a CertificateAuthorityService using an external injected CA implementation
+	ExternalCAS = "externalcas"
 )
 
 // String returns a string from the type. It will always return the lower case
@@ -63,6 +65,14 @@ func (t Type) String() string {
 		return SoftCAS
 	}
 	return strings.ToLower(string(t))
+}
+
+// TypeOf returns the type of the given CertificateAuthorityService.
+func TypeOf(c CertificateAuthorityService) Type {
+	if ct, ok := c.(interface{ Type() Type }); ok {
+		return ct.Type()
+	}
+	return ExternalCAS
 }
 
 // NotImplementedError is the type of error returned if an operation is not implemented.

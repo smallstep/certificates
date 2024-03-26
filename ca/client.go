@@ -27,12 +27,14 @@ import (
 	"github.com/smallstep/certificates/api"
 	"github.com/smallstep/certificates/authority"
 	"github.com/smallstep/certificates/authority/provisioner"
+	"github.com/smallstep/certificates/ca/client"
 	"github.com/smallstep/certificates/ca/identity"
 	"github.com/smallstep/certificates/errs"
 	"go.step.sm/cli-utils/step"
 	"go.step.sm/crypto/jose"
 	"go.step.sm/crypto/keyutil"
 	"go.step.sm/crypto/pemutil"
+	"go.step.sm/crypto/randutil"
 	"go.step.sm/crypto/x509util"
 	"golang.org/x/net/http2"
 	"google.golang.org/protobuf/encoding/protojson"
@@ -83,8 +85,7 @@ func (c *uaClient) GetWithContext(ctx context.Context, u string) (*http.Response
 	if err != nil {
 		return nil, errors.Wrapf(err, "create GET %s request failed", u)
 	}
-	req.Header.Set("User-Agent", UserAgent)
-	return c.Client.Do(req)
+	return c.Do(req)
 }
 
 func (c *uaClient) Post(u, contentType string, body io.Reader) (*http.Response, error) {
@@ -97,12 +98,43 @@ func (c *uaClient) PostWithContext(ctx context.Context, u, contentType string, b
 		return nil, errors.Wrapf(err, "create POST %s request failed", u)
 	}
 	req.Header.Set("Content-Type", contentType)
-	req.Header.Set("User-Agent", UserAgent)
-	return c.Client.Do(req)
+	return c.Do(req)
+}
+
+// requestIDHeader is the header name used for propagating request IDs from
+// the CA client to the CA and back again.
+const requestIDHeader = "X-Request-Id"
+
+// newRequestID generates a new random UUIDv4 request ID. If it fails,
+// the request ID will be the empty string.
+func newRequestID() string {
+	requestID, err := randutil.UUIDv4()
+	if err != nil {
+		return ""
+	}
+
+	return requestID
+}
+
+// enforceRequestID checks if the X-Request-Id HTTP header is filled. If it's
+// empty, the context is searched for a request ID. If that's also empty, a new
+// request ID is generated.
+func enforceRequestID(r *http.Request) {
+	if requestID := r.Header.Get(requestIDHeader); requestID == "" {
+		if reqID, ok := client.RequestIDFromContext(r.Context()); ok {
+			// TODO(hs): ensure the request ID from the context is fresh, and thus hasn't been
+			// used before by the client (unless it's a retry for the same request)?
+			requestID = reqID
+		} else {
+			requestID = newRequestID()
+		}
+		r.Header.Set(requestIDHeader, requestID)
+	}
 }
 
 func (c *uaClient) Do(req *http.Request) (*http.Response, error) {
 	req.Header.Set("User-Agent", UserAgent)
+	enforceRequestID(req)
 	return c.Client.Do(req)
 }
 
@@ -375,8 +407,8 @@ func getTransportFromSHA256(endpoint, sum string) (http.RoundTripper, error) {
 	if err != nil {
 		return nil, err
 	}
-	client := &Client{endpoint: u}
-	root, err := client.Root(sum)
+	caClient := &Client{endpoint: u}
+	root, err := caClient.Root(sum)
 	if err != nil {
 		return nil, err
 	}
@@ -610,7 +642,7 @@ retry:
 			retried = true
 			goto retry
 		}
-		return nil, readError(resp.Body)
+		return nil, readError(resp)
 	}
 	var version api.VersionResponse
 	if err := readJSON(resp.Body, &version); err != nil {
@@ -640,7 +672,7 @@ retry:
 			retried = true
 			goto retry
 		}
-		return nil, readError(resp.Body)
+		return nil, readError(resp)
 	}
 	var health api.HealthResponse
 	if err := readJSON(resp.Body, &health); err != nil {
@@ -675,7 +707,7 @@ retry:
 			retried = true
 			goto retry
 		}
-		return nil, readError(resp.Body)
+		return nil, readError(resp)
 	}
 	var root api.RootResponse
 	if err := readJSON(resp.Body, &root); err != nil {
@@ -714,7 +746,7 @@ retry:
 			retried = true
 			goto retry
 		}
-		return nil, readError(resp.Body)
+		return nil, readError(resp)
 	}
 	var sign api.SignResponse
 	if err := readJSON(resp.Body, &sign); err != nil {
@@ -737,14 +769,14 @@ func (c *Client) Renew(tr http.RoundTripper) (*api.SignResponse, error) {
 func (c *Client) RenewWithContext(ctx context.Context, tr http.RoundTripper) (*api.SignResponse, error) {
 	var retried bool
 	u := c.endpoint.ResolveReference(&url.URL{Path: "/renew"})
-	client := &http.Client{Transport: tr}
+	httpClient := &http.Client{Transport: tr}
 retry:
 	req, err := http.NewRequestWithContext(ctx, "POST", u.String(), http.NoBody)
 	if err != nil {
 		return nil, err
 	}
 	req.Header.Set("Content-Type", "application/json")
-	resp, err := client.Do(req)
+	resp, err := httpClient.Do(req)
 	if err != nil {
 		return nil, clientError(err)
 	}
@@ -753,7 +785,7 @@ retry:
 			retried = true
 			goto retry
 		}
-		return nil, readError(resp.Body)
+		return nil, readError(resp)
 	}
 	var sign api.SignResponse
 	if err := readJSON(resp.Body, &sign); err != nil {
@@ -790,7 +822,7 @@ retry:
 			retried = true
 			goto retry
 		}
-		return nil, readError(resp.Body)
+		return nil, readError(resp)
 	}
 	var sign api.SignResponse
 	if err := readJSON(resp.Body, &sign); err != nil {
@@ -814,14 +846,14 @@ func (c *Client) RekeyWithContext(ctx context.Context, req *api.RekeyRequest, tr
 		return nil, errors.Wrap(err, "error marshaling request")
 	}
 	u := c.endpoint.ResolveReference(&url.URL{Path: "/rekey"})
-	client := &http.Client{Transport: tr}
+	httpClient := &http.Client{Transport: tr}
 retry:
 	httpReq, err := http.NewRequestWithContext(ctx, "POST", u.String(), bytes.NewReader(body))
 	if err != nil {
 		return nil, err
 	}
 	httpReq.Header.Set("Content-Type", "application/json")
-	resp, err := client.Do(httpReq)
+	resp, err := httpClient.Do(httpReq)
 	if err != nil {
 		return nil, clientError(err)
 	}
@@ -830,7 +862,7 @@ retry:
 			retried = true
 			goto retry
 		}
-		return nil, readError(resp.Body)
+		return nil, readError(resp)
 	}
 	var sign api.SignResponse
 	if err := readJSON(resp.Body, &sign); err != nil {
@@ -853,16 +885,16 @@ func (c *Client) RevokeWithContext(ctx context.Context, req *api.RevokeRequest, 
 	if err != nil {
 		return nil, errors.Wrap(err, "error marshaling request")
 	}
-	var client *uaClient
+	var uaClient *uaClient
 retry:
 	if tr != nil {
-		client = newClient(tr)
+		uaClient = newClient(tr)
 	} else {
-		client = c.client
+		uaClient = c.client
 	}
 
 	u := c.endpoint.ResolveReference(&url.URL{Path: "/revoke"})
-	resp, err := client.PostWithContext(ctx, u.String(), "application/json", bytes.NewReader(body))
+	resp, err := uaClient.PostWithContext(ctx, u.String(), "application/json", bytes.NewReader(body))
 	if err != nil {
 		return nil, clientError(err)
 	}
@@ -871,7 +903,7 @@ retry:
 			retried = true
 			goto retry
 		}
-		return nil, readError(resp.Body)
+		return nil, readError(resp)
 	}
 	var revoke api.RevokeResponse
 	if err := readJSON(resp.Body, &revoke); err != nil {
@@ -914,7 +946,7 @@ retry:
 			retried = true
 			goto retry
 		}
-		return nil, readError(resp.Body)
+		return nil, readError(resp)
 	}
 	var provisioners api.ProvisionersResponse
 	if err := readJSON(resp.Body, &provisioners); err != nil {
@@ -946,7 +978,7 @@ retry:
 			retried = true
 			goto retry
 		}
-		return nil, readError(resp.Body)
+		return nil, readError(resp)
 	}
 	var key api.ProvisionerKeyResponse
 	if err := readJSON(resp.Body, &key); err != nil {
@@ -976,7 +1008,7 @@ retry:
 			retried = true
 			goto retry
 		}
-		return nil, readError(resp.Body)
+		return nil, readError(resp)
 	}
 	var roots api.RootsResponse
 	if err := readJSON(resp.Body, &roots); err != nil {
@@ -1006,7 +1038,7 @@ retry:
 			retried = true
 			goto retry
 		}
-		return nil, readError(resp.Body)
+		return nil, readError(resp)
 	}
 	var federation api.FederationResponse
 	if err := readJSON(resp.Body, &federation); err != nil {
@@ -1040,7 +1072,7 @@ retry:
 			retried = true
 			goto retry
 		}
-		return nil, readError(resp.Body)
+		return nil, readError(resp)
 	}
 	var sign api.SSHSignResponse
 	if err := readJSON(resp.Body, &sign); err != nil {
@@ -1074,7 +1106,7 @@ retry:
 			retried = true
 			goto retry
 		}
-		return nil, readError(resp.Body)
+		return nil, readError(resp)
 	}
 	var renew api.SSHRenewResponse
 	if err := readJSON(resp.Body, &renew); err != nil {
@@ -1108,7 +1140,7 @@ retry:
 			retried = true
 			goto retry
 		}
-		return nil, readError(resp.Body)
+		return nil, readError(resp)
 	}
 	var rekey api.SSHRekeyResponse
 	if err := readJSON(resp.Body, &rekey); err != nil {
@@ -1142,7 +1174,7 @@ retry:
 			retried = true
 			goto retry
 		}
-		return nil, readError(resp.Body)
+		return nil, readError(resp)
 	}
 	var revoke api.SSHRevokeResponse
 	if err := readJSON(resp.Body, &revoke); err != nil {
@@ -1172,7 +1204,7 @@ retry:
 			retried = true
 			goto retry
 		}
-		return nil, readError(resp.Body)
+		return nil, readError(resp)
 	}
 	var keys api.SSHRootsResponse
 	if err := readJSON(resp.Body, &keys); err != nil {
@@ -1202,7 +1234,7 @@ retry:
 			retried = true
 			goto retry
 		}
-		return nil, readError(resp.Body)
+		return nil, readError(resp)
 	}
 	var keys api.SSHRootsResponse
 	if err := readJSON(resp.Body, &keys); err != nil {
@@ -1236,7 +1268,7 @@ retry:
 			retried = true
 			goto retry
 		}
-		return nil, readError(resp.Body)
+		return nil, readError(resp)
 	}
 	var cfg api.SSHConfigResponse
 	if err := readJSON(resp.Body, &cfg); err != nil {
@@ -1275,7 +1307,7 @@ retry:
 			retried = true
 			goto retry
 		}
-		return nil, readError(resp.Body)
+		return nil, readError(resp)
 	}
 	var check api.SSHCheckPrincipalResponse
 	if err := readJSON(resp.Body, &check); err != nil {
@@ -1304,7 +1336,7 @@ retry:
 			retried = true
 			goto retry
 		}
-		return nil, readError(resp.Body)
+		return nil, readError(resp)
 	}
 	var hosts api.SSHGetHostsResponse
 	if err := readJSON(resp.Body, &hosts); err != nil {
@@ -1336,7 +1368,7 @@ retry:
 			retried = true
 			goto retry
 		}
-		return nil, readError(resp.Body)
+		return nil, readError(resp)
 	}
 	var bastion api.SSHBastionResponse
 	if err := readJSON(resp.Body, &bastion); err != nil {
@@ -1504,12 +1536,13 @@ func readProtoJSON(r io.ReadCloser, m proto.Message) error {
 	return protojson.Unmarshal(data, m)
 }
 
-func readError(r io.ReadCloser) error {
-	defer r.Close()
+func readError(r *http.Response) error {
+	defer r.Body.Close()
 	apiErr := new(errs.Error)
-	if err := json.NewDecoder(r).Decode(apiErr); err != nil {
-		return err
+	if err := json.NewDecoder(r.Body).Decode(apiErr); err != nil {
+		return fmt.Errorf("failed decoding CA error response: %w", err)
 	}
+	apiErr.RequestID = r.Header.Get("X-Request-Id")
 	return apiErr
 }
 

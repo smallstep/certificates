@@ -1,6 +1,8 @@
 package authority
 
 import (
+	"context"
+
 	"github.com/smallstep/certificates/authority/provisioner"
 	"github.com/smallstep/certificates/webhook"
 )
@@ -14,7 +16,7 @@ type mockWebhookController struct {
 
 var _ webhookController = &mockWebhookController{}
 
-func (wc *mockWebhookController) Enrich(*webhook.RequestBody) error {
+func (wc *mockWebhookController) Enrich(context.Context, *webhook.RequestBody) error {
 	for key, data := range wc.respData {
 		wc.templateData.SetWebhook(key, data)
 	}
@@ -22,6 +24,6 @@ func (wc *mockWebhookController) Enrich(*webhook.RequestBody) error {
 	return wc.enrichErr
 }
 
-func (wc *mockWebhookController) Authorize(*webhook.RequestBody) error {
+func (wc *mockWebhookController) Authorize(context.Context, *webhook.RequestBody) error {
 	return wc.authorizeErr
 }

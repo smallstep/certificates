@@ -92,7 +92,7 @@ func (p *JWK) GetType() Type {
 
 // GetEncryptedKey returns the base provisioner encrypted key if it's defined.
 func (p *JWK) GetEncryptedKey() (string, string, bool) {
-	return p.Key.KeyID, p.EncryptedKey, len(p.EncryptedKey) > 0
+	return p.Key.KeyID, p.EncryptedKey, p.EncryptedKey != ""
 }
 
 // Init initializes and validates the fields of a JWK type.

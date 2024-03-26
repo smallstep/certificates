@@ -15,6 +15,7 @@ import (
 	"time"
 
 	"github.com/pkg/errors"
+	"github.com/smallstep/certificates/middleware/requestid"
 	"github.com/smallstep/certificates/templates"
 	"github.com/smallstep/certificates/webhook"
 	"go.step.sm/linkedca"
@@ -36,7 +37,7 @@ type WebhookController struct {
 
 // Enrich fetches data from remote servers and adds returned data to the
 // templateData
-func (wc *WebhookController) Enrich(req *webhook.RequestBody) error {
+func (wc *WebhookController) Enrich(ctx context.Context, req *webhook.RequestBody) error {
 	if wc == nil {
 		return nil
 	}
@@ -55,7 +56,11 @@ func (wc *WebhookController) Enrich(req *webhook.RequestBody) error {
 		if !wc.isCertTypeOK(wh) {
 			continue
 		}
-		resp, err := wh.Do(wc.client, req, wc.TemplateData)
+
+		whCtx, cancel := context.WithTimeout(ctx, time.Second*10)
+		defer cancel() //nolint:gocritic // every request canceled with its own timeout
+
+		resp, err := wh.DoWithContext(whCtx, wc.client, req, wc.TemplateData)
 		if err != nil {
 			return err
 		}
@@ -68,7 +73,7 @@ func (wc *WebhookController) Enrich(req *webhook.RequestBody) error {
 }
 
 // Authorize checks that all remote servers allow the request
-func (wc *WebhookController) Authorize(req *webhook.RequestBody) error {
+func (wc *WebhookController) Authorize(ctx context.Context, req *webhook.RequestBody) error {
 	if wc == nil {
 		return nil
 	}
@@ -87,7 +92,11 @@ func (wc *WebhookController) Authorize(req *webhook.RequestBody) error {
 		if !wc.isCertTypeOK(wh) {
 			continue
 		}
-		resp, err := wh.Do(wc.client, req, wc.TemplateData)
+
+		whCtx, cancel := context.WithTimeout(ctx, time.Second*10)
+		defer cancel() //nolint:gocritic // every request canceled with its own timeout
+
+		resp, err := wh.DoWithContext(whCtx, wc.client, req, wc.TemplateData)
 		if err != nil {
 			return err
 		}
@@ -121,13 +130,6 @@ type Webhook struct {
 		Username string
 		Password string
 	} `json:"-"`
-}
-
-func (w *Webhook) Do(client *http.Client, reqBody *webhook.RequestBody, data any) (*webhook.ResponseBody, error) {
-	ctx, cancel := context.WithTimeout(context.Background(), time.Second*10)
-	defer cancel()
-
-	return w.DoWithContext(ctx, client, reqBody, data)
 }
 
 func (w *Webhook) DoWithContext(ctx context.Context, client *http.Client, reqBody *webhook.RequestBody, data any) (*webhook.ResponseBody, error) {
@@ -167,6 +169,10 @@ retry:
 	req, err := http.NewRequestWithContext(ctx, "POST", url, bytes.NewReader(reqBytes))
 	if err != nil {
 		return nil, err
+	}
+
+	if requestID, ok := requestid.FromContext(ctx); ok {
+		req.Header.Set("X-Request-Id", requestID)
 	}
 
 	secret, err := base64.StdEncoding.DecodeString(w.Secret)

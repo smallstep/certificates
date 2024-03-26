@@ -45,7 +45,7 @@ func (a *Authority) GetRoots() ([]*x509.Certificate, error) {
 // GetFederation returns all the root certificates in the federation.
 // This method implements the Authority interface.
 func (a *Authority) GetFederation() (federation []*x509.Certificate, err error) {
-	a.certificates.Range(func(k, v interface{}) bool {
+	a.certificates.Range(func(_, v interface{}) bool {
 		crt, ok := v.(*x509.Certificate)
 		if !ok {
 			federation = nil
