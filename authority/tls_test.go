@@ -15,16 +15,17 @@ import (
 	"fmt"
 	"net/http"
 	"reflect"
+	"strings"
 	"testing"
 	"time"
 
+	"go.step.sm/crypto/fingerprint"
 	"go.step.sm/crypto/jose"
 	"go.step.sm/crypto/keyutil"
 	"go.step.sm/crypto/minica"
 	"go.step.sm/crypto/pemutil"
 	"go.step.sm/crypto/x509util"
 
-	sassert "github.com/smallstep/assert"
 	"github.com/smallstep/certificates/api/render"
 	"github.com/smallstep/certificates/authority/config"
 	"github.com/smallstep/certificates/authority/policy"
@@ -239,6 +240,11 @@ func (e *testEnforcer) Enforce(cert *x509.Certificate) error {
 	return nil
 }
 
+func assertHasPrefix(t *testing.T, s, p string, msg ...interface{}) bool {
+	t.Helper()
+	return assert.True(t, strings.HasPrefix(s, p), "%q is not a prefix of %q", p, s)
+}
+
 func TestAuthority_SignWithContext(t *testing.T) {
 	pub, priv, err := keyutil.GenerateDefaultKeyPair()
 	require.NoError(t, err)
@@ -418,7 +424,7 @@ ZYtQ9Ot36qc=
 			require.NoError(t, err)
 			testAuthority.db = &db.MockAuthDB{
 				MStoreCertificate: func(crt *x509.Certificate) error {
-					sassert.Equals(t, crt.Subject.CommonName, "smallstep test")
+					assert.Equal(t, crt.Subject.CommonName, "smallstep test")
 					return nil
 				},
 			}
@@ -447,7 +453,7 @@ ZYtQ9Ot36qc=
 			require.NoError(t, err)
 			testAuthority.db = &db.MockAuthDB{
 				MStoreCertificate: func(crt *x509.Certificate) error {
-					sassert.Equals(t, crt.Subject.CommonName, "smallstep test")
+					assert.Equal(t, crt.Subject.CommonName, "smallstep test")
 					return nil
 				},
 			}
@@ -476,7 +482,7 @@ ZYtQ9Ot36qc=
 			require.NoError(t, err)
 			testAuthority.db = &db.MockAuthDB{
 				MStoreCertificate: func(crt *x509.Certificate) error {
-					sassert.Equals(t, crt.Subject.CommonName, "smallstep test")
+					assert.Equal(t, crt.Subject.CommonName, "smallstep test")
 					return nil
 				},
 			}
@@ -494,7 +500,7 @@ ZYtQ9Ot36qc=
 			aa := testAuthority(t)
 			aa.db = &db.MockAuthDB{
 				MStoreCertificate: func(crt *x509.Certificate) error {
-					sassert.Equals(t, crt.Subject.CommonName, "smallstep test")
+					assert.Equal(t, crt.Subject.CommonName, "smallstep test")
 					return nil
 				},
 			}
@@ -519,7 +525,7 @@ ZYtQ9Ot36qc=
 			}))
 			aa.db = &db.MockAuthDB{
 				MStoreCertificate: func(crt *x509.Certificate) error {
-					sassert.Equals(t, crt.Subject.CommonName, "smallstep test")
+					assert.Equal(t, crt.Subject.CommonName, "smallstep test")
 					return nil
 				},
 			}
@@ -539,7 +545,7 @@ ZYtQ9Ot36qc=
 			aa.db = &db.MockAuthDB{
 				MStoreCertificate: func(crt *x509.Certificate) error {
 					fmt.Println(crt.Subject)
-					sassert.Equals(t, crt.Subject.CommonName, "smallstep test")
+					assert.Equal(t, crt.Subject.CommonName, "smallstep test")
 					return nil
 				},
 			}
@@ -595,12 +601,49 @@ ZYtQ9Ot36qc=
 				code:     http.StatusForbidden,
 			}
 		},
+		"fail with cnf": func(t *testing.T) *signTest {
+			csr := getCSR(t, priv)
+
+			auth := testAuthority(t)
+			auth.config.AuthorityConfig.Template = a.config.AuthorityConfig.Template
+			auth.db = &db.MockAuthDB{
+				MUseToken: func(id, tok string) (bool, error) {
+					return true, nil
+				},
+				MStoreCertificate: func(crt *x509.Certificate) error {
+					assert.Equal(t, crt.Subject.CommonName, "smallstep test")
+					assert.Equal(t, crt.DNSNames, []string{"test.smallstep.com"})
+					return nil
+				},
+			}
+
+			// Create a token with cnf
+			tok, err := generateCustomToken("smallstep test", "step-cli", testAudiences.Sign[0], key, nil, map[string]any{
+				"sans": []string{"test.smallstep.com"},
+				"cnf":  map[string]any{"kid": "bad-fingerprint"},
+			})
+			require.NoError(t, err)
+
+			opts, err := auth.Authorize(ctx, tok)
+			require.NoError(t, err)
+
+			return &signTest{
+				auth:      auth,
+				csr:       csr,
+				extraOpts: opts,
+				signOpts:  signOpts,
+				notBefore: signOpts.NotBefore.Time().Truncate(time.Second),
+				notAfter:  signOpts.NotAfter.Time().Truncate(time.Second),
+				err:       errors.New(`certificate request fingerprint does not match "bad-fingerprint"`),
+				code:      http.StatusForbidden,
+			}
+		},
 		"ok": func(t *testing.T) *signTest {
 			csr := getCSR(t, priv)
 			_a := testAuthority(t)
 			_a.db = &db.MockAuthDB{
 				MStoreCertificate: func(crt *x509.Certificate) error {
-					sassert.Equals(t, crt.Subject.CommonName, "smallstep test")
+					assert.Equal(t, crt.Subject.CommonName, "smallstep test")
 					return nil
 				},
 			}
@@ -634,7 +677,7 @@ ZYtQ9Ot36qc=
 			_a := testAuthority(t)
 			_a.db = &db.MockAuthDB{
 				MStoreCertificate: func(crt *x509.Certificate) error {
-					sassert.Equals(t, crt.Subject.CommonName, "smallstep test")
+					assert.Equal(t, crt.Subject.CommonName, "smallstep test")
 					return nil
 				},
 			}
@@ -668,7 +711,7 @@ ZYtQ9Ot36qc=
 			require.NoError(t, err)
 			testAuthority.db = &db.MockAuthDB{
 				MStoreCertificate: func(crt *x509.Certificate) error {
-					sassert.Equals(t, crt.Subject.CommonName, "smallstep test")
+					assert.Equal(t, crt.Subject.CommonName, "smallstep test")
 					return nil
 				},
 			}
@@ -702,7 +745,7 @@ ZYtQ9Ot36qc=
 			require.NoError(t, err)
 			testAuthority.db = &db.MockAuthDB{
 				MStoreCertificate: func(crt *x509.Certificate) error {
-					sassert.Equals(t, crt.Subject.CommonName, "smallstep test")
+					assert.Equal(t, crt.Subject.CommonName, "smallstep test")
 					return nil
 				},
 			}
@@ -739,7 +782,7 @@ ZYtQ9Ot36qc=
 			_a.config.AuthorityConfig.Template = &ASN1DN{}
 			_a.db = &db.MockAuthDB{
 				MStoreCertificate: func(crt *x509.Certificate) error {
-					sassert.Equals(t, crt.Subject, pkix.Name{})
+					assert.Equal(t, crt.Subject, pkix.Name{})
 					return nil
 				},
 			}
@@ -764,8 +807,8 @@ ZYtQ9Ot36qc=
 			aa.config.AuthorityConfig.Template = a.config.AuthorityConfig.Template
 			aa.db = &db.MockAuthDB{
 				MStoreCertificate: func(crt *x509.Certificate) error {
-					sassert.Equals(t, crt.Subject.CommonName, "smallstep test")
-					sassert.Equals(t, crt.CRLDistributionPoints, []string{"http://ca.example.org/leaf.crl"})
+					assert.Equal(t, crt.Subject.CommonName, "smallstep test")
+					assert.Equal(t, crt.CRLDistributionPoints, []string{"http://ca.example.org/leaf.crl"})
 					return nil
 				},
 			}
@@ -785,7 +828,7 @@ ZYtQ9Ot36qc=
 			aa.config.AuthorityConfig.Template = a.config.AuthorityConfig.Template
 			aa.db = &db.MockAuthDB{
 				MStoreCertificate: func(crt *x509.Certificate) error {
-					sassert.Equals(t, crt.Subject.CommonName, "smallstep test")
+					assert.Equal(t, crt.Subject.CommonName, "smallstep test")
 					return nil
 				},
 			}
@@ -818,13 +861,13 @@ ZYtQ9Ot36qc=
 				MStoreCertificateChain: func(prov provisioner.Interface, certs ...*x509.Certificate) error {
 					p, ok := prov.(attProvisioner)
 					if assert.True(t, ok) {
-						sassert.Equals(t, &provisioner.AttestationData{
+						assert.Equal(t, &provisioner.AttestationData{
 							PermanentIdentifier: "1234567890",
 						}, p.AttestationData())
 					}
 					if assert.Len(t, certs, 2) {
-						sassert.Equals(t, certs[0].Subject.CommonName, "smallstep test")
-						sassert.Equals(t, certs[1].Subject.CommonName, "smallstep Intermediate CA")
+						assert.Equal(t, certs[0].Subject.CommonName, "smallstep test")
+						assert.Equal(t, certs[1].Subject.CommonName, "smallstep Intermediate CA")
 					}
 					return nil
 				},
@@ -842,6 +885,44 @@ ZYtQ9Ot36qc=
 				extensionsCount: 6,
 			}
 		},
+		"ok with cnf": func(t *testing.T) *signTest {
+			csr := getCSR(t, priv)
+			fingerprint, err := fingerprint.New(csr.Raw, crypto.SHA256, fingerprint.Base64RawURLFingerprint)
+			require.NoError(t, err)
+
+			auth := testAuthority(t)
+			auth.config.AuthorityConfig.Template = a.config.AuthorityConfig.Template
+			auth.db = &db.MockAuthDB{
+				MUseToken: func(id, tok string) (bool, error) {
+					return true, nil
+				},
+				MStoreCertificate: func(crt *x509.Certificate) error {
+					assert.Equal(t, crt.Subject.CommonName, "smallstep test")
+					assert.Equal(t, crt.DNSNames, []string{"test.smallstep.com"})
+					return nil
+				},
+			}
+
+			// Create a token with cnf
+			tok, err := generateCustomToken("smallstep test", "step-cli", testAudiences.Sign[0], key, nil, map[string]any{
+				"sans": []string{"test.smallstep.com"},
+				"cnf":  map[string]any{"kid": fingerprint},
+			})
+			require.NoError(t, err)
+
+			opts, err := auth.Authorize(ctx, tok)
+			require.NoError(t, err)
+
+			return &signTest{
+				auth:            auth,
+				csr:             csr,
+				extraOpts:       opts,
+				signOpts:        signOpts,
+				notBefore:       signOpts.NotBefore.Time().Truncate(time.Second),
+				notAfter:        signOpts.NotAfter.Time().Truncate(time.Second),
+				extensionsCount: 6,
+			}
+		},
 	}
 
 	for name, genTestCase := range tests {
@@ -853,26 +934,26 @@ ZYtQ9Ot36qc=
 				if assert.NotNil(t, tc.err, fmt.Sprintf("unexpected error: %s", err)) {
 					assert.Nil(t, certChain)
 					var sc render.StatusCodedError
-					sassert.Fatal(t, errors.As(err, &sc), "error does not implement StatusCodedError interface")
-					sassert.Equals(t, sc.StatusCode(), tc.code)
-					sassert.HasPrefix(t, err.Error(), tc.err.Error())
+					require.True(t, errors.As(err, &sc), "error does not implement StatusCodedError interface")
+					assert.Equal(t, sc.StatusCode(), tc.code)
+					assertHasPrefix(t, err.Error(), tc.err.Error())
 
 					var ctxErr *errs.Error
-					sassert.Fatal(t, errors.As(err, &ctxErr), "error is not of type *errs.Error")
-					sassert.Equals(t, ctxErr.Details["csr"], tc.csr)
-					sassert.Equals(t, ctxErr.Details["signOptions"], tc.signOpts)
+					require.True(t, errors.As(err, &ctxErr), "error is not of type *errs.Error")
+					assert.Equal(t, ctxErr.Details["csr"], tc.csr)
+					assert.Equal(t, ctxErr.Details["signOptions"], tc.signOpts)
 				}
 			} else {
 				leaf := certChain[0]
 				intermediate := certChain[1]
 				if assert.Nil(t, tc.err) {
-					sassert.Equals(t, leaf.NotBefore, tc.notBefore)
-					sassert.Equals(t, leaf.NotAfter, tc.notAfter)
+					assert.Equal(t, leaf.NotBefore, tc.notBefore)
+					assert.Equal(t, leaf.NotAfter, tc.notAfter)
 					tmplt := a.config.AuthorityConfig.Template
 					if tc.csr.Subject.CommonName == "" {
-						sassert.Equals(t, leaf.Subject, pkix.Name{})
+						assert.Equal(t, leaf.Subject, pkix.Name{})
 					} else {
-						sassert.Equals(t, leaf.Subject.String(),
+						assert.Equal(t, leaf.Subject.String(),
 							pkix.Name{
 								Country:       []string{tmplt.Country},
 								Organization:  []string{tmplt.Organization},
@@ -881,18 +962,18 @@ ZYtQ9Ot36qc=
 								Province:      []string{tmplt.Province},
 								CommonName:    "smallstep test",
 							}.String())
-						sassert.Equals(t, leaf.DNSNames, []string{"test.smallstep.com"})
+						assert.Equal(t, leaf.DNSNames, []string{"test.smallstep.com"})
 					}
-					sassert.Equals(t, leaf.Issuer, intermediate.Subject)
-					sassert.Equals(t, leaf.SignatureAlgorithm, x509.ECDSAWithSHA256)
-					sassert.Equals(t, leaf.PublicKeyAlgorithm, x509.ECDSA)
-					sassert.Equals(t, leaf.ExtKeyUsage, []x509.ExtKeyUsage{x509.ExtKeyUsageServerAuth, x509.ExtKeyUsageClientAuth})
+					assert.Equal(t, leaf.Issuer, intermediate.Subject)
+					assert.Equal(t, leaf.SignatureAlgorithm, x509.ECDSAWithSHA256)
+					assert.Equal(t, leaf.PublicKeyAlgorithm, x509.ECDSA)
+					assert.Equal(t, leaf.ExtKeyUsage, []x509.ExtKeyUsage{x509.ExtKeyUsageServerAuth, x509.ExtKeyUsageClientAuth})
 
 					issuer := getDefaultIssuer(a)
 					subjectKeyID, err := generateSubjectKeyID(pub)
 					require.NoError(t, err)
-					sassert.Equals(t, leaf.SubjectKeyId, subjectKeyID)
-					sassert.Equals(t, leaf.AuthorityKeyId, issuer.SubjectKeyId)
+					assert.Equal(t, leaf.SubjectKeyId, subjectKeyID)
+					assert.Equal(t, leaf.AuthorityKeyId, issuer.SubjectKeyId)
 
 					// Verify Provisioner OID
 					found := 0
@@ -903,9 +984,9 @@ ZYtQ9Ot36qc=
 							val := stepProvisionerASN1{}
 							_, err := asn1.Unmarshal(ext.Value, &val)
 							require.NoError(t, err)
-							sassert.Equals(t, val.Type, provisionerTypeJWK)
-							sassert.Equals(t, val.Name, []byte(p.Name))
-							sassert.Equals(t, val.CredentialID, []byte(p.Key.KeyID))
+							assert.Equal(t, val.Type, provisionerTypeJWK)
+							assert.Equal(t, val.Name, []byte(p.Name))
+							assert.Equal(t, val.CredentialID, []byte(p.Key.KeyID))
 
 						// Basic Constraints
 						case ext.Id.Equal(asn1.ObjectIdentifier([]int{2, 5, 29, 19})):
@@ -913,7 +994,7 @@ ZYtQ9Ot36qc=
 							_, err := asn1.Unmarshal(ext.Value, &val)
 							require.NoError(t, err)
 							assert.False(t, val.IsCA, false)
-							sassert.Equals(t, val.MaxPathLen, 0)
+							assert.Equal(t, val.MaxPathLen, 0)
 
 						// SAN extension
 						case ext.Id.Equal(asn1.ObjectIdentifier([]int{2, 5, 29, 17})):
@@ -924,10 +1005,10 @@ ZYtQ9Ot36qc=
 							}
 						}
 					}
-					sassert.Equals(t, found, 1)
+					assert.Equal(t, found, 1)
 					realIntermediate, err := x509.ParseCertificate(issuer.Raw)
 					require.NoError(t, err)
-					sassert.Equals(t, intermediate, realIntermediate)
+					assert.Equal(t, intermediate, realIntermediate)
 					assert.Len(t, leaf.Extensions, tc.extensionsCount)
 				}
 			}
@@ -1070,19 +1151,19 @@ func TestAuthority_Renew(t *testing.T) {
 				if assert.NotNil(t, tc.err, fmt.Sprintf("unexpected error: %s", err)) {
 					assert.Nil(t, certChain)
 					var sc render.StatusCodedError
-					sassert.Fatal(t, errors.As(err, &sc), "error does not implement StatusCodedError interface")
-					sassert.Equals(t, sc.StatusCode(), tc.code)
-					sassert.HasPrefix(t, err.Error(), tc.err.Error())
+					require.True(t, errors.As(err, &sc), "error does not implement StatusCodedError interface")
+					assert.Equal(t, sc.StatusCode(), tc.code)
+					assertHasPrefix(t, err.Error(), tc.err.Error())
 
 					var ctxErr *errs.Error
-					sassert.Fatal(t, errors.As(err, &ctxErr), "error is not of type *errs.Error")
-					sassert.Equals(t, ctxErr.Details["serialNumber"], tc.cert.SerialNumber.String())
+					require.True(t, errors.As(err, &ctxErr), "error is not of type *errs.Error")
+					assert.Equal(t, ctxErr.Details["serialNumber"], tc.cert.SerialNumber.String())
 				}
 			} else {
 				leaf := certChain[0]
 				intermediate := certChain[1]
 				if assert.Nil(t, tc.err) {
-					sassert.Equals(t, leaf.NotAfter.Sub(leaf.NotBefore), tc.cert.NotAfter.Sub(cert.NotBefore))
+					assert.Equal(t, leaf.NotAfter.Sub(leaf.NotBefore), tc.cert.NotAfter.Sub(cert.NotBefore))
 
 					assert.True(t, leaf.NotBefore.After(now.Add(-2*time.Minute)))
 					assert.True(t, leaf.NotBefore.Before(now.Add(time.Minute)))
@@ -1092,30 +1173,30 @@ func TestAuthority_Renew(t *testing.T) {
 					assert.True(t, leaf.NotAfter.Before(expiry.Add(time.Hour)))
 
 					tmplt := a.config.AuthorityConfig.Template
-					sassert.Equals(t, leaf.RawSubject, tc.cert.RawSubject)
-					sassert.Equals(t, leaf.Subject.Country, []string{tmplt.Country})
-					sassert.Equals(t, leaf.Subject.Organization, []string{tmplt.Organization})
-					sassert.Equals(t, leaf.Subject.Locality, []string{tmplt.Locality})
-					sassert.Equals(t, leaf.Subject.StreetAddress, []string{tmplt.StreetAddress})
-					sassert.Equals(t, leaf.Subject.Province, []string{tmplt.Province})
-					sassert.Equals(t, leaf.Subject.CommonName, tmplt.CommonName)
+					assert.Equal(t, leaf.RawSubject, tc.cert.RawSubject)
+					assert.Equal(t, leaf.Subject.Country, []string{tmplt.Country})
+					assert.Equal(t, leaf.Subject.Organization, []string{tmplt.Organization})
+					assert.Equal(t, leaf.Subject.Locality, []string{tmplt.Locality})
+					assert.Equal(t, leaf.Subject.StreetAddress, []string{tmplt.StreetAddress})
+					assert.Equal(t, leaf.Subject.Province, []string{tmplt.Province})
+					assert.Equal(t, leaf.Subject.CommonName, tmplt.CommonName)
 
-					sassert.Equals(t, leaf.Issuer, intermediate.Subject)
+					assert.Equal(t, leaf.Issuer, intermediate.Subject)
 
-					sassert.Equals(t, leaf.SignatureAlgorithm, x509.ECDSAWithSHA256)
-					sassert.Equals(t, leaf.PublicKeyAlgorithm, x509.ECDSA)
-					sassert.Equals(t, leaf.ExtKeyUsage,
+					assert.Equal(t, leaf.SignatureAlgorithm, x509.ECDSAWithSHA256)
+					assert.Equal(t, leaf.PublicKeyAlgorithm, x509.ECDSA)
+					assert.Equal(t, leaf.ExtKeyUsage,
 						[]x509.ExtKeyUsage{x509.ExtKeyUsageServerAuth, x509.ExtKeyUsageClientAuth})
-					sassert.Equals(t, leaf.DNSNames, []string{"test.smallstep.com", "test"})
+					assert.Equal(t, leaf.DNSNames, []string{"test.smallstep.com", "test"})
 
 					subjectKeyID, err := generateSubjectKeyID(leaf.PublicKey)
 					require.NoError(t, err)
-					sassert.Equals(t, leaf.SubjectKeyId, subjectKeyID)
+					assert.Equal(t, leaf.SubjectKeyId, subjectKeyID)
 
 					// We did not change the intermediate before renewing.
 					authIssuer := getDefaultIssuer(tc.auth)
 					if issuer.SerialNumber == authIssuer.SerialNumber {
-						sassert.Equals(t, leaf.AuthorityKeyId, issuer.SubjectKeyId)
+						assert.Equal(t, leaf.AuthorityKeyId, issuer.SubjectKeyId)
 						// Compare extensions: they can be in a different order
 						for _, ext1 := range tc.cert.Extensions {
 							//skip SubjectKeyIdentifier
@@ -1135,7 +1216,7 @@ func TestAuthority_Renew(t *testing.T) {
 						}
 					} else {
 						// We did change the intermediate before renewing.
-						sassert.Equals(t, leaf.AuthorityKeyId, authIssuer.SubjectKeyId)
+						assert.Equal(t, leaf.AuthorityKeyId, authIssuer.SubjectKeyId)
 						// Compare extensions: they can be in a different order
 						for _, ext1 := range tc.cert.Extensions {
 							//skip SubjectKeyIdentifier
@@ -1164,7 +1245,7 @@ func TestAuthority_Renew(t *testing.T) {
 
 					realIntermediate, err := x509.ParseCertificate(authIssuer.Raw)
 					require.NoError(t, err)
-					sassert.Equals(t, intermediate, realIntermediate)
+					assert.Equal(t, intermediate, realIntermediate)
 				}
 			}
 		})
@@ -1275,19 +1356,19 @@ func TestAuthority_Rekey(t *testing.T) {
 				if assert.NotNil(t, tc.err, fmt.Sprintf("unexpected error: %s", err)) {
 					assert.Nil(t, certChain)
 					var sc render.StatusCodedError
-					sassert.Fatal(t, errors.As(err, &sc), "error does not implement StatusCodedError interface")
-					sassert.Equals(t, sc.StatusCode(), tc.code)
-					sassert.HasPrefix(t, err.Error(), tc.err.Error())
+					require.True(t, errors.As(err, &sc), "error does not implement StatusCodedError interface")
+					assert.Equal(t, sc.StatusCode(), tc.code)
+					assertHasPrefix(t, err.Error(), tc.err.Error())
 
 					var ctxErr *errs.Error
-					sassert.Fatal(t, errors.As(err, &ctxErr), "error is not of type *errs.Error")
-					sassert.Equals(t, ctxErr.Details["serialNumber"], tc.cert.SerialNumber.String())
+					require.True(t, errors.As(err, &ctxErr), "error is not of type *errs.Error")
+					assert.Equal(t, ctxErr.Details["serialNumber"], tc.cert.SerialNumber.String())
 				}
 			} else {
 				leaf := certChain[0]
 				intermediate := certChain[1]
 				if assert.Nil(t, tc.err) {
-					sassert.Equals(t, leaf.NotAfter.Sub(leaf.NotBefore), tc.cert.NotAfter.Sub(cert.NotBefore))
+					assert.Equal(t, leaf.NotAfter.Sub(leaf.NotBefore), tc.cert.NotAfter.Sub(cert.NotBefore))
 
 					assert.True(t, leaf.NotBefore.After(now.Add(-2*time.Minute)))
 					assert.True(t, leaf.NotBefore.Before(now.Add(time.Minute)))
@@ -1297,7 +1378,7 @@ func TestAuthority_Rekey(t *testing.T) {
 					assert.True(t, leaf.NotAfter.Before(expiry.Add(time.Hour)))
 
 					tmplt := a.config.AuthorityConfig.Template
-					sassert.Equals(t, leaf.Subject.String(),
+					assert.Equal(t, leaf.Subject.String(),
 						pkix.Name{
 							Country:       []string{tmplt.Country},
 							Organization:  []string{tmplt.Organization},
@@ -1306,32 +1387,32 @@ func TestAuthority_Rekey(t *testing.T) {
 							Province:      []string{tmplt.Province},
 							CommonName:    tmplt.CommonName,
 						}.String())
-					sassert.Equals(t, leaf.Issuer, intermediate.Subject)
+					assert.Equal(t, leaf.Issuer, intermediate.Subject)
 
-					sassert.Equals(t, leaf.SignatureAlgorithm, x509.ECDSAWithSHA256)
-					sassert.Equals(t, leaf.PublicKeyAlgorithm, x509.ECDSA)
-					sassert.Equals(t, leaf.ExtKeyUsage,
+					assert.Equal(t, leaf.SignatureAlgorithm, x509.ECDSAWithSHA256)
+					assert.Equal(t, leaf.PublicKeyAlgorithm, x509.ECDSA)
+					assert.Equal(t, leaf.ExtKeyUsage,
 						[]x509.ExtKeyUsage{x509.ExtKeyUsageServerAuth, x509.ExtKeyUsageClientAuth})
-					sassert.Equals(t, leaf.DNSNames, []string{"test.smallstep.com", "test"})
+					assert.Equal(t, leaf.DNSNames, []string{"test.smallstep.com", "test"})
 
 					// Test Public Key and SubjectKeyId
 					expectedPK := tc.pk
 					if tc.pk == nil {
 						expectedPK = cert.PublicKey
 					}
-					sassert.Equals(t, leaf.PublicKey, expectedPK)
+					assert.Equal(t, leaf.PublicKey, expectedPK)
 
 					subjectKeyID, err := generateSubjectKeyID(expectedPK)
 					require.NoError(t, err)
-					sassert.Equals(t, leaf.SubjectKeyId, subjectKeyID)
+					assert.Equal(t, leaf.SubjectKeyId, subjectKeyID)
 					if tc.pk == nil {
-						sassert.Equals(t, leaf.SubjectKeyId, cert.SubjectKeyId)
+						assert.Equal(t, leaf.SubjectKeyId, cert.SubjectKeyId)
 					}
 
 					// We did not change the intermediate before renewing.
 					authIssuer := getDefaultIssuer(tc.auth)
 					if issuer.SerialNumber == authIssuer.SerialNumber {
-						sassert.Equals(t, leaf.AuthorityKeyId, issuer.SubjectKeyId)
+						assert.Equal(t, leaf.AuthorityKeyId, issuer.SubjectKeyId)
 						// Compare extensions: they can be in a different order
 						for _, ext1 := range tc.cert.Extensions {
 							//skip SubjectKeyIdentifier
@@ -1351,7 +1432,7 @@ func TestAuthority_Rekey(t *testing.T) {
 						}
 					} else {
 						// We did change the intermediate before renewing.
-						sassert.Equals(t, leaf.AuthorityKeyId, authIssuer.SubjectKeyId)
+						assert.Equal(t, leaf.AuthorityKeyId, authIssuer.SubjectKeyId)
 						// Compare extensions: they can be in a different order
 						for _, ext1 := range tc.cert.Extensions {
 							//skip SubjectKeyIdentifier
@@ -1380,7 +1461,7 @@ func TestAuthority_Rekey(t *testing.T) {
 
 					realIntermediate, err := x509.ParseCertificate(authIssuer.Raw)
 					require.NoError(t, err)
-					sassert.Equals(t, intermediate, realIntermediate)
+					assert.Equal(t, intermediate, realIntermediate)
 				}
 			}
 		})
@@ -1418,7 +1499,7 @@ func TestAuthority_GetTLSOptions(t *testing.T) {
 			require.NoError(t, err)
 
 			opts := tc.auth.GetTLSOptions()
-			sassert.Equals(t, opts, tc.opts)
+			assert.Equal(t, opts, tc.opts)
 		})
 	}
 }
@@ -1488,9 +1569,9 @@ func TestAuthority_Revoke(t *testing.T) {
 				err:  errors.New("authority.Revoke; no persistence layer configured"),
 				code: http.StatusNotImplemented,
 				checkErrDetails: func(err *errs.Error) {
-					sassert.Equals(t, err.Details["token"], raw)
-					sassert.Equals(t, err.Details["tokenID"], "44")
-					sassert.Equals(t, err.Details["provisionerID"], "step-cli:4UELJx8e0aS9m0CH3fZ0EB7D5aUPICb759zALHFejvc")
+					assert.Equal(t, err.Details["token"], raw)
+					assert.Equal(t, err.Details["tokenID"], "44")
+					assert.Equal(t, err.Details["provisionerID"], "step-cli:4UELJx8e0aS9m0CH3fZ0EB7D5aUPICb759zALHFejvc")
 				},
 			}
 		},
@@ -1528,9 +1609,9 @@ func TestAuthority_Revoke(t *testing.T) {
 				err:  errors.New("authority.Revoke: force"),
 				code: http.StatusInternalServerError,
 				checkErrDetails: func(err *errs.Error) {
-					sassert.Equals(t, err.Details["token"], raw)
-					sassert.Equals(t, err.Details["tokenID"], "44")
-					sassert.Equals(t, err.Details["provisionerID"], "step-cli:4UELJx8e0aS9m0CH3fZ0EB7D5aUPICb759zALHFejvc")
+					assert.Equal(t, err.Details["token"], raw)
+					assert.Equal(t, err.Details["tokenID"], "44")
+					assert.Equal(t, err.Details["provisionerID"], "step-cli:4UELJx8e0aS9m0CH3fZ0EB7D5aUPICb759zALHFejvc")
 				},
 			}
 		},
@@ -1568,9 +1649,9 @@ func TestAuthority_Revoke(t *testing.T) {
 				err:  errors.New("certificate with serial number 'sn' is already revoked"),
 				code: http.StatusBadRequest,
 				checkErrDetails: func(err *errs.Error) {
-					sassert.Equals(t, err.Details["token"], raw)
-					sassert.Equals(t, err.Details["tokenID"], "44")
-					sassert.Equals(t, err.Details["provisionerID"], "step-cli:4UELJx8e0aS9m0CH3fZ0EB7D5aUPICb759zALHFejvc")
+					assert.Equal(t, err.Details["token"], raw)
+					assert.Equal(t, err.Details["tokenID"], "44")
+					assert.Equal(t, err.Details["provisionerID"], "step-cli:4UELJx8e0aS9m0CH3fZ0EB7D5aUPICb759zALHFejvc")
 				},
 			}
 		},
@@ -1704,17 +1785,17 @@ func TestAuthority_Revoke(t *testing.T) {
 			if err := tc.auth.Revoke(tc.ctx, tc.opts); err != nil {
 				if assert.NotNil(t, tc.err, fmt.Sprintf("unexpected error: %s", err)) {
 					var sc render.StatusCodedError
-					sassert.Fatal(t, errors.As(err, &sc), "error does not implement StatusCodedError interface")
-					sassert.Equals(t, sc.StatusCode(), tc.code)
-					sassert.HasPrefix(t, err.Error(), tc.err.Error())
+					require.True(t, errors.As(err, &sc), "error does not implement StatusCodedError interface")
+					assert.Equal(t, sc.StatusCode(), tc.code)
+					assertHasPrefix(t, err.Error(), tc.err.Error())
 
 					var ctxErr *errs.Error
-					sassert.Fatal(t, errors.As(err, &ctxErr), "error is not of type *errs.Error")
-					sassert.Equals(t, ctxErr.Details["serialNumber"], tc.opts.Serial)
-					sassert.Equals(t, ctxErr.Details["reasonCode"], tc.opts.ReasonCode)
-					sassert.Equals(t, ctxErr.Details["reason"], tc.opts.Reason)
-					sassert.Equals(t, ctxErr.Details["MTLS"], tc.opts.MTLS)
-					sassert.Equals(t, ctxErr.Details["context"], provisioner.RevokeMethod.String())
+					require.True(t, errors.As(err, &ctxErr), "error is not of type *errs.Error")
+					assert.Equal(t, ctxErr.Details["serialNumber"], tc.opts.Serial)
+					assert.Equal(t, ctxErr.Details["reasonCode"], tc.opts.ReasonCode)
+					assert.Equal(t, ctxErr.Details["reason"], tc.opts.Reason)
+					assert.Equal(t, ctxErr.Details["MTLS"], tc.opts.MTLS)
+					assert.Equal(t, ctxErr.Details["context"], provisioner.RevokeMethod.String())
 
 					if tc.checkErrDetails != nil {
 						tc.checkErrDetails(ctxErr)
