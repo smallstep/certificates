@@ -38,7 +38,7 @@ func GetProvisioner(w http.ResponseWriter, r *http.Request) {
 	auth := mustAuthority(ctx)
 	db := admin.MustFromContext(ctx)
 
-	if len(id) > 0 {
+	if id != "" {
 		if p, err = auth.LoadProvisionerByID(id); err != nil {
 			render.Error(w, admin.WrapErrorISE(err, "error loading provisioner %s", id))
 			return
@@ -116,7 +116,7 @@ func DeleteProvisioner(w http.ResponseWriter, r *http.Request) {
 	name := chi.URLParam(r, "name")
 	auth := mustAuthority(r.Context())
 
-	if len(id) > 0 {
+	if id != "" {
 		if p, err = auth.LoadProvisionerByID(id); err != nil {
 			render.Error(w, admin.WrapErrorISE(err, "error loading provisioner %s", id))
 			return

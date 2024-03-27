@@ -29,8 +29,8 @@ import (
 	"github.com/smallstep/certificates/cas/apiv1"
 	"github.com/smallstep/certificates/db"
 	"github.com/smallstep/certificates/internal/metrix"
-	"github.com/smallstep/certificates/internal/requestid"
 	"github.com/smallstep/certificates/logging"
+	"github.com/smallstep/certificates/middleware/requestid"
 	"github.com/smallstep/certificates/monitoring"
 	"github.com/smallstep/certificates/scep"
 	scepAPI "github.com/smallstep/certificates/scep/api"
@@ -678,7 +678,7 @@ func (ca *CA) shouldServeSCEPEndpoints() bool {
 //nolint:unused // useful for debugging
 func dumpRoutes(mux chi.Routes) {
 	// helpful routine for logging all routes
-	walkFunc := func(method string, route string, handler http.Handler, middlewares ...func(http.Handler) http.Handler) error {
+	walkFunc := func(method string, route string, _ http.Handler, _ ...func(http.Handler) http.Handler) error {
 		fmt.Printf("%s %s\n", method, route)
 		return nil
 	}

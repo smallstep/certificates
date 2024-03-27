@@ -184,14 +184,12 @@ if [ -z "$CA_PROVISIONER_JWK_PASSWORD_FILE" ]; then
 fi
 
 echo "Installing 'step-ca' in /usr/bin..."
-CA_VERSION=$(curl -s https://api.github.com/repos/smallstep/certificates/releases/latest | jq -r '.tag_name')
-
-curl -sLO https://github.com/smallstep/certificates/releases/download/$CA_VERSION/step-ca_linux_${CA_VERSION:1}_$arch.tar.gz
-tar -xf step-ca_linux_${CA_VERSION:1}_$arch.tar.gz
-install -m 0755 -t /usr/bin step-ca_${CA_VERSION:1}/step-ca
+curl -sLO https://dl.smallstep.com/certificates/ra-installer/latest/step-ca_linux_$arch.tar.gz
+tar -xf step-ca_linux_$arch.tar.gz
+install -m 0755 -t /usr/bin step-ca_linux_$arch/step-ca
 setcap CAP_NET_BIND_SERVICE=+eip $(which step-ca)
-rm step-ca_linux_${CA_VERSION:1}_$arch.tar.gz
-rm -rf step-ca_${CA_VERSION:1}
+rm step-ca_linux_$arch.tar.gz
+rm -rf step-ca_linux_$arch
 
 echo "Creating 'step' user..."
 export STEPPATH=/etc/step-ca

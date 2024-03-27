@@ -304,7 +304,7 @@ func (s *SCEP) Init(config Config) (err error) {
 		}
 	}
 
-	if decryptionKeyURI := s.DecrypterKeyURI; len(decryptionKeyURI) > 0 {
+	if decryptionKeyURI := s.DecrypterKeyURI; decryptionKeyURI != "" {
 		u, err := uri.Parse(s.DecrypterKeyURI)
 		if err != nil {
 			return fmt.Errorf("failed parsing decrypter key: %w", err)

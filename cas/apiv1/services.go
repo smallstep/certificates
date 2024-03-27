@@ -67,6 +67,14 @@ func (t Type) String() string {
 	return strings.ToLower(string(t))
 }
 
+// TypeOf returns the type of the given CertificateAuthorityService.
+func TypeOf(c CertificateAuthorityService) Type {
+	if ct, ok := c.(interface{ Type() Type }); ok {
+		return ct.Type()
+	}
+	return ExternalCAS
+}
+
 // NotImplementedError is the type of error returned if an operation is not implemented.
 type NotImplementedError struct {
 	Message string

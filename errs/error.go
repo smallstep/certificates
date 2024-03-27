@@ -80,7 +80,7 @@ func (e *Error) StatusCode() int {
 
 // Message returns a user friendly error, if one is set.
 func (e *Error) Message() string {
-	if len(e.Msg) > 0 {
+	if e.Msg != "" {
 		return e.Msg
 	}
 	return e.Err.Error()
@@ -123,7 +123,7 @@ func Wrapf(status int, e error, format string, args ...interface{}) error {
 // MarshalJSON implements json.Marshaller interface for the Error struct.
 func (e *Error) MarshalJSON() ([]byte, error) {
 	var msg string
-	if len(e.Msg) > 0 {
+	if e.Msg != "" {
 		msg = e.Msg
 	} else {
 		msg = http.StatusText(e.Status)
