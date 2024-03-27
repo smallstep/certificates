@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/pkg/errors"
+	"github.com/smallstep/certificates/acme/wire"
 	"go.step.sm/linkedca"
 )
 
@@ -26,6 +27,10 @@ const (
 	TLS_ALPN_01 ACMEChallenge = "tls-alpn-01"
 	// DEVICE_ATTEST_01 is the device-attest-01 ACME challenge.
 	DEVICE_ATTEST_01 ACMEChallenge = "device-attest-01"
+	// WIREOIDC_01 is the Wire OIDC challenge.
+	WIREOIDC_01 ACMEChallenge = "wire-oidc-01"
+	// WIREDPOP_01 is the Wire DPoP challenge.
+	WIREDPOP_01 ACMEChallenge = "wire-dpop-01"
 )
 
 // String returns a normalized version of the challenge.
@@ -36,7 +41,7 @@ func (c ACMEChallenge) String() string {
 // Validate returns an error if the acme challenge is not a valid one.
 func (c ACMEChallenge) Validate() error {
 	switch ACMEChallenge(c.String()) {
-	case HTTP_01, DNS_01, TLS_ALPN_01, DEVICE_ATTEST_01:
+	case HTTP_01, DNS_01, TLS_ALPN_01, DEVICE_ATTEST_01, WIREOIDC_01, WIREDPOP_01:
 		return nil
 	default:
 		return fmt.Errorf("acme challenge %q is not supported", c)
@@ -102,7 +107,8 @@ type ACME struct {
 	RequireEAB bool `json:"requireEAB,omitempty"`
 	// Challenges contains the enabled challenges for this provisioner. If this
 	// value is not set the default http-01, dns-01 and tls-alpn-01 challenges
-	// will be enabled, device-attest-01 will be disabled.
+	// will be enabled, device-attest-01, wire-oidc-01 and wire-dpop-01 will be
+	// disabled.
 	Challenges []ACMEChallenge `json:"challenges,omitempty"`
 	// AttestationFormats contains the enabled attestation formats for this
 	// provisioner. If this value is not set the default apple, step and tpm
@@ -206,8 +212,48 @@ func (p *ACME) Init(config Config) (err error) {
 		}
 	}
 
+	if err := p.initializeWireOptions(); err != nil {
+		return fmt.Errorf("failed initializing Wire options: %w", err)
+	}
+
 	p.ctl, err = NewController(p, p.Claims, config, p.Options)
 	return
+}
+
+// initializeWireOptions initializes the options for the ACME Wire
+// integration. It'll return early if no Wire challenge types are
+// enabled.
+func (p *ACME) initializeWireOptions() error {
+	hasWireChallenges := false
+	for _, c := range p.Challenges {
+		if c == WIREOIDC_01 || c == WIREDPOP_01 {
+			hasWireChallenges = true
+			break
+		}
+	}
+	if !hasWireChallenges {
+		return nil
+	}
+
+	w, err := p.GetOptions().GetWireOptions()
+	if err != nil {
+		return fmt.Errorf("failed getting Wire options: %w", err)
+	}
+
+	if err := w.Validate(); err != nil {
+		return fmt.Errorf("failed validating Wire options: %w", err)
+	}
+
+	// at this point the Wire options have been validated, and (mostly)
+	// initialized. Remote keys will be loaded upon the first verification,
+	// currently.
+	// TODO(hs): can/should we "prime" the underlying remote keyset, to verify
+	// auto discovery works as expected? Because of the current way provisioners
+	// are initialized, doing that as part of the initialization isn't the best
+	// time to do it, because it could result in operations not resulting in the
+	// expected result in all cases.
+
+	return nil
 }
 
 // ACMEIdentifierType encodes ACME Identifier types
@@ -218,6 +264,10 @@ const (
 	IP ACMEIdentifierType = "ip"
 	// DNS is the ACME dns identifier type
 	DNS ACMEIdentifierType = "dns"
+	// WireUser is the Wire user identifier type
+	WireUser ACMEIdentifierType = "wireapp-user"
+	// WireDevice is the Wire device identifier type
+	WireDevice ACMEIdentifierType = "wireapp-device"
 )
 
 // ACMEIdentifier encodes ACME Order Identifiers
@@ -243,6 +293,18 @@ func (p *ACME) AuthorizeOrderIdentifier(_ context.Context, identifier ACMEIdenti
 		err = x509Policy.IsIPAllowed(net.ParseIP(identifier.Value))
 	case DNS:
 		err = x509Policy.IsDNSAllowed(identifier.Value)
+	case WireUser:
+		var wireID wire.UserID
+		if wireID, err = wire.ParseUserID(identifier.Value); err != nil {
+			return fmt.Errorf("failed parsing Wire SANs: %w", err)
+		}
+		err = x509Policy.AreSANsAllowed([]string{wireID.Handle})
+	case WireDevice:
+		var wireID wire.DeviceID
+		if wireID, err = wire.ParseDeviceID(identifier.Value); err != nil {
+			return fmt.Errorf("failed parsing Wire SANs: %w", err)
+		}
+		err = x509Policy.AreSANsAllowed([]string{wireID.ClientID})
 	default:
 		err = fmt.Errorf("invalid ACME identifier type '%s' provided", identifier.Type)
 	}
