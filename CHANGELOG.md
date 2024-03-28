@@ -25,6 +25,35 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
 
 ---
 
+## [0.26.0] - 2024-03-28
+
+### Added 
+
+- [TPM KMS](https://github.com/smallstep/crypto/tree/master/kms/tpmkms) support for CA keys (smallstep/certificates#1772)
+- Propagation of HTTP request identifier using X-Request-Id header (smallstep/certificates#1743, smallstep/certificates#1542)
+- Expires header in CRL response (smallstep/certificates#1708)
+- Support for providing TLS configuration programmatically (smallstep/certificates#1685)
+- Support for providing external CAS implementation (smallstep/certificates#1684)
+- AWS `ca-west-1` identity document root certificate (smallstep/certificates#1715)
+- [COSE RS1](https://www.rfc-editor.org/rfc/rfc8812.html#section-2) as a supported algorithm with ACME `device-attest-01` challenge (smallstep/certificates#1663)
+
+### Changed 
+
+- In an RA setup, let the CA decide the RA certificate lifetime (smallstep/certificates#1764)
+- Use Debian Bookworm in Docker containers (smallstep/certificates#1615)
+- Error message for CSR validation (smallstep/certificates#1665)
+- Updated dependencies
+
+### Fixed
+
+- Stop CA when any of the required servers fails to start (smallstep/certificates#1751). Before the fix, the CA would continue running and only log the server failure when stopped.
+- Configuration loading errors when not using context were not returned. Fixed in [cli-utils/109](https://github.com/smallstep/cli-utils/pull/109).
+- HTTP_PROXY and HTTPS_PROXY support for ACME validation client (smallstep/certificates#1658).
+
+### Security
+
+- Upgrade to using cosign v2 for signing artifacts
+
 ## [0.25.1] - 2023-11-28
 
 ### Added
