@@ -283,7 +283,7 @@ winget:
     repository:
       owner: smallstep
       name: winget-pkgs
-      branch: step
+      branch: "step-ca-{{.Version}}"
 
       # Optionally a token can be provided, if it differs from the token
       # provided to GoReleaser
