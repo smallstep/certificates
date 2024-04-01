@@ -268,7 +268,7 @@ winget:
     # Release notes URL.
     #
     # Templates: allowed
-    release_notes_url: "https://github.com/smallstep/certificates/releases/tag/{{.Version}}"
+    release_notes_url: "https://github.com/smallstep/certificates/releases/tag/{{ .Tag }}"
 
     # Create the PR - for testing
     skip_upload: auto
