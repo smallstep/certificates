@@ -19,7 +19,7 @@ require (
 	github.com/hashicorp/vault/api v1.12.2
 	github.com/hashicorp/vault/api/auth/approle v0.6.0
 	github.com/hashicorp/vault/api/auth/kubernetes v0.6.0
-	github.com/newrelic/go-agent/v3 v3.30.0
+	github.com/newrelic/go-agent/v3 v3.31.0
 	github.com/pkg/errors v0.9.1
 	github.com/prometheus/client_golang v1.19.0
 	github.com/rs/xid v1.5.0
@@ -36,7 +36,7 @@ require (
 	go.step.sm/crypto v0.44.2
 	go.step.sm/linkedca v0.20.1
 	golang.org/x/crypto v0.21.0
-	golang.org/x/exp v0.0.0-20230310171629-522b1b587ee0
+	golang.org/x/exp v0.0.0-20240318143956-a85f2c67cd81
 	golang.org/x/net v0.22.0
 	google.golang.org/api v0.171.0
 	google.golang.org/grpc v1.62.1
