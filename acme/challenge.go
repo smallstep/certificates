@@ -726,7 +726,7 @@ var (
 	oidTCGKpAIKCertificate       = asn1.ObjectIdentifier{2, 23, 133, 8, 3}
 )
 
-// validateAKCertifiate validates the X.509 AK certificate to be
+// validateAKCertificate validates the X.509 AK certificate to be
 // in accordance with the required properties. The requirements come from:
 // https://www.w3.org/TR/webauthn-2/#sctn-tpm-cert-requirements.
 //
@@ -735,7 +735,7 @@ var (
 //   - The Subject Alternative Name extension MUST be set as defined
 //     in [TPMv2-EK-Profile] section 3.2.9.
 //   - The Extended Key Usage extension MUST contain the OID 2.23.133.8.3
-//     ("joint-iso-itu-t(2) internationalorganizations(23) 133 tcg-kp(8) tcg-kp-AIKCertificate(3)").
+//     ("joint-iso-itu-t(2) international-organizations(23) 133 tcg-kp(8) tcg-kp-AIKCertificate(3)").
 //   - The Basic Constraints extension MUST have the CA component set to false.
 //   - An Authority Information Access (AIA) extension with entry id-ad-ocsp
 //     and a CRL Distribution Point extension [RFC5280] are both OPTIONAL as

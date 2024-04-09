@@ -130,7 +130,7 @@ func (m *MockProvisioner) GetName() string {
 	return m.Mret1.(string)
 }
 
-// AuthorizeOrderIdentifiers mock
+// AuthorizeOrderIdentifier mock
 func (m *MockProvisioner) AuthorizeOrderIdentifier(ctx context.Context, identifier provisioner.ACMEIdentifier) error {
 	if m.MauthorizeOrderIdentifier != nil {
 		return m.MauthorizeOrderIdentifier(ctx, identifier)
