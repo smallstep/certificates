@@ -308,7 +308,7 @@ func (a *Authority) SignCSR(ctx context.Context, csr *x509.CertificateRequest, m
 
 	certChain, err := a.signAuth.SignWithContext(ctx, csr, opts, signOps...)
 	if err != nil {
-		return nil, fmt.Errorf("error generating certificate for order: %w", err)
+		return nil, fmt.Errorf("error generating certificate: %w", err)
 	}
 
 	// take the issued certificate (only); https://tools.ietf.org/html/rfc8894#section-3.3.2
