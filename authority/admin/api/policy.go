@@ -35,7 +35,7 @@ type PolicyAdminResponder interface {
 // policyAdminResponder implements PolicyAdminResponder.
 type policyAdminResponder struct{}
 
-// NewACMEAdminResponder returns a new PolicyAdminResponder.
+// NewPolicyAdminResponder returns a new PolicyAdminResponder.
 func NewPolicyAdminResponder() PolicyAdminResponder {
 	return &policyAdminResponder{}
 }
