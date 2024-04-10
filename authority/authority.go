@@ -62,9 +62,10 @@ type Authority struct {
 	x509Enforcers         []provisioner.CertificateEnforcer
 
 	// SCEP CA
-	scepOptions   *scep.Options
-	validateSCEP  bool
-	scepAuthority *scep.Authority
+	scepOptions    *scep.Options
+	validateSCEP   bool
+	scepAuthority  *scep.Authority
+	scepKeyManager provisioner.SCEPKeyManager
 
 	// SSH CA
 	sshHostPassword         []byte

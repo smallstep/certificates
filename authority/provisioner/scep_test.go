@@ -2,19 +2,27 @@ package provisioner
 
 import (
 	"context"
+	"crypto"
+	"crypto/rand"
+	"crypto/rsa"
 	"crypto/x509"
+	"crypto/x509/pkix"
 	"encoding/json"
+	"encoding/pem"
 	"errors"
 	"net/http"
 	"net/http/httptest"
+	"os"
+	"path/filepath"
 	"testing"
 
+	"github.com/smallstep/certificates/webhook"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-
+	"go.step.sm/crypto/kms/softkms"
+	"go.step.sm/crypto/minica"
+	"go.step.sm/crypto/pemutil"
 	"go.step.sm/linkedca"
-
-	"github.com/smallstep/certificates/webhook"
 )
 
 func Test_challengeValidationController_Validate(t *testing.T) {
@@ -363,6 +371,276 @@ func TestSCEP_ValidateChallenge(t *testing.T) {
 			}
 
 			assert.NoError(t, err)
+		})
+	}
+}
+
+func TestSCEP_Init(t *testing.T) {
+	serialize := func(key crypto.PrivateKey, password string) []byte {
+		var opts []pemutil.Options
+		if password == "" {
+			opts = append(opts, pemutil.WithPasswordPrompt("no password", func(s string) ([]byte, error) {
+				return nil, nil
+			}))
+		} else {
+			opts = append(opts, pemutil.WithPassword([]byte("password")))
+		}
+		block, err := pemutil.Serialize(key, opts...)
+		require.NoError(t, err)
+		return pem.EncodeToMemory(block)
+	}
+
+	ca, err := minica.New()
+	require.NoError(t, err)
+
+	key, err := rsa.GenerateKey(rand.Reader, 2048)
+	require.NoError(t, err)
+	badKey, err := rsa.GenerateKey(rand.Reader, 2048)
+	require.NoError(t, err)
+
+	cert, err := ca.Sign(&x509.Certificate{
+		Subject:   pkix.Name{CommonName: "SCEP decryptor"},
+		PublicKey: key.Public(),
+	})
+	require.NoError(t, err)
+
+	certPEM := pem.EncodeToMemory(&pem.Block{
+		Type: "CERTIFICATE", Bytes: cert.Raw,
+	})
+	certPEMWithIntermediate := append(pem.EncodeToMemory(&pem.Block{
+		Type: "CERTIFICATE", Bytes: cert.Raw,
+	}), pem.EncodeToMemory(&pem.Block{
+		Type: "CERTIFICATE", Bytes: ca.Intermediate.Raw,
+	})...)
+
+	keyPEM := serialize(key, "password")
+	keyPEMNoPassword := serialize(key, "")
+	badKeyPEM := serialize(badKey, "password")
+
+	tmp := t.TempDir()
+	path := filepath.Join(tmp, "rsa.priv")
+	pathNoPassword := filepath.Join(tmp, "rsa.key")
+
+	require.NoError(t, os.WriteFile(path, keyPEM, 0600))
+	require.NoError(t, os.WriteFile(pathNoPassword, keyPEMNoPassword, 0600))
+
+	type args struct {
+		config Config
+	}
+	tests := []struct {
+		name    string
+		s       *SCEP
+		args    args
+		wantErr bool
+	}{
+		{"ok", &SCEP{
+			Type:                          "SCEP",
+			Name:                          "scep",
+			ChallengePassword:             "password123",
+			MinimumPublicKeyLength:        0,
+			DecrypterCertificate:          certPEM,
+			DecrypterKeyPEM:               keyPEM,
+			DecrypterKeyPassword:          "password",
+			EncryptionAlgorithmIdentifier: 0,
+		}, args{Config{Claims: globalProvisionerClaims}}, false},
+		{"ok no password", &SCEP{
+			Type:                          "SCEP",
+			Name:                          "scep",
+			ChallengePassword:             "password123",
+			MinimumPublicKeyLength:        0,
+			DecrypterCertificate:          certPEM,
+			DecrypterKeyPEM:               keyPEMNoPassword,
+			DecrypterKeyPassword:          "",
+			EncryptionAlgorithmIdentifier: 1,
+		}, args{Config{Claims: globalProvisionerClaims}}, false},
+		{"ok with uri", &SCEP{
+			Type:                          "SCEP",
+			Name:                          "scep",
+			ChallengePassword:             "password123",
+			MinimumPublicKeyLength:        1024,
+			DecrypterCertificate:          certPEM,
+			DecrypterKeyURI:               "softkms:path=" + path,
+			DecrypterKeyPassword:          "password",
+			EncryptionAlgorithmIdentifier: 2,
+		}, args{Config{Claims: globalProvisionerClaims}}, false},
+		{"ok with uri no password", &SCEP{
+			Type:                          "SCEP",
+			Name:                          "scep",
+			ChallengePassword:             "password123",
+			MinimumPublicKeyLength:        2048,
+			DecrypterCertificate:          certPEM,
+			DecrypterKeyURI:               "softkms:path=" + pathNoPassword,
+			DecrypterKeyPassword:          "",
+			EncryptionAlgorithmIdentifier: 3,
+		}, args{Config{Claims: globalProvisionerClaims}}, false},
+		{"ok with SCEPKeyManager", &SCEP{
+			Type:                          "SCEP",
+			Name:                          "scep",
+			ChallengePassword:             "password123",
+			MinimumPublicKeyLength:        2048,
+			DecrypterCertificate:          certPEM,
+			DecrypterKeyURI:               "softkms:path=" + pathNoPassword,
+			DecrypterKeyPassword:          "",
+			EncryptionAlgorithmIdentifier: 4,
+		}, args{Config{Claims: globalProvisionerClaims, SCEPKeyManager: &softkms.SoftKMS{}}}, false},
+		{"ok intermediate", &SCEP{
+			Type:                          "SCEP",
+			Name:                          "scep",
+			ChallengePassword:             "password123",
+			MinimumPublicKeyLength:        0,
+			DecrypterCertificate:          nil,
+			DecrypterKeyPEM:               nil,
+			DecrypterKeyPassword:          "",
+			EncryptionAlgorithmIdentifier: 0,
+		}, args{Config{Claims: globalProvisionerClaims}}, false},
+		{"fail type", &SCEP{
+			Type:                          "",
+			Name:                          "scep",
+			ChallengePassword:             "password123",
+			MinimumPublicKeyLength:        0,
+			DecrypterCertificate:          certPEM,
+			DecrypterKeyPEM:               keyPEM,
+			DecrypterKeyPassword:          "password",
+			EncryptionAlgorithmIdentifier: 0,
+		}, args{Config{Claims: globalProvisionerClaims}}, true},
+		{"fail name", &SCEP{
+			Type:                          "SCEP",
+			Name:                          "",
+			ChallengePassword:             "password123",
+			MinimumPublicKeyLength:        0,
+			DecrypterCertificate:          certPEM,
+			DecrypterKeyPEM:               keyPEM,
+			DecrypterKeyPassword:          "password",
+			EncryptionAlgorithmIdentifier: 0,
+		}, args{Config{Claims: globalProvisionerClaims}}, true},
+		{"fail minimumPublicKeyLength", &SCEP{
+			Type:                          "SCEP",
+			Name:                          "scep",
+			ChallengePassword:             "password123",
+			MinimumPublicKeyLength:        2001,
+			DecrypterCertificate:          certPEM,
+			DecrypterKeyPEM:               keyPEM,
+			DecrypterKeyPassword:          "password",
+			EncryptionAlgorithmIdentifier: 0,
+		}, args{Config{Claims: globalProvisionerClaims}}, true},
+		{"fail encryptionAlgorithmIdentifier", &SCEP{
+			Type:                          "SCEP",
+			Name:                          "scep",
+			ChallengePassword:             "password123",
+			MinimumPublicKeyLength:        0,
+			DecrypterCertificate:          certPEM,
+			DecrypterKeyPEM:               keyPEM,
+			DecrypterKeyPassword:          "password",
+			EncryptionAlgorithmIdentifier: 5,
+		}, args{Config{Claims: globalProvisionerClaims}}, true},
+		{"fail negative encryptionAlgorithmIdentifier", &SCEP{
+			Type:                          "SCEP",
+			Name:                          "scep",
+			ChallengePassword:             "password123",
+			MinimumPublicKeyLength:        0,
+			DecrypterCertificate:          certPEM,
+			DecrypterKeyPEM:               keyPEM,
+			DecrypterKeyPassword:          "password",
+			EncryptionAlgorithmIdentifier: -1,
+		}, args{Config{Claims: globalProvisionerClaims}}, true},
+		{"fail key decode", &SCEP{
+			Type:                          "SCEP",
+			Name:                          "scep",
+			ChallengePassword:             "password123",
+			MinimumPublicKeyLength:        0,
+			DecrypterCertificate:          certPEM,
+			DecrypterKeyPEM:               []byte("not a pem"),
+			DecrypterKeyPassword:          "password",
+			EncryptionAlgorithmIdentifier: 0,
+		}, args{Config{Claims: globalProvisionerClaims}}, true},
+		{"fail certificate decode", &SCEP{
+			Type:                          "SCEP",
+			Name:                          "scep",
+			ChallengePassword:             "password123",
+			MinimumPublicKeyLength:        0,
+			DecrypterCertificate:          []byte("not a pem"),
+			DecrypterKeyPEM:               keyPEM,
+			DecrypterKeyPassword:          "password",
+			EncryptionAlgorithmIdentifier: 0,
+		}, args{Config{Claims: globalProvisionerClaims}}, true},
+		{"fail certificate with intermediate", &SCEP{
+			Type:                   "SCEP",
+			Name:                   "scep",
+			ChallengePassword:      "password123",
+			MinimumPublicKeyLength: 0,
+			DecrypterCertificate:   certPEMWithIntermediate,
+			DecrypterKeyPEM:        keyPEM,
+			DecrypterKeyPassword:   "password",
+		}, args{Config{Claims: globalProvisionerClaims}}, true},
+		{"fail decrypter password", &SCEP{
+			Type:                          "SCEP",
+			Name:                          "scep",
+			ChallengePassword:             "password123",
+			MinimumPublicKeyLength:        0,
+			DecrypterCertificate:          certPEM,
+			DecrypterKeyPEM:               keyPEM,
+			DecrypterKeyPassword:          "badpassword",
+			EncryptionAlgorithmIdentifier: 0,
+		}, args{Config{Claims: globalProvisionerClaims}}, true},
+		{"fail uri", &SCEP{
+			Type:                          "SCEP",
+			Name:                          "scep",
+			ChallengePassword:             "password123",
+			MinimumPublicKeyLength:        0,
+			DecrypterCertificate:          certPEM,
+			DecrypterKeyURI:               "softkms:path=missing.key",
+			DecrypterKeyPassword:          "password",
+			EncryptionAlgorithmIdentifier: 0,
+		}, args{Config{Claims: globalProvisionerClaims}}, true},
+		{"fail uri password", &SCEP{
+			Type:                          "SCEP",
+			Name:                          "scep",
+			ChallengePassword:             "password123",
+			MinimumPublicKeyLength:        0,
+			DecrypterCertificate:          certPEM,
+			DecrypterKeyURI:               "softkms:path=" + path,
+			DecrypterKeyPassword:          "badpassword",
+			EncryptionAlgorithmIdentifier: 0,
+		}, args{Config{Claims: globalProvisionerClaims}}, true},
+		{"fail uri type", &SCEP{
+			Type:                          "SCEP",
+			Name:                          "scep",
+			ChallengePassword:             "password123",
+			MinimumPublicKeyLength:        0,
+			DecrypterCertificate:          certPEM,
+			DecrypterKeyURI:               "foo:path=" + path,
+			DecrypterKeyPassword:          "password",
+			EncryptionAlgorithmIdentifier: 0,
+		}, args{Config{Claims: globalProvisionerClaims}}, true},
+		{"fail missing certificate", &SCEP{
+			Type:                          "SCEP",
+			Name:                          "scep",
+			ChallengePassword:             "password123",
+			MinimumPublicKeyLength:        0,
+			DecrypterCertificate:          nil,
+			DecrypterKeyPEM:               keyPEM,
+			DecrypterKeyPassword:          "password",
+			EncryptionAlgorithmIdentifier: 0,
+		}, args{Config{Claims: globalProvisionerClaims}}, true},
+		{"fail key match", &SCEP{
+			Type:                          "SCEP",
+			Name:                          "scep",
+			ChallengePassword:             "password123",
+			MinimumPublicKeyLength:        0,
+			DecrypterCertificate:          certPEM,
+			DecrypterKeyPEM:               badKeyPEM,
+			DecrypterKeyPassword:          "password",
+			EncryptionAlgorithmIdentifier: 0,
+		}, args{Config{Claims: globalProvisionerClaims}}, true},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if tt.name == "fail key type" {
+				t.Log(1)
+			}
+			if err := tt.s.Init(tt.args.config); (err != nil) != tt.wantErr {
+				t.Errorf("SCEP.Init() error = %v, wantErr %v", err, tt.wantErr)
+			}
 		})
 	}
 }
