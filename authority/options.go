@@ -226,6 +226,16 @@ func WithFullSCEPOptions(options *scep.Options) Option {
 	}
 }
 
+// WithSCEPKeyManager defines the key manager used on SCEP provisioners.
+//
+// This feature is EXPERIMENTAL and might change at any time.
+func WithSCEPKeyManager(skm provisioner.SCEPKeyManager) Option {
+	return func(a *Authority) error {
+		a.scepKeyManager = skm
+		return nil
+	}
+}
+
 // WithSSHUserSigner defines the signer used to sign SSH user certificates.
 func WithSSHUserSigner(s crypto.Signer) Option {
 	return func(a *Authority) error {
