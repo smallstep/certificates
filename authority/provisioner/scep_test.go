@@ -635,9 +635,6 @@ func TestSCEP_Init(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if tt.name == "fail key type" {
-				t.Log(1)
-			}
 			if err := tt.s.Init(tt.args.config); (err != nil) != tt.wantErr {
 				t.Errorf("SCEP.Init() error = %v, wantErr %v", err, tt.wantErr)
 			}
