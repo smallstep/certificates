@@ -139,7 +139,7 @@ func New(cfg *config.Config, opts ...Option) (*Authority, error) {
 		}
 	}
 	if a.keyManager != nil {
-		a.keyManager = &instrumentedKeyManager{a.keyManager, a.meter}
+		a.keyManager = newInstrumentedKeyManager(a.keyManager, a.meter)
 	}
 
 	if !a.skipInit {
@@ -168,7 +168,7 @@ func NewEmbedded(opts ...Option) (*Authority, error) {
 		}
 	}
 	if a.keyManager != nil {
-		a.keyManager = &instrumentedKeyManager{a.keyManager, a.meter}
+		a.keyManager = newInstrumentedKeyManager(a.keyManager, a.meter)
 	}
 
 	// Validate required options
@@ -349,7 +349,7 @@ func (a *Authority) init() error {
 			return err
 		}
 
-		a.keyManager = &instrumentedKeyManager{a.keyManager, a.meter}
+		a.keyManager = newInstrumentedKeyManager(a.keyManager, a.meter)
 	}
 
 	// Initialize linkedca client if necessary. On a linked RA, the issuer
