@@ -33,7 +33,7 @@ require (
 	github.com/stretchr/testify v1.9.0
 	github.com/urfave/cli v1.22.14
 	go.step.sm/cli-utils v0.9.0
-	go.step.sm/crypto v0.44.3
+	go.step.sm/crypto v0.44.4
 	go.step.sm/linkedca v0.20.1
 	golang.org/x/crypto v0.22.0
 	golang.org/x/exp v0.0.0-20240318143956-a85f2c67cd81
