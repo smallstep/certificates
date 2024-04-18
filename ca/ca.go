@@ -425,6 +425,7 @@ func (ca *CA) Run() error {
 			log.Printf("Current context: %s", step.Contexts().GetCurrent().Name)
 		}
 		log.Printf("Config file: %s", ca.getConfigFileOutput())
+		log.Printf("Mode: %s", ca.auth.Mode())
 		baseURL := fmt.Sprintf("https://%s%s",
 			authorityInfo.DNSNames[0],
 			ca.config.Address[strings.LastIndex(ca.config.Address, ":"):])

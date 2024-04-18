@@ -8,6 +8,7 @@ import (
 	"crypto/sha256"
 	"crypto/x509"
 	"encoding/hex"
+	"fmt"
 	"log"
 	"net/http"
 	"strings"
@@ -447,6 +448,7 @@ func (a *Authority) init() error {
 				return err
 			}
 			a.rootX509Certs = append(a.rootX509Certs, resp.RootCertificate)
+			a.intermediateX509Certs = append(a.intermediateX509Certs, resp.IntermediateCertificates...)
 		}
 	}
 
@@ -695,32 +697,42 @@ func (a *Authority) init() error {
 			options := &scep.Options{
 				Roots:         a.rootX509Certs,
 				Intermediates: a.intermediateX509Certs,
-				SignerCert:    a.intermediateX509Certs[0],
 			}
-			if options.Signer, err = a.keyManager.CreateSigner(&kmsapi.CreateSignerRequest{
-				SigningKey: a.config.IntermediateKey,
-				Password:   a.password,
-			}); err != nil {
-				return err
+
+			// intermediate certificates can be empty in RA mode
+			if len(a.intermediateX509Certs) > 0 {
+				options.SignerCert = a.intermediateX509Certs[0]
 			}
-			// TODO(hs): instead of creating the decrypter here, pass the
-			// intermediate key + chain down to the SCEP authority,
-			// and only instantiate it when required there. Is that possible?
-			// Also with entering passwords?
-			// TODO(hs): if moving the logic, try improving the logic for the
-			// decrypter password too? Right now it needs to be entered multiple
-			// times; I've observed it to be three times maximum, every time
-			// the intermediate key is read.
-			_, isRSA := options.Signer.Public().(*rsa.PublicKey)
-			if km, ok := a.keyManager.(kmsapi.Decrypter); ok && isRSA {
-				if decrypter, err := km.CreateDecrypter(&kmsapi.CreateDecrypterRequest{
-					DecryptionKey: a.config.IntermediateKey,
-					Password:      a.password,
-				}); err == nil {
-					// only pass the decrypter down when it was successfully created,
-					// meaning it's an RSA key, and `CreateDecrypter` did not fail.
-					options.Decrypter = decrypter
-					options.DecrypterCert = options.Intermediates[0]
+
+			// attempt to create the (default) SCEP signer if the intermediate
+			// key is configured.
+			if a.config.IntermediateKey != "" {
+				if options.Signer, err = a.keyManager.CreateSigner(&kmsapi.CreateSignerRequest{
+					SigningKey: a.config.IntermediateKey,
+					Password:   a.password,
+				}); err != nil {
+					return err
+				}
+
+				// TODO(hs): instead of creating the decrypter here, pass the
+				// intermediate key + chain down to the SCEP authority,
+				// and only instantiate it when required there. Is that possible?
+				// Also with entering passwords?
+				// TODO(hs): if moving the logic, try improving the logic for the
+				// decrypter password too? Right now it needs to be entered multiple
+				// times; I've observed it to be three times maximum, every time
+				// the intermediate key is read.
+				_, isRSAKey := options.Signer.Public().(*rsa.PublicKey)
+				if km, ok := a.keyManager.(kmsapi.Decrypter); ok && isRSAKey {
+					if decrypter, err := km.CreateDecrypter(&kmsapi.CreateDecrypterRequest{
+						DecryptionKey: a.config.IntermediateKey,
+						Password:      a.password,
+					}); err == nil {
+						// only pass the decrypter down when it was successfully created,
+						// meaning it's an RSA key, and `CreateDecrypter` did not fail.
+						options.Decrypter = decrypter
+						options.DecrypterCert = options.Intermediates[0]
+					}
 				}
 			}
 
@@ -809,6 +821,26 @@ func (a *Authority) init() error {
 	a.initOnce = true
 
 	return nil
+}
+
+func (a *Authority) Mode() string {
+	if a.isRA() {
+		return fmt.Sprintf("RA (%s)", casapi.TypeOf(a.x509CAService).Name())
+	}
+
+	return "CA" // TODO(hs): more info? I.e. KMS type?
+}
+
+func (a *Authority) isRA() bool {
+	if a.x509CAService == nil {
+		return false
+	}
+	switch casapi.TypeOf(a.x509CAService) {
+	case casapi.StepCAS, casapi.CloudCAS, casapi.VaultCAS, casapi.ExternalCAS:
+		return true
+	default:
+		return false
+	}
 }
 
 // initLogf is used to log initialization information. The output
