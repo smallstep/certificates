@@ -67,23 +67,6 @@ func (t Type) String() string {
 	return strings.ToLower(string(t))
 }
 
-// Name returns the name of the CAS implementation.
-func (t Type) Name() (name string) {
-	switch t {
-	case CloudCAS:
-		name = "GCP CAS"
-	case StepCAS:
-		name = "Step CAS"
-	case VaultCAS:
-		name = "Vault"
-	case ExternalCAS:
-		name = "External"
-	default:
-		name = "SoftCAS" // TODO(hs): different name? It's not a "CAS" CAS, really
-	}
-	return
-}
-
 // TypeOf returns the type of the given CertificateAuthorityService.
 func TypeOf(c CertificateAuthorityService) Type {
 	if ct, ok := c.(interface{ Type() Type }); ok {

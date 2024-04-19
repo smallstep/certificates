@@ -8,7 +8,6 @@ import (
 	"crypto/sha256"
 	"crypto/x509"
 	"encoding/hex"
-	"fmt"
 	"log"
 	"net/http"
 	"strings"
@@ -821,26 +820,6 @@ func (a *Authority) init() error {
 	a.initOnce = true
 
 	return nil
-}
-
-func (a *Authority) Mode() string {
-	if a.isRA() {
-		return fmt.Sprintf("RA (%s)", casapi.TypeOf(a.x509CAService).Name())
-	}
-
-	return "CA" // TODO(hs): more info? I.e. KMS type?
-}
-
-func (a *Authority) isRA() bool {
-	if a.x509CAService == nil {
-		return false
-	}
-	switch casapi.TypeOf(a.x509CAService) {
-	case casapi.StepCAS, casapi.CloudCAS, casapi.VaultCAS, casapi.ExternalCAS:
-		return true
-	default:
-		return false
-	}
 }
 
 // initLogf is used to log initialization information. The output
