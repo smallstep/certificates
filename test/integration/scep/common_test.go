@@ -3,6 +3,7 @@ package sceptest
 import (
 	"crypto/rand"
 	"crypto/rsa"
+	"crypto/tls"
 	"crypto/x509"
 	"encoding/base64"
 	"errors"
@@ -49,11 +50,20 @@ type client struct {
 	httpClient *http.Client
 }
 
-func createSCEPClient(t *testing.T, caURL string) (*client, error) {
+func createSCEPClient(t *testing.T, caURL string, root *x509.Certificate) (*client, error) {
 	t.Helper()
+	trustedRoots := x509.NewCertPool()
+	trustedRoots.AddCert(root)
+	transport := http.DefaultTransport.(*http.Transport).Clone()
+	transport.TLSClientConfig = &tls.Config{
+		RootCAs: trustedRoots,
+	}
+	httpClient := &http.Client{
+		Transport: transport,
+	}
 	return &client{
 		caURL:      caURL,
-		httpClient: http.DefaultClient,
+		httpClient: httpClient,
 	}, nil
 }
 
@@ -100,6 +110,8 @@ func (c *client) getCACert(t *testing.T) error {
 		}
 		c.caCert = cert
 	default:
+		fmt.Println("body", string(body))
+
 		return fmt.Errorf("unexpected content-type value %q", ct)
 	}
 

@@ -77,7 +77,6 @@ func TestIssuesCertificateUsingSCEPWithDecrypter(t *testing.T) {
 	// get a random address to listen on and connect to; currently no nicer way to get one before starting the server
 	// TODO(hs): find/implement a nicer way to expose the CA URL, similar to how e.g. httptest.Server exposes it?
 	host, port := reservePort(t)
-	insecureHost, insecurePort := reservePort(t)
 
 	prov := &provisioner.SCEP{
 		ID:                            "scep",
@@ -100,8 +99,7 @@ func TestIssuesCertificateUsingSCEPWithDecrypter(t *testing.T) {
 		Root:             []string{rootFilepath},
 		IntermediateCert: intermediateCertFilepath,
 		IntermediateKey:  intermediateKeyFilepath,
-		Address:          net.JoinHostPort(host, port),                 // reuse the address that was just "reserved"
-		InsecureAddress:  net.JoinHostPort(insecureHost, insecurePort), // reuse the address that was just "reserved"
+		Address:          net.JoinHostPort(host, port), // reuse the address that was just "reserved"
 		DNSNames:         []string{"127.0.0.1", "[::1]", "localhost"},
 		AuthorityConfig: &config.AuthConfig{
 			AuthorityID:    "stepca-test-scep",
@@ -137,7 +135,7 @@ func TestIssuesCertificateUsingSCEPWithDecrypter(t *testing.T) {
 		require.Equal(t, "ok", healthResponse.Status)
 	}
 
-	scepClient, err := createSCEPClient(t, fmt.Sprintf("http://localhost:%s/scep/scep", insecurePort))
+	scepClient, err := createSCEPClient(t, fmt.Sprintf("https://localhost:%s/scep/scep", port), m.Root)
 	require.NoError(t, err)
 
 	cert, err := scepClient.requestCertificate(t, "test.localhost", []string{"test.localhost"})

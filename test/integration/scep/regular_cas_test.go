@@ -24,7 +24,7 @@ import (
 	"github.com/smallstep/certificates/cas/apiv1"
 )
 
-func TestIssuesCertificateUsingRegularSCEPConfiguration(t *testing.T) {
+func TestFailsIssuingCertificateUsingRegularSCEPWithUpstreamCAS(t *testing.T) {
 	signer, err := keyutil.GenerateSigner("RSA", "", 2048)
 	require.NoError(t, err)
 
@@ -49,7 +49,6 @@ func TestIssuesCertificateUsingRegularSCEPConfiguration(t *testing.T) {
 	// get a random address to listen on and connect to; currently no nicer way to get one before starting the server
 	// TODO(hs): find/implement a nicer way to expose the CA URL, similar to how e.g. httptest.Server exposes it?
 	host, port := reservePort(t)
-	insecureHost, insecurePort := reservePort(t)
 
 	prov := &provisioner.SCEP{
 		ID:                            "scep",
@@ -72,9 +71,8 @@ func TestIssuesCertificateUsingRegularSCEPConfiguration(t *testing.T) {
 	})
 
 	cfg := &config.Config{
-		Address:         net.JoinHostPort(host, port),                 // reuse the address that was just "reserved"
-		InsecureAddress: net.JoinHostPort(insecureHost, insecurePort), // reuse the address that was just "reserved"
-		DNSNames:        []string{"127.0.0.1", "[::1]", "localhost"},
+		Address:  net.JoinHostPort(host, port), // reuse the address that was just "reserved"
+		DNSNames: []string{"127.0.0.1", "[::1]", "localhost"},
 		AuthorityConfig: &config.AuthConfig{
 			Options: &apiv1.Options{
 				AuthorityID:          "stepca-test-scep",
@@ -114,15 +112,14 @@ func TestIssuesCertificateUsingRegularSCEPConfiguration(t *testing.T) {
 		require.Equal(t, "ok", healthResponse.Status)
 	}
 
-	scepClient, err := createSCEPClient(t, fmt.Sprintf("http://localhost:%s/scep/scep", insecurePort))
+	scepClient, err := createSCEPClient(t, fmt.Sprintf("https://localhost:%s/scep/scep", port), m.Root)
 	require.NoError(t, err)
 
+	// issuance is expected to fail when an upstream CAS is configured, as the current
+	// CAS interfaces do not support providing a decrypter.
 	cert, err := scepClient.requestCertificate(t, "test.localhost", []string{"test.localhost"})
-	assert.NoError(t, err)
-	require.NotNil(t, cert)
-
-	assert.Equal(t, "test.localhost", cert.Subject.CommonName)
-	assert.Equal(t, "Step E2E | SCEP Regular w/ Upstream CAS Intermediate CA", cert.Issuer.CommonName)
+	assert.Error(t, err)
+	assert.Nil(t, cert)
 
 	// done testing; stop and wait for the server to quit
 	err = c.Stop()
