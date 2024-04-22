@@ -131,8 +131,6 @@ func (c *client) getCACert(t *testing.T) error {
 		}
 		c.caCert = cert
 	default:
-		fmt.Println("body", string(body))
-
 		return fmt.Errorf("unexpected content-type value %q", ct)
 	}
 
