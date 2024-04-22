@@ -268,7 +268,7 @@ winget:
     # Release notes URL.
     #
     # Templates: allowed
-    release_notes_url: "https://github.com/smallstep/certificates/releases/tag/{{.Version}}"
+    release_notes_url: "https://github.com/smallstep/certificates/releases/tag/{{ .Tag }}"
 
     # Create the PR - for testing
     skip_upload: auto
@@ -283,7 +283,7 @@ winget:
     repository:
       owner: smallstep
       name: winget-pkgs
-      branch: step
+      branch: "step-ca-{{.Version}}"
 
       # Optionally a token can be provided, if it differs from the token
       # provided to GoReleaser

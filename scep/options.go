@@ -37,19 +37,21 @@ func (o *Options) Validate() error {
 	switch {
 	case len(o.Intermediates) == 0:
 		return errors.New("no intermediate certificate available for SCEP authority")
-	case o.Signer == nil:
-		return errors.New("no signer available for SCEP authority")
 	case o.SignerCert == nil:
 		return errors.New("no signer certificate available for SCEP authority")
 	}
 
-	// check if the signer (intermediate CA) certificate has the same public key as
-	// the signer. According to the RFC it seems valid to have different keys for
-	// the intermediate and the CA signing new certificates, so this might change
-	// in the future.
-	signerPublicKey := o.Signer.Public().(comparablePublicKey)
-	if !signerPublicKey.Equal(o.SignerCert.PublicKey) {
-		return errors.New("mismatch between signer certificate and public key")
+	// the signer is optional, but if it's set, its public key must match the signer
+	// certificate public key.
+	if o.Signer != nil {
+		// check if the signer (intermediate CA) certificate has the same public key as
+		// the signer. According to the RFC it seems valid to have different keys for
+		// the intermediate and the CA signing new certificates, so this might change
+		// in the future.
+		signerPublicKey := o.Signer.Public().(comparablePublicKey)
+		if !signerPublicKey.Equal(o.SignerCert.PublicKey) {
+			return errors.New("mismatch between signer certificate and public key")
+		}
 	}
 
 	// decrypter can be nil in case a signing only key is used; validation complete.

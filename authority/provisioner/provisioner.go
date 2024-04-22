@@ -10,6 +10,7 @@ import (
 	"strings"
 
 	"github.com/pkg/errors"
+	kmsapi "go.step.sm/crypto/kms/apiv1"
 	"golang.org/x/crypto/ssh"
 
 	"github.com/smallstep/certificates/errs"
@@ -206,6 +207,13 @@ type SSHKeys struct {
 	HostKeys []ssh.PublicKey
 }
 
+// SCEPKeyManager is a KMS interface that combines a KeyManager with a
+// Decrypter.
+type SCEPKeyManager interface {
+	kmsapi.KeyManager
+	kmsapi.Decrypter
+}
+
 // Config defines the default parameters used in the initialization of
 // provisioners.
 type Config struct {
@@ -226,6 +234,8 @@ type Config struct {
 	AuthorizeSSHRenewFunc AuthorizeSSHRenewFunc
 	// WebhookClient is an http client to use in webhook request
 	WebhookClient *http.Client
+	// SCEPKeyManager, if defined, is the interface used by SCEP provisioners.
+	SCEPKeyManager SCEPKeyManager
 }
 
 type provisioner struct {
@@ -320,7 +330,7 @@ func (b *base) AuthorizeSSHSign(context.Context, string) ([]SignOption, error) {
 	return nil, errs.Unauthorized("provisioner.AuthorizeSSHSign not implemented")
 }
 
-// AuthorizeRevoke returns an unimplemented error. Provisioners should overwrite
+// AuthorizeSSHRevoke returns an unimplemented error. Provisioners should overwrite
 // this method if they will support authorizing tokens for revoking SSH Certificates.
 func (b *base) AuthorizeSSHRevoke(context.Context, string) error {
 	return errs.Unauthorized("provisioner.AuthorizeSSHRevoke not implemented")

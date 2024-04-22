@@ -201,6 +201,7 @@ func (a *Authority) generateProvisionerConfig(ctx context.Context) (provisioner.
 		AuthorizeRenewFunc:    a.authorizeRenewFunc,
 		AuthorizeSSHRenewFunc: a.authorizeSSHRenewFunc,
 		WebhookClient:         a.webhookClient,
+		SCEPKeyManager:        a.scepKeyManager,
 	}, nil
 }
 

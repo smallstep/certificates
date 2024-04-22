@@ -138,7 +138,7 @@ func (o *Order) UpdateStatus(ctx context.Context, db DB) error {
 	return nil
 }
 
-// getKeyFingerprint returns a fingerprint from the list of authorizations. This
+// getAuthorizationFingerprint returns a fingerprint from the list of authorizations. This
 // fingerprint is used on the device-attest-01 flow to verify the attestation
 // certificate public key with the CSR public key.
 //
