@@ -25,6 +25,18 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
 
 ---
 
+## [0.26.1] - 2024-04-22
+
+### Added
+
+- Allow configuration of a custom SCEP key manager (smallstep/certificates#1797)
+
+### Fixed
+
+- id-scep-failInfoText OID (smallstep/certificates#1794)
+- CA startup with Vault RA configuration (smallstep/certificates#1803)
+
+
 ## [0.26.0] - 2024-03-28
 
 ### Added 
