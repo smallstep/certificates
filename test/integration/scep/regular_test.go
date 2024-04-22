@@ -1,7 +1,6 @@
 package sceptest
 
 import (
-	"context"
 	"crypto"
 	"encoding/json"
 	"fmt"
@@ -79,13 +78,6 @@ func TestIssuesCertificateUsingRegularSCEPConfiguration(t *testing.T) {
 	c, err := ca.New(cfg)
 	require.NoError(t, err)
 
-	// instantiate a client for the CA running at the random address
-	caClient, err := ca.NewClient(
-		fmt.Sprintf("https://localhost:%s", port),
-		ca.WithRootFile(rootFilepath),
-	)
-	require.NoError(t, err)
-
 	var wg sync.WaitGroup
 	wg.Add(1)
 
@@ -95,17 +87,11 @@ func TestIssuesCertificateUsingRegularSCEPConfiguration(t *testing.T) {
 		require.ErrorIs(t, err, http.ErrServerClosed)
 	}()
 
-	// require OK health response as the baseline
-	ctx := context.Background()
-	healthResponse, err := caClient.HealthWithContext(ctx)
-	require.NoError(t, err)
-	if assert.NotNil(t, healthResponse) {
-		require.Equal(t, "ok", healthResponse.Status)
-	}
+	// instantiate a client for the CA running at the random address
+	caClient := newCAClient(t, fmt.Sprintf("https://localhost:%s", port), rootFilepath)
+	requireHealthyCA(t, caClient)
 
-	scepClient, err := createSCEPClient(t, fmt.Sprintf("https://localhost:%s/scep/scep", port), m.Root)
-	require.NoError(t, err)
-
+	scepClient := createSCEPClient(t, fmt.Sprintf("https://localhost:%s/scep/scep", port), m.Root)
 	cert, err := scepClient.requestCertificate(t, "test.localhost", []string{"test.localhost"})
 	assert.NoError(t, err)
 	require.NotNil(t, cert)

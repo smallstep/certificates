@@ -1,6 +1,7 @@
 package sceptest
 
 import (
+	"context"
 	"crypto/rand"
 	"crypto/rsa"
 	"crypto/tls"
@@ -16,6 +17,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
 	"github.com/smallstep/pkcs7"
@@ -23,8 +25,27 @@ import (
 	"go.step.sm/crypto/minica"
 	"go.step.sm/crypto/x509util"
 
+	"github.com/smallstep/certificates/ca"
 	"github.com/smallstep/certificates/cas/apiv1"
 )
+
+func newCAClient(t *testing.T, caURL, rootFilepath string) *ca.Client {
+	caClient, err := ca.NewClient(
+		caURL,
+		ca.WithRootFile(rootFilepath),
+	)
+	require.NoError(t, err)
+	return caClient
+}
+
+func requireHealthyCA(t *testing.T, caClient *ca.Client) {
+	ctx := context.Background()
+	healthResponse, err := caClient.HealthWithContext(ctx)
+	require.NoError(t, err)
+	if assert.NotNil(t, healthResponse) {
+		require.Equal(t, "ok", healthResponse.Status)
+	}
+}
 
 // reservePort "reserves" a TCP port by opening a listener on a random
 // port and immediately closing it. The port can then be assumed to be
@@ -50,7 +71,7 @@ type client struct {
 	httpClient *http.Client
 }
 
-func createSCEPClient(t *testing.T, caURL string, root *x509.Certificate) (*client, error) {
+func createSCEPClient(t *testing.T, caURL string, root *x509.Certificate) *client {
 	t.Helper()
 	trustedRoots := x509.NewCertPool()
 	trustedRoots.AddCert(root)
@@ -64,7 +85,7 @@ func createSCEPClient(t *testing.T, caURL string, root *x509.Certificate) (*clie
 	return &client{
 		caURL:      caURL,
 		httpClient: httpClient,
-	}, nil
+	}
 }
 
 func (c *client) getCACert(t *testing.T) error {
