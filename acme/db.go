@@ -2,6 +2,7 @@ package acme
 
 import (
 	"context"
+	"database/sql"
 
 	"github.com/pkg/errors"
 )
@@ -15,7 +16,7 @@ var ErrNotFound = errors.New("not found")
 // IsErrNotFound returns true if the error is a "not found" error. Returns false
 // otherwise.
 func IsErrNotFound(err error) bool {
-	return errors.Is(err, ErrNotFound)
+	return errors.Is(err, ErrNotFound) || errors.Is(err, sql.ErrNoRows)
 }
 
 // DB is the DB interface expected by the step-ca ACME API.

@@ -27,7 +27,7 @@ require (
 	github.com/slackhq/nebula v1.6.1
 	github.com/smallstep/assert v0.0.0-20200723003110-82e2b9b3b262
 	github.com/smallstep/go-attestation v0.4.4-0.20240109183208-413678f90935
-	github.com/smallstep/nosql v0.6.0
+	github.com/smallstep/nosql v0.6.1
 	github.com/smallstep/pkcs7 v0.0.0-20231024181729-3b98ecc1ca81
 	github.com/smallstep/scep v0.0.0-20231024192529-aee96d7ad34d
 	github.com/stretchr/testify v1.9.0
@@ -149,7 +149,7 @@ require (
 	github.com/spf13/cast v1.4.1 // indirect
 	github.com/thales-e-security/pool v0.0.2 // indirect
 	github.com/x448/float16 v0.8.4 // indirect
-	go.etcd.io/bbolt v1.3.7 // indirect
+	go.etcd.io/bbolt v1.3.9 // indirect
 	go.opencensus.io v0.24.0 // indirect
 	go.opentelemetry.io/contrib/instrumentation/google.golang.org/grpc/otelgrpc v0.49.0 // indirect
 	go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp v0.49.0 // indirect
