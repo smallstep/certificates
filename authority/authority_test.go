@@ -113,7 +113,7 @@ func TestAuthorityNew(t *testing.T) {
 			c.Root = []string{"foo"}
 			return &newTest{
 				config: c,
-				err:    errors.New("error reading foo: no such file or directory"),
+				err:    errors.New(`error reading "foo": no such file or directory`),
 			}
 		},
 		"fail bad password": func(t *testing.T) *newTest {
@@ -131,7 +131,7 @@ func TestAuthorityNew(t *testing.T) {
 			c.IntermediateCert = "wrong"
 			return &newTest{
 				config: c,
-				err:    errors.New("error reading wrong: no such file or directory"),
+				err:    errors.New(`error reading "wrong": no such file or directory`),
 			}
 		},
 	}
