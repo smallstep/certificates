@@ -1,7 +1,6 @@
 package api
 
 import (
-	"errors"
 	"net/http"
 
 	"github.com/go-chi/chi/v5"
@@ -125,7 +124,7 @@ func loadExternalAccountKey(next http.HandlerFunc) http.HandlerFunc {
 		}
 
 		if err != nil {
-			if errors.Is(err, acme.ErrNotFound) {
+			if acme.IsErrNotFound(err) {
 				render.Error(w, admin.NewError(admin.ErrorNotFoundType, "ACME External Account Key not found"))
 				return
 			}
