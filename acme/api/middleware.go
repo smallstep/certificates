@@ -247,7 +247,7 @@ func extractJWK(next nextHTTP) nextHTTP {
 		// Get Account OR continue to generate a new one OR continue Revoke with certificate private key
 		acc, err := db.GetAccountByKeyID(ctx, jwk.KeyID)
 		switch {
-		case errors.Is(err, acme.ErrNotFound):
+		case acme.IsErrNotFound(err):
 			// For NewAccount and Revoke requests ...
 			break
 		case err != nil:
