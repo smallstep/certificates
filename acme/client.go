@@ -5,6 +5,7 @@ import (
 	"crypto/tls"
 	"net"
 	"net/http"
+	"net/http/cookiejar"
 	"time"
 )
 
@@ -51,8 +52,13 @@ type client struct {
 
 // NewClient returns an implementation of Client for verifying ACME challenges.
 func NewClient() Client {
+	jar, err := cookiejar.New(nil)
+	if err != nil {
+		panic(err)
+	}
 	return &client{
 		http: &http.Client{
+			Jar:     jar,
 			Timeout: 30 * time.Second,
 			Transport: &http.Transport{
 				Proxy: http.ProxyFromEnvironment,
