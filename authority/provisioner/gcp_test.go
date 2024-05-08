@@ -187,6 +187,7 @@ func TestGCP_Init(t *testing.T) {
 		wantErr bool
 	}{
 		{"ok", fields{"GCP", "name", nil, zero, nil}, args{config, srv.URL}, false},
+		{"ok", fields{"GCP", "name", nil, zero, nil}, args{config, srv.URL}, false},
 		{"ok", fields{"GCP", "name", []string{"service-account"}, zero, nil}, args{config, srv.URL}, false},
 		{"ok", fields{"GCP", "name", []string{"service-account"}, Duration{Duration: 1 * time.Minute}, nil}, args{config, srv.URL}, false},
 		{"bad type", fields{"", "name", nil, zero, nil}, args{config, srv.URL}, true},
@@ -210,6 +211,14 @@ func TestGCP_Init(t *testing.T) {
 			}
 			if err := p.Init(tt.args.config); (err != nil) != tt.wantErr {
 				t.Errorf("GCP.Init() error = %v, wantErr %v", err, tt.wantErr)
+			}
+
+			if p.EnableSSHCAUser {
+				t.Errorf("By default EnableSSHCAUser should be false")
+			}
+
+			if p.DisableSSHCAHost {
+				t.Errorf("By default DisableSSHCAHost should be false")
 			}
 		})
 	}
