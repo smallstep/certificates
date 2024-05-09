@@ -482,7 +482,7 @@ func (p *GCP) genHostOptions(_ context.Context, claims *gcpPayload) (SignSSHOpti
 func (p *GCP) genUserOptions(_ context.Context, claims *gcpPayload) (SignSSHOptions, string, []string, sshutil.CertType, string) {
 	keyID := claims.Email
 	principals := []string{
-		SanitizeSSHUserPrincipal(claims.Email),
+		fmt.Sprintf("sa_%v", claims.Subject),
 		claims.Email,
 	}
 
