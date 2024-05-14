@@ -334,15 +334,22 @@ func lookupJWK(next nextHTTP) nextHTTP {
 				// Verify that the provisioner with which the account was created
 				// matches the provisioner in the request URL.
 				reqProv := acme.MustProvisionerFromContext(ctx)
-				reqProvName := reqProv.GetName()
-				accProvName := acc.ProvisionerName
-				if reqProvName != accProvName {
-					// Provisioner in the URL must match the provisioner with
-					// which the account was created.
-					render.Error(w, acme.NewError(acme.ErrorUnauthorizedType,
-						"account provisioner does not match requested provisioner; account provisioner = %s, requested provisioner = %s",
-						accProvName, reqProvName))
-					return
+				if acc.ProvisionerID == "" || reqProv.GetID() != acc.ProvisionerID {
+					reqProvisioner := reqProv.GetName()
+					accProvisioner := acc.ProvisionerName
+					if reqProvisioner != accProvisioner {
+						// Show IDs if names are not available
+						if accProvisioner == "" && acc.ProvisionerID != "" {
+							reqProvisioner = reqProv.GetID()
+							accProvisioner = acc.ProvisionerID
+						}
+						// Provisioner in the URL must match the provisioner with
+						// which the account was created.
+						render.Error(w, acme.NewError(acme.ErrorUnauthorizedType,
+							"account provisioner does not match requested provisioner; account provisioner = %s, requested provisioner = %s",
+							accProvisioner, reqProvisioner))
+						return
+					}
 				}
 			} else {
 				// This code will only execute for old ACME accounts that do
