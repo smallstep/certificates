@@ -186,19 +186,19 @@ func (l *linker) Middleware(next http.Handler) http.Handler {
 		nameEscaped := chi.URLParam(r, "provisionerID")
 		name, err := url.PathUnescape(nameEscaped)
 		if err != nil {
-			render.Error(w, WrapErrorISE(err, "error url unescaping provisioner name '%s'", nameEscaped))
+			render.Error(w, r, WrapErrorISE(err, "error url unescaping provisioner name '%s'", nameEscaped))
 			return
 		}
 
 		p, err := authority.MustFromContext(ctx).LoadProvisionerByName(name)
 		if err != nil {
-			render.Error(w, err)
+			render.Error(w, r, err)
 			return
 		}
 
 		acmeProv, ok := p.(*provisioner.ACME)
 		if !ok {
-			render.Error(w, NewError(ErrorAccountDoesNotExistType, "provisioner must be of type ACME"))
+			render.Error(w, r, NewError(ErrorAccountDoesNotExistType, "provisioner must be of type ACME"))
 			return
 		}
 

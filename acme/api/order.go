@@ -99,29 +99,29 @@ func NewOrder(w http.ResponseWriter, r *http.Request) {
 
 	acc, err := accountFromContext(ctx)
 	if err != nil {
-		render.Error(w, err)
+		render.Error(w, r, err)
 		return
 	}
 	prov, err := provisionerFromContext(ctx)
 	if err != nil {
-		render.Error(w, err)
+		render.Error(w, r, err)
 		return
 	}
 	payload, err := payloadFromContext(ctx)
 	if err != nil {
-		render.Error(w, err)
+		render.Error(w, r, err)
 		return
 	}
 
 	var nor NewOrderRequest
 	if err := json.Unmarshal(payload.value, &nor); err != nil {
-		render.Error(w, acme.WrapError(acme.ErrorMalformedType, err,
+		render.Error(w, r, acme.WrapError(acme.ErrorMalformedType, err,
 			"failed to unmarshal new-order request payload"))
 		return
 	}
 
 	if err := nor.Validate(); err != nil {
-		render.Error(w, err)
+		render.Error(w, r, err)
 		return
 	}
 
@@ -130,39 +130,39 @@ func NewOrder(w http.ResponseWriter, r *http.Request) {
 
 	acmeProv, err := acmeProvisionerFromContext(ctx)
 	if err != nil {
-		render.Error(w, err)
+		render.Error(w, r, err)
 		return
 	}
 
 	var eak *acme.ExternalAccountKey
 	if acmeProv.RequireEAB {
 		if eak, err = db.GetExternalAccountKeyByAccountID(ctx, prov.GetID(), acc.ID); err != nil {
-			render.Error(w, acme.WrapErrorISE(err, "error retrieving external account binding key"))
+			render.Error(w, r, acme.WrapErrorISE(err, "error retrieving external account binding key"))
 			return
 		}
 	}
 
 	acmePolicy, err := newACMEPolicyEngine(eak)
 	if err != nil {
-		render.Error(w, acme.WrapErrorISE(err, "error creating ACME policy engine"))
+		render.Error(w, r, acme.WrapErrorISE(err, "error creating ACME policy engine"))
 		return
 	}
 
 	for _, identifier := range nor.Identifiers {
 		// evaluate the ACME account level policy
 		if err = isIdentifierAllowed(acmePolicy, identifier); err != nil {
-			render.Error(w, acme.WrapError(acme.ErrorRejectedIdentifierType, err, "not authorized"))
+			render.Error(w, r, acme.WrapError(acme.ErrorRejectedIdentifierType, err, "not authorized"))
 			return
 		}
 		// evaluate the provisioner level policy
 		orderIdentifier := provisioner.ACMEIdentifier{Type: provisioner.ACMEIdentifierType(identifier.Type), Value: identifier.Value}
 		if err = prov.AuthorizeOrderIdentifier(ctx, orderIdentifier); err != nil {
-			render.Error(w, acme.WrapError(acme.ErrorRejectedIdentifierType, err, "not authorized"))
+			render.Error(w, r, acme.WrapError(acme.ErrorRejectedIdentifierType, err, "not authorized"))
 			return
 		}
 		// evaluate the authority level policy
 		if err = ca.AreSANsAllowed(ctx, []string{identifier.Value}); err != nil {
-			render.Error(w, acme.WrapError(acme.ErrorRejectedIdentifierType, err, "not authorized"))
+			render.Error(w, r, acme.WrapError(acme.ErrorRejectedIdentifierType, err, "not authorized"))
 			return
 		}
 	}
@@ -188,7 +188,7 @@ func NewOrder(w http.ResponseWriter, r *http.Request) {
 			Status:     acme.StatusPending,
 		}
 		if err := newAuthorization(ctx, az); err != nil {
-			render.Error(w, err)
+			render.Error(w, r, err)
 			return
 		}
 		o.AuthorizationIDs[i] = az.ID
@@ -207,14 +207,14 @@ func NewOrder(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if err := db.CreateOrder(ctx, o); err != nil {
-		render.Error(w, acme.WrapErrorISE(err, "error creating order"))
+		render.Error(w, r, acme.WrapErrorISE(err, "error creating order"))
 		return
 	}
 
 	linker.LinkOrder(ctx, o)
 
 	w.Header().Set("Location", linker.GetLink(ctx, acme.OrderLinkType, o.ID))
-	render.JSONStatus(w, o, http.StatusCreated)
+	render.JSONStatus(w, r, o, http.StatusCreated)
 }
 
 func isIdentifierAllowed(acmePolicy policy.X509Policy, identifier acme.Identifier) error {
@@ -288,39 +288,39 @@ func GetOrder(w http.ResponseWriter, r *http.Request) {
 
 	acc, err := accountFromContext(ctx)
 	if err != nil {
-		render.Error(w, err)
+		render.Error(w, r, err)
 		return
 	}
 	prov, err := provisionerFromContext(ctx)
 	if err != nil {
-		render.Error(w, err)
+		render.Error(w, r, err)
 		return
 	}
 
 	o, err := db.GetOrder(ctx, chi.URLParam(r, "ordID"))
 	if err != nil {
-		render.Error(w, acme.WrapErrorISE(err, "error retrieving order"))
+		render.Error(w, r, acme.WrapErrorISE(err, "error retrieving order"))
 		return
 	}
 	if acc.ID != o.AccountID {
-		render.Error(w, acme.NewError(acme.ErrorUnauthorizedType,
+		render.Error(w, r, acme.NewError(acme.ErrorUnauthorizedType,
 			"account '%s' does not own order '%s'", acc.ID, o.ID))
 		return
 	}
 	if prov.GetID() != o.ProvisionerID {
-		render.Error(w, acme.NewError(acme.ErrorUnauthorizedType,
+		render.Error(w, r, acme.NewError(acme.ErrorUnauthorizedType,
 			"provisioner '%s' does not own order '%s'", prov.GetID(), o.ID))
 		return
 	}
 	if err = o.UpdateStatus(ctx, db); err != nil {
-		render.Error(w, acme.WrapErrorISE(err, "error updating order status"))
+		render.Error(w, r, acme.WrapErrorISE(err, "error updating order status"))
 		return
 	}
 
 	linker.LinkOrder(ctx, o)
 
 	w.Header().Set("Location", linker.GetLink(ctx, acme.OrderLinkType, o.ID))
-	render.JSON(w, o)
+	render.JSON(w, r, o)
 }
 
 // FinalizeOrder attempts to finalize an order and create a certificate.
@@ -331,56 +331,56 @@ func FinalizeOrder(w http.ResponseWriter, r *http.Request) {
 
 	acc, err := accountFromContext(ctx)
 	if err != nil {
-		render.Error(w, err)
+		render.Error(w, r, err)
 		return
 	}
 	prov, err := provisionerFromContext(ctx)
 	if err != nil {
-		render.Error(w, err)
+		render.Error(w, r, err)
 		return
 	}
 	payload, err := payloadFromContext(ctx)
 	if err != nil {
-		render.Error(w, err)
+		render.Error(w, r, err)
 		return
 	}
 	var fr FinalizeRequest
 	if err := json.Unmarshal(payload.value, &fr); err != nil {
-		render.Error(w, acme.WrapError(acme.ErrorMalformedType, err,
+		render.Error(w, r, acme.WrapError(acme.ErrorMalformedType, err,
 			"failed to unmarshal finalize-order request payload"))
 		return
 	}
 	if err := fr.Validate(); err != nil {
-		render.Error(w, err)
+		render.Error(w, r, err)
 		return
 	}
 
 	o, err := db.GetOrder(ctx, chi.URLParam(r, "ordID"))
 	if err != nil {
-		render.Error(w, acme.WrapErrorISE(err, "error retrieving order"))
+		render.Error(w, r, acme.WrapErrorISE(err, "error retrieving order"))
 		return
 	}
 	if acc.ID != o.AccountID {
-		render.Error(w, acme.NewError(acme.ErrorUnauthorizedType,
+		render.Error(w, r, acme.NewError(acme.ErrorUnauthorizedType,
 			"account '%s' does not own order '%s'", acc.ID, o.ID))
 		return
 	}
 	if prov.GetID() != o.ProvisionerID {
-		render.Error(w, acme.NewError(acme.ErrorUnauthorizedType,
+		render.Error(w, r, acme.NewError(acme.ErrorUnauthorizedType,
 			"provisioner '%s' does not own order '%s'", prov.GetID(), o.ID))
 		return
 	}
 
 	ca := mustAuthority(ctx)
 	if err = o.Finalize(ctx, db, fr.csr, ca, prov); err != nil {
-		render.Error(w, acme.WrapErrorISE(err, "error finalizing order"))
+		render.Error(w, r, acme.WrapErrorISE(err, "error finalizing order"))
 		return
 	}
 
 	linker.LinkOrder(ctx, o)
 
 	w.Header().Set("Location", linker.GetLink(ctx, acme.OrderLinkType, o.ID))
-	render.JSON(w, o)
+	render.JSON(w, r, o)
 }
 
 // challengeTypes determines the types of challenges that should be used

@@ -42,19 +42,19 @@ type SSHRekeyResponse struct {
 func SSHRekey(w http.ResponseWriter, r *http.Request) {
 	var body SSHRekeyRequest
 	if err := read.JSON(r.Body, &body); err != nil {
-		render.Error(w, errs.BadRequestErr(err, "error reading request body"))
+		render.Error(w, r, errs.BadRequestErr(err, "error reading request body"))
 		return
 	}
 
 	logOtt(w, body.OTT)
 	if err := body.Validate(); err != nil {
-		render.Error(w, err)
+		render.Error(w, r, err)
 		return
 	}
 
 	publicKey, err := ssh.ParsePublicKey(body.PublicKey)
 	if err != nil {
-		render.Error(w, errs.BadRequestErr(err, "error parsing publicKey"))
+		render.Error(w, r, errs.BadRequestErr(err, "error parsing publicKey"))
 		return
 	}
 
@@ -64,18 +64,18 @@ func SSHRekey(w http.ResponseWriter, r *http.Request) {
 	a := mustAuthority(ctx)
 	signOpts, err := a.Authorize(ctx, body.OTT)
 	if err != nil {
-		render.Error(w, errs.UnauthorizedErr(err))
+		render.Error(w, r, errs.UnauthorizedErr(err))
 		return
 	}
 	oldCert, _, err := provisioner.ExtractSSHPOPCert(body.OTT)
 	if err != nil {
-		render.Error(w, errs.InternalServerErr(err))
+		render.Error(w, r, errs.InternalServerErr(err))
 		return
 	}
 
 	newCert, err := a.RekeySSH(ctx, oldCert, publicKey, signOpts...)
 	if err != nil {
-		render.Error(w, errs.ForbiddenErr(err, "error rekeying ssh certificate"))
+		render.Error(w, r, errs.ForbiddenErr(err, "error rekeying ssh certificate"))
 		return
 	}
 
@@ -85,12 +85,12 @@ func SSHRekey(w http.ResponseWriter, r *http.Request) {
 
 	identity, err := renewIdentityCertificate(r, notBefore, notAfter)
 	if err != nil {
-		render.Error(w, errs.ForbiddenErr(err, "error renewing identity certificate"))
+		render.Error(w, r, errs.ForbiddenErr(err, "error renewing identity certificate"))
 		return
 	}
 
 	LogSSHCertificate(w, newCert)
-	render.JSONStatus(w, &SSHRekeyResponse{
+	render.JSONStatus(w, r, &SSHRekeyResponse{
 		Certificate:         SSHCertificate{newCert},
 		IdentityCertificate: identity,
 	}, http.StatusCreated)
