@@ -13,8 +13,8 @@ import (
 )
 
 // JSON is shorthand for JSONStatus(w, v, http.StatusOK).
-func JSON(w http.ResponseWriter, v interface{}) {
-	JSONStatus(w, v, http.StatusOK)
+func JSON(w http.ResponseWriter, r *http.Request, v interface{}) {
+	JSONStatus(w, r, v, http.StatusOK)
 }
 
 // JSONStatus marshals v into w. It additionally sets the status code of
@@ -22,7 +22,7 @@ func JSON(w http.ResponseWriter, v interface{}) {
 //
 // JSONStatus sets the Content-Type of w to application/json unless one is
 // specified.
-func JSONStatus(w http.ResponseWriter, v interface{}, status int) {
+func JSONStatus(w http.ResponseWriter, r *http.Request, v interface{}, status int) {
 	setContentTypeUnlessPresent(w, "application/json")
 	w.WriteHeader(status)
 
@@ -43,7 +43,7 @@ func JSONStatus(w http.ResponseWriter, v interface{}, status int) {
 		}
 	}
 
-	log.EnabledResponse(w, v)
+	log.EnabledResponse(w, r, v)
 }
 
 // ProtoJSON is shorthand for ProtoJSONStatus(w, m, http.StatusOK).
@@ -80,22 +80,22 @@ func setContentTypeUnlessPresent(w http.ResponseWriter, contentType string) {
 type RenderableError interface {
 	error
 
-	Render(http.ResponseWriter)
+	Render(http.ResponseWriter, *http.Request)
 }
 
 // Error marshals the JSON representation of err to w. In case err implements
 // RenderableError its own Render method will be called instead.
-func Error(w http.ResponseWriter, err error) {
-	log.Error(w, err)
+func Error(rw http.ResponseWriter, r *http.Request, err error) {
+	log.Error(rw, r, err)
 
-	var r RenderableError
-	if errors.As(err, &r) {
-		r.Render(w)
+	var re RenderableError
+	if errors.As(err, &re) {
+		re.Render(rw, r)
 
 		return
 	}
 
-	JSONStatus(w, err, statusCodeFromError(err))
+	JSONStatus(rw, r, err, statusCodeFromError(err))
 }
 
 // StatusCodedError is the set of errors that implement the basic StatusCode

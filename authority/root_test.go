@@ -2,15 +2,18 @@ package authority
 
 import (
 	"crypto/x509"
+	"crypto/x509/pkix"
 	"errors"
 	"net/http"
 	"reflect"
 	"testing"
 
-	"go.step.sm/crypto/pemutil"
-
 	"github.com/smallstep/assert"
 	"github.com/smallstep/certificates/api/render"
+	"github.com/stretchr/testify/require"
+	"go.step.sm/crypto/keyutil"
+	"go.step.sm/crypto/minica"
+	"go.step.sm/crypto/pemutil"
 )
 
 func TestRoot(t *testing.T) {
@@ -148,6 +151,66 @@ func TestAuthority_GetFederation(t *testing.T) {
 			}
 			if !reflect.DeepEqual(gotFederation, tt.wantFederation) {
 				t.Errorf("Authority.GetFederation() = %v, want %v", gotFederation, tt.wantFederation)
+			}
+		})
+	}
+}
+
+func TestAuthority_GetIntermediateCertificate(t *testing.T) {
+	ca, err := minica.New(minica.WithRootTemplate(`{
+		"subject": {{ toJson .Subject }},
+		"issuer": {{ toJson .Subject }},
+		"keyUsage": ["certSign", "crlSign"],
+		"basicConstraints": {
+			"isCA": true,
+			"maxPathLen": -1
+		}
+	}`), minica.WithIntermediateTemplate(`{
+		"subject": {{ toJson .Subject }},
+		"keyUsage": ["certSign", "crlSign"],
+		"basicConstraints": {
+			"isCA": true,
+			"maxPathLen": 1
+		}
+	}`))
+	require.NoError(t, err)
+
+	signer, err := keyutil.GenerateDefaultSigner()
+	require.NoError(t, err)
+
+	cert, err := ca.Sign(&x509.Certificate{
+		Subject:               pkix.Name{CommonName: "MiniCA Intermediate CA 0"},
+		PublicKey:             signer.Public(),
+		BasicConstraintsValid: true,
+		IsCA:                  true,
+		MaxPathLen:            0,
+	})
+	require.NoError(t, err)
+
+	type fields struct {
+		intermediateX509Certs []*x509.Certificate
+	}
+	tests := []struct {
+		name      string
+		fields    fields
+		want      *x509.Certificate
+		wantSlice []*x509.Certificate
+	}{
+		{"ok one", fields{[]*x509.Certificate{ca.Intermediate}}, ca.Intermediate, []*x509.Certificate{ca.Intermediate}},
+		{"ok multiple", fields{[]*x509.Certificate{cert, ca.Intermediate}}, cert, []*x509.Certificate{cert, ca.Intermediate}},
+		{"ok empty", fields{[]*x509.Certificate{}}, nil, []*x509.Certificate{}},
+		{"ok nil", fields{nil}, nil, nil},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			a := &Authority{
+				intermediateX509Certs: tt.fields.intermediateX509Certs,
+			}
+			if got := a.GetIntermediateCertificate(); !reflect.DeepEqual(got, tt.want) {
+				t.Errorf("Authority.GetIntermediateCertificate() = %v, want %v", got, tt.want)
+			}
+			if got := a.GetIntermediateCertificates(); !reflect.DeepEqual(got, tt.wantSlice) {
+				t.Errorf("Authority.GetIntermediateCertificates() = %v, want %v", got, tt.wantSlice)
 			}
 		})
 	}

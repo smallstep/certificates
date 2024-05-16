@@ -87,7 +87,7 @@ func startCAServer(configFile string) (*CA, string, error) {
 func mTLSMiddleware(next http.Handler, nonAuthenticatedPaths ...string) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Path == "/version" {
-			render.JSON(w, api.VersionResponse{
+			render.JSON(w, r, api.VersionResponse{
 				Version:                     "test",
 				RequireClientAuthentication: true,
 			})
@@ -102,7 +102,7 @@ func mTLSMiddleware(next http.Handler, nonAuthenticatedPaths ...string) http.Han
 		}
 		isMTLS := r.TLS != nil && len(r.TLS.PeerCertificates) > 0
 		if !isMTLS {
-			render.Error(w, errs.Unauthorized("missing peer certificate"))
+			render.Error(w, r, errs.Unauthorized("missing peer certificate"))
 		} else {
 			next.ServeHTTP(w, r)
 		}
@@ -412,7 +412,7 @@ func TestBootstrapClientServerRotation(t *testing.T) {
 	//nolint:gosec // insecure test server
 	server, err := BootstrapServer(context.Background(), token, &http.Server{
 		Addr: ":0",
-		Handler: http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+		Handler: http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			w.Write([]byte("ok"))
 		}),
 	}, RequireAndVerifyClientCert())
@@ -531,7 +531,7 @@ func TestBootstrapClientServerFederation(t *testing.T) {
 	//nolint:gosec // insecure test server
 	server, err := BootstrapServer(context.Background(), token, &http.Server{
 		Addr: ":0",
-		Handler: http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+		Handler: http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			w.Write([]byte("ok"))
 		}),
 	}, RequireAndVerifyClientCert(), AddFederationToClientCAs())

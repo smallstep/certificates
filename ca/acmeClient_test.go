@@ -108,19 +108,19 @@ func TestNewACMEClient(t *testing.T) {
 			tc := run(t)
 
 			i := 0
-			srv.Config.Handler = http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
-				assert.Equals(t, "step-http-client/1.0", req.Header.Get("User-Agent")) // check default User-Agent header
+			srv.Config.Handler = http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				assert.Equals(t, "step-http-client/1.0", r.Header.Get("User-Agent")) // check default User-Agent header
 				switch {
 				case i == 0:
-					render.JSONStatus(w, tc.r1, tc.rc1)
+					render.JSONStatus(w, r, tc.r1, tc.rc1)
 					i++
 				case i == 1:
 					w.Header().Set("Replay-Nonce", "abc123")
-					render.JSONStatus(w, []byte{}, 200)
+					render.JSONStatus(w, r, []byte{}, 200)
 					i++
 				default:
 					w.Header().Set("Location", accLocation)
-					render.JSONStatus(w, tc.r2, tc.rc2)
+					render.JSONStatus(w, r, tc.r2, tc.rc2)
 				}
 			})
 
@@ -203,10 +203,10 @@ func TestACMEClient_GetNonce(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			tc := run(t)
 
-			srv.Config.Handler = http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
-				assert.Equals(t, "step-http-client/1.0", req.Header.Get("User-Agent")) // check default User-Agent header
+			srv.Config.Handler = http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				assert.Equals(t, "step-http-client/1.0", r.Header.Get("User-Agent")) // check default User-Agent header
 				w.Header().Set("Replay-Nonce", expectedNonce)
-				render.JSONStatus(w, tc.r1, tc.rc1)
+				render.JSONStatus(w, r, tc.r1, tc.rc1)
 			})
 
 			if nonce, err := ac.GetNonce(); err != nil {
@@ -310,18 +310,18 @@ func TestACMEClient_post(t *testing.T) {
 			tc := run(t)
 
 			i := 0
-			srv.Config.Handler = http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
-				assert.Equals(t, "step-http-client/1.0", req.Header.Get("User-Agent")) // check default User-Agent header
+			srv.Config.Handler = http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				assert.Equals(t, "step-http-client/1.0", r.Header.Get("User-Agent")) // check default User-Agent header
 
 				w.Header().Set("Replay-Nonce", expectedNonce)
 				if i == 0 {
-					render.JSONStatus(w, tc.r1, tc.rc1)
+					render.JSONStatus(w, r, tc.r1, tc.rc1)
 					i++
 					return
 				}
 
 				// validate jws request protected headers and body
-				body, err := io.ReadAll(req.Body)
+				body, err := io.ReadAll(r.Body)
 				assert.FatalError(t, err)
 				jws, err := jose.ParseJWS(string(body))
 				assert.FatalError(t, err)
@@ -338,7 +338,7 @@ func TestACMEClient_post(t *testing.T) {
 					assert.Equals(t, hdr.KeyID, ac.kid)
 				}
 
-				render.JSONStatus(w, tc.r2, tc.rc2)
+				render.JSONStatus(w, r, tc.r2, tc.rc2)
 			})
 
 			if resp, err := tc.client.post(tc.payload, url, tc.ops...); err != nil {
@@ -450,18 +450,18 @@ func TestACMEClient_NewOrder(t *testing.T) {
 			tc := run(t)
 
 			i := 0
-			srv.Config.Handler = http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
-				assert.Equals(t, "step-http-client/1.0", req.Header.Get("User-Agent")) // check default User-Agent header
+			srv.Config.Handler = http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				assert.Equals(t, "step-http-client/1.0", r.Header.Get("User-Agent")) // check default User-Agent header
 
 				w.Header().Set("Replay-Nonce", expectedNonce)
 				if i == 0 {
-					render.JSONStatus(w, tc.r1, tc.rc1)
+					render.JSONStatus(w, r, tc.r1, tc.rc1)
 					i++
 					return
 				}
 
 				// validate jws request protected headers and body
-				body, err := io.ReadAll(req.Body)
+				body, err := io.ReadAll(r.Body)
 				assert.FatalError(t, err)
 				jws, err := jose.ParseJWS(string(body))
 				assert.FatalError(t, err)
@@ -477,7 +477,7 @@ func TestACMEClient_NewOrder(t *testing.T) {
 				assert.FatalError(t, err)
 				assert.Equals(t, payload, norb)
 
-				render.JSONStatus(w, tc.r2, tc.rc2)
+				render.JSONStatus(w, r, tc.r2, tc.rc2)
 			})
 
 			if res, err := ac.NewOrder(norb); err != nil {
@@ -572,18 +572,18 @@ func TestACMEClient_GetOrder(t *testing.T) {
 			tc := run(t)
 
 			i := 0
-			srv.Config.Handler = http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
-				assert.Equals(t, "step-http-client/1.0", req.Header.Get("User-Agent")) // check default User-Agent header
+			srv.Config.Handler = http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				assert.Equals(t, "step-http-client/1.0", r.Header.Get("User-Agent")) // check default User-Agent header
 
 				w.Header().Set("Replay-Nonce", expectedNonce)
 				if i == 0 {
-					render.JSONStatus(w, tc.r1, tc.rc1)
+					render.JSONStatus(w, r, tc.r1, tc.rc1)
 					i++
 					return
 				}
 
 				// validate jws request protected headers and body
-				body, err := io.ReadAll(req.Body)
+				body, err := io.ReadAll(r.Body)
 				assert.FatalError(t, err)
 				jws, err := jose.ParseJWS(string(body))
 				assert.FatalError(t, err)
@@ -599,7 +599,7 @@ func TestACMEClient_GetOrder(t *testing.T) {
 				assert.FatalError(t, err)
 				assert.Equals(t, len(payload), 0)
 
-				render.JSONStatus(w, tc.r2, tc.rc2)
+				render.JSONStatus(w, r, tc.r2, tc.rc2)
 			})
 
 			if res, err := ac.GetOrder(url); err != nil {
@@ -694,18 +694,18 @@ func TestACMEClient_GetAuthz(t *testing.T) {
 			tc := run(t)
 
 			i := 0
-			srv.Config.Handler = http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
-				assert.Equals(t, "step-http-client/1.0", req.Header.Get("User-Agent")) // check default User-Agent header
+			srv.Config.Handler = http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				assert.Equals(t, "step-http-client/1.0", r.Header.Get("User-Agent")) // check default User-Agent header
 
 				w.Header().Set("Replay-Nonce", expectedNonce)
 				if i == 0 {
-					render.JSONStatus(w, tc.r1, tc.rc1)
+					render.JSONStatus(w, r, tc.r1, tc.rc1)
 					i++
 					return
 				}
 
 				// validate jws request protected headers and body
-				body, err := io.ReadAll(req.Body)
+				body, err := io.ReadAll(r.Body)
 				assert.FatalError(t, err)
 				jws, err := jose.ParseJWS(string(body))
 				assert.FatalError(t, err)
@@ -721,7 +721,7 @@ func TestACMEClient_GetAuthz(t *testing.T) {
 				assert.FatalError(t, err)
 				assert.Equals(t, len(payload), 0)
 
-				render.JSONStatus(w, tc.r2, tc.rc2)
+				render.JSONStatus(w, r, tc.r2, tc.rc2)
 			})
 
 			if res, err := ac.GetAuthz(url); err != nil {
@@ -816,18 +816,18 @@ func TestACMEClient_GetChallenge(t *testing.T) {
 			tc := run(t)
 
 			i := 0
-			srv.Config.Handler = http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
-				assert.Equals(t, "step-http-client/1.0", req.Header.Get("User-Agent")) // check default User-Agent header
+			srv.Config.Handler = http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				assert.Equals(t, "step-http-client/1.0", r.Header.Get("User-Agent")) // check default User-Agent header
 
 				w.Header().Set("Replay-Nonce", expectedNonce)
 				if i == 0 {
-					render.JSONStatus(w, tc.r1, tc.rc1)
+					render.JSONStatus(w, r, tc.r1, tc.rc1)
 					i++
 					return
 				}
 
 				// validate jws request protected headers and body
-				body, err := io.ReadAll(req.Body)
+				body, err := io.ReadAll(r.Body)
 				assert.FatalError(t, err)
 				jws, err := jose.ParseJWS(string(body))
 				assert.FatalError(t, err)
@@ -844,7 +844,7 @@ func TestACMEClient_GetChallenge(t *testing.T) {
 
 				assert.Equals(t, len(payload), 0)
 
-				render.JSONStatus(w, tc.r2, tc.rc2)
+				render.JSONStatus(w, r, tc.r2, tc.rc2)
 			})
 
 			if res, err := ac.GetChallenge(url); err != nil {
@@ -939,18 +939,18 @@ func TestACMEClient_ValidateChallenge(t *testing.T) {
 			tc := run(t)
 
 			i := 0
-			srv.Config.Handler = http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
-				assert.Equals(t, "step-http-client/1.0", req.Header.Get("User-Agent")) // check default User-Agent header
+			srv.Config.Handler = http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				assert.Equals(t, "step-http-client/1.0", r.Header.Get("User-Agent")) // check default User-Agent header
 
 				w.Header().Set("Replay-Nonce", expectedNonce)
 				if i == 0 {
-					render.JSONStatus(w, tc.r1, tc.rc1)
+					render.JSONStatus(w, r, tc.r1, tc.rc1)
 					i++
 					return
 				}
 
 				// validate jws request protected headers and body
-				body, err := io.ReadAll(req.Body)
+				body, err := io.ReadAll(r.Body)
 				assert.FatalError(t, err)
 				jws, err := jose.ParseJWS(string(body))
 				assert.FatalError(t, err)
@@ -967,7 +967,7 @@ func TestACMEClient_ValidateChallenge(t *testing.T) {
 
 				assert.Equals(t, payload, []byte("{}"))
 
-				render.JSONStatus(w, tc.r2, tc.rc2)
+				render.JSONStatus(w, r, tc.r2, tc.rc2)
 			})
 
 			if err := ac.ValidateChallenge(url); err != nil {
@@ -983,22 +983,22 @@ func TestACMEClient_ValidateWithPayload(t *testing.T) {
 	key, err := jose.GenerateJWK("EC", "P-256", "ES256", "sig", "", 0)
 	assert.FatalError(t, err)
 
-	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
-		assert.Equals(t, "step-http-client/1.0", req.Header.Get("User-Agent")) // check default User-Agent header
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		assert.Equals(t, "step-http-client/1.0", r.Header.Get("User-Agent")) // check default User-Agent header
 
-		t.Log(req.RequestURI)
+		t.Log(r.RequestURI)
 		w.Header().Set("Replay-Nonce", "nonce")
-		switch req.RequestURI {
+		switch r.RequestURI {
 		case "/nonce":
-			render.JSONStatus(w, []byte{}, 200)
+			render.JSONStatus(w, r, []byte{}, 200)
 			return
 		case "/fail-nonce":
-			render.JSONStatus(w, acme.NewError(acme.ErrorMalformedType, "malformed request"), 400)
+			render.JSONStatus(w, r, acme.NewError(acme.ErrorMalformedType, "malformed request"), 400)
 			return
 		}
 
 		// validate jws request protected headers and body
-		body, err := io.ReadAll(req.Body)
+		body, err := io.ReadAll(r.Body)
 		assert.FatalError(t, err)
 
 		jws, err := jose.ParseJWS(string(body))
@@ -1015,15 +1015,15 @@ func TestACMEClient_ValidateWithPayload(t *testing.T) {
 		assert.FatalError(t, err)
 		assert.Equals(t, payload, []byte("the-payload"))
 
-		switch req.RequestURI {
+		switch r.RequestURI {
 		case "/ok":
-			render.JSONStatus(w, acme.Challenge{
+			render.JSONStatus(w, r, acme.Challenge{
 				Type:   "device-attestation-01",
 				Status: "valid",
 				Token:  "foo",
 			}, 200)
 		case "/fail":
-			render.JSONStatus(w, acme.NewError(acme.ErrorMalformedType, "malformed request"), 400)
+			render.JSONStatus(w, r, acme.NewError(acme.ErrorMalformedType, "malformed request"), 400)
 		}
 	}))
 	defer srv.Close()
@@ -1160,18 +1160,18 @@ func TestACMEClient_FinalizeOrder(t *testing.T) {
 			tc := run(t)
 
 			i := 0
-			srv.Config.Handler = http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
-				assert.Equals(t, "step-http-client/1.0", req.Header.Get("User-Agent")) // check default User-Agent header
+			srv.Config.Handler = http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				assert.Equals(t, "step-http-client/1.0", r.Header.Get("User-Agent")) // check default User-Agent header
 
 				w.Header().Set("Replay-Nonce", expectedNonce)
 				if i == 0 {
-					render.JSONStatus(w, tc.r1, tc.rc1)
+					render.JSONStatus(w, r, tc.r1, tc.rc1)
 					i++
 					return
 				}
 
 				// validate jws request protected headers and body
-				body, err := io.ReadAll(req.Body)
+				body, err := io.ReadAll(r.Body)
 				assert.FatalError(t, err)
 				jws, err := jose.ParseJWS(string(body))
 				assert.FatalError(t, err)
@@ -1187,7 +1187,7 @@ func TestACMEClient_FinalizeOrder(t *testing.T) {
 				assert.FatalError(t, err)
 				assert.Equals(t, payload, frb)
 
-				render.JSONStatus(w, tc.r2, tc.rc2)
+				render.JSONStatus(w, r, tc.r2, tc.rc2)
 			})
 
 			if err := ac.FinalizeOrder(url, csr); err != nil {
@@ -1289,18 +1289,18 @@ func TestACMEClient_GetAccountOrders(t *testing.T) {
 			tc := run(t)
 
 			i := 0
-			srv.Config.Handler = http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
-				assert.Equals(t, "step-http-client/1.0", req.Header.Get("User-Agent")) // check default User-Agent header
+			srv.Config.Handler = http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				assert.Equals(t, "step-http-client/1.0", r.Header.Get("User-Agent")) // check default User-Agent header
 
 				w.Header().Set("Replay-Nonce", expectedNonce)
 				if i == 0 {
-					render.JSONStatus(w, tc.r1, tc.rc1)
+					render.JSONStatus(w, r, tc.r1, tc.rc1)
 					i++
 					return
 				}
 
 				// validate jws request protected headers and body
-				body, err := io.ReadAll(req.Body)
+				body, err := io.ReadAll(r.Body)
 				assert.FatalError(t, err)
 				jws, err := jose.ParseJWS(string(body))
 				assert.FatalError(t, err)
@@ -1316,7 +1316,7 @@ func TestACMEClient_GetAccountOrders(t *testing.T) {
 				assert.FatalError(t, err)
 				assert.Equals(t, len(payload), 0)
 
-				render.JSONStatus(w, tc.r2, tc.rc2)
+				render.JSONStatus(w, r, tc.r2, tc.rc2)
 			})
 
 			if res, err := tc.client.GetAccountOrders(); err != nil {
@@ -1420,18 +1420,18 @@ func TestACMEClient_GetCertificate(t *testing.T) {
 			tc := run(t)
 
 			i := 0
-			srv.Config.Handler = http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
-				assert.Equals(t, "step-http-client/1.0", req.Header.Get("User-Agent")) // check default User-Agent header
+			srv.Config.Handler = http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				assert.Equals(t, "step-http-client/1.0", r.Header.Get("User-Agent")) // check default User-Agent header
 
 				w.Header().Set("Replay-Nonce", expectedNonce)
 				if i == 0 {
-					render.JSONStatus(w, tc.r1, tc.rc1)
+					render.JSONStatus(w, r, tc.r1, tc.rc1)
 					i++
 					return
 				}
 
 				// validate jws request protected headers and body
-				body, err := io.ReadAll(req.Body)
+				body, err := io.ReadAll(r.Body)
 				assert.FatalError(t, err)
 				jws, err := jose.ParseJWS(string(body))
 				assert.FatalError(t, err)
@@ -1450,7 +1450,7 @@ func TestACMEClient_GetCertificate(t *testing.T) {
 				if tc.certBytes != nil {
 					w.Write(tc.certBytes)
 				} else {
-					render.JSONStatus(w, tc.r2, tc.rc2)
+					render.JSONStatus(w, r, tc.r2, tc.rc2)
 				}
 			})
 

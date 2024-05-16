@@ -97,7 +97,7 @@ func route(r api.Router, middleware func(next http.HandlerFunc) http.HandlerFunc
 func Get(w http.ResponseWriter, r *http.Request) {
 	req, err := decodeRequest(r)
 	if err != nil {
-		fail(w, fmt.Errorf("invalid scep get request: %w", err))
+		fail(w, r, fmt.Errorf("invalid scep get request: %w", err))
 		return
 	}
 
@@ -116,18 +116,18 @@ func Get(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if err != nil {
-		fail(w, fmt.Errorf("scep get request failed: %w", err))
+		fail(w, r, fmt.Errorf("scep get request failed: %w", err))
 		return
 	}
 
-	writeResponse(w, res)
+	writeResponse(w, r, res)
 }
 
 // Post handles all SCEP POST requests
 func Post(w http.ResponseWriter, r *http.Request) {
 	req, err := decodeRequest(r)
 	if err != nil {
-		fail(w, fmt.Errorf("invalid scep post request: %w", err))
+		fail(w, r, fmt.Errorf("invalid scep post request: %w", err))
 		return
 	}
 
@@ -140,11 +140,11 @@ func Post(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if err != nil {
-		fail(w, fmt.Errorf("scep post request failed: %w", err))
+		fail(w, r, fmt.Errorf("scep post request failed: %w", err))
 		return
 	}
 
-	writeResponse(w, res)
+	writeResponse(w, r, res)
 }
 
 func decodeRequest(r *http.Request) (request, error) {
@@ -274,7 +274,7 @@ func lookupProvisioner(next http.HandlerFunc) http.HandlerFunc {
 		name := chi.URLParam(r, "provisionerName")
 		provisionerName, err := url.PathUnescape(name)
 		if err != nil {
-			fail(w, fmt.Errorf("error url unescaping provisioner name '%s'", name))
+			fail(w, r, fmt.Errorf("error url unescaping provisioner name '%s'", name))
 			return
 		}
 
@@ -282,13 +282,13 @@ func lookupProvisioner(next http.HandlerFunc) http.HandlerFunc {
 		auth := authority.MustFromContext(ctx)
 		p, err := auth.LoadProvisionerByName(provisionerName)
 		if err != nil {
-			fail(w, err)
+			fail(w, r, err)
 			return
 		}
 
 		prov, ok := p.(*provisioner.SCEP)
 		if !ok {
-			fail(w, errors.New("provisioner must be of type SCEP"))
+			fail(w, r, errors.New("provisioner must be of type SCEP"))
 			return
 		}
 
@@ -430,9 +430,9 @@ func formatCapabilities(caps []string) []byte {
 }
 
 // writeResponse writes a SCEP response back to the SCEP client.
-func writeResponse(w http.ResponseWriter, res Response) {
+func writeResponse(w http.ResponseWriter, r *http.Request, res Response) {
 	if res.Error != nil {
-		log.Error(w, res.Error)
+		log.Error(w, r, res.Error)
 	}
 
 	if res.Certificate != nil {
@@ -443,8 +443,8 @@ func writeResponse(w http.ResponseWriter, res Response) {
 	_, _ = w.Write(res.Data)
 }
 
-func fail(w http.ResponseWriter, err error) {
-	log.Error(w, err)
+func fail(w http.ResponseWriter, r *http.Request, err error) {
+	log.Error(w, r, err)
 
 	http.Error(w, err.Error(), http.StatusInternalServerError)
 }
