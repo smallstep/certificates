@@ -33,7 +33,11 @@ func TestError(t *testing.T) {
 	var buf bytes.Buffer
 	logger := slog.New(slog.NewJSONHandler(&buf, &slog.HandlerOptions{}))
 	req := httptest.NewRequest("GET", "/test", http.NoBody)
-	reqWithLogger := req.WithContext(NewContext(req.Context(), logger))
+	reqWithLogger := req.WithContext(WithErrorLogger(req.Context(), func(w http.ResponseWriter, r *http.Request, err error) {
+		if err != nil {
+			logger.ErrorContext(r.Context(), "request failed", slog.Any("error", err))
+		}
+	}))
 
 	tests := []struct {
 		name string
