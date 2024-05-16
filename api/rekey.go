@@ -29,25 +29,25 @@ func (s *RekeyRequest) Validate() error {
 // Rekey is similar to renew except that the certificate will be renewed with new key from csr.
 func Rekey(w http.ResponseWriter, r *http.Request) {
 	if r.TLS == nil || len(r.TLS.PeerCertificates) == 0 {
-		render.Error(w, errs.BadRequest("missing client certificate"))
+		render.Error(w, r, errs.BadRequest("missing client certificate"))
 		return
 	}
 
 	var body RekeyRequest
 	if err := read.JSON(r.Body, &body); err != nil {
-		render.Error(w, errs.BadRequestErr(err, "error reading request body"))
+		render.Error(w, r, errs.BadRequestErr(err, "error reading request body"))
 		return
 	}
 
 	if err := body.Validate(); err != nil {
-		render.Error(w, err)
+		render.Error(w, r, err)
 		return
 	}
 
 	a := mustAuthority(r.Context())
 	certChain, err := a.Rekey(r.TLS.PeerCertificates[0], body.CsrPEM.CertificateRequest.PublicKey)
 	if err != nil {
-		render.Error(w, errs.Wrap(http.StatusInternalServerError, err, "cahandler.Rekey"))
+		render.Error(w, r, errs.Wrap(http.StatusInternalServerError, err, "cahandler.Rekey"))
 		return
 	}
 	certChainPEM := certChainToPEM(certChain)
@@ -57,7 +57,7 @@ func Rekey(w http.ResponseWriter, r *http.Request) {
 	}
 
 	LogCertificate(w, certChain[0])
-	render.JSONStatus(w, &SignResponse{
+	render.JSONStatus(w, r, &SignResponse{
 		ServerPEM:    certChainPEM[0],
 		CaPEM:        caPEM,
 		CertChainPEM: certChainPEM,

@@ -19,7 +19,7 @@ import (
 func requireAPIEnabled(next http.HandlerFunc) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		if !mustAuthority(r.Context()).IsAdminAPIEnabled() {
-			render.Error(w, admin.NewError(admin.ErrorNotImplementedType, "administration API not enabled"))
+			render.Error(w, r, admin.NewError(admin.ErrorNotImplementedType, "administration API not enabled"))
 			return
 		}
 		next(w, r)
@@ -31,7 +31,7 @@ func extractAuthorizeTokenAdmin(next http.HandlerFunc) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		tok := r.Header.Get("Authorization")
 		if tok == "" {
-			render.Error(w, admin.NewError(admin.ErrorUnauthorizedType,
+			render.Error(w, r, admin.NewError(admin.ErrorUnauthorizedType,
 				"missing authorization header token"))
 			return
 		}
@@ -39,7 +39,7 @@ func extractAuthorizeTokenAdmin(next http.HandlerFunc) http.HandlerFunc {
 		ctx := r.Context()
 		adm, err := mustAuthority(ctx).AuthorizeAdminToken(r, tok)
 		if err != nil {
-			render.Error(w, err)
+			render.Error(w, r, err)
 			return
 		}
 
@@ -64,13 +64,13 @@ func loadProvisionerByName(next http.HandlerFunc) http.HandlerFunc {
 
 		// TODO(hs): distinguish 404 vs. 500
 		if p, err = auth.LoadProvisionerByName(name); err != nil {
-			render.Error(w, admin.WrapErrorISE(err, "error loading provisioner %s", name))
+			render.Error(w, r, admin.WrapErrorISE(err, "error loading provisioner %s", name))
 			return
 		}
 
 		prov, err := adminDB.GetProvisioner(ctx, p.GetID())
 		if err != nil {
-			render.Error(w, admin.WrapErrorISE(err, "error retrieving provisioner %s", name))
+			render.Error(w, r, admin.WrapErrorISE(err, "error retrieving provisioner %s", name))
 			return
 		}
 
@@ -91,7 +91,7 @@ func checkAction(next http.HandlerFunc, supportedInStandalone bool) http.Handler
 		// when an action is not supported in standalone mode and when
 		// using a nosql.DB backend, actions are not supported
 		if _, ok := admin.MustFromContext(r.Context()).(*nosql.DB); ok {
-			render.Error(w, admin.NewError(admin.ErrorNotImplementedType,
+			render.Error(w, r, admin.NewError(admin.ErrorNotImplementedType,
 				"operation not supported in standalone mode"))
 			return
 		}
@@ -125,15 +125,15 @@ func loadExternalAccountKey(next http.HandlerFunc) http.HandlerFunc {
 
 		if err != nil {
 			if acme.IsErrNotFound(err) {
-				render.Error(w, admin.NewError(admin.ErrorNotFoundType, "ACME External Account Key not found"))
+				render.Error(w, r, admin.NewError(admin.ErrorNotFoundType, "ACME External Account Key not found"))
 				return
 			}
-			render.Error(w, admin.WrapErrorISE(err, "error retrieving ACME External Account Key"))
+			render.Error(w, r, admin.WrapErrorISE(err, "error retrieving ACME External Account Key"))
 			return
 		}
 
 		if eak == nil {
-			render.Error(w, admin.NewError(admin.ErrorNotFoundType, "ACME External Account Key not found"))
+			render.Error(w, r, admin.NewError(admin.ErrorNotFoundType, "ACME External Account Key not found"))
 			return
 		}
 
