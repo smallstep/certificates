@@ -15,6 +15,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/google/uuid"
 	"github.com/smallstep/assert"
 	"github.com/smallstep/certificates/acme"
 	tassert "github.com/stretchr/testify/assert"
@@ -831,8 +832,37 @@ func TestHandler_lookupJWK(t *testing.T) {
 				},
 				statusCode: http.StatusUnauthorized,
 				err: acme.NewError(acme.ErrorUnauthorizedType,
-					"account provisioner does not match requested provisioner; account provisioner = %s, reqested provisioner = %s",
-					prov.GetName(), "other"),
+					"account provisioner does not match requested provisioner; account provisioner = %s, requested provisioner = %s",
+					"other", prov.GetName()),
+			}
+		},
+		"fail/account-with-location-prefix/bad-provisioner-id": func(t *testing.T) test {
+			p := newProvWithID()
+			acc := &acme.Account{LocationPrefix: prefix + accID, Status: "valid", Key: jwk, ProvisionerID: uuid.NewString()}
+			ctx := acme.NewProvisionerContext(context.Background(), p)
+			ctx = context.WithValue(ctx, jwsContextKey, parsedJWS)
+			return test{
+				linker: acme.NewLinker("test.ca.smallstep.com", "acme"),
+				db: &acme.MockDB{
+					MockGetAccount: func(ctx context.Context, id string) (*acme.Account, error) {
+						assert.Equals(t, id, accID)
+						return acc, nil
+					},
+				},
+				ctx: ctx,
+				next: func(w http.ResponseWriter, r *http.Request) {
+					_acc, err := accountFromContext(r.Context())
+					assert.FatalError(t, err)
+					assert.Equals(t, _acc, acc)
+					_jwk, err := jwkFromContext(r.Context())
+					assert.FatalError(t, err)
+					assert.Equals(t, _jwk, jwk)
+					w.Write(testBody)
+				},
+				statusCode: http.StatusUnauthorized,
+				err: acme.NewError(acme.ErrorUnauthorizedType,
+					"account provisioner does not match requested provisioner; account provisioner = %s, requested provisioner = %s",
+					acc.ProvisionerID, p.GetID()),
 			}
 		},
 		"ok/account-with-location-prefix": func(t *testing.T) test {
@@ -863,6 +893,32 @@ func TestHandler_lookupJWK(t *testing.T) {
 		"ok/account-without-location-prefix": func(t *testing.T) test {
 			acc := &acme.Account{Status: "valid", Key: jwk}
 			ctx := acme.NewProvisionerContext(context.Background(), prov)
+			ctx = context.WithValue(ctx, jwsContextKey, parsedJWS)
+			return test{
+				linker: acme.NewLinker("test.ca.smallstep.com", "acme"),
+				db: &acme.MockDB{
+					MockGetAccount: func(ctx context.Context, id string) (*acme.Account, error) {
+						assert.Equals(t, id, accID)
+						return acc, nil
+					},
+				},
+				ctx: ctx,
+				next: func(w http.ResponseWriter, r *http.Request) {
+					_acc, err := accountFromContext(r.Context())
+					assert.FatalError(t, err)
+					assert.Equals(t, _acc, acc)
+					_jwk, err := jwkFromContext(r.Context())
+					assert.FatalError(t, err)
+					assert.Equals(t, _jwk, jwk)
+					w.Write(testBody)
+				},
+				statusCode: 200,
+			}
+		},
+		"ok/account-with-provisioner-id": func(t *testing.T) test {
+			p := newProvWithID()
+			acc := &acme.Account{LocationPrefix: prefix + accID, Status: "valid", Key: jwk, ProvisionerID: p.GetID()}
+			ctx := acme.NewProvisionerContext(context.Background(), p)
 			ctx = context.WithValue(ctx, jwsContextKey, parsedJWS)
 			return test{
 				linker: acme.NewLinker("test.ca.smallstep.com", "acme"),
