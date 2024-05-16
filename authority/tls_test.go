@@ -229,7 +229,7 @@ func assertHasPrefix(t *testing.T, s, p string) bool {
 		return true
 	}
 	t.Helper()
-	t.Errorf("'%s' is not a prefix of '%s'", p, s)
+	t.Errorf("%q is not a prefix of %q", p, s)
 	return false
 }
 
