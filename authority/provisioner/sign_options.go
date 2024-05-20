@@ -369,8 +369,8 @@ type validityValidator struct {
 }
 
 // newValidityValidator return a new validity validator.
-func newValidityValidator(min, max time.Duration) *validityValidator {
-	return &validityValidator{min: min, max: max}
+func newValidityValidator(minDur, maxDur time.Duration) *validityValidator {
+	return &validityValidator{min: minDur, max: maxDur}
 }
 
 // Valid validates the certificate validity settings (notBefore/notAfter) and
