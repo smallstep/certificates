@@ -5,7 +5,10 @@ import (
 	"crypto/ecdsa"
 	"crypto/ed25519"
 	"crypto/rsa"
+	"crypto/sha256"
+	"crypto/subtle"
 	"crypto/x509"
+	"encoding/base64"
 	"encoding/json"
 	"net"
 	"net/http"
@@ -490,5 +493,23 @@ func (o *provisionerExtensionOption) Modify(cert *x509.Certificate, _ SignOption
 		}
 	}
 	cert.ExtraExtensions = append(cert.ExtraExtensions, ext)
+	return nil
+}
+
+// fingerprintValidator is a CertificateRequestValidator that checks the
+// fingerprint of the certificate with the provided one.
+type fingerprintValidator string
+
+func (s fingerprintValidator) Valid(cr *x509.CertificateRequest) error {
+	if s != "" {
+		expected, err := base64.RawURLEncoding.DecodeString(string(s))
+		if err != nil {
+			return errs.ForbiddenErr(err, "error decoding fingerprint")
+		}
+		sum := sha256.Sum256(cr.Raw)
+		if subtle.ConstantTimeCompare(expected, sum[:]) != 1 {
+			return errs.Forbidden("certificate request fingerprint does not match %q", s)
+		}
+	}
 	return nil
 }
