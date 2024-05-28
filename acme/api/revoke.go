@@ -33,65 +33,65 @@ func RevokeCert(w http.ResponseWriter, r *http.Request) {
 
 	jws, err := jwsFromContext(ctx)
 	if err != nil {
-		render.Error(w, err)
+		render.Error(w, r, err)
 		return
 	}
 
 	prov, err := provisionerFromContext(ctx)
 	if err != nil {
-		render.Error(w, err)
+		render.Error(w, r, err)
 		return
 	}
 
 	payload, err := payloadFromContext(ctx)
 	if err != nil {
-		render.Error(w, err)
+		render.Error(w, r, err)
 		return
 	}
 
 	var p revokePayload
 	err = json.Unmarshal(payload.value, &p)
 	if err != nil {
-		render.Error(w, acme.WrapErrorISE(err, "error unmarshaling payload"))
+		render.Error(w, r, acme.WrapErrorISE(err, "error unmarshaling payload"))
 		return
 	}
 
 	certBytes, err := base64.RawURLEncoding.DecodeString(p.Certificate)
 	if err != nil {
 		// in this case the most likely cause is a client that didn't properly encode the certificate
-		render.Error(w, acme.WrapError(acme.ErrorMalformedType, err, "error base64url decoding payload certificate property"))
+		render.Error(w, r, acme.WrapError(acme.ErrorMalformedType, err, "error base64url decoding payload certificate property"))
 		return
 	}
 
 	certToBeRevoked, err := x509.ParseCertificate(certBytes)
 	if err != nil {
 		// in this case a client may have encoded something different than a certificate
-		render.Error(w, acme.WrapError(acme.ErrorMalformedType, err, "error parsing certificate"))
+		render.Error(w, r, acme.WrapError(acme.ErrorMalformedType, err, "error parsing certificate"))
 		return
 	}
 
 	serial := certToBeRevoked.SerialNumber.String()
 	dbCert, err := db.GetCertificateBySerial(ctx, serial)
 	if err != nil {
-		render.Error(w, acme.WrapErrorISE(err, "error retrieving certificate by serial"))
+		render.Error(w, r, acme.WrapErrorISE(err, "error retrieving certificate by serial"))
 		return
 	}
 
 	if !bytes.Equal(dbCert.Leaf.Raw, certToBeRevoked.Raw) {
 		// this should never happen
-		render.Error(w, acme.NewErrorISE("certificate raw bytes are not equal"))
+		render.Error(w, r, acme.NewErrorISE("certificate raw bytes are not equal"))
 		return
 	}
 
 	if shouldCheckAccountFrom(jws) {
 		account, err := accountFromContext(ctx)
 		if err != nil {
-			render.Error(w, err)
+			render.Error(w, r, err)
 			return
 		}
 		acmeErr := isAccountAuthorized(ctx, dbCert, certToBeRevoked, account)
 		if acmeErr != nil {
-			render.Error(w, acmeErr)
+			render.Error(w, r, acmeErr)
 			return
 		}
 	} else {
@@ -100,7 +100,7 @@ func RevokeCert(w http.ResponseWriter, r *http.Request) {
 		_, err := jws.Verify(certToBeRevoked.PublicKey)
 		if err != nil {
 			// TODO(hs): possible to determine an error vs. unauthorized and thus provide an ISE vs. Unauthorized?
-			render.Error(w, wrapUnauthorizedError(certToBeRevoked, nil, "verification of jws using certificate public key failed", err))
+			render.Error(w, r, wrapUnauthorizedError(certToBeRevoked, nil, "verification of jws using certificate public key failed", err))
 			return
 		}
 	}
@@ -108,19 +108,19 @@ func RevokeCert(w http.ResponseWriter, r *http.Request) {
 	ca := mustAuthority(ctx)
 	hasBeenRevokedBefore, err := ca.IsRevoked(serial)
 	if err != nil {
-		render.Error(w, acme.WrapErrorISE(err, "error retrieving revocation status of certificate"))
+		render.Error(w, r, acme.WrapErrorISE(err, "error retrieving revocation status of certificate"))
 		return
 	}
 
 	if hasBeenRevokedBefore {
-		render.Error(w, acme.NewError(acme.ErrorAlreadyRevokedType, "certificate was already revoked"))
+		render.Error(w, r, acme.NewError(acme.ErrorAlreadyRevokedType, "certificate was already revoked"))
 		return
 	}
 
 	reasonCode := p.ReasonCode
 	acmeErr := validateReasonCode(reasonCode)
 	if acmeErr != nil {
-		render.Error(w, acmeErr)
+		render.Error(w, r, acmeErr)
 		return
 	}
 
@@ -128,14 +128,14 @@ func RevokeCert(w http.ResponseWriter, r *http.Request) {
 	ctx = provisioner.NewContextWithMethod(ctx, provisioner.RevokeMethod)
 	err = prov.AuthorizeRevoke(ctx, "")
 	if err != nil {
-		render.Error(w, acme.WrapErrorISE(err, "error authorizing revocation on provisioner"))
+		render.Error(w, r, acme.WrapErrorISE(err, "error authorizing revocation on provisioner"))
 		return
 	}
 
 	options := revokeOptions(serial, certToBeRevoked, reasonCode)
 	err = ca.Revoke(ctx, options)
 	if err != nil {
-		render.Error(w, wrapRevokeErr(err))
+		render.Error(w, r, wrapRevokeErr(err))
 		return
 	}
 

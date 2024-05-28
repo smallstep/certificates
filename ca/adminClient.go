@@ -204,7 +204,7 @@ func (o *adminOptions) apply(opts []AdminOption) (err error) {
 
 func (o *adminOptions) rawQuery() string {
 	v := url.Values{}
-	if len(o.cursor) > 0 {
+	if o.cursor != "" {
 		v.Set("cursor", o.cursor)
 	}
 	if o.limit > 0 {

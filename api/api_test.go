@@ -189,7 +189,7 @@ type mockAuthority struct {
 	authorizeRenewToken          func(ctx context.Context, ott string) (*x509.Certificate, error)
 	getTLSOptions                func() *authority.TLSOptions
 	root                         func(shasum string) (*x509.Certificate, error)
-	sign                         func(cr *x509.CertificateRequest, opts provisioner.SignOptions, signOpts ...provisioner.SignOption) ([]*x509.Certificate, error)
+	signWithContext              func(ctx context.Context, cr *x509.CertificateRequest, opts provisioner.SignOptions, signOpts ...provisioner.SignOption) ([]*x509.Certificate, error)
 	renew                        func(cert *x509.Certificate) ([]*x509.Certificate, error)
 	rekey                        func(oldCert *x509.Certificate, pk crypto.PublicKey) ([]*x509.Certificate, error)
 	renewContext                 func(ctx context.Context, oldCert *x509.Certificate, pk crypto.PublicKey) ([]*x509.Certificate, error)
@@ -200,7 +200,7 @@ type mockAuthority struct {
 	getEncryptedKey              func(kid string) (string, error)
 	getRoots                     func() ([]*x509.Certificate, error)
 	getFederation                func() ([]*x509.Certificate, error)
-	getCRL                       func() ([]byte, error)
+	getCRL                       func() (*authority.CertificateRevocationListInfo, error)
 	signSSH                      func(ctx context.Context, key ssh.PublicKey, opts provisioner.SignSSHOptions, signOpts ...provisioner.SignOption) (*ssh.Certificate, error)
 	signSSHAddUser               func(ctx context.Context, key ssh.PublicKey, cert *ssh.Certificate) (*ssh.Certificate, error)
 	renewSSH                     func(ctx context.Context, cert *ssh.Certificate) (*ssh.Certificate, error)
@@ -214,12 +214,12 @@ type mockAuthority struct {
 	version                      func() authority.Version
 }
 
-func (m *mockAuthority) GetCertificateRevocationList() ([]byte, error) {
+func (m *mockAuthority) GetCertificateRevocationList() (*authority.CertificateRevocationListInfo, error) {
 	if m.getCRL != nil {
 		return m.getCRL()
 	}
 
-	return m.ret1.([]byte), m.err
+	return m.ret1.(*authority.CertificateRevocationListInfo), m.err
 }
 
 // TODO: remove once Authorize is deprecated.
@@ -251,9 +251,9 @@ func (m *mockAuthority) Root(shasum string) (*x509.Certificate, error) {
 	return m.ret1.(*x509.Certificate), m.err
 }
 
-func (m *mockAuthority) Sign(cr *x509.CertificateRequest, opts provisioner.SignOptions, signOpts ...provisioner.SignOption) ([]*x509.Certificate, error) {
-	if m.sign != nil {
-		return m.sign(cr, opts, signOpts...)
+func (m *mockAuthority) SignWithContext(ctx context.Context, cr *x509.CertificateRequest, opts provisioner.SignOptions, signOpts ...provisioner.SignOption) ([]*x509.Certificate, error) {
+	if m.signWithContext != nil {
+		return m.signWithContext(ctx, cr, opts, signOpts...)
 	}
 	return []*x509.Certificate{m.ret1.(*x509.Certificate), m.ret2.(*x509.Certificate)}, m.err
 }
@@ -789,45 +789,6 @@ func (m *mockProvisioner) AuthorizeSSHRekey(ctx context.Context, token string) (
 	return m.ret1.(*ssh.Certificate), m.ret2.([]provisioner.SignOption), m.err
 }
 
-func Test_CRLGeneration(t *testing.T) {
-	tests := []struct {
-		name       string
-		err        error
-		statusCode int
-		expected   []byte
-	}{
-		{"empty", nil, http.StatusOK, nil},
-	}
-
-	chiCtx := chi.NewRouteContext()
-	req := httptest.NewRequest("GET", "http://example.com/crl", http.NoBody)
-	req = req.WithContext(context.WithValue(context.Background(), chi.RouteCtxKey, chiCtx))
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			mockMustAuthority(t, &mockAuthority{ret1: tt.expected, err: tt.err})
-			w := httptest.NewRecorder()
-			CRL(w, req)
-			res := w.Result()
-
-			if res.StatusCode != tt.statusCode {
-				t.Errorf("caHandler.CRL StatusCode = %d, wants %d", res.StatusCode, tt.statusCode)
-			}
-
-			body, err := io.ReadAll(res.Body)
-			res.Body.Close()
-			if err != nil {
-				t.Errorf("caHandler.Root unexpected error = %v", err)
-			}
-			if tt.statusCode == 200 {
-				if !bytes.Equal(bytes.TrimSpace(body), tt.expected) {
-					t.Errorf("caHandler.Root CRL = %s, wants %s", body, tt.expected)
-				}
-			}
-		})
-	}
-}
-
 func Test_caHandler_Route(t *testing.T) {
 	type fields struct {
 		Authority Authority
@@ -923,16 +884,12 @@ func Test_Sign(t *testing.T) {
 		CsrPEM: CertificateRequest{csr},
 		OTT:    "foobarzar",
 	})
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
 	invalid, err := json.Marshal(SignRequest{
 		CsrPEM: CertificateRequest{csr},
 		OTT:    "",
 	})
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
 
 	expected1 := []byte(`{"crt":"` + strings.ReplaceAll(certPEM, "\n", `\n`) + `\n","ca":"` + strings.ReplaceAll(rootPEM, "\n", `\n`) + `\n","certChain":["` + strings.ReplaceAll(certPEM, "\n", `\n`) + `\n","` + strings.ReplaceAll(rootPEM, "\n", `\n`) + `\n"]}`)
 	expected2 := []byte(`{"crt":"` + strings.ReplaceAll(stepCertPEM, "\n", `\n`) + `\n","ca":"` + strings.ReplaceAll(rootPEM, "\n", `\n`) + `\n","certChain":["` + strings.ReplaceAll(stepCertPEM, "\n", `\n`) + `\n","` + strings.ReplaceAll(rootPEM, "\n", `\n`) + `\n"]}`)

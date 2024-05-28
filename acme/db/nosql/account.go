@@ -18,6 +18,7 @@ type dbAccount struct {
 	Contact         []string         `json:"contact,omitempty"`
 	Status          acme.Status      `json:"status"`
 	LocationPrefix  string           `json:"locationPrefix"`
+	ProvisionerID   string           `json:"provisionerID,omitempty"`
 	ProvisionerName string           `json:"provisionerName"`
 	CreatedAt       time.Time        `json:"createdAt"`
 	DeactivatedAt   time.Time        `json:"deactivatedAt"`
@@ -69,6 +70,7 @@ func (db *DB) GetAccount(ctx context.Context, id string) (*acme.Account, error) 
 		Key:             dbacc.Key,
 		ID:              dbacc.ID,
 		LocationPrefix:  dbacc.LocationPrefix,
+		ProvisionerID:   dbacc.ProvisionerID,
 		ProvisionerName: dbacc.ProvisionerName,
 	}, nil
 }
@@ -97,6 +99,7 @@ func (db *DB) CreateAccount(ctx context.Context, acc *acme.Account) error {
 		Status:          acc.Status,
 		CreatedAt:       clock.Now(),
 		LocationPrefix:  acc.LocationPrefix,
+		ProvisionerID:   acc.ProvisionerID,
 		ProvisionerName: acc.ProvisionerName,
 	}
 

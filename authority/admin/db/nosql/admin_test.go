@@ -857,7 +857,7 @@ func TestDB_CreateAdmin(t *testing.T) {
 						var _dba = new(dbAdmin)
 						assert.FatalError(t, json.Unmarshal(nu, _dba))
 
-						assert.True(t, len(_dba.ID) > 0 && _dba.ID == string(key))
+						assert.True(t, _dba.ID != "" && _dba.ID == string(key))
 						assert.Equals(t, _dba.AuthorityID, adm.AuthorityId)
 						assert.Equals(t, _dba.ProvisionerID, adm.ProvisionerId)
 						assert.Equals(t, _dba.Subject, adm.Subject)
@@ -890,7 +890,7 @@ func TestDB_CreateAdmin(t *testing.T) {
 						var _dba = new(dbAdmin)
 						assert.FatalError(t, json.Unmarshal(nu, _dba))
 
-						assert.True(t, len(_dba.ID) > 0 && _dba.ID == string(key))
+						assert.True(t, _dba.ID != "" && _dba.ID == string(key))
 						assert.Equals(t, _dba.AuthorityID, adm.AuthorityId)
 						assert.Equals(t, _dba.ProvisionerID, adm.ProvisionerId)
 						assert.Equals(t, _dba.Subject, adm.Subject)

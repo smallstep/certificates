@@ -116,7 +116,7 @@ func New(c *Config) (AuthDB, error) {
 
 	opts := []nosql.Option{nosql.WithDatabase(c.Database),
 		nosql.WithValueDir(c.ValueDir)}
-	if len(c.BadgerFileLoadingMode) > 0 {
+	if c.BadgerFileLoadingMode != "" {
 		opts = append(opts, nosql.WithBadgerFileLoadingMode(c.BadgerFileLoadingMode))
 	}
 

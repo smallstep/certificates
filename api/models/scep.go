@@ -97,7 +97,7 @@ func (s *SCEP) AuthorizeSSHSign(context.Context, string) ([]provisioner.SignOpti
 	return nil, errDummyImplementation
 }
 
-// AuthorizeRevoke returns an unimplemented error. Provisioners should overwrite
+// AuthorizeSSHRevoke returns an unimplemented error. Provisioners should overwrite
 // this method if they will support authorizing tokens for revoking SSH Certificates.
 func (s *SCEP) AuthorizeSSHRevoke(context.Context, string) error {
 	return errDummyImplementation

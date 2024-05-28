@@ -38,21 +38,21 @@ func GetProvisioner(w http.ResponseWriter, r *http.Request) {
 	auth := mustAuthority(ctx)
 	db := admin.MustFromContext(ctx)
 
-	if len(id) > 0 {
+	if id != "" {
 		if p, err = auth.LoadProvisionerByID(id); err != nil {
-			render.Error(w, admin.WrapErrorISE(err, "error loading provisioner %s", id))
+			render.Error(w, r, admin.WrapErrorISE(err, "error loading provisioner %s", id))
 			return
 		}
 	} else {
 		if p, err = auth.LoadProvisionerByName(name); err != nil {
-			render.Error(w, admin.WrapErrorISE(err, "error loading provisioner %s", name))
+			render.Error(w, r, admin.WrapErrorISE(err, "error loading provisioner %s", name))
 			return
 		}
 	}
 
 	prov, err := db.GetProvisioner(ctx, p.GetID())
 	if err != nil {
-		render.Error(w, err)
+		render.Error(w, r, err)
 		return
 	}
 	render.ProtoJSON(w, prov)
@@ -62,17 +62,17 @@ func GetProvisioner(w http.ResponseWriter, r *http.Request) {
 func GetProvisioners(w http.ResponseWriter, r *http.Request) {
 	cursor, limit, err := api.ParseCursor(r)
 	if err != nil {
-		render.Error(w, admin.WrapError(admin.ErrorBadRequestType, err,
+		render.Error(w, r, admin.WrapError(admin.ErrorBadRequestType, err,
 			"error parsing cursor and limit from query params"))
 		return
 	}
 
 	p, next, err := mustAuthority(r.Context()).GetProvisioners(cursor, limit)
 	if err != nil {
-		render.Error(w, errs.InternalServerErr(err))
+		render.Error(w, r, errs.InternalServerErr(err))
 		return
 	}
-	render.JSON(w, &GetProvisionersResponse{
+	render.JSON(w, r, &GetProvisionersResponse{
 		Provisioners: p,
 		NextCursor:   next,
 	})
@@ -82,24 +82,24 @@ func GetProvisioners(w http.ResponseWriter, r *http.Request) {
 func CreateProvisioner(w http.ResponseWriter, r *http.Request) {
 	var prov = new(linkedca.Provisioner)
 	if err := read.ProtoJSON(r.Body, prov); err != nil {
-		render.Error(w, err)
+		render.Error(w, r, err)
 		return
 	}
 
 	// TODO: Validate inputs
 	if err := authority.ValidateClaims(prov.Claims); err != nil {
-		render.Error(w, err)
+		render.Error(w, r, err)
 		return
 	}
 
 	// validate the templates and template data
 	if err := validateTemplates(prov.X509Template, prov.SshTemplate); err != nil {
-		render.Error(w, admin.WrapError(admin.ErrorBadRequestType, err, "invalid template"))
+		render.Error(w, r, admin.WrapError(admin.ErrorBadRequestType, err, "invalid template"))
 		return
 	}
 
 	if err := mustAuthority(r.Context()).StoreProvisioner(r.Context(), prov); err != nil {
-		render.Error(w, admin.WrapErrorISE(err, "error storing provisioner %s", prov.Name))
+		render.Error(w, r, admin.WrapErrorISE(err, "error storing provisioner %s", prov.Name))
 		return
 	}
 	render.ProtoJSONStatus(w, prov, http.StatusCreated)
@@ -116,31 +116,31 @@ func DeleteProvisioner(w http.ResponseWriter, r *http.Request) {
 	name := chi.URLParam(r, "name")
 	auth := mustAuthority(r.Context())
 
-	if len(id) > 0 {
+	if id != "" {
 		if p, err = auth.LoadProvisionerByID(id); err != nil {
-			render.Error(w, admin.WrapErrorISE(err, "error loading provisioner %s", id))
+			render.Error(w, r, admin.WrapErrorISE(err, "error loading provisioner %s", id))
 			return
 		}
 	} else {
 		if p, err = auth.LoadProvisionerByName(name); err != nil {
-			render.Error(w, admin.WrapErrorISE(err, "error loading provisioner %s", name))
+			render.Error(w, r, admin.WrapErrorISE(err, "error loading provisioner %s", name))
 			return
 		}
 	}
 
 	if err := auth.RemoveProvisioner(r.Context(), p.GetID()); err != nil {
-		render.Error(w, admin.WrapErrorISE(err, "error removing provisioner %s", p.GetName()))
+		render.Error(w, r, admin.WrapErrorISE(err, "error removing provisioner %s", p.GetName()))
 		return
 	}
 
-	render.JSON(w, &DeleteResponse{Status: "ok"})
+	render.JSON(w, r, &DeleteResponse{Status: "ok"})
 }
 
 // UpdateProvisioner updates an existing prov.
 func UpdateProvisioner(w http.ResponseWriter, r *http.Request) {
 	var nu = new(linkedca.Provisioner)
 	if err := read.ProtoJSON(r.Body, nu); err != nil {
-		render.Error(w, err)
+		render.Error(w, r, err)
 		return
 	}
 
@@ -151,51 +151,51 @@ func UpdateProvisioner(w http.ResponseWriter, r *http.Request) {
 
 	p, err := auth.LoadProvisionerByName(name)
 	if err != nil {
-		render.Error(w, admin.WrapErrorISE(err, "error loading provisioner from cached configuration '%s'", name))
+		render.Error(w, r, admin.WrapErrorISE(err, "error loading provisioner from cached configuration '%s'", name))
 		return
 	}
 
 	old, err := db.GetProvisioner(r.Context(), p.GetID())
 	if err != nil {
-		render.Error(w, admin.WrapErrorISE(err, "error loading provisioner from db '%s'", p.GetID()))
+		render.Error(w, r, admin.WrapErrorISE(err, "error loading provisioner from db '%s'", p.GetID()))
 		return
 	}
 
 	if nu.Id != old.Id {
-		render.Error(w, admin.NewErrorISE("cannot change provisioner ID"))
+		render.Error(w, r, admin.NewErrorISE("cannot change provisioner ID"))
 		return
 	}
 	if nu.Type != old.Type {
-		render.Error(w, admin.NewErrorISE("cannot change provisioner type"))
+		render.Error(w, r, admin.NewErrorISE("cannot change provisioner type"))
 		return
 	}
 	if nu.AuthorityId != old.AuthorityId {
-		render.Error(w, admin.NewErrorISE("cannot change provisioner authorityID"))
+		render.Error(w, r, admin.NewErrorISE("cannot change provisioner authorityID"))
 		return
 	}
 	if !nu.CreatedAt.AsTime().Equal(old.CreatedAt.AsTime()) {
-		render.Error(w, admin.NewErrorISE("cannot change provisioner createdAt"))
+		render.Error(w, r, admin.NewErrorISE("cannot change provisioner createdAt"))
 		return
 	}
 	if !nu.DeletedAt.AsTime().Equal(old.DeletedAt.AsTime()) {
-		render.Error(w, admin.NewErrorISE("cannot change provisioner deletedAt"))
+		render.Error(w, r, admin.NewErrorISE("cannot change provisioner deletedAt"))
 		return
 	}
 
 	// TODO: Validate inputs
 	if err := authority.ValidateClaims(nu.Claims); err != nil {
-		render.Error(w, err)
+		render.Error(w, r, err)
 		return
 	}
 
 	// validate the templates and template data
 	if err := validateTemplates(nu.X509Template, nu.SshTemplate); err != nil {
-		render.Error(w, admin.WrapError(admin.ErrorBadRequestType, err, "invalid template"))
+		render.Error(w, r, admin.WrapError(admin.ErrorBadRequestType, err, "invalid template"))
 		return
 	}
 
 	if err := auth.UpdateProvisioner(r.Context(), nu); err != nil {
-		render.Error(w, err)
+		render.Error(w, r, err)
 		return
 	}
 	render.ProtoJSON(w, nu)

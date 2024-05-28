@@ -127,7 +127,7 @@ func (o *Order) UpdateStatus(ctx context.Context, db DB) error {
 	return nil
 }
 
-// getKeyFingerprint returns a fingerprint from the list of authorizations. This
+// getAuthorizationFingerprint returns a fingerprint from the list of authorizations. This
 // fingerprint is used on the device-attest-01 flow to verify the attestation
 // certificate public key with the CSR public key.
 //
@@ -284,7 +284,7 @@ func (o *Order) Finalize(ctx context.Context, db DB, csr *x509.CertificateReques
 	signOps = append(signOps, extraOptions...)
 
 	// Sign a new certificate.
-	certChain, err := auth.Sign(csr, provisioner.SignOptions{
+	certChain, err := auth.SignWithContext(ctx, csr, provisioner.SignOptions{
 		NotBefore: provisioner.NewTimeDuration(o.NotBefore),
 		NotAfter:  provisioner.NewTimeDuration(o.NotAfter),
 	}, signOps...)

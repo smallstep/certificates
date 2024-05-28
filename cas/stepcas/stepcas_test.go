@@ -624,6 +624,23 @@ func TestNew(t *testing.T) {
 	}
 }
 
+func TestStepCAS_Type(t *testing.T) {
+	tests := []struct {
+		name string
+		want apiv1.Type
+	}{
+		{"ok", apiv1.StepCAS},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			c := &StepCAS{}
+			if got := c.Type(); got != tt.want {
+				t.Errorf("StepCAS.Type() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
 func TestStepCAS_CreateCertificate(t *testing.T) {
 	caURL, client := testCAHelper(t)
 	x5c := testX5CIssuer(t, caURL, "")

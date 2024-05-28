@@ -1,8 +1,12 @@
 package authority
 
-import "github.com/smallstep/certificates/webhook"
+import (
+	"context"
+
+	"github.com/smallstep/certificates/webhook"
+)
 
 type webhookController interface {
-	Enrich(*webhook.RequestBody) error
-	Authorize(*webhook.RequestBody) error
+	Enrich(context.Context, *webhook.RequestBody) error
+	Authorize(context.Context, *webhook.RequestBody) error
 }

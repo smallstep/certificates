@@ -906,7 +906,7 @@ func TestDB_CreateProvisioner(t *testing.T) {
 						var _dbp = new(dbProvisioner)
 						assert.FatalError(t, json.Unmarshal(nu, _dbp))
 
-						assert.True(t, len(_dbp.ID) > 0 && _dbp.ID == string(key))
+						assert.True(t, _dbp.ID != "" && _dbp.ID == string(key))
 						assert.Equals(t, _dbp.AuthorityID, prov.AuthorityId)
 						assert.Equals(t, _dbp.Type, prov.Type)
 						assert.Equals(t, _dbp.Name, prov.Name)
@@ -944,7 +944,7 @@ func TestDB_CreateProvisioner(t *testing.T) {
 						var _dbp = new(dbProvisioner)
 						assert.FatalError(t, json.Unmarshal(nu, _dbp))
 
-						assert.True(t, len(_dbp.ID) > 0 && _dbp.ID == string(key))
+						assert.True(t, _dbp.ID != "" && _dbp.ID == string(key))
 						assert.Equals(t, _dbp.AuthorityID, prov.AuthorityId)
 						assert.Equals(t, _dbp.Type, prov.Type)
 						assert.Equals(t, _dbp.Name, prov.Name)
@@ -1093,7 +1093,7 @@ func TestDB_UpdateProvisioner(t *testing.T) {
 						var _dbp = new(dbProvisioner)
 						assert.FatalError(t, json.Unmarshal(nu, _dbp))
 
-						assert.True(t, len(_dbp.ID) > 0 && _dbp.ID == string(key))
+						assert.True(t, _dbp.ID != "" && _dbp.ID == string(key))
 						assert.Equals(t, _dbp.AuthorityID, prov.AuthorityId)
 						assert.Equals(t, _dbp.Type, prov.Type)
 						assert.Equals(t, _dbp.Name, prov.Name)
@@ -1188,7 +1188,7 @@ func TestDB_UpdateProvisioner(t *testing.T) {
 						var _dbp = new(dbProvisioner)
 						assert.FatalError(t, json.Unmarshal(nu, _dbp))
 
-						assert.True(t, len(_dbp.ID) > 0 && _dbp.ID == string(key))
+						assert.True(t, _dbp.ID != "" && _dbp.ID == string(key))
 						assert.Equals(t, _dbp.AuthorityID, prov.AuthorityId)
 						assert.Equals(t, _dbp.Type, prov.Type)
 						assert.Equals(t, _dbp.Name, prov.Name)

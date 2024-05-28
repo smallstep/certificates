@@ -1,6 +1,7 @@
 package apiv1
 
 import (
+	"crypto"
 	"crypto/x509"
 	"net/http"
 	"strings"
@@ -26,11 +27,18 @@ type CertificateAuthorityGetter interface {
 	GetCertificateAuthority(req *GetCertificateAuthorityRequest) (*GetCertificateAuthorityResponse, error)
 }
 
-// CertificateAuthorityCreator is an interface implamented by a
+// CertificateAuthorityCreator is an interface implemented by a
 // CertificateAuthorityService that has a method to create a new certificate
 // authority.
 type CertificateAuthorityCreator interface {
 	CreateCertificateAuthority(req *CreateCertificateAuthorityRequest) (*CreateCertificateAuthorityResponse, error)
+}
+
+// CertificateAuthoritySigner is an optional interface implemented by a
+// CertificateAuthorityService that has a method that returns a [crypto.Signer]
+// using the same key used to issue certificates.
+type CertificateAuthoritySigner interface {
+	GetSigner() (crypto.Signer, error)
 }
 
 // SignatureAlgorithmGetter is an optional implementation in a crypto.Signer
@@ -53,6 +61,8 @@ const (
 	StepCAS = "stepcas"
 	// VaultCAS is a CertificateAuthorityService using Hasicorp Vault PKI.
 	VaultCAS = "vaultcas"
+	// ExternalCAS is a CertificateAuthorityService using an external injected CA implementation
+	ExternalCAS = "externalcas"
 )
 
 // String returns a string from the type. It will always return the lower case
@@ -63,6 +73,14 @@ func (t Type) String() string {
 		return SoftCAS
 	}
 	return strings.ToLower(string(t))
+}
+
+// TypeOf returns the type of the given CertificateAuthorityService.
+func TypeOf(c CertificateAuthorityService) Type {
+	if ct, ok := c.(interface{ Type() Type }); ok {
+		return ct.Type()
+	}
+	return ExternalCAS
 }
 
 // NotImplementedError is the type of error returned if an operation is not implemented.

@@ -105,7 +105,7 @@ func getKeysFromJWKsURI(uri string) (jose.JSONWebKeySet, time.Duration, error) {
 
 func getCacheAge(cacheControl string) time.Duration {
 	age := defaultCacheAge
-	if len(cacheControl) > 0 {
+	if cacheControl != "" {
 		match := maxAgeRegex.FindAllStringSubmatch(cacheControl, -1)
 		if len(match) > 0 {
 			if len(match[0]) == 2 {

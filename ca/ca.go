@@ -26,8 +26,11 @@ import (
 	"github.com/smallstep/certificates/authority/admin"
 	adminAPI "github.com/smallstep/certificates/authority/admin/api"
 	"github.com/smallstep/certificates/authority/config"
+	"github.com/smallstep/certificates/cas/apiv1"
 	"github.com/smallstep/certificates/db"
+	"github.com/smallstep/certificates/internal/metrix"
 	"github.com/smallstep/certificates/logging"
+	"github.com/smallstep/certificates/middleware/requestid"
 	"github.com/smallstep/certificates/monitoring"
 	"github.com/smallstep/certificates/scep"
 	scepAPI "github.com/smallstep/certificates/scep/api"
@@ -46,6 +49,8 @@ type options struct {
 	sshHostPassword []byte
 	sshUserPassword []byte
 	database        db.AuthDB
+	x509CAService   apiv1.CertificateAuthorityService
+	tlsConfig       *tls.Config
 }
 
 func (o *options) apply(opts []Option) {
@@ -62,6 +67,13 @@ type Option func(o *options)
 func WithConfigFile(name string) Option {
 	return func(o *options) {
 		o.configFile = name
+	}
+}
+
+// WithX509CAService provides the x509CAService to be used for signing x509 requests
+func WithX509CAService(svc apiv1.CertificateAuthorityService) Option {
+	return func(o *options) {
+		o.x509CAService = svc
 	}
 }
 
@@ -104,6 +116,14 @@ func WithDatabase(d db.AuthDB) Option {
 	}
 }
 
+// WithTLSConfig sets the TLS configuration to be used by the HTTP(s) server
+// spun by step-ca.
+func WithTLSConfig(t *tls.Config) Option {
+	return func(o *options) {
+		o.tlsConfig = t
+	}
+}
+
 // WithLinkedCAToken sets the token used to authenticate with the linkedca.
 func WithLinkedCAToken(token string) Option {
 	return func(o *options) {
@@ -125,6 +145,7 @@ type CA struct {
 	config      *config.Config
 	srv         *server.Server
 	insecureSrv *server.Server
+	metricsSrv  *server.Server
 	opts        *options
 	renewer     *TLSRenewer
 	compactStop chan struct{}
@@ -163,6 +184,16 @@ func (ca *CA) Init(cfg *config.Config) (*CA, error) {
 		opts = append(opts, authority.WithQuietInit())
 	}
 
+	if ca.opts.x509CAService != nil {
+		opts = append(opts, authority.WithX509CAService(ca.opts.x509CAService))
+	}
+
+	var meter *metrix.Meter
+	if ca.config.MetricsAddress != "" {
+		meter = metrix.New()
+		opts = append(opts, authority.WithMeter(meter))
+	}
+
 	webhookTransport := http.DefaultTransport.(*http.Transport).Clone()
 	opts = append(opts, authority.WithWebhookClient(&http.Client{Transport: webhookTransport}))
 
@@ -172,9 +203,20 @@ func (ca *CA) Init(cfg *config.Config) (*CA, error) {
 	}
 	ca.auth = auth
 
-	tlsConfig, clientTLSConfig, err := ca.getTLSConfig(auth)
-	if err != nil {
-		return nil, err
+	var tlsConfig *tls.Config
+	var clientTLSConfig *tls.Config
+	if ca.opts.tlsConfig != nil {
+		// try using the tls Configuration supplied by the caller
+		log.Print("Using tls configuration supplied by the application")
+		tlsConfig = ca.opts.tlsConfig
+		clientTLSConfig = ca.opts.tlsConfig
+	} else {
+		// default to using the step-ca x509 Signer Interface
+		log.Print("Building new tls configuration using step-ca x509 Signer Interface")
+		tlsConfig, clientTLSConfig, err = ca.getTLSConfig(auth)
+		if err != nil {
+			return nil, err
+		}
 	}
 
 	webhookTransport.TLSClientConfig = clientTLSConfig
@@ -288,14 +330,20 @@ func (ca *CA) Init(cfg *config.Config) (*CA, error) {
 	}
 
 	// Add logger if configured
+	var legacyTraceHeader string
 	if len(cfg.Logger) > 0 {
 		logger, err := logging.New("ca", cfg.Logger)
 		if err != nil {
 			return nil, err
 		}
+		legacyTraceHeader = logger.GetTraceHeader()
 		handler = logger.Middleware(handler)
 		insecureHandler = logger.Middleware(insecureHandler)
 	}
+
+	// always use request ID middleware; traceHeader is provided for backwards compatibility (for now)
+	handler = requestid.New(legacyTraceHeader).Middleware(handler)
+	insecureHandler = requestid.New(legacyTraceHeader).Middleware(insecureHandler)
 
 	// Create context with all the necessary values.
 	baseContext := buildContext(auth, scepAuthority, acmeDB, acmeLinker)
@@ -314,6 +362,13 @@ func (ca *CA) Init(cfg *config.Config) (*CA, error) {
 		// reload.
 		ca.insecureSrv = server.New(cfg.InsecureAddress, insecureHandler, nil)
 		ca.insecureSrv.BaseContext = func(net.Listener) context.Context {
+			return baseContext
+		}
+	}
+
+	if meter != nil {
+		ca.metricsSrv = server.New(ca.config.MetricsAddress, meter, nil)
+		ca.metricsSrv.BaseContext = func(net.Listener) context.Context {
 			return baseContext
 		}
 	}
@@ -404,6 +459,14 @@ func (ca *CA) Run() error {
 		}()
 	}
 
+	if ca.metricsSrv != nil {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			errs <- ca.metricsSrv.ListenAndServe()
+		}()
+	}
+
 	wg.Add(1)
 	go func() {
 		defer wg.Done()
@@ -413,6 +476,20 @@ func (ca *CA) Run() error {
 	// wait till error occurs; ensures the servers keep listening
 	err := <-errs
 
+	// if the error is not the usual HTTP server closed error, it is
+	// highly likely that an error occurred when starting one of the
+	// CA servers, possibly because of a port already being in use or
+	// some part of the configuration not being correct. This case is
+	// handled by stopping the CA in its entirety.
+	if !errors.Is(err, http.ErrServerClosed) {
+		log.Println("shutting down due to startup error ...")
+		if stopErr := ca.Stop(); stopErr != nil {
+			err = fmt.Errorf("failed stopping CA after error occurred: %w: %w", err, stopErr)
+		} else {
+			err = fmt.Errorf("stopped CA after error occurred: %w", err)
+		}
+	}
+
 	wg.Wait()
 
 	return err
@@ -421,7 +498,10 @@ func (ca *CA) Run() error {
 // Stop stops the CA calling to the server Shutdown method.
 func (ca *CA) Stop() error {
 	close(ca.compactStop)
-	ca.renewer.Stop()
+	if ca.renewer != nil {
+		ca.renewer.Stop()
+	}
+
 	if err := ca.auth.Shutdown(); err != nil {
 		log.Printf("error stopping ca.Authority: %+v\n", err)
 	}
@@ -480,6 +560,13 @@ func (ca *CA) Reload() error {
 		}
 	}
 
+	if ca.metricsSrv != nil {
+		if err = ca.metricsSrv.Reload(newCA.metricsSrv); err != nil {
+			logContinue("Reload failed because metrics server could not be replaced.")
+			return errors.Wrap(err, "error reloading metrics server")
+		}
+	}
+
 	if err = ca.srv.Reload(newCA.srv); err != nil {
 		logContinue("Reload failed because server could not be replaced.")
 		return errors.Wrap(err, "error reloading server")
@@ -489,7 +576,10 @@ func (ca *CA) Reload() error {
 	// 2. Safely shutdown any internal resources (e.g. key manager)
 	// 3. Replace ca properties
 	// Do not replace ca.srv
-	ca.renewer.Stop()
+	if ca.renewer != nil {
+		ca.renewer.Stop()
+	}
+
 	ca.auth.CloseForReload()
 	ca.auth = newCA.auth
 	ca.config = newCA.config
@@ -588,7 +678,7 @@ func (ca *CA) shouldServeSCEPEndpoints() bool {
 //nolint:unused // useful for debugging
 func dumpRoutes(mux chi.Routes) {
 	// helpful routine for logging all routes
-	walkFunc := func(method string, route string, handler http.Handler, middlewares ...func(http.Handler) http.Handler) error {
+	walkFunc := func(method string, route string, _ http.Handler, _ ...func(http.Handler) http.Handler) error {
 		fmt.Printf("%s %s\n", method, route)
 		return nil
 	}
