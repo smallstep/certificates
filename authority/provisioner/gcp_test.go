@@ -213,11 +213,11 @@ func TestGCP_Init(t *testing.T) {
 				t.Errorf("GCP.Init() error = %v, wantErr %v", err, tt.wantErr)
 			}
 
-			if p.EnableSSHCAUser {
-				t.Errorf("By default EnableSSHCAUser should be false")
+			if *p.DisableSSHCAUser != true {
+				t.Errorf("By default DisableSSHCAUser should be true")
 			}
 
-			if p.DisableSSHCAHost {
+			if *p.DisableSSHCAHost != false {
 				t.Errorf("By default DisableSSHCAHost should be false")
 			}
 		})
@@ -601,7 +601,9 @@ func TestGCP_AuthorizeSSHSign(t *testing.T) {
 	p1, err := generateGCP()
 	assert.FatalError(t, err)
 	p1.DisableCustomSANs = true
-	p1.EnableSSHCAUser = true
+	// enable ssh user CA
+	disableSSCAUser := false
+	p1.DisableSSHCAUser = &disableSSCAUser
 
 	p2, err := generateGCP()
 	assert.FatalError(t, err)
@@ -617,7 +619,9 @@ func TestGCP_AuthorizeSSHSign(t *testing.T) {
 
 	p4, err := generateGCP()
 	assert.FatalError(t, err)
-	p4.DisableSSHCAHost = true
+	// disable ssh host CA
+	disableSSCAHost := true
+	p4.DisableSSHCAHost = &disableSSCAHost
 
 	t1, err := generateGCPToken(p1.ServiceAccounts[0],
 		"https://accounts.google.com", p1.GetID(),
@@ -662,7 +666,7 @@ func TestGCP_AuthorizeSSHSign(t *testing.T) {
 		ValidAfter: NewTimeDuration(tm), ValidBefore: NewTimeDuration(tm.Add(hostDuration)),
 	}
 	expectedUserOptions := &SignSSHOptions{
-		CertType: "user", Principals: []string{"foo", "foo@developer.gserviceaccount.com"},
+		CertType: "user", Principals: []string{FormatServiceAccountUsername(p1.ServiceAccounts[0]), "foo@developer.gserviceaccount.com"},
 		ValidAfter: NewTimeDuration(tm), ValidBefore: NewTimeDuration(tm.Add(p1.ctl.Claimer.DefaultUserSSHCertDuration())),
 	}
 

@@ -30,6 +30,12 @@ const gcpCertsURL = "https://www.googleapis.com/oauth2/v3/certs"
 // gcpIdentityURL is the base url for the identity document in GCP.
 const gcpIdentityURL = "http://metadata/computeMetadata/v1/instance/service-accounts/default/identity"
 
+// DefaultDisableSSHCAHost is the default value for SSH Host CA used when DisableSSHCAHost is not set
+var DefaultDisableSSHCAHost = false
+
+// DefaultDisableSSHCAUser is the default value for SSH User CA used when DisableSSHCAUser is not set
+var DefaultDisableSSHCAUser = true
+
 // gcpPayload extends jwt.Claims with custom GCP attributes.
 type gcpPayload struct {
 	jose.Claims
@@ -89,8 +95,8 @@ type GCP struct {
 	ProjectIDs             []string `json:"projectIDs"`
 	DisableCustomSANs      bool     `json:"disableCustomSANs"`
 	DisableTrustOnFirstUse bool     `json:"disableTrustOnFirstUse"`
-	EnableSSHCAUser        bool     `json:"enableSSHCAUser"`
-	DisableSSHCAHost       bool     `json:"disableSSHCAHost"`
+	DisableSSHCAUser       *bool    `json:"disableSSHCAUser,omitempty"`
+	DisableSSHCAHost       *bool    `json:"disableSSHCAHost,omitempty"`
 	InstanceAge            Duration `json:"instanceAge,omitempty"`
 	Claims                 *Claims  `json:"claims,omitempty"`
 	Options                *Options `json:"options,omitempty"`
@@ -201,6 +207,14 @@ func (p *GCP) GetIdentityToken(subject, caURL string) (string, error) {
 
 // Init validates and initializes the GCP provisioner.
 func (p *GCP) Init(config Config) (err error) {
+	if p.DisableSSHCAHost == nil {
+		p.DisableSSHCAHost = &DefaultDisableSSHCAHost
+	}
+
+	if p.DisableSSHCAUser == nil {
+		p.DisableSSHCAUser = &DefaultDisableSSHCAUser
+	}
+
 	switch {
 	case p.Type == "":
 		return errors.New("provisioner type cannot be empty")
@@ -479,10 +493,14 @@ func (p *GCP) genHostOptions(_ context.Context, claims *gcpPayload) (SignSSHOpti
 	return SignSSHOptions{CertType: SSHHostCert}, keyID, principals, sshutil.HostCert, sshutil.DefaultIIDTemplate
 }
 
+func FormatServiceAccountUsername(serviceAccountId string) string {
+	return fmt.Sprintf("sa_%v", serviceAccountId)
+}
+
 func (p *GCP) genUserOptions(_ context.Context, claims *gcpPayload) (SignSSHOptions, string, []string, sshutil.CertType, string) {
 	keyID := claims.Email
 	principals := []string{
-		fmt.Sprintf("sa_%v", claims.Subject),
+		FormatServiceAccountUsername(claims.Subject),
 		claims.Email,
 	}
 
@@ -494,11 +512,11 @@ func (p *GCP) isUnauthorizedToIssueSSHCert(certType string) error {
 		return errs.Unauthorized("gcp.AuthorizeSSHSign; sshCA is disabled for gcp provisioner '%s'", p.GetName())
 	}
 
-	if certType == SSHHostCert && p.DisableSSHCAHost {
+	if certType == SSHHostCert && *p.DisableSSHCAHost {
 		return errs.Unauthorized("gcp.AuthorizeSSHSign; sshCA for Hosts is disabled for gcp provisioner '%s'", p.GetName())
 	}
 
-	if certType == SSHUserCert && !p.EnableSSHCAUser {
+	if certType == SSHUserCert && *p.DisableSSHCAUser {
 		return errs.Unauthorized("gcp.AuthorizeSSHSign; sshCA for Users is disabled for gcp provisioner '%s'", p.GetName())
 	}
 
