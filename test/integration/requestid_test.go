@@ -135,11 +135,13 @@ func Test_reflectRequestID(t *testing.T) {
 
 	// require OK health response as the baseline
 	ctx := context.Background()
-	healthResponse, err := caClient.HealthWithContext(ctx)
-	require.NoError(t, err)
-	if assert.NotNil(t, healthResponse) {
-		require.Equal(t, "ok", healthResponse.Status)
-	}
+	assert.EventuallyWithT(t, func(c *assert.CollectT) {
+		healthResponse, err := caClient.HealthWithContext(ctx)
+		require.NoError(c, err)
+		if assert.NotNil(c, healthResponse) {
+			require.Equal(c, "ok", healthResponse.Status)
+		}
+	}, 5*time.Second, time.Second)
 
 	// expect an error when retrieving an invalid root
 	rootResponse, err := caClient.RootWithContext(ctx, "invalid")

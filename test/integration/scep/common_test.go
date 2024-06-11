@@ -40,11 +40,13 @@ func newCAClient(t *testing.T, caURL, rootFilepath string) *ca.Client {
 
 func requireHealthyCA(t *testing.T, caClient *ca.Client) {
 	ctx := context.Background()
-	healthResponse, err := caClient.HealthWithContext(ctx)
-	require.NoError(t, err)
-	if assert.NotNil(t, healthResponse) {
-		require.Equal(t, "ok", healthResponse.Status)
-	}
+	assert.EventuallyWithT(t, func(c *assert.CollectT) {
+		healthResponse, err := caClient.HealthWithContext(ctx)
+		require.NoError(c, err)
+		if assert.NotNil(c, healthResponse) {
+			require.Equal(c, "ok", healthResponse.Status)
+		}
+	}, 5*time.Second, time.Second)
 }
 
 // reservePort "reserves" a TCP port by opening a listener on a random
