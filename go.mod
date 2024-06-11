@@ -37,7 +37,7 @@ require (
 	go.step.sm/linkedca v0.20.1
 	golang.org/x/crypto v0.24.0
 	golang.org/x/exp v0.0.0-20240318143956-a85f2c67cd81
-	golang.org/x/net v0.25.0
+	golang.org/x/net v0.26.0
 	google.golang.org/api v0.183.0
 	google.golang.org/grpc v1.64.0
 	google.golang.org/protobuf v1.34.1
@@ -53,8 +53,8 @@ require (
 	filippo.io/edwards25519 v1.1.0 // indirect
 	github.com/AndreasBriese/bbloom v0.0.0-20190825152654-46b345b51c96 // indirect
 	github.com/Azure/azure-sdk-for-go/sdk/azcore v1.11.1 // indirect
-	github.com/Azure/azure-sdk-for-go/sdk/azidentity v1.5.2 // indirect
-	github.com/Azure/azure-sdk-for-go/sdk/internal v1.5.2 // indirect
+	github.com/Azure/azure-sdk-for-go/sdk/azidentity v1.6.0 // indirect
+	github.com/Azure/azure-sdk-for-go/sdk/internal v1.8.0 // indirect
 	github.com/Azure/azure-sdk-for-go/sdk/keyvault/azkeys v0.10.0 // indirect
 	github.com/Azure/azure-sdk-for-go/sdk/keyvault/internal v0.7.1 // indirect
 	github.com/AzureAD/microsoft-authentication-library-for-go v1.2.2 // indirect
