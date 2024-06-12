@@ -40,12 +40,12 @@ func requireEABEnabled(next http.HandlerFunc) http.HandlerFunc {
 
 		acmeProvisioner := prov.GetDetails().GetACME()
 		if acmeProvisioner == nil {
-			render.Error(w, admin.NewErrorISE("error getting ACME details for provisioner '%s'", prov.GetName()))
+			render.Error(w, r, admin.NewErrorISE("error getting ACME details for provisioner '%s'", prov.GetName()))
 			return
 		}
 
 		if !acmeProvisioner.RequireEab {
-			render.Error(w, admin.NewError(admin.ErrorBadRequestType, "ACME EAB not enabled for provisioner '%s'", prov.GetName()))
+			render.Error(w, r, admin.NewError(admin.ErrorBadRequestType, "ACME EAB not enabled for provisioner '%s'", prov.GetName()))
 			return
 		}
 
@@ -69,18 +69,18 @@ func NewACMEAdminResponder() ACMEAdminResponder {
 }
 
 // GetExternalAccountKeys writes the response for the EAB keys GET endpoint
-func (h *acmeAdminResponder) GetExternalAccountKeys(w http.ResponseWriter, _ *http.Request) {
-	render.Error(w, admin.NewError(admin.ErrorNotImplementedType, "this functionality is currently only available in Certificate Manager: https://u.step.sm/cm"))
+func (h *acmeAdminResponder) GetExternalAccountKeys(w http.ResponseWriter, r *http.Request) {
+	render.Error(w, r, admin.NewError(admin.ErrorNotImplementedType, "this functionality is currently only available in Certificate Manager: https://u.step.sm/cm"))
 }
 
 // CreateExternalAccountKey writes the response for the EAB key POST endpoint
-func (h *acmeAdminResponder) CreateExternalAccountKey(w http.ResponseWriter, _ *http.Request) {
-	render.Error(w, admin.NewError(admin.ErrorNotImplementedType, "this functionality is currently only available in Certificate Manager: https://u.step.sm/cm"))
+func (h *acmeAdminResponder) CreateExternalAccountKey(w http.ResponseWriter, r *http.Request) {
+	render.Error(w, r, admin.NewError(admin.ErrorNotImplementedType, "this functionality is currently only available in Certificate Manager: https://u.step.sm/cm"))
 }
 
 // DeleteExternalAccountKey writes the response for the EAB key DELETE endpoint
-func (h *acmeAdminResponder) DeleteExternalAccountKey(w http.ResponseWriter, _ *http.Request) {
-	render.Error(w, admin.NewError(admin.ErrorNotImplementedType, "this functionality is currently only available in Certificate Manager: https://u.step.sm/cm"))
+func (h *acmeAdminResponder) DeleteExternalAccountKey(w http.ResponseWriter, r *http.Request) {
+	render.Error(w, r, admin.NewError(admin.ErrorNotImplementedType, "this functionality is currently only available in Certificate Manager: https://u.step.sm/cm"))
 }
 
 func eakToLinked(k *acme.ExternalAccountKey) *linkedca.EABKey {

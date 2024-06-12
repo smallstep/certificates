@@ -248,6 +248,7 @@ func mustParseECKey(t *testing.T, pemKey string) *ecdsa.PrivateKey {
 	block, _ := pem.Decode([]byte(pemKey))
 	if block == nil {
 		t.Fatal("failed to parse key")
+		return nil
 	}
 	key, err := x509.ParseECPrivateKey(block.Bytes)
 	if err != nil {
@@ -882,7 +883,7 @@ func TestCloudCAS_CreateCertificateAuthority(t *testing.T) {
 	defer srv.Stop()
 
 	// Create fake privateca client
-	conn, err := grpc.DialContext(context.Background(), "", grpc.WithTransportCredentials(insecure.NewCredentials()),
+	conn, err := grpc.NewClient("localhost", grpc.WithTransportCredentials(insecure.NewCredentials()),
 		grpc.WithContextDialer(func(context.Context, string) (net.Conn, error) {
 			return lis.Dial()
 		}))

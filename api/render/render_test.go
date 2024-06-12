@@ -18,8 +18,8 @@ import (
 func TestJSON(t *testing.T) {
 	rec := httptest.NewRecorder()
 	rw := logging.NewResponseLogger(rec)
-
-	JSON(rw, map[string]interface{}{"foo": "bar"})
+	r := httptest.NewRequest("POST", "/test", http.NoBody)
+	JSON(rw, r, map[string]interface{}{"foo": "bar"})
 
 	assert.Equal(t, http.StatusOK, rec.Result().StatusCode)
 	assert.Equal(t, "application/json", rec.Header().Get("Content-Type"))
@@ -64,7 +64,8 @@ func jsonPanicTest[T json.UnsupportedTypeError | json.UnsupportedValueError | js
 		assert.ErrorAs(t, err, &e)
 	}()
 
-	JSON(httptest.NewRecorder(), v)
+	r := httptest.NewRequest("POST", "/test", http.NoBody)
+	JSON(httptest.NewRecorder(), r, v)
 }
 
 type renderableError struct {
@@ -76,10 +77,9 @@ func (err renderableError) Error() string {
 	return err.Message
 }
 
-func (err renderableError) Render(w http.ResponseWriter) {
+func (err renderableError) Render(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "something/custom")
-
-	JSONStatus(w, err, err.Code)
+	JSONStatus(w, r, err, err.Code)
 }
 
 type statusedError struct {
@@ -116,8 +116,8 @@ func TestError(t *testing.T) {
 
 		t.Run(strconv.Itoa(caseIndex), func(t *testing.T) {
 			rec := httptest.NewRecorder()
-
-			Error(rec, kase.err)
+			r := httptest.NewRequest("POST", "/test", http.NoBody)
+			Error(rec, r, kase.err)
 
 			assert.Equal(t, kase.code, rec.Result().StatusCode)
 			assert.Equal(t, kase.body, rec.Body.String())
