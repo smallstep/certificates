@@ -497,7 +497,7 @@ func (o *provisionerExtensionOption) Modify(cert *x509.Certificate, _ SignOption
 }
 
 // fingerprintValidator is a CertificateRequestValidator that checks the
-// fingerprint of the certificate with the provided one.
+// fingerprint of the certificate request with the provided one.
 type fingerprintValidator string
 
 func (s fingerprintValidator) Valid(cr *x509.CertificateRequest) error {
