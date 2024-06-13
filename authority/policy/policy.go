@@ -21,6 +21,7 @@ type HostPolicy policy.SSHNamePolicyEngine
 func NewX509PolicyEngine(policyOptions X509PolicyOptionsInterface) (X509Policy, error) {
 	// return early if no policy engine options to configure
 	if policyOptions == nil {
+		//nolint:nilnil,nolintlint // expected values
 		return nil, nil
 	}
 
@@ -50,6 +51,7 @@ func NewX509PolicyEngine(policyOptions X509PolicyOptionsInterface) (X509Policy, 
 
 	// ensure no policy engine is returned when no name options were provided
 	if len(options) == 0 {
+		//nolint:nilnil,nolintlint // expected values
 		return nil, nil
 	}
 
@@ -93,6 +95,7 @@ func NewSSHHostPolicyEngine(policyOptions SSHPolicyOptionsInterface) (HostPolicy
 func newSSHPolicyEngine(policyOptions SSHPolicyOptionsInterface, typ sshPolicyEngineType) (policy.SSHNamePolicyEngine, error) {
 	// return early if no policy engine options to configure
 	if policyOptions == nil {
+		//nolint:nilnil,nolintlint // expected values
 		return nil, nil
 	}
 
@@ -134,6 +137,7 @@ func newSSHPolicyEngine(policyOptions SSHPolicyOptionsInterface, typ sshPolicyEn
 
 	// ensure no policy engine is returned when no name options were provided
 	if len(options) == 0 {
+		//nolint:nilnil,nolintlint // expected values
 		return nil, nil
 	}
 

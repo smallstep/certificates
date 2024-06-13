@@ -34,7 +34,7 @@ require (
 	github.com/urfave/cli v1.22.15
 	go.step.sm/cli-utils v0.9.0
 	go.step.sm/crypto v0.47.0
-	go.step.sm/linkedca v0.20.1
+	go.step.sm/linkedca v0.21.1
 	golang.org/x/crypto v0.24.0
 	golang.org/x/exp v0.0.0-20240318143956-a85f2c67cd81
 	golang.org/x/net v0.26.0

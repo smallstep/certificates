@@ -25,6 +25,22 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
 
 ---
 
+## [0.26.2] - 2024-06-13
+
+### Added
+
+- Add provisionerID to ACME accounts (smallstep/certificates#1830)
+- Enable verifying ACME provisioner using provisionerID if available (smallstep/certificates#1844)
+- Add methods to Authority to get intermediate certificates (smallstep/certificates#1848)
+- Add GetX509Signer method (smallstep/certificates#1850)
+
+### Changed
+
+- Make ISErrNotFound more flexible (smallstep/certificates#1819)
+- Log errors using slog.Logger (smallstep/certificates#1849)
+- Update hardcoded AWS certificates (smallstep/certificates#1881)
+
+
 ## [0.26.1] - 2024-04-22
 
 ### Added
