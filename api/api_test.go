@@ -844,7 +844,7 @@ func Test_Root(t *testing.T) {
 		statusCode  int
 	}{
 		{"ok", parseCertificate(rootPEM), nil, "", 200},
-		{"fail", nil, fmt.Errorf("not found"), fmt.Sprintf("root with fingerprint %s was not found", sha), 404},
+		{"fail", nil, fmt.Errorf("not found"), fmt.Sprintf("root certificate with fingerprint %q was not found", sha), 404},
 	}
 
 	// Request with chi context
@@ -868,7 +868,6 @@ func Test_Root(t *testing.T) {
 
 			body, err := io.ReadAll(res.Body)
 			res.Body.Close()
-			fmt.Println("body:", string(body))
 			if err != nil {
 				t.Errorf("caHandler.Root unexpected error = %v", err)
 			}
