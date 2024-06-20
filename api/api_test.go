@@ -835,20 +835,22 @@ func Test_Health(t *testing.T) {
 }
 
 func Test_Root(t *testing.T) {
+	const sha = "efc7d6b475a56fe587650bcdb999a4a308f815ba44db4bf0371ea68a786ccd36"
 	tests := []struct {
-		name       string
-		root       *x509.Certificate
-		err        error
-		statusCode int
+		name        string
+		root        *x509.Certificate
+		err         error
+		expectedMsg string
+		statusCode  int
 	}{
-		{"ok", parseCertificate(rootPEM), nil, 200},
-		{"fail", nil, fmt.Errorf("not found"), 404},
+		{"ok", parseCertificate(rootPEM), nil, "", 200},
+		{"fail", nil, fmt.Errorf("not found"), fmt.Sprintf("root with fingerprint %s was not found", sha), 404},
 	}
 
 	// Request with chi context
 	chiCtx := chi.NewRouteContext()
-	chiCtx.URLParams.Add("sha", "efc7d6b475a56fe587650bcdb999a4a308f815ba44db4bf0371ea68a786ccd36")
-	req := httptest.NewRequest("GET", "http://example.com/root/efc7d6b475a56fe587650bcdb999a4a308f815ba44db4bf0371ea68a786ccd36", http.NoBody)
+	chiCtx.URLParams.Add("sha", sha)
+	req := httptest.NewRequest("GET", "http://example.com/root/"+sha, http.NoBody)
 	req = req.WithContext(context.WithValue(context.Background(), chi.RouteCtxKey, chiCtx))
 
 	expected := []byte(`{"ca":"` + strings.ReplaceAll(rootPEM, "\n", `\n`) + `\n"}`)
@@ -866,6 +868,7 @@ func Test_Root(t *testing.T) {
 
 			body, err := io.ReadAll(res.Body)
 			res.Body.Close()
+			fmt.Println("body:", string(body))
 			if err != nil {
 				t.Errorf("caHandler.Root unexpected error = %v", err)
 			}
@@ -873,6 +876,8 @@ func Test_Root(t *testing.T) {
 				if !bytes.Equal(bytes.TrimSpace(body), expected) {
 					t.Errorf("caHandler.Root Body = %s, wants %s", body, expected)
 				}
+			} else {
+				require.Contains(t, string(body), tt.expectedMsg)
 			}
 		})
 	}
