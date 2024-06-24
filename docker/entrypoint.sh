@@ -76,6 +76,17 @@ function step_ca_init () {
     echo "🤫 This will only be displayed once."
     shred -u $STEPPATH/provisioner_password
     mv $STEPPATH/password $PWDPATH
+
+    # Run scripts in /docker-entrypoint-initdb.d
+    if [ -d /docker-entrypoint-initdb.d ]; then
+        for f in /docker-entrypoint-initdb.d/*; do
+            case "$f" in
+                *.sh)  echo "$0: running $f"; . "$f" ;;
+                *)     echo "$0: ignoring $f" ;;
+            esac
+            echo
+        done
+    fi
 }
 
 if [ -f /usr/sbin/pcscd ]; then
