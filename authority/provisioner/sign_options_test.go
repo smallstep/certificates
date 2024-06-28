@@ -598,9 +598,61 @@ func Test_profileDefaultDuration_Option(t *testing.T) {
 			na := time.Now().Add(10 * time.Minute).UTC()
 			d := 4 * time.Hour
 			return test{
-				pdd:  profileDefaultDuration(d),
-				so:   SignOptions{NotBefore: NewTimeDuration(nb), NotAfter: NewTimeDuration(na)},
-				cert: new(x509.Certificate),
+				pdd: profileDefaultDuration(d),
+				so:  SignOptions{NotBefore: NewTimeDuration(nb), NotAfter: NewTimeDuration(na)},
+				cert: &x509.Certificate{
+					NotBefore: time.Now(),
+					NotAfter:  time.Now().Add(time.Hour),
+				},
+				valid: func(cert *x509.Certificate) {
+					assert.Equals(t, cert.NotBefore, nb)
+					assert.Equals(t, cert.NotAfter, na)
+				},
+			}
+		},
+		"ok/cert-with-validity": func() test {
+			nb := time.Now().Add(5 * time.Minute).UTC()
+			na := time.Now().Add(10 * time.Minute).UTC()
+			d := 4 * time.Hour
+			return test{
+				pdd: profileDefaultDuration(d),
+				so:  SignOptions{},
+				cert: &x509.Certificate{
+					NotBefore: nb,
+					NotAfter:  na,
+				},
+				valid: func(cert *x509.Certificate) {
+					assert.Equals(t, cert.NotBefore, nb)
+					assert.Equals(t, cert.NotAfter, na)
+				},
+			}
+		},
+		"ok/cert-notBefore-option-notafter": func() test {
+			nb := time.Now().Add(5 * time.Minute).UTC()
+			na := time.Now().Add(10 * time.Minute).UTC()
+			d := 4 * time.Hour
+			return test{
+				pdd: profileDefaultDuration(d),
+				so:  SignOptions{NotAfter: NewTimeDuration(na)},
+				cert: &x509.Certificate{
+					NotBefore: nb,
+				},
+				valid: func(cert *x509.Certificate) {
+					assert.Equals(t, cert.NotBefore, nb)
+					assert.Equals(t, cert.NotAfter, na)
+				},
+			}
+		},
+		"ok/cert-notAfter-option-notBefore": func() test {
+			nb := time.Now().Add(5 * time.Minute).UTC()
+			na := time.Now().Add(10 * time.Minute).UTC()
+			d := 4 * time.Hour
+			return test{
+				pdd: profileDefaultDuration(d),
+				so:  SignOptions{NotBefore: NewTimeDuration(nb)},
+				cert: &x509.Certificate{
+					NotAfter: na,
+				},
 				valid: func(cert *x509.Certificate) {
 					assert.Equals(t, cert.NotBefore, nb)
 					assert.Equals(t, cert.NotAfter, na)
@@ -725,6 +777,28 @@ func Test_profileLimitDuration_Option(t *testing.T) {
 				err:  errors.New("requested certificate notAfter ("),
 			}
 		},
+		"fail/cert-validity-notBefore": func() test {
+			return test{
+				pld: profileLimitDuration{def: 4 * time.Hour, notBefore: n, notAfter: n.Add(6 * time.Hour)},
+				so:  SignOptions{},
+				cert: &x509.Certificate{
+					NotBefore: n.Add(-time.Second),
+					NotAfter:  n.Add(5 * time.Hour),
+				},
+				err: errors.New("requested certificate notBefore ("),
+			}
+		},
+		"fail/cert-validity-notAfter": func() test {
+			return test{
+				pld: profileLimitDuration{def: 4 * time.Hour, notBefore: n, notAfter: n.Add(6 * time.Hour)},
+				so:  SignOptions{},
+				cert: &x509.Certificate{
+					NotBefore: n,
+					NotAfter:  n.Add(6*time.Hour + time.Second),
+				},
+				err: errors.New("requested certificate notAfter ("),
+			}
+		},
 		"ok/valid-notAfter-requested": func() test {
 			d, err := ParseTimeDuration("2h")
 			assert.FatalError(t, err)
@@ -779,6 +853,72 @@ func Test_profileLimitDuration_Option(t *testing.T) {
 				valid: func(cert *x509.Certificate) {
 					assert.Equals(t, cert.NotBefore, n.Add(-time.Minute))
 					assert.Equals(t, cert.NotAfter, n.Add(24*time.Hour))
+				},
+			}
+		},
+		"ok/cert-validity": func() test {
+			return test{
+				pld: profileLimitDuration{def: 4 * time.Hour, notBefore: n, notAfter: n.Add(6 * time.Hour)},
+				so:  SignOptions{},
+				cert: &x509.Certificate{
+					NotBefore: n,
+					NotAfter:  n.Add(5 * time.Hour),
+				},
+				valid: func(cert *x509.Certificate) {
+					assert.Equals(t, cert.NotBefore, n)
+					assert.Equals(t, cert.NotAfter, n.Add(5*time.Hour))
+				},
+			}
+		},
+		"ok/cert-notBefore-default": func() test {
+			return test{
+				pld: profileLimitDuration{def: 4 * time.Hour, notBefore: n, notAfter: n.Add(6 * time.Hour)},
+				so:  SignOptions{},
+				cert: &x509.Certificate{
+					NotBefore: n,
+				},
+				valid: func(cert *x509.Certificate) {
+					assert.Equals(t, cert.NotBefore, n)
+					assert.Equals(t, cert.NotAfter, n.Add(4*time.Hour))
+				},
+			}
+		},
+		"ok/cert-notAfter-default": func() test {
+			return test{
+				pld: profileLimitDuration{def: 4 * time.Hour, notBefore: n, notAfter: n.Add(6 * time.Hour)},
+				so:  SignOptions{},
+				cert: &x509.Certificate{
+					NotAfter: n.Add(5 * time.Hour),
+				},
+				valid: func(cert *x509.Certificate) {
+					assert.Equals(t, cert.NotBefore, n)
+					assert.Equals(t, cert.NotAfter, n.Add(5*time.Hour))
+				},
+			}
+		},
+		"ok/cert-notBefore-option": func() test {
+			return test{
+				pld: profileLimitDuration{def: 4 * time.Hour, notBefore: n, notAfter: n.Add(6 * time.Hour)},
+				so:  SignOptions{NotAfter: NewTimeDuration(n.Add(5 * time.Hour))},
+				cert: &x509.Certificate{
+					NotBefore: n,
+				},
+				valid: func(cert *x509.Certificate) {
+					assert.Equals(t, cert.NotBefore, n)
+					assert.Equals(t, cert.NotAfter, n.Add(5*time.Hour))
+				},
+			}
+		},
+		"ok/cert-notAfter-option": func() test {
+			return test{
+				pld: profileLimitDuration{def: 4 * time.Hour, notBefore: n, notAfter: n.Add(6 * time.Hour)},
+				so:  SignOptions{NotBefore: NewTimeDuration(n.Add(4 * time.Hour))},
+				cert: &x509.Certificate{
+					NotAfter: n.Add(5 * time.Hour),
+				},
+				valid: func(cert *x509.Certificate) {
+					assert.Equals(t, cert.NotBefore, n.Add(4*time.Hour))
+					assert.Equals(t, cert.NotAfter, n.Add(5*time.Hour))
 				},
 			}
 		},
