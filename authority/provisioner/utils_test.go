@@ -363,11 +363,13 @@ func generateGCP() (*GCP, error) {
 		return nil, err
 	}
 	p := &GCP{
-		Type:            "GCP",
-		Name:            name,
-		ServiceAccounts: []string{serviceAccount},
-		Claims:          &globalProvisionerClaims,
-		config:          newGCPConfig(),
+		Type:             "GCP",
+		Name:             name,
+		ServiceAccounts:  []string{serviceAccount},
+		Claims:           &globalProvisionerClaims,
+		DisableSSHCAHost: &DefaultDisableSSHCAHost,
+		DisableSSHCAUser: &DefaultDisableSSHCAUser,
+		config:           newGCPConfig(),
 		keyStore: &keyStore{
 			keySet: jose.JSONWebKeySet{Keys: []jose.JSONWebKey{*jwk}},
 			expiry: time.Now().Add(24 * time.Hour),
