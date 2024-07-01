@@ -605,8 +605,8 @@ func Test_profileDefaultDuration_Option(t *testing.T) {
 					NotAfter:  time.Now().Add(time.Hour),
 				},
 				valid: func(cert *x509.Certificate) {
-					assert.Equals(t, cert.NotBefore, nb)
-					assert.Equals(t, cert.NotAfter, na)
+					assert.Equals(t, nb, cert.NotBefore)
+					assert.Equals(t, na, cert.NotAfter)
 				},
 			}
 		},
@@ -622,8 +622,8 @@ func Test_profileDefaultDuration_Option(t *testing.T) {
 					NotAfter:  na,
 				},
 				valid: func(cert *x509.Certificate) {
-					assert.Equals(t, cert.NotBefore, nb)
-					assert.Equals(t, cert.NotAfter, na)
+					assert.Equals(t, nb, cert.NotBefore)
+					assert.Equals(t, na, cert.NotAfter)
 				},
 			}
 		},
@@ -638,8 +638,8 @@ func Test_profileDefaultDuration_Option(t *testing.T) {
 					NotBefore: nb,
 				},
 				valid: func(cert *x509.Certificate) {
-					assert.Equals(t, cert.NotBefore, nb)
-					assert.Equals(t, cert.NotAfter, na)
+					assert.Equals(t, nb, cert.NotBefore)
+					assert.Equals(t, na, cert.NotAfter)
 				},
 			}
 		},
@@ -865,8 +865,8 @@ func Test_profileLimitDuration_Option(t *testing.T) {
 					NotAfter:  n.Add(5 * time.Hour),
 				},
 				valid: func(cert *x509.Certificate) {
-					assert.Equals(t, cert.NotBefore, n)
-					assert.Equals(t, cert.NotAfter, n.Add(5*time.Hour))
+					assert.Equals(t, n, cert.NotBefore)
+					assert.Equals(t, n.Add(5*time.Hour), cert.NotAfter)
 				},
 			}
 		},
@@ -878,8 +878,8 @@ func Test_profileLimitDuration_Option(t *testing.T) {
 					NotBefore: n,
 				},
 				valid: func(cert *x509.Certificate) {
-					assert.Equals(t, cert.NotBefore, n)
-					assert.Equals(t, cert.NotAfter, n.Add(4*time.Hour))
+					assert.Equals(t, n, cert.NotBefore)
+					assert.Equals(t, n.Add(4*time.Hour), cert.NotAfter)
 				},
 			}
 		},
@@ -891,8 +891,8 @@ func Test_profileLimitDuration_Option(t *testing.T) {
 					NotAfter: n.Add(5 * time.Hour),
 				},
 				valid: func(cert *x509.Certificate) {
-					assert.Equals(t, cert.NotBefore, n)
-					assert.Equals(t, cert.NotAfter, n.Add(5*time.Hour))
+					assert.Equals(t, n, cert.NotBefore)
+					assert.Equals(t, n.Add(5*time.Hour), cert.NotAfter)
 				},
 			}
 		},
@@ -904,8 +904,8 @@ func Test_profileLimitDuration_Option(t *testing.T) {
 					NotBefore: n,
 				},
 				valid: func(cert *x509.Certificate) {
-					assert.Equals(t, cert.NotBefore, n)
-					assert.Equals(t, cert.NotAfter, n.Add(5*time.Hour))
+					assert.Equals(t, n, cert.NotBefore)
+					assert.Equals(t, n.Add(5*time.Hour), cert.NotAfter)
 				},
 			}
 		},
@@ -917,8 +917,8 @@ func Test_profileLimitDuration_Option(t *testing.T) {
 					NotAfter: n.Add(5 * time.Hour),
 				},
 				valid: func(cert *x509.Certificate) {
-					assert.Equals(t, cert.NotBefore, n.Add(4*time.Hour))
-					assert.Equals(t, cert.NotAfter, n.Add(5*time.Hour))
+					assert.Equals(t, n.Add(4*time.Hour), cert.NotBefore)
+					assert.Equals(t, n.Add(5*time.Hour), cert.NotAfter)
 				},
 			}
 		},
