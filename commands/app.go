@@ -183,6 +183,13 @@ func appAction(ctx *cli.Context) error {
 		}
 	}
 
+	// allow paths relative to STEPPATH for root, crt and key
+	for i, root := range cfg.Root {
+		cfg.Root[i] = step.Abs(root)
+	}
+	cfg.IntermediateCert = step.Abs(cfg.IntermediateCert)
+	cfg.IntermediateKey = step.Abs(cfg.IntermediateKey)
+
 	if cfg.AuthorityConfig != nil {
 		if token == "" && strings.EqualFold(cfg.AuthorityConfig.DeploymentType, pki.LinkedDeployment.String()) {
 			return errors.New(`'step-ca' requires the '--token' flag for linked deploy type.
