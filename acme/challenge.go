@@ -110,7 +110,8 @@ func (ch *Challenge) Validate(ctx context.Context, db DB, jwk *jose.JSONWebKey, 
 }
 
 func http01Validate(ctx context.Context, ch *Challenge, db DB, jwk *jose.JSONWebKey) error {
-	u := &url.URL{Scheme: "http", Host: http01ChallengeHost(ch.Value), Path: fmt.Sprintf("/.well-known/acme-challenge/%s", ch.Token)}
+	u := &url.URL{Scheme: "http", Host: ch.Value, Path: fmt.Sprintf("/.well-known/acme-challenge/%s", ch.Token)}
+	challengeURL := &url.URL{Scheme: "http", Host: http01ChallengeHost(ch.Value), Path: fmt.Sprintf("/.well-known/acme-challenge/%s", ch.Token)}
 
 	// Append insecure port if set.
 	// Only used for testing purposes.
@@ -119,7 +120,7 @@ func http01Validate(ctx context.Context, ch *Challenge, db DB, jwk *jose.JSONWeb
 	}
 
 	vc := MustClientFromContext(ctx)
-	resp, err := vc.Get(u.String())
+	resp, err := vc.Get(challengeURL.String())
 	if err != nil {
 		return storeError(ctx, db, ch, false, WrapError(ErrorConnectionType, err,
 			"error doing http GET for url %s", u))

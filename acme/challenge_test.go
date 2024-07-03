@@ -457,7 +457,7 @@ func TestChallenge_Validate(t *testing.T) {
 						assert.Equal(t, "zap.internal", updch.Value)
 						assert.Equal(t, StatusPending, updch.Status)
 
-						err := NewError(ErrorConnectionType, "error doing http GET for url http://zap.internal./.well-known/acme-challenge/%s: force", ch.Token)
+						err := NewError(ErrorConnectionType, "error doing http GET for url http://zap.internal/.well-known/acme-challenge/%s: force", ch.Token)
 						assert.EqualError(t, updch.Error.Err, err.Err.Error())
 						assert.Equal(t, err.Type, updch.Error.Type)
 						assert.Equal(t, err.Detail, updch.Error.Detail)
@@ -494,7 +494,7 @@ func TestChallenge_Validate(t *testing.T) {
 						assert.Equal(t, "zap.internal", updch.Value)
 						assert.Equal(t, StatusPending, updch.Status)
 
-						err := NewError(ErrorConnectionType, "error doing http GET for url http://zap.internal./.well-known/acme-challenge/%s: force", ch.Token)
+						err := NewError(ErrorConnectionType, "error doing http GET for url http://zap.internal/.well-known/acme-challenge/%s: force", ch.Token)
 						assert.EqualError(t, updch.Error.Err, err.Err.Error())
 						assert.Equal(t, err.Type, updch.Error.Type)
 						assert.Equal(t, err.Detail, updch.Error.Detail)
@@ -536,7 +536,7 @@ func TestChallenge_Validate(t *testing.T) {
 						assert.Equal(t, "zap.internal", updch.Value)
 						assert.Equal(t, StatusPending, updch.Status)
 
-						err := NewError(ErrorConnectionType, "error doing http GET for url http://zap.internal.:8080/.well-known/acme-challenge/%s: force", ch.Token)
+						err := NewError(ErrorConnectionType, "error doing http GET for url http://zap.internal:8080/.well-known/acme-challenge/%s: force", ch.Token)
 						assert.EqualError(t, updch.Error.Err, err.Err.Error())
 						assert.Equal(t, err.Type, updch.Error.Type)
 						assert.Equal(t, err.Detail, updch.Error.Detail)
@@ -926,7 +926,7 @@ func TestHTTP01Validate(t *testing.T) {
 						assert.Equal(t, "zap.internal", updch.Value)
 						assert.Equal(t, StatusPending, updch.Status)
 
-						err := NewError(ErrorConnectionType, "error doing http GET for url http://zap.internal./.well-known/acme-challenge/%s: force", ch.Token)
+						err := NewError(ErrorConnectionType, "error doing http GET for url http://zap.internal/.well-known/acme-challenge/%s: force", ch.Token)
 						assert.EqualError(t, updch.Error.Err, err.Err.Error())
 						assert.Equal(t, err.Type, updch.Error.Type)
 						assert.Equal(t, err.Detail, updch.Error.Detail)
@@ -961,7 +961,7 @@ func TestHTTP01Validate(t *testing.T) {
 						assert.Equal(t, "zap.internal", updch.Value)
 						assert.Equal(t, StatusPending, updch.Status)
 
-						err := NewError(ErrorConnectionType, "error doing http GET for url http://zap.internal./.well-known/acme-challenge/%s: force", ch.Token)
+						err := NewError(ErrorConnectionType, "error doing http GET for url http://zap.internal/.well-known/acme-challenge/%s: force", ch.Token)
 						assert.EqualError(t, updch.Error.Err, err.Err.Error())
 						assert.Equal(t, err.Type, updch.Error.Type)
 						assert.Equal(t, err.Detail, updch.Error.Detail)
@@ -998,7 +998,7 @@ func TestHTTP01Validate(t *testing.T) {
 						assert.Equal(t, "zap.internal", updch.Value)
 						assert.Equal(t, StatusPending, updch.Status)
 
-						err := NewError(ErrorConnectionType, "error doing http GET for url http://zap.internal./.well-known/acme-challenge/%s with status code 400", ch.Token)
+						err := NewError(ErrorConnectionType, "error doing http GET for url http://zap.internal/.well-known/acme-challenge/%s with status code 400", ch.Token)
 						assert.EqualError(t, updch.Error.Err, err.Err.Error())
 						assert.Equal(t, err.Type, updch.Error.Type)
 						assert.Equal(t, err.Detail, updch.Error.Detail)
@@ -1036,7 +1036,7 @@ func TestHTTP01Validate(t *testing.T) {
 						assert.Equal(t, "zap.internal", updch.Value)
 						assert.Equal(t, StatusPending, updch.Status)
 
-						err := NewError(ErrorConnectionType, "error doing http GET for url http://zap.internal./.well-known/acme-challenge/%s with status code 400", ch.Token)
+						err := NewError(ErrorConnectionType, "error doing http GET for url http://zap.internal/.well-known/acme-challenge/%s with status code 400", ch.Token)
 						assert.EqualError(t, updch.Error.Err, err.Err.Error())
 						assert.Equal(t, err.Type, updch.Error.Type)
 						assert.Equal(t, err.Detail, updch.Error.Detail)
@@ -1065,7 +1065,7 @@ func TestHTTP01Validate(t *testing.T) {
 						}, nil
 					},
 				},
-				err: NewErrorISE("error reading response body for url http://zap.internal./.well-known/acme-challenge/%s: force", ch.Token),
+				err: NewErrorISE("error reading response body for url http://zap.internal/.well-known/acme-challenge/%s: force", ch.Token),
 			}
 		},
 		"fail/key-auth-gen-error": func(t *testing.T) test {
