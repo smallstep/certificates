@@ -646,7 +646,7 @@ func TestChallenge_Validate(t *testing.T) {
 						assert.Equal(t, "zap.internal", updch.Value)
 						assert.Equal(t, StatusPending, updch.Status)
 
-						err := NewError(ErrorConnectionType, "error doing TLS dial for %v:443: force", ch.Value)
+						err := NewError(ErrorConnectionType, "error doing TLS dial for %v: force", ch.Value)
 
 						assert.EqualError(t, updch.Error.Err, err.Err.Error())
 						assert.Equal(t, err.Type, updch.Error.Type)
@@ -1723,7 +1723,7 @@ func TestTLSALPN01Validate(t *testing.T) {
 						assert.Equal(t, ChallengeType("tls-alpn-01"), updch.Type)
 						assert.Equal(t, "zap.internal", updch.Value)
 
-						err := NewError(ErrorConnectionType, "error doing TLS dial for %v:443: force", ch.Value)
+						err := NewError(ErrorConnectionType, "error doing TLS dial for %v: force", ch.Value)
 
 						assert.EqualError(t, updch.Error.Err, err.Err.Error())
 						assert.Equal(t, err.Type, updch.Error.Type)
@@ -1754,7 +1754,7 @@ func TestTLSALPN01Validate(t *testing.T) {
 						assert.Equal(t, ChallengeType("tls-alpn-01"), updch.Type)
 						assert.Equal(t, "zap.internal", updch.Value)
 
-						err := NewError(ErrorConnectionType, "error doing TLS dial for %v:443: force", ch.Value)
+						err := NewError(ErrorConnectionType, "error doing TLS dial for %v: force", ch.Value)
 
 						assert.EqualError(t, updch.Error.Err, err.Err.Error())
 						assert.Equal(t, err.Type, updch.Error.Type)
@@ -1786,7 +1786,7 @@ func TestTLSALPN01Validate(t *testing.T) {
 						assert.Equal(t, ChallengeType("tls-alpn-01"), updch.Type)
 						assert.Equal(t, "zap.internal", updch.Value)
 
-						err := NewError(ErrorConnectionType, "error doing TLS dial for %v:443: context deadline exceeded", ch.Value)
+						err := NewError(ErrorConnectionType, "error doing TLS dial for %v: context deadline exceeded", ch.Value)
 
 						assert.EqualError(t, updch.Error.Err, err.Err.Error())
 						assert.Equal(t, err.Type, updch.Error.Type)
@@ -2774,7 +2774,12 @@ func Test_http01ChallengeHost(t *testing.T) {
 		{
 			name:  "dns",
 			value: "www.example.com",
-			want:  "www.example.com",
+			want:  "www.example.com.",
+		},
+		{
+			name:  "rooted dns",
+			value: "www.example.com.",
+			want:  "www.example.com.",
 		},
 		{
 			name:  "ipv4",
@@ -4300,4 +4305,44 @@ func createSubjectAltNameExtension(dnsNames, emailAddresses x509util.MultiString
 		Critical: subjectIsEmpty,
 		Value:    rawBytes,
 	}, nil
+}
+
+func Test_tlsAlpn01ChallengeHost(t *testing.T) {
+	type args struct {
+		name string
+	}
+	tests := []struct {
+		name string
+		args args
+		want string
+	}{
+		{"dns", args{"smallstep.com"}, "smallstep.com."},
+		{"rooted dns", args{"smallstep.com."}, "smallstep.com."},
+		{"ipv4", args{"1.2.3.4"}, "1.2.3.4"},
+		{"ipv6", args{"2607:f8b0:4023:1009::71"}, "2607:f8b0:4023:1009::71"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			assert.Equal(t, tt.want, tlsAlpn01ChallengeHost(tt.args.name))
+		})
+	}
+}
+
+func Test_dns01ChallengeHost(t *testing.T) {
+	type args struct {
+		domain string
+	}
+	tests := []struct {
+		name string
+		args args
+		want string
+	}{
+		{"dns", args{"smallstep.com"}, "_acme-challenge.smallstep.com."},
+		{"rooted dns", args{"smallstep.com."}, "_acme-challenge.smallstep.com."},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			assert.Equal(t, tt.want, dns01ChallengeHost(tt.args.domain))
+		})
+	}
 }
