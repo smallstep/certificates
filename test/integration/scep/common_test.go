@@ -39,6 +39,9 @@ func newCAClient(t *testing.T, caURL, rootFilepath string) *ca.Client {
 }
 
 func requireHealthyCA(t *testing.T, caClient *ca.Client) {
+	// Wait for CA
+	time.Sleep(time.Second)
+
 	ctx := context.Background()
 	healthResponse, err := caClient.HealthWithContext(ctx)
 	require.NoError(t, err)
