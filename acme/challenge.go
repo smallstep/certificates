@@ -1,6 +1,7 @@
 package acme
 
 import (
+	"bytes"
 	"context"
 	"crypto"
 	"crypto/ecdsa"
@@ -397,12 +398,26 @@ func deviceAttest01Validate(ctx context.Context, ch *Challenge, db DB, jwk *jose
 
 	attObj, err := base64.RawURLEncoding.DecodeString(p.AttObj)
 	if err != nil {
-		return WrapErrorISE(err, "error base64 decoding attObj")
+		return storeError(ctx, db, ch, true, NewDetailedError(ErrorBadAttestationStatementType, "failed base64 decoding attObj %q", p.AttObj))
+	}
+
+	if len(attObj) == 0 || bytes.Equal(attObj, []byte("{}")) {
+		return storeError(ctx, db, ch, true, NewDetailedError(ErrorBadAttestationStatementType, "attObj must not be empty"))
+	}
+
+	cborDecoderOptions := cbor.DecOptions{}
+	cborDecoder, err := cborDecoderOptions.DecMode()
+	if err != nil {
+		return WrapErrorISE(err, "failed creating CBOR decoder")
+	}
+
+	if err := cborDecoder.Wellformed(attObj); err != nil {
+		return storeError(ctx, db, ch, true, NewDetailedError(ErrorBadAttestationStatementType, "attObj is not well formed CBOR: %v", err))
 	}
 
 	att := attestationObject{}
-	if err := cbor.Unmarshal(attObj, &att); err != nil {
-		return WrapErrorISE(err, "error unmarshalling CBOR")
+	if err := cborDecoder.Unmarshal(attObj, &att); err != nil {
+		return WrapErrorISE(err, "failed unmarshalling CBOR")
 	}
 
 	format := att.Format

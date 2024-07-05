@@ -3268,10 +3268,50 @@ func Test_deviceAttest01Validate(t *testing.T) {
 		AttObj: "?!",
 	})
 	require.NoError(t, err)
-	errorCBORPayload, err := json.Marshal(struct {
+	emptyPayload, err := json.Marshal(struct {
 		AttObj string `json:"attObj"`
 	}{
-		AttObj: "AAAA",
+		AttObj: base64.RawURLEncoding.EncodeToString([]byte("")),
+	})
+	require.NoError(t, err)
+	emptyObjectPayload, err := json.Marshal(struct {
+		AttObj string `json:"attObj"`
+	}{
+		AttObj: base64.RawURLEncoding.EncodeToString([]byte("{}")),
+	})
+	require.NoError(t, err)
+	attObj, err := cbor.Marshal(struct {
+		Format       string                 `json:"fmt"`
+		AttStatement map[string]interface{} `json:"attStmt,omitempty"`
+	}{
+		Format: "step",
+		AttStatement: map[string]interface{}{
+			"alg": -7,
+			"sig": "",
+		},
+	})
+	require.NoError(t, err)
+	errorNonWellformedCBORPayload, err := json.Marshal(struct {
+		AttObj string `json:"attObj"`
+	}{
+		AttObj: base64.RawURLEncoding.EncodeToString(attObj[:len(attObj)-1]), // cut the CBOR encoded data off
+	})
+	require.NoError(t, err)
+	unsupportedFormatAttObj, err := cbor.Marshal(struct {
+		Format       string                 `json:"fmt"`
+		AttStatement map[string]interface{} `json:"attStmt,omitempty"`
+	}{
+		Format: "unsupported-format",
+		AttStatement: map[string]interface{}{
+			"alg": -7,
+			"sig": "",
+		},
+	})
+	require.NoError(t, err)
+	errorUnsupportedFormat, err := json.Marshal(struct {
+		AttObj string `json:"attObj"`
+	}{
+		AttObj: base64.RawURLEncoding.EncodeToString(unsupportedFormatAttObj),
 	})
 	require.NoError(t, err)
 	type args struct {
@@ -3408,7 +3448,7 @@ func Test_deviceAttest01Validate(t *testing.T) {
 				wantErr: nil,
 			}
 		},
-		"fail/base64-decode": func(t *testing.T) test {
+		"ok/base64-decode": func(t *testing.T) test {
 			return test{
 				args: args{
 					ch: &Challenge{
@@ -3423,14 +3463,30 @@ func Test_deviceAttest01Validate(t *testing.T) {
 						MockGetAuthorization: func(ctx context.Context, id string) (*Authorization, error) {
 							assert.Equal(t, "azID", id)
 							return &Authorization{ID: "azID"}, nil
+						},
+						MockUpdateChallenge: func(ctx context.Context, updch *Challenge) error {
+							assert.Equal(t, "chID", updch.ID)
+							assert.Equal(t, "token", updch.Token)
+							assert.Equal(t, StatusInvalid, updch.Status)
+							assert.Equal(t, ChallengeType("device-attest-01"), updch.Type)
+							assert.Equal(t, "12345678", updch.Value)
+
+							err := NewDetailedError(ErrorBadAttestationStatementType, "failed base64 decoding attObj %q", "?!")
+
+							assert.EqualError(t, updch.Error.Err, err.Err.Error())
+							assert.Equal(t, err.Type, updch.Error.Type)
+							assert.Equal(t, err.Detail, updch.Error.Detail)
+							assert.Equal(t, err.Status, updch.Error.Status)
+							assert.Equal(t, err.Subproblems, updch.Error.Subproblems)
+
+							return nil
 						},
 					},
 					payload: errorBase64Payload,
 				},
-				wantErr: NewErrorISE("error base64 decoding attObj: illegal base64 data at input byte 0"),
 			}
 		},
-		"fail/cbor.Unmarshal": func(t *testing.T) test {
+		"ok/empty-attobj": func(t *testing.T) test {
 			return test{
 				args: args{
 					ch: &Challenge{
@@ -3446,10 +3502,142 @@ func Test_deviceAttest01Validate(t *testing.T) {
 							assert.Equal(t, "azID", id)
 							return &Authorization{ID: "azID"}, nil
 						},
+						MockUpdateChallenge: func(ctx context.Context, updch *Challenge) error {
+							assert.Equal(t, "chID", updch.ID)
+							assert.Equal(t, "token", updch.Token)
+							assert.Equal(t, StatusInvalid, updch.Status)
+							assert.Equal(t, ChallengeType("device-attest-01"), updch.Type)
+							assert.Equal(t, "12345678", updch.Value)
+
+							err := NewDetailedError(ErrorBadAttestationStatementType, "attObj must not be empty")
+
+							assert.EqualError(t, updch.Error.Err, err.Err.Error())
+							assert.Equal(t, err.Type, updch.Error.Type)
+							assert.Equal(t, err.Detail, updch.Error.Detail)
+							assert.Equal(t, err.Status, updch.Error.Status)
+							assert.Equal(t, err.Subproblems, updch.Error.Subproblems)
+
+							return nil
+						},
 					},
-					payload: errorCBORPayload,
+					payload: emptyPayload,
 				},
-				wantErr: NewErrorISE("error unmarshalling CBOR: cbor:"),
+			}
+		},
+		"ok/empty-json-attobj": func(t *testing.T) test {
+			return test{
+				args: args{
+					ch: &Challenge{
+						ID:              "chID",
+						AuthorizationID: "azID",
+						Token:           "token",
+						Type:            "device-attest-01",
+						Status:          StatusPending,
+						Value:           "12345678",
+					},
+					db: &MockDB{
+						MockGetAuthorization: func(ctx context.Context, id string) (*Authorization, error) {
+							assert.Equal(t, "azID", id)
+							return &Authorization{ID: "azID"}, nil
+						},
+						MockUpdateChallenge: func(ctx context.Context, updch *Challenge) error {
+							assert.Equal(t, "chID", updch.ID)
+							assert.Equal(t, "token", updch.Token)
+							assert.Equal(t, StatusInvalid, updch.Status)
+							assert.Equal(t, ChallengeType("device-attest-01"), updch.Type)
+							assert.Equal(t, "12345678", updch.Value)
+
+							err := NewDetailedError(ErrorBadAttestationStatementType, "attObj must not be empty")
+
+							assert.EqualError(t, updch.Error.Err, err.Err.Error())
+							assert.Equal(t, err.Type, updch.Error.Type)
+							assert.Equal(t, err.Detail, updch.Error.Detail)
+							assert.Equal(t, err.Status, updch.Error.Status)
+							assert.Equal(t, err.Subproblems, updch.Error.Subproblems)
+
+							return nil
+						},
+					},
+					payload: emptyObjectPayload,
+				},
+			}
+		},
+		"ok/cborDecoder.Wellformed": func(t *testing.T) test {
+			return test{
+				args: args{
+					ch: &Challenge{
+						ID:              "chID",
+						AuthorizationID: "azID",
+						Token:           "token",
+						Type:            "device-attest-01",
+						Status:          StatusPending,
+						Value:           "12345678",
+					},
+					db: &MockDB{
+						MockGetAuthorization: func(ctx context.Context, id string) (*Authorization, error) {
+							assert.Equal(t, "azID", id)
+							return &Authorization{ID: "azID"}, nil
+						},
+						MockUpdateChallenge: func(ctx context.Context, updch *Challenge) error {
+							assert.Equal(t, "chID", updch.ID)
+							assert.Equal(t, "token", updch.Token)
+							assert.Equal(t, StatusInvalid, updch.Status)
+							assert.Equal(t, ChallengeType("device-attest-01"), updch.Type)
+							assert.Equal(t, "12345678", updch.Value)
+
+							err := NewDetailedError(ErrorBadAttestationStatementType, "attObj is not well formed CBOR: unexpected EOF")
+
+							assert.EqualError(t, updch.Error.Err, err.Err.Error())
+							assert.Equal(t, err.Type, updch.Error.Type)
+							assert.Equal(t, err.Detail, updch.Error.Detail)
+							assert.Equal(t, err.Status, updch.Error.Status)
+							assert.Equal(t, err.Subproblems, updch.Error.Subproblems)
+
+							return nil
+						},
+					},
+					payload: errorNonWellformedCBORPayload,
+				},
+			}
+		},
+		"ok/unsupported-attestation-format": func(t *testing.T) test {
+			ctx := NewProvisionerContext(context.Background(), mustNonAttestationProvisioner(t))
+			return test{
+				args: args{
+					ctx: ctx,
+					ch: &Challenge{
+						ID:              "chID",
+						AuthorizationID: "azID",
+						Token:           "token",
+						Type:            "device-attest-01",
+						Status:          StatusPending,
+						Value:           "12345678",
+					},
+					db: &MockDB{
+						MockGetAuthorization: func(ctx context.Context, id string) (*Authorization, error) {
+							assert.Equal(t, "azID", id)
+							return &Authorization{ID: "azID"}, nil
+						},
+						MockUpdateChallenge: func(ctx context.Context, updch *Challenge) error {
+							assert.Equal(t, "chID", updch.ID)
+							assert.Equal(t, "token", updch.Token)
+							assert.Equal(t, StatusInvalid, updch.Status)
+							assert.Equal(t, ChallengeType("device-attest-01"), updch.Type)
+							assert.Equal(t, "12345678", updch.Value)
+
+							err := NewDetailedError(ErrorBadAttestationStatementType, "unsupported attestation object format %q", "unsupported-format")
+
+							assert.EqualError(t, updch.Error.Err, err.Err.Error())
+							assert.Equal(t, err.Type, updch.Error.Type)
+							assert.Equal(t, err.Detail, updch.Error.Detail)
+							assert.Equal(t, err.Status, updch.Error.Status)
+							assert.Equal(t, err.Subproblems, updch.Error.Subproblems)
+
+							return nil
+						},
+					},
+					payload: errorUnsupportedFormat,
+				},
 			}
 		},
 		"ok/prov.IsAttestationFormatEnabled": func(t *testing.T) test {
