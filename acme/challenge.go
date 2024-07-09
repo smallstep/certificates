@@ -117,7 +117,9 @@ func http01Validate(ctx context.Context, ch *Challenge, db DB, jwk *jose.JSONWeb
 	// Append insecure port if set.
 	// Only used for testing purposes.
 	if InsecurePortHTTP01 != 0 {
-		u.Host += ":" + strconv.Itoa(InsecurePortHTTP01)
+		insecurePort := strconv.Itoa(InsecurePortHTTP01)
+		u.Host += ":" + insecurePort
+		challengeURL.Host += ":" + insecurePort
 	}
 
 	vc := MustClientFromContext(ctx)
