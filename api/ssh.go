@@ -502,7 +502,7 @@ func SSHBastion(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
-// identityModifier is a custom modifier used to force a fixed duration. and set
+// identityModifier is a custom modifier used to force a fixed duration, and set
 // the identity URI.
 type identityModifier struct {
 	Identity  *url.URL
