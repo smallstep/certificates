@@ -34,24 +34,24 @@ type Interface interface {
 	AuthorizeSSHRekey(ctx context.Context, token string) (*ssh.Certificate, []SignOption, error)
 }
 
-// Disabled represents a disabled provisioner. Disabled provisioners are created
-// when the Init methods fails.
-type Disabled struct {
+// Uninitialized represents a disabled provisioner. Uninitialized provisioners
+// are created when the Init methods fails.
+type Uninitialized struct {
 	Interface
 	Reason error
 }
 
 // MarshalJSON returns the JSON encoding of the provisioner with the disabled
 // reason.
-func (p Disabled) MarshalJSON() ([]byte, error) {
+func (p Uninitialized) MarshalJSON() ([]byte, error) {
 	provisionerJSON, err := json.Marshal(p.Interface)
 	if err != nil {
 		return nil, err
 	}
 	reasonJSON, err := json.Marshal(struct {
-		Disabled       bool   `json:"disabled"`
-		DisabledReason string `json:"disabledReason"`
-	}{true, p.Reason.Error()})
+		State       string `json:"state"`
+		StateReason string `json:"stateReason"`
+	}{"Uninitialized", p.Reason.Error()})
 	if err != nil {
 		return nil, err
 	}

@@ -24,6 +24,7 @@ import (
 	"go.step.sm/crypto/randutil"
 	"go.step.sm/crypto/x509util"
 
+	"github.com/google/uuid"
 	"github.com/smallstep/assert"
 	"github.com/smallstep/certificates/api/render"
 	"github.com/smallstep/certificates/authority/provisioner"
@@ -301,6 +302,24 @@ func TestAuthority_authorizeToken(t *testing.T) {
 				auth:  _a,
 				token: raw,
 				err:   errors.New("token already used"),
+				code:  http.StatusUnauthorized,
+			}
+		},
+		"fail/uninitialized": func(t *testing.T) *authorizeTest {
+			cl := jose.Claims{
+				Subject:   "test.smallstep.com",
+				Issuer:    "uninitialized",
+				NotBefore: jose.NewNumericDate(now),
+				Expiry:    jose.NewNumericDate(now.Add(time.Minute)),
+				Audience:  validAudience,
+				ID:        uuid.NewString(),
+			}
+			raw, err := jose.Signed(sig).Claims(cl).CompactSerialize()
+			assert.FatalError(t, err)
+			return &authorizeTest{
+				auth:  a,
+				token: raw,
+				err:   errors.New(`provisioner "uninitialized" is disabled due to an initialization error`),
 				code:  http.StatusUnauthorized,
 			}
 		},
