@@ -69,6 +69,15 @@ func testAuthority(t *testing.T, opts ...Option) *Authority {
 				EnableSSHCA: &enableSSHCA,
 			},
 		},
+		&provisioner.JWK{
+			Name: "uninitialized",
+			Type: "JWK",
+			Key:  clijwk,
+			Claims: &provisioner.Claims{
+				MinTLSDur: &provisioner.Duration{Duration: 5 * time.Minute},
+				MaxTLSDur: &provisioner.Duration{Duration: time.Minute},
+			},
+		},
 	}
 	c := &Config{
 		Address:          "127.0.0.1:443",

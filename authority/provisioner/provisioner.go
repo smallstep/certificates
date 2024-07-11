@@ -34,6 +34,31 @@ type Interface interface {
 	AuthorizeSSHRekey(ctx context.Context, token string) (*ssh.Certificate, []SignOption, error)
 }
 
+// Uninitialized represents a disabled provisioner. Uninitialized provisioners
+// are created when the Init methods fails.
+type Uninitialized struct {
+	Interface
+	Reason error
+}
+
+// MarshalJSON returns the JSON encoding of the provisioner with the disabled
+// reason.
+func (p Uninitialized) MarshalJSON() ([]byte, error) {
+	provisionerJSON, err := json.Marshal(p.Interface)
+	if err != nil {
+		return nil, err
+	}
+	reasonJSON, err := json.Marshal(struct {
+		State       string `json:"state"`
+		StateReason string `json:"stateReason"`
+	}{"Uninitialized", p.Reason.Error()})
+	if err != nil {
+		return nil, err
+	}
+	reasonJSON[0] = ','
+	return append(provisionerJSON[:len(provisionerJSON)-1], reasonJSON...), nil
+}
+
 // ErrAllowTokenReuse is an error that is returned by provisioners that allows
 // the reuse of tokens.
 //
