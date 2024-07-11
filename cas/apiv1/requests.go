@@ -116,7 +116,8 @@ type GetCertificateAuthorityRequest struct {
 // GetCertificateAuthorityResponse is the response that contains
 // the root certificate.
 type GetCertificateAuthorityResponse struct {
-	RootCertificate *x509.Certificate
+	RootCertificate          *x509.Certificate
+	IntermediateCertificates []*x509.Certificate
 }
 
 // CreateKeyRequest is the request used to generate a new key using a KMS.

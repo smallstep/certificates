@@ -91,6 +91,21 @@ func withDefaultASN1DN(def *config.ASN1DN) provisioner.CertificateModifierFunc {
 	}
 }
 
+// GetX509Signer returns a [crypto.Signer] implementation using the intermediate
+// key.
+//
+// This method can return a [NotImplementedError] if the CA is configured with a
+// Certificate Authority Service (CAS) that does not implement the
+// CertificateAuthoritySigner interface.
+//
+// [NotImplementedError]: https://pkg.go.dev/github.com/smallstep/certificates/cas/apiv1#NotImplementedError
+func (a *Authority) GetX509Signer() (crypto.Signer, error) {
+	if s, ok := a.x509CAService.(casapi.CertificateAuthoritySigner); ok {
+		return s.GetSigner()
+	}
+	return nil, casapi.NotImplementedError{}
+}
+
 // Sign creates a signed certificate from a certificate signing request. It
 // creates a new context.Context, and calls into SignWithContext.
 //

@@ -91,12 +91,12 @@ func (m *Meter) SSHSigned(p provisioner.Interface, err error) {
 	incrProvisionerCounter(m.ssh.signed, p, err)
 }
 
-// SSHAuthorized implements [authority.Meter] for [Meter].
+// SSHWebhookAuthorized implements [authority.Meter] for [Meter].
 func (m *Meter) SSHWebhookAuthorized(p provisioner.Interface, err error) {
 	incrProvisionerCounter(m.ssh.webhookAuthorized, p, err)
 }
 
-// SSHEnriched implements [authority.Meter] for [Meter].
+// SSHWebhookEnriched implements [authority.Meter] for [Meter].
 func (m *Meter) SSHWebhookEnriched(p provisioner.Interface, err error) {
 	incrProvisionerCounter(m.ssh.webhookEnriched, p, err)
 }
@@ -116,12 +116,12 @@ func (m *Meter) X509Signed(p provisioner.Interface, err error) {
 	incrProvisionerCounter(m.x509.signed, p, err)
 }
 
-// X509Authorized implements [authority.Meter] for [Meter].
+// X509WebhookAuthorized implements [authority.Meter] for [Meter].
 func (m *Meter) X509WebhookAuthorized(p provisioner.Interface, err error) {
 	incrProvisionerCounter(m.x509.webhookAuthorized, p, err)
 }
 
-// X509Enriched implements [authority.Meter] for [Meter].
+// X509WebhookEnriched implements [authority.Meter] for [Meter].
 func (m *Meter) X509WebhookEnriched(p provisioner.Interface, err error) {
 	incrProvisionerCounter(m.x509.webhookEnriched, p, err)
 }

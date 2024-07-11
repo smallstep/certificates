@@ -426,25 +426,25 @@ func ValidateClaims(c *linkedca.Claims) error {
 // ValidateDurations validates the Durations type.
 func ValidateDurations(d *linkedca.Durations) error {
 	var (
-		err           error
-		min, max, def *provisioner.Duration
+		err                 error
+		minDur, maxDur, def *provisioner.Duration
 	)
 
 	if d.Min != "" {
-		min, err = provisioner.NewDuration(d.Min)
+		minDur, err = provisioner.NewDuration(d.Min)
 		if err != nil {
 			return admin.WrapError(admin.ErrorBadRequestType, err, "min duration '%s' is invalid", d.Min)
 		}
-		if min.Value() < 0 {
+		if minDur.Value() < 0 {
 			return admin.WrapError(admin.ErrorBadRequestType, err, "min duration '%s' cannot be less than 0", d.Min)
 		}
 	}
 	if d.Max != "" {
-		max, err = provisioner.NewDuration(d.Max)
+		maxDur, err = provisioner.NewDuration(d.Max)
 		if err != nil {
 			return admin.WrapError(admin.ErrorBadRequestType, err, "max duration '%s' is invalid", d.Max)
 		}
-		if max.Value() < 0 {
+		if maxDur.Value() < 0 {
 			return admin.WrapError(admin.ErrorBadRequestType, err, "max duration '%s' cannot be less than 0", d.Max)
 		}
 	}
@@ -457,15 +457,15 @@ func ValidateDurations(d *linkedca.Durations) error {
 			return admin.WrapError(admin.ErrorBadRequestType, err, "default duration '%s' cannot be less than 0", d.Default)
 		}
 	}
-	if d.Min != "" && d.Max != "" && min.Value() > max.Value() {
+	if d.Min != "" && d.Max != "" && minDur.Value() > maxDur.Value() {
 		return admin.NewError(admin.ErrorBadRequestType,
 			"min duration '%s' cannot be greater than max duration '%s'", d.Min, d.Max)
 	}
-	if d.Min != "" && d.Default != "" && min.Value() > def.Value() {
+	if d.Min != "" && d.Default != "" && minDur.Value() > def.Value() {
 		return admin.NewError(admin.ErrorBadRequestType,
 			"min duration '%s' cannot be greater than default duration '%s'", d.Min, d.Default)
 	}
-	if d.Default != "" && d.Max != "" && min.Value() > def.Value() {
+	if d.Default != "" && d.Max != "" && minDur.Value() > def.Value() {
 		return admin.NewError(admin.ErrorBadRequestType,
 			"default duration '%s' cannot be greater than max duration '%s'", d.Default, d.Max)
 	}
@@ -608,15 +608,15 @@ func provisionerWebhookToLinkedca(pwh *provisioner.Webhook) *linkedca.Webhook {
 	return lwh
 }
 
-func durationsToCertificates(d *linkedca.Durations) (min, max, def *provisioner.Duration, err error) {
+func durationsToCertificates(d *linkedca.Durations) (minDur, maxDur, def *provisioner.Duration, err error) {
 	if d.Min != "" {
-		min, err = provisioner.NewDuration(d.Min)
+		minDur, err = provisioner.NewDuration(d.Min)
 		if err != nil {
 			return nil, nil, nil, admin.WrapErrorISE(err, "error parsing minimum duration '%s'", d.Min)
 		}
 	}
 	if d.Max != "" {
-		max, err = provisioner.NewDuration(d.Max)
+		maxDur, err = provisioner.NewDuration(d.Max)
 		if err != nil {
 			return nil, nil, nil, admin.WrapErrorISE(err, "error parsing maximum duration '%s'", d.Max)
 		}
@@ -918,6 +918,8 @@ func ProvisionerToCertificates(p *linkedca.Provisioner) (provisioner.Interface, 
 			Domains:               cfg.Domains,
 			Groups:                cfg.Groups,
 			ListenAddress:         cfg.ListenAddress,
+			Scopes:                cfg.Scopes,
+			AuthParams:            cfg.AuthParams,
 			Claims:                claims,
 			Options:               options,
 		}, nil
@@ -1066,6 +1068,8 @@ func ProvisionerToLinkedca(p provisioner.Interface) (*linkedca.Provisioner, erro
 						Groups:                p.Groups,
 						ListenAddress:         p.ListenAddress,
 						TenantId:              p.TenantID,
+						Scopes:                p.Scopes,
+						AuthParams:            p.AuthParams,
 					},
 				},
 			},

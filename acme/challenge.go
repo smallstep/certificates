@@ -1,6 +1,7 @@
 package acme
 
 import (
+	"bytes"
 	"context"
 	"crypto"
 	"crypto/ecdsa"
@@ -110,16 +111,19 @@ func (ch *Challenge) Validate(ctx context.Context, db DB, jwk *jose.JSONWebKey, 
 }
 
 func http01Validate(ctx context.Context, ch *Challenge, db DB, jwk *jose.JSONWebKey) error {
-	u := &url.URL{Scheme: "http", Host: http01ChallengeHost(ch.Value), Path: fmt.Sprintf("/.well-known/acme-challenge/%s", ch.Token)}
+	u := &url.URL{Scheme: "http", Host: ch.Value, Path: fmt.Sprintf("/.well-known/acme-challenge/%s", ch.Token)}
+	challengeURL := &url.URL{Scheme: "http", Host: http01ChallengeHost(ch.Value), Path: fmt.Sprintf("/.well-known/acme-challenge/%s", ch.Token)}
 
 	// Append insecure port if set.
 	// Only used for testing purposes.
 	if InsecurePortHTTP01 != 0 {
-		u.Host += ":" + strconv.Itoa(InsecurePortHTTP01)
+		insecurePort := strconv.Itoa(InsecurePortHTTP01)
+		u.Host += ":" + insecurePort
+		challengeURL.Host += ":" + insecurePort
 	}
 
 	vc := MustClientFromContext(ctx)
-	resp, err := vc.Get(u.String())
+	resp, err := vc.Get(challengeURL.String())
 	if err != nil {
 		return storeError(ctx, db, ch, false, WrapError(ErrorConnectionType, err,
 			"error doing http GET for url %s", u))
@@ -157,15 +161,40 @@ func http01Validate(ctx context.Context, ch *Challenge, db DB, jwk *jose.JSONWeb
 	return nil
 }
 
+// rootedName adds a trailing "." to a given domain name.
+func rootedName(name string) string {
+	if name == "" || name[len(name)-1] != '.' {
+		return name + "."
+	}
+	return name
+}
+
 // http01ChallengeHost checks if a Challenge value is an IPv6 address
 // and adds square brackets if that's the case, so that it can be used
 // as a hostname. Returns the original Challenge value as the host to
 // use in other cases.
 func http01ChallengeHost(value string) string {
-	if ip := net.ParseIP(value); ip != nil && ip.To4() == nil {
-		value = "[" + value + "]"
+	if ip := net.ParseIP(value); ip != nil {
+		if ip.To4() == nil {
+			value = "[" + value + "]"
+		}
+		return value
 	}
-	return value
+	return rootedName(value)
+}
+
+// tlsAlpn01ChallengeHost returns the rooted DNS used on TLS-ALPN-01
+// validations.
+func tlsAlpn01ChallengeHost(name string) string {
+	if ip := net.ParseIP(name); ip != nil {
+		return name
+	}
+	return rootedName(name)
+}
+
+// dns01ChallengeHost returns the TXT record used in DNS-01 validations.
+func dns01ChallengeHost(domain string) string {
+	return "_acme-challenge." + rootedName(domain)
 }
 
 func tlsAlert(err error) uint8 {
@@ -190,13 +219,12 @@ func tlsalpn01Validate(ctx context.Context, ch *Challenge, db DB, jwk *jose.JSON
 		InsecureSkipVerify: true, //nolint:gosec // we expect a self-signed challenge certificate
 	}
 
-	var hostPort string
-
 	// Allow to change TLS port for testing purposes.
+	hostPort := tlsAlpn01ChallengeHost(ch.Value)
 	if port := InsecurePortTLSALPN01; port == 0 {
-		hostPort = net.JoinHostPort(ch.Value, "443")
+		hostPort = net.JoinHostPort(hostPort, "443")
 	} else {
-		hostPort = net.JoinHostPort(ch.Value, strconv.Itoa(port))
+		hostPort = net.JoinHostPort(hostPort, strconv.Itoa(port))
 	}
 
 	vc := MustClientFromContext(ctx)
@@ -211,7 +239,7 @@ func tlsalpn01Validate(ctx context.Context, ch *Challenge, db DB, jwk *jose.JSON
 				"cannot negotiate ALPN acme-tls/1 protocol for tls-alpn-01 challenge"))
 		}
 		return storeError(ctx, db, ch, false, WrapError(ErrorConnectionType, err,
-			"error doing TLS dial for %s", hostPort))
+			"error doing TLS dial for %s", ch.Value))
 	}
 	defer conn.Close()
 
@@ -307,7 +335,7 @@ func dns01Validate(ctx context.Context, ch *Challenge, db DB, jwk *jose.JSONWebK
 	domain := strings.TrimPrefix(ch.Value, "*.")
 
 	vc := MustClientFromContext(ctx)
-	txtRecords, err := vc.LookupTxt("_acme-challenge." + domain)
+	txtRecords, err := vc.LookupTxt(dns01ChallengeHost(domain))
 	if err != nil {
 		return storeError(ctx, db, ch, false, WrapError(ErrorDNSType, err,
 			"error looking up TXT records for domain %s", domain))
@@ -372,12 +400,26 @@ func deviceAttest01Validate(ctx context.Context, ch *Challenge, db DB, jwk *jose
 
 	attObj, err := base64.RawURLEncoding.DecodeString(p.AttObj)
 	if err != nil {
-		return WrapErrorISE(err, "error base64 decoding attObj")
+		return storeError(ctx, db, ch, true, NewDetailedError(ErrorBadAttestationStatementType, "failed base64 decoding attObj %q", p.AttObj))
+	}
+
+	if len(attObj) == 0 || bytes.Equal(attObj, []byte("{}")) {
+		return storeError(ctx, db, ch, true, NewDetailedError(ErrorBadAttestationStatementType, "attObj must not be empty"))
+	}
+
+	cborDecoderOptions := cbor.DecOptions{}
+	cborDecoder, err := cborDecoderOptions.DecMode()
+	if err != nil {
+		return WrapErrorISE(err, "failed creating CBOR decoder")
+	}
+
+	if err := cborDecoder.Wellformed(attObj); err != nil {
+		return storeError(ctx, db, ch, true, NewDetailedError(ErrorBadAttestationStatementType, "attObj is not well formed CBOR: %v", err))
 	}
 
 	att := attestationObject{}
-	if err := cbor.Unmarshal(attObj, &att); err != nil {
-		return WrapErrorISE(err, "error unmarshalling CBOR")
+	if err := cborDecoder.Unmarshal(attObj, &att); err != nil {
+		return WrapErrorISE(err, "failed unmarshalling CBOR")
 	}
 
 	format := att.Format
@@ -726,7 +768,7 @@ var (
 	oidTCGKpAIKCertificate       = asn1.ObjectIdentifier{2, 23, 133, 8, 3}
 )
 
-// validateAKCertifiate validates the X.509 AK certificate to be
+// validateAKCertificate validates the X.509 AK certificate to be
 // in accordance with the required properties. The requirements come from:
 // https://www.w3.org/TR/webauthn-2/#sctn-tpm-cert-requirements.
 //
@@ -735,7 +777,7 @@ var (
 //   - The Subject Alternative Name extension MUST be set as defined
 //     in [TPMv2-EK-Profile] section 3.2.9.
 //   - The Extended Key Usage extension MUST contain the OID 2.23.133.8.3
-//     ("joint-iso-itu-t(2) internationalorganizations(23) 133 tcg-kp(8) tcg-kp-AIKCertificate(3)").
+//     ("joint-iso-itu-t(2) international-organizations(23) 133 tcg-kp(8) tcg-kp-AIKCertificate(3)").
 //   - The Basic Constraints extension MUST have the CA component set to false.
 //   - An Authority Information Access (AIA) extension with entry id-ad-ocsp
 //     and a CRL Distribution Point extension [RFC5280] are both OPTIONAL as
@@ -1058,14 +1100,10 @@ func doStepAttestationFormat(_ context.Context, prov Provisioner, ch *Challenge,
 // should be the ARPA address https://datatracker.ietf.org/doc/html/rfc8738#section-6.
 // It also references TLS Extensions [RFC6066].
 func serverName(ch *Challenge) string {
-	var serverName string
-	ip := net.ParseIP(ch.Value)
-	if ip != nil {
-		serverName = reverseAddr(ip)
-	} else {
-		serverName = ch.Value
+	if ip := net.ParseIP(ch.Value); ip != nil {
+		return reverseAddr(ip)
 	}
-	return serverName
+	return ch.Value
 }
 
 // reverseaddr returns the in-addr.arpa. or ip6.arpa. hostname of the IP

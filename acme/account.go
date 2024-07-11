@@ -21,6 +21,7 @@ type Account struct {
 	OrdersURL              string           `json:"orders"`
 	ExternalAccountBinding interface{}      `json:"externalAccountBinding,omitempty"`
 	LocationPrefix         string           `json:"-"`
+	ProvisionerID          string           `json:"-"`
 	ProvisionerName        string           `json:"-"`
 }
 

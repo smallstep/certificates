@@ -177,8 +177,8 @@ func TestClient_Version(t *testing.T) {
 			c, err := NewClient(srv.URL, WithTransport(http.DefaultTransport))
 			require.NoError(t, err)
 
-			srv.Config.Handler = http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
-				render.JSONStatus(w, tt.response, tt.responseCode)
+			srv.Config.Handler = http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				render.JSONStatus(w, r, tt.response, tt.responseCode)
 			})
 
 			got, err := c.Version()
@@ -218,8 +218,8 @@ func TestClient_Health(t *testing.T) {
 			c, err := NewClient(srv.URL, WithTransport(http.DefaultTransport))
 			require.NoError(t, err)
 
-			srv.Config.Handler = http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
-				render.JSONStatus(w, tt.response, tt.responseCode)
+			srv.Config.Handler = http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				render.JSONStatus(w, r, tt.response, tt.responseCode)
 			})
 
 			got, err := c.Health()
@@ -262,12 +262,12 @@ func TestClient_Root(t *testing.T) {
 			c, err := NewClient(srv.URL, WithTransport(http.DefaultTransport))
 			require.NoError(t, err)
 
-			srv.Config.Handler = http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+			srv.Config.Handler = http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 				expected := "/root/" + tt.shasum
-				if req.RequestURI != expected {
-					t.Errorf("RequestURI = %s, want %s", req.RequestURI, expected)
+				if r.RequestURI != expected {
+					t.Errorf("RequestURI = %s, want %s", r.RequestURI, expected)
 				}
-				render.JSONStatus(w, tt.response, tt.responseCode)
+				render.JSONStatus(w, r, tt.response, tt.responseCode)
 			})
 
 			got, err := c.Root(tt.shasum)
@@ -323,12 +323,12 @@ func TestClient_Sign(t *testing.T) {
 			c, err := NewClient(srv.URL, WithTransport(http.DefaultTransport))
 			require.NoError(t, err)
 
-			srv.Config.Handler = http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+			srv.Config.Handler = http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 				body := new(api.SignRequest)
-				if err := read.JSON(req.Body, body); err != nil {
+				if err := read.JSON(r.Body, body); err != nil {
 					e, ok := tt.response.(error)
 					require.True(t, ok, "response expected to be error type")
-					render.Error(w, e)
+					render.Error(w, r, e)
 					return
 				} else if !equalJSON(t, body, tt.request) {
 					if tt.request == nil {
@@ -339,7 +339,7 @@ func TestClient_Sign(t *testing.T) {
 						t.Errorf("Client.Sign() request = %v, wants %v", body, tt.request)
 					}
 				}
-				render.JSONStatus(w, tt.response, tt.responseCode)
+				render.JSONStatus(w, r, tt.response, tt.responseCode)
 			})
 
 			got, err := c.Sign(tt.request)
@@ -385,12 +385,12 @@ func TestClient_Revoke(t *testing.T) {
 			c, err := NewClient(srv.URL, WithTransport(http.DefaultTransport))
 			require.NoError(t, err)
 
-			srv.Config.Handler = http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+			srv.Config.Handler = http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 				body := new(api.RevokeRequest)
-				if err := read.JSON(req.Body, body); err != nil {
+				if err := read.JSON(r.Body, body); err != nil {
 					e, ok := tt.response.(error)
 					require.True(t, ok, "response expected to be error type")
-					render.Error(w, e)
+					render.Error(w, r, e)
 					return
 				} else if !equalJSON(t, body, tt.request) {
 					if tt.request == nil {
@@ -401,7 +401,7 @@ func TestClient_Revoke(t *testing.T) {
 						t.Errorf("Client.Revoke() request = %v, wants %v", body, tt.request)
 					}
 				}
-				render.JSONStatus(w, tt.response, tt.responseCode)
+				render.JSONStatus(w, r, tt.response, tt.responseCode)
 			})
 
 			got, err := c.Revoke(tt.request, nil)
@@ -450,8 +450,8 @@ func TestClient_Renew(t *testing.T) {
 			c, err := NewClient(srv.URL, WithTransport(http.DefaultTransport))
 			require.NoError(t, err)
 
-			srv.Config.Handler = http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
-				render.JSONStatus(w, tt.response, tt.responseCode)
+			srv.Config.Handler = http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				render.JSONStatus(w, r, tt.response, tt.responseCode)
 			})
 
 			got, err := c.Renew(nil)
@@ -504,11 +504,11 @@ func TestClient_RenewWithToken(t *testing.T) {
 			c, err := NewClient(srv.URL, WithTransport(http.DefaultTransport))
 			require.NoError(t, err)
 
-			srv.Config.Handler = http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
-				if req.Header.Get("Authorization") != "Bearer token" {
-					render.JSONStatus(w, errs.InternalServer("force"), 500)
+			srv.Config.Handler = http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				if r.Header.Get("Authorization") != "Bearer token" {
+					render.JSONStatus(w, r, errs.InternalServer("force"), 500)
 				} else {
-					render.JSONStatus(w, tt.response, tt.responseCode)
+					render.JSONStatus(w, r, tt.response, tt.responseCode)
 				}
 			})
 
@@ -567,8 +567,8 @@ func TestClient_Rekey(t *testing.T) {
 			c, err := NewClient(srv.URL, WithTransport(http.DefaultTransport))
 			require.NoError(t, err)
 
-			srv.Config.Handler = http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
-				render.JSONStatus(w, tt.response, tt.responseCode)
+			srv.Config.Handler = http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				render.JSONStatus(w, r, tt.response, tt.responseCode)
 			})
 
 			got, err := c.Rekey(tt.request, nil)
@@ -619,11 +619,11 @@ func TestClient_Provisioners(t *testing.T) {
 			c, err := NewClient(srv.URL, WithTransport(http.DefaultTransport))
 			require.NoError(t, err)
 
-			srv.Config.Handler = http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
-				if req.RequestURI != tt.expectedURI {
-					t.Errorf("RequestURI = %s, want %s", req.RequestURI, tt.expectedURI)
+			srv.Config.Handler = http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				if r.RequestURI != tt.expectedURI {
+					t.Errorf("RequestURI = %s, want %s", r.RequestURI, tt.expectedURI)
 				}
-				render.JSONStatus(w, tt.response, tt.responseCode)
+				render.JSONStatus(w, r, tt.response, tt.responseCode)
 			})
 
 			got, err := c.Provisioners(tt.args...)
@@ -666,12 +666,12 @@ func TestClient_ProvisionerKey(t *testing.T) {
 			c, err := NewClient(srv.URL, WithTransport(http.DefaultTransport))
 			require.NoError(t, err)
 
-			srv.Config.Handler = http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+			srv.Config.Handler = http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 				expected := "/provisioners/" + tt.kid + "/encrypted-key"
-				if req.RequestURI != expected {
-					t.Errorf("RequestURI = %s, want %s", req.RequestURI, expected)
+				if r.RequestURI != expected {
+					t.Errorf("RequestURI = %s, want %s", r.RequestURI, expected)
 				}
-				render.JSONStatus(w, tt.response, tt.responseCode)
+				render.JSONStatus(w, r, tt.response, tt.responseCode)
 			})
 
 			got, err := c.ProvisionerKey(tt.kid)
@@ -720,8 +720,8 @@ func TestClient_Roots(t *testing.T) {
 			c, err := NewClient(srv.URL, WithTransport(http.DefaultTransport))
 			require.NoError(t, err)
 
-			srv.Config.Handler = http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
-				render.JSONStatus(w, tt.response, tt.responseCode)
+			srv.Config.Handler = http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				render.JSONStatus(w, r, tt.response, tt.responseCode)
 			})
 
 			got, err := c.Roots()
@@ -769,8 +769,8 @@ func TestClient_Federation(t *testing.T) {
 			c, err := NewClient(srv.URL, WithTransport(http.DefaultTransport))
 			require.NoError(t, err)
 
-			srv.Config.Handler = http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
-				render.JSONStatus(w, tt.response, tt.responseCode)
+			srv.Config.Handler = http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				render.JSONStatus(w, r, tt.response, tt.responseCode)
 			})
 
 			got, err := c.Federation()
@@ -820,8 +820,8 @@ func TestClient_SSHRoots(t *testing.T) {
 			c, err := NewClient(srv.URL, WithTransport(http.DefaultTransport))
 			require.NoError(t, err)
 
-			srv.Config.Handler = http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
-				render.JSONStatus(w, tt.response, tt.responseCode)
+			srv.Config.Handler = http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				render.JSONStatus(w, r, tt.response, tt.responseCode)
 			})
 
 			got, err := c.SSHRoots()
@@ -912,8 +912,8 @@ func TestClient_RootFingerprint(t *testing.T) {
 			c, err := NewClient(tt.server.URL, WithTransport(tr))
 			require.NoError(t, err)
 
-			tt.server.Config.Handler = http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
-				render.JSONStatus(w, tt.response, tt.responseCode)
+			tt.server.Config.Handler = http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				render.JSONStatus(w, r, tt.response, tt.responseCode)
 			})
 
 			got, err := c.RootFingerprint()
@@ -970,8 +970,8 @@ func TestClient_SSHBastion(t *testing.T) {
 			c, err := NewClient(srv.URL, WithTransport(http.DefaultTransport))
 			require.NoError(t, err)
 
-			srv.Config.Handler = http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
-				render.JSONStatus(w, tt.response, tt.responseCode)
+			srv.Config.Handler = http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				render.JSONStatus(w, r, tt.response, tt.responseCode)
 			})
 
 			got, err := c.SSHBastion(tt.request)
