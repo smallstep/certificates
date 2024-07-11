@@ -6,8 +6,11 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"net/http"
+	"net/url"
+	"strings"
 	"time"
 
+	"github.com/google/uuid"
 	"github.com/pkg/errors"
 	"golang.org/x/crypto/ssh"
 
@@ -326,6 +329,7 @@ func SSHSign(w http.ResponseWriter, r *http.Request) {
 
 		// Enforce the same duration as ssh certificate.
 		signOpts = append(signOpts, &identityModifier{
+			Identity:  getIdentityURI(cr),
 			NotBefore: time.Unix(int64(cert.ValidAfter), 0),
 			NotAfter:  time.Unix(int64(cert.ValidBefore), 0),
 		})
@@ -498,14 +502,42 @@ func SSHBastion(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
-// identityModifier is a custom modifier used to force a fixed duration.
+// identityModifier is a custom modifier used to force a fixed duration, and set
+// the identity URI.
 type identityModifier struct {
+	Identity  *url.URL
 	NotBefore time.Time
 	NotAfter  time.Time
 }
 
+// Enforce implements the enforcer interface and sets the validity bounds and
+// the identity uri to the certificate.
 func (m *identityModifier) Enforce(cert *x509.Certificate) error {
 	cert.NotBefore = m.NotBefore
 	cert.NotAfter = m.NotAfter
+	if m.Identity != nil {
+		var identityURL = m.Identity.String()
+		for _, u := range cert.URIs {
+			if u.String() == identityURL {
+				return nil
+			}
+		}
+		cert.URIs = append(cert.URIs, m.Identity)
+	}
+
+	return nil
+}
+
+// getIdentityURI returns the first valid UUID URN from the given CSR.
+func getIdentityURI(cr *x509.CertificateRequest) *url.URL {
+	for _, u := range cr.URIs {
+		s := u.String()
+		// urn:uuid:xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx
+		if len(s) == 9+36 && strings.EqualFold(s[:9], "urn:uuid:") {
+			if _, err := uuid.Parse(s); err == nil {
+				return u
+			}
+		}
+	}
 	return nil
 }
