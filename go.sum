@@ -415,8 +415,8 @@ go.opentelemetry.io/otel/trace v1.24.0 h1:CsKnnL4dUAr/0llH9FKuc698G04IrpWV0MQA/Y
 go.opentelemetry.io/otel/trace v1.24.0/go.mod h1:HPc3Xr/cOApsBI154IU0OI0HJexz+aw5uPdbs3UCjNU=
 go.step.sm/cli-utils v0.9.0 h1:55jYcsQbnArNqepZyAwcato6Zy2MoZDRkWW+jF+aPfQ=
 go.step.sm/cli-utils v0.9.0/go.mod h1:Y/CRoWl1FVR9j+7PnAewufAwKmBOTzR6l9+7EYGAnp8=
-go.step.sm/crypto v0.49.0 h1:J4qW5/ODYeHJFAM4PuNLSHKBMGWh4iwX6Tcrsp42r+U=
-go.step.sm/crypto v0.49.0/go.mod h1:NCFMhLS6FJXQ9sD9PP282oHtsBWLrI6wXZY0eOkq7t8=
+go.step.sm/crypto v0.50.0 h1:BqI9sEgocoHDLLHiZnFqdqXl5FjdMvOWKMm/fKL/lrw=
+go.step.sm/crypto v0.50.0/go.mod h1:NCFMhLS6FJXQ9sD9PP282oHtsBWLrI6wXZY0eOkq7t8=
 go.step.sm/linkedca v0.21.1 h1:2pM0qk48Rd8mre5V/Zch3AsaXUpyZAxsICKYB/gV2kc=
 go.step.sm/linkedca v0.21.1/go.mod h1:dOKdF4HSn73YUEkfS5/FECngZmBtj2Il5DTKWXY4S6Y=
 go.uber.org/multierr v1.11.0 h1:blXXJkSxSSfBVBlC76pxqeO+LN3aDfLQo+309xJstO0=
