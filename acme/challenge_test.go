@@ -2767,19 +2767,34 @@ func Test_serverName(t *testing.T) {
 
 func Test_http01ChallengeHost(t *testing.T) {
 	tests := []struct {
-		name  string
-		value string
-		want  string
+		name       string
+		strictFQDN bool
+		value      string
+		want       string
 	}{
 		{
-			name:  "dns",
-			value: "www.example.com",
-			want:  "www.example.com.",
+			name:       "dns",
+			strictFQDN: false,
+			value:      "www.example.com",
+			want:       "www.example.com",
 		},
 		{
-			name:  "rooted dns",
-			value: "www.example.com.",
-			want:  "www.example.com.",
+			name:       "dns strict",
+			strictFQDN: true,
+			value:      "www.example.com",
+			want:       "www.example.com.",
+		},
+		{
+			name:       "rooted dns",
+			strictFQDN: false,
+			value:      "www.example.com.",
+			want:       "www.example.com.",
+		},
+		{
+			name:       "rooted dns strict",
+			strictFQDN: true,
+			value:      "www.example.com.",
+			want:       "www.example.com.",
 		},
 		{
 			name:  "ipv4",
@@ -2794,6 +2809,11 @@ func Test_http01ChallengeHost(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			tmp := StrictFQDN
+			t.Cleanup(func() {
+				StrictFQDN = tmp
+			})
+			StrictFQDN = tt.strictFQDN
 			if got := http01ChallengeHost(tt.value); got != tt.want {
 				t.Errorf("http01ChallengeHost() = %v, want %v", got, tt.want)
 			}
@@ -4500,17 +4520,25 @@ func Test_tlsAlpn01ChallengeHost(t *testing.T) {
 		name string
 	}
 	tests := []struct {
-		name string
-		args args
-		want string
+		name       string
+		strictFQDN bool
+		args       args
+		want       string
 	}{
-		{"dns", args{"smallstep.com"}, "smallstep.com."},
-		{"rooted dns", args{"smallstep.com."}, "smallstep.com."},
-		{"ipv4", args{"1.2.3.4"}, "1.2.3.4"},
-		{"ipv6", args{"2607:f8b0:4023:1009::71"}, "2607:f8b0:4023:1009::71"},
+		{"dns", false, args{"smallstep.com"}, "smallstep.com"},
+		{"dns strict", true, args{"smallstep.com"}, "smallstep.com."},
+		{"rooted dns", false, args{"smallstep.com."}, "smallstep.com."},
+		{"rooted dns strict", true, args{"smallstep.com."}, "smallstep.com."},
+		{"ipv4", true, args{"1.2.3.4"}, "1.2.3.4"},
+		{"ipv6", true, args{"2607:f8b0:4023:1009::71"}, "2607:f8b0:4023:1009::71"},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			tmp := StrictFQDN
+			t.Cleanup(func() {
+				StrictFQDN = tmp
+			})
+			StrictFQDN = tt.strictFQDN
 			assert.Equal(t, tt.want, tlsAlpn01ChallengeHost(tt.args.name))
 		})
 	}
@@ -4521,15 +4549,23 @@ func Test_dns01ChallengeHost(t *testing.T) {
 		domain string
 	}
 	tests := []struct {
-		name string
-		args args
-		want string
+		name       string
+		strictFQDN bool
+		args       args
+		want       string
 	}{
-		{"dns", args{"smallstep.com"}, "_acme-challenge.smallstep.com."},
-		{"rooted dns", args{"smallstep.com."}, "_acme-challenge.smallstep.com."},
+		{"dns", false, args{"smallstep.com"}, "_acme-challenge.smallstep.com"},
+		{"dns strict", true, args{"smallstep.com"}, "_acme-challenge.smallstep.com."},
+		{"rooted dns", false, args{"smallstep.com."}, "_acme-challenge.smallstep.com."},
+		{"rooted dns strict", true, args{"smallstep.com."}, "_acme-challenge.smallstep.com."},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			tmp := StrictFQDN
+			t.Cleanup(func() {
+				StrictFQDN = tmp
+			})
+			StrictFQDN = tt.strictFQDN
 			assert.Equal(t, tt.want, dns01ChallengeHost(tt.args.domain))
 		})
 	}

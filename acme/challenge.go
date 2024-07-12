@@ -63,6 +63,11 @@ var (
 	//
 	// This variable can be used for testing purposes.
 	InsecurePortTLSALPN01 int
+
+	// StrictFQDN allows to enforce a fully qualified domain name in the DNS
+	// resolution. By default it allows domain resolution using a search list
+	// defined in the resolv.conf or similar configuration.
+	StrictFQDN bool
 )
 
 // Challenge represents an ACME response Challenge type.
@@ -163,8 +168,10 @@ func http01Validate(ctx context.Context, ch *Challenge, db DB, jwk *jose.JSONWeb
 
 // rootedName adds a trailing "." to a given domain name.
 func rootedName(name string) string {
-	if name == "" || name[len(name)-1] != '.' {
-		return name + "."
+	if StrictFQDN {
+		if name == "" || name[len(name)-1] != '.' {
+			return name + "."
+		}
 	}
 	return name
 }
