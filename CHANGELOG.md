@@ -25,6 +25,22 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
 
 ---
 
+## [0.27.0] - 2024-07-11
+
+### Added
+
+- Support for validity windows in templates (smallstep/certificates#1903)
+- Create identity certificate with host URI when using any provisioner (smallstep/certificates#1922)
+
+### Fixed
+
+- Handle bad attestation object in deviceAttest01 validation (smallstep/certificates#1913)
+
+### Security
+
+- Do strict DNS lookup on ACME (smallstep/certificates#1910)
+
+
 ## [0.26.2] - 2024-06-13
 
 ### Added
