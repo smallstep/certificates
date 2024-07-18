@@ -25,6 +25,21 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
 
 ---
 
+## [0.27.2] - 2024-07-18
+
+### Added
+
+- `--console` option to default step-ssh config (smallstep/certificates#1931)
+
+
+## [0.27.1] - 2024-07-12
+
+### Changed
+
+- Enable use of strict FQDN with a flag (smallstep/certificates#1926)
+    - This reverses a change in 0.27.0 that required the use of strict FQDNs (smallstep/certificate#1910)
+
+
 ## [0.27.0] - 2024-07-11
 
 ### Added
@@ -32,13 +47,13 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
 - Support for validity windows in templates (smallstep/certificates#1903)
 - Create identity certificate with host URI when using any provisioner (smallstep/certificates#1922)
 
+### Changed
+
+- Do strict DNS lookup on ACME (smallstep/certificates#1910)
+
 ### Fixed
 
 - Handle bad attestation object in deviceAttest01 validation (smallstep/certificates#1913)
-
-### Security
-
-- Do strict DNS lookup on ACME (smallstep/certificates#1910)
 
 
 ## [0.26.2] - 2024-06-13
