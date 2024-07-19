@@ -45,12 +45,12 @@ jobs:
           echo "DOCKER_TAGS_HSM=${{ env.DOCKER_TAGS_HSM }},${{ env.DOCKER_IMAGE }}:hsm" >> "${GITHUB_ENV}"
       - name: Create Release
         id: create_release
-        uses: actions/create-release@v1
+        uses: softprops/action-gh-release@a74c6b72af54cfa997e81df42d94703d6313a2d0 # v2.0.6
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
-          tag_name: ${{ github.ref }}
-          release_name: Release ${{ github.ref }}
+          tag_name: ${{ github.ref_name }}
+          name: Release ${{ github.ref_name }}
           draft: false
           prerelease: ${{ steps.is_prerelease.outputs.IS_PRERELEASE }}
 
