@@ -2,9 +2,6 @@ package provisioner
 
 import (
 	"crypto/rsa"
-	"crypto/sha256"
-	"crypto/subtle"
-	"encoding/base64"
 	"encoding/binary"
 	"encoding/json"
 	"fmt"
@@ -427,24 +424,6 @@ func (v *sshNamePolicyValidator) Valid(cert *ssh.Certificate, _ SignSSHOptions) 
 	default:
 		return fmt.Errorf("unexpected SSH certificate type %d", cert.CertType) // satisfy return; shouldn't happen
 	}
-}
-
-// sshFingerprintValidator is a SSHPublicKeyValidator that checks the
-// fingerprint of the public key with the provided one.
-type sshFingerprintValidator string
-
-func (s sshFingerprintValidator) Valid(key ssh.PublicKey) error {
-	if s != "" {
-		expected, err := base64.RawURLEncoding.DecodeString(string(s))
-		if err != nil {
-			return errs.ForbiddenErr(err, "error decoding fingerprint")
-		}
-		sum := sha256.Sum256(key.Marshal())
-		if subtle.ConstantTimeCompare(expected, sum[:]) != 1 {
-			return errs.Forbidden("ssh public key fingerprint does not match %q", s)
-		}
-	}
-	return nil
 }
 
 // sshCertTypeUInt32

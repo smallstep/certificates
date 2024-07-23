@@ -493,8 +493,8 @@ func (p *GCP) genHostOptions(_ context.Context, claims *gcpPayload) (SignSSHOpti
 	return SignSSHOptions{CertType: SSHHostCert}, keyID, principals, sshutil.HostCert, sshutil.DefaultIIDTemplate
 }
 
-func FormatServiceAccountUsername(serviceAccountId string) string {
-	return fmt.Sprintf("sa_%v", serviceAccountId)
+func FormatServiceAccountUsername(serviceAccountID string) string {
+	return fmt.Sprintf("sa_%v", serviceAccountID)
 }
 
 func (p *GCP) genUserOptions(_ context.Context, claims *gcpPayload) (SignSSHOptions, string, []string, sshutil.CertType, string) {

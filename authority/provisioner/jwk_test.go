@@ -336,7 +336,7 @@ func TestJWK_AuthorizeSign(t *testing.T) {
 						case *x509NamePolicyValidator:
 							assert.Equals(t, nil, v.policyEngine)
 						case *WebhookController:
-						case fingerprintValidator:
+						case csrFingerprintValidator:
 							assert.Equals(t, tt.fingerprint, string(v))
 						default:
 							assert.FatalError(t, fmt.Errorf("unexpected sign option of type %T", v))
@@ -491,10 +491,10 @@ func TestJWK_AuthorizeSSHSign(t *testing.T) {
 		{"host-principals", p1, args{t2, SignSSHOptions{Principals: []string{"smallstep.com"}}, pub}, expectedHostOptions, http.StatusOK, false, false},
 		{"host-options", p1, args{t2, SignSSHOptions{CertType: "host", Principals: []string{"smallstep.com"}}, pub}, expectedHostOptions, http.StatusOK, false, false},
 		{"host-cnf", p1, args{t3, SignSSHOptions{CertType: "host", Principals: []string{"smallstep.com"}}, pub}, expectedHostOptions, http.StatusOK, false, false},
+		{"ignore-bad-cnf", p1, args{t4, SignSSHOptions{CertType: "host", Principals: []string{"smallstep.com"}}, pub}, expectedHostOptions, http.StatusOK, false, false},
 		{"fail-sshCA-disabled", p2, args{"foo", SignSSHOptions{}, pub}, expectedUserOptions, http.StatusUnauthorized, true, false},
 		{"fail-signature", p1, args{failSig, SignSSHOptions{}, pub}, nil, http.StatusUnauthorized, true, false},
 		{"fail-rsa1024", p1, args{t1, SignSSHOptions{}, rsa1024.Public()}, expectedUserOptions, http.StatusOK, false, true},
-		{"fail-cnf", p1, args{t4, SignSSHOptions{CertType: "host", Principals: []string{"smallstep.com"}}, pub}, expectedHostOptions, http.StatusUnauthorized, false, true},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {

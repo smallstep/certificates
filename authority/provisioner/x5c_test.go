@@ -527,7 +527,7 @@ func TestX5C_AuthorizeSign(t *testing.T) {
 								assert.Len(t, 0, v.webhooks)
 								assert.Equals(t, linkedca.Webhook_X509, v.certType)
 								assert.Len(t, 2, v.options)
-							case fingerprintValidator:
+							case csrFingerprintValidator:
 								assert.Equals(t, tc.fingerprint, string(v))
 							default:
 								assert.FatalError(t, fmt.Errorf("unexpected sign option of type %T", v))
@@ -824,7 +824,7 @@ func TestX5C_AuthorizeSSHSign(t *testing.T) {
 				claims:      claims,
 				token:       tok,
 				fingerprint: "fingerprint",
-				count:       11,
+				count:       10,
 			}
 		},
 	}
@@ -874,8 +874,6 @@ func TestX5C_AuthorizeSSHSign(t *testing.T) {
 								assert.Len(t, 0, v.webhooks)
 								assert.Equals(t, linkedca.Webhook_SSH, v.certType)
 								assert.Len(t, 2, v.options)
-							case sshFingerprintValidator:
-								assert.Equals(t, tc.fingerprint, string(v))
 							default:
 								assert.FatalError(t, fmt.Errorf("unexpected sign option of type %T", v))
 							}

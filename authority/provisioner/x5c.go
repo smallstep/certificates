@@ -250,7 +250,7 @@ func (p *X5C) AuthorizeSign(ctx context.Context, token string) ([]SignOption, er
 			x5cLeaf.NotBefore, x5cLeaf.NotAfter,
 		},
 		// validators
-		fingerprintValidator(fingerprint),
+		csrFingerprintValidator(fingerprint),
 		commonNameValidator(claims.Subject),
 		newDefaultSANsValidator(ctx, claims.SANs),
 		defaultPublicKeyValidator{},
@@ -291,11 +291,6 @@ func (p *X5C) AuthorizeSSHSign(_ context.Context, token string) ([]SignOption, e
 		sshCertOptionsValidator(*opts),
 		// validate users's KeyID is the token subject.
 		sshCertOptionsValidator(SignSSHOptions{KeyID: claims.Subject}),
-	}
-
-	// Check the fingerprint of the certificate request if given.
-	if claims.Confirmation != nil && claims.Confirmation.Kid != "" {
-		signOptions = append(signOptions, sshFingerprintValidator(claims.Confirmation.Kid))
 	}
 
 	// Default template attributes.

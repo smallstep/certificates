@@ -201,7 +201,7 @@ func (p *JWK) AuthorizeSign(ctx context.Context, token string) ([]SignOption, er
 		newProvisionerExtensionOption(TypeJWK, p.Name, p.Key.KeyID).WithControllerOptions(p.ctl),
 		profileDefaultDuration(p.ctl.Claimer.DefaultTLSCertDuration()),
 		// validators
-		fingerprintValidator(fingerprint),
+		csrFingerprintValidator(fingerprint),
 		commonNameSliceValidator(append([]string{claims.Subject}, claims.SANs...)),
 		defaultPublicKeyValidator{},
 		newDefaultSANsValidator(ctx, claims.SANs),
@@ -239,11 +239,6 @@ func (p *JWK) AuthorizeSSHSign(_ context.Context, token string) ([]SignOption, e
 		sshCertOptionsValidator(*opts),
 		// validate users's KeyID is the token subject.
 		sshCertOptionsValidator(SignSSHOptions{KeyID: claims.Subject}),
-	}
-
-	// Check the fingerprint of the certificate request if given.
-	if claims.Confirmation != nil && claims.Confirmation.Kid != "" {
-		signOptions = append(signOptions, sshFingerprintValidator(claims.Confirmation.Kid))
 	}
 
 	// Default template attributes.

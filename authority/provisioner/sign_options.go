@@ -507,11 +507,11 @@ func (o *provisionerExtensionOption) Modify(cert *x509.Certificate, _ SignOption
 	return nil
 }
 
-// fingerprintValidator is a CertificateRequestValidator that checks the
+// csrFingerprintValidator is a CertificateRequestValidator that checks the
 // fingerprint of the certificate request with the provided one.
-type fingerprintValidator string
+type csrFingerprintValidator string
 
-func (s fingerprintValidator) Valid(cr *x509.CertificateRequest) error {
+func (s csrFingerprintValidator) Valid(cr *x509.CertificateRequest) error {
 	if s != "" {
 		expected, err := base64.RawURLEncoding.DecodeString(string(s))
 		if err != nil {
