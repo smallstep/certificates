@@ -78,3 +78,17 @@ func TokenFromContext(ctx context.Context) (string, bool) {
 	token, ok := ctx.Value(tokenKey{}).(string)
 	return token, ok
 }
+
+// The key to save the certTypeKey in the context.
+type certTypeKey struct{}
+
+// NewContextWithCertType creates a new context with the given CertType.
+func NewContextWithCertType(ctx context.Context, certType string) context.Context {
+	return context.WithValue(ctx, certTypeKey{}, certType)
+}
+
+// CertTypeFromContext returns the certType stored in the given context.
+func CertTypeFromContext(ctx context.Context) (string, bool) {
+	certType, ok := ctx.Value(certTypeKey{}).(string)
+	return certType, ok
+}

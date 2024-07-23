@@ -270,7 +270,7 @@ func (e *NamePolicyEngine) IsSSHCertificateAllowed(cert *ssh.Certificate) error 
 	return e.validateNames(dnsNames, ips, emails, []*url.URL{}, principals)
 }
 
-// splitPrincipals splits SSH certificate principals into DNS names, emails and usernames.
+// splitSSHPrincipals splits SSH certificate principals into DNS names, emails and usernames.
 func splitSSHPrincipals(cert *ssh.Certificate) (dnsNames []string, ips []net.IP, emails, principals []string, err error) {
 	dnsNames = []string{}
 	ips = []net.IP{}

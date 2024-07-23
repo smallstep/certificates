@@ -93,6 +93,8 @@ type OIDC struct {
 	ListenAddress         string   `json:"listenAddress,omitempty"`
 	Claims                *Claims  `json:"claims,omitempty"`
 	Options               *Options `json:"options,omitempty"`
+	Scopes                []string `json:"scopes,omitempty"`
+	AuthParams            []string `json:"authParams,omitempty"`
 	configuration         openIDConfiguration
 	keyStore              *keyStore
 	ctl                   *Controller

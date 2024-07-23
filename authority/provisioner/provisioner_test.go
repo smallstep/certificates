@@ -6,10 +6,10 @@ import (
 	"net/http"
 	"testing"
 
-	"golang.org/x/crypto/ssh"
-
-	"github.com/smallstep/assert"
+	"github.com/go-jose/go-jose/v3"
 	"github.com/smallstep/certificates/api/render"
+	"github.com/stretchr/testify/assert"
+	"golang.org/x/crypto/ssh"
 )
 
 func TestType_String(t *testing.T) {
@@ -149,11 +149,11 @@ func TestDefaultIdentityFunc(t *testing.T) {
 			identity, err := DefaultIdentityFunc(context.Background(), tc.p, tc.email)
 			if err != nil {
 				if assert.NotNil(t, tc.err) {
-					assert.Equals(t, tc.err.Error(), err.Error())
+					assert.Equal(t, tc.err.Error(), err.Error())
 				}
 			} else {
 				if assert.Nil(t, tc.err) {
-					assert.Equals(t, identity.Usernames, tc.identity.Usernames)
+					assert.Equal(t, identity.Usernames, tc.identity.Usernames)
 				}
 			}
 		})
@@ -243,9 +243,43 @@ func TestUnimplementedMethods(t *testing.T) {
 			}
 			var sc render.StatusCodedError
 			if assert.True(t, errors.As(err, &sc), "error does not implement StatusCodedError interface") {
-				assert.Equals(t, sc.StatusCode(), http.StatusUnauthorized)
+				assert.Equal(t, http.StatusUnauthorized, sc.StatusCode())
 			}
-			assert.Equals(t, err.Error(), msg)
+			assert.Equal(t, msg, err.Error())
+		})
+	}
+}
+
+func TestUninitialized_MarshalJSON(t *testing.T) {
+	p := &JWK{
+		Name: "bad-provisioner",
+		Type: "JWK",
+		Key: &jose.JSONWebKey{
+			Key: []byte("foo"),
+		},
+	}
+
+	type fields struct {
+		Interface Interface
+		Reason    error
+	}
+	tests := []struct {
+		name      string
+		fields    fields
+		want      []byte
+		assertion assert.ErrorAssertionFunc
+	}{
+		{"ok", fields{p, errors.New("bad key")}, []byte(`{"type":"JWK","name":"bad-provisioner","key":{"kty":"oct","k":"Zm9v"},"state":"Uninitialized","stateReason":"bad key"}`), assert.NoError},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			p := Uninitialized{
+				Interface: tt.fields.Interface,
+				Reason:    tt.fields.Reason,
+			}
+			got, err := p.MarshalJSON()
+			tt.assertion(t, err)
+			assert.Equal(t, tt.want, got)
 		})
 	}
 }

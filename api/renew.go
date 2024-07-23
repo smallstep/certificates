@@ -23,19 +23,20 @@ func Renew(w http.ResponseWriter, r *http.Request) {
 	// Get the leaf certificate from the peer or the token.
 	cert, token, err := getPeerCertificate(r)
 	if err != nil {
-		render.Error(w, err)
+		render.Error(w, r, err)
 		return
 	}
 
 	// The token can be used by RAs to renew a certificate.
 	if token != "" {
 		ctx = authority.NewTokenContext(ctx, token)
+		logOtt(w, token)
 	}
 
 	a := mustAuthority(ctx)
 	certChain, err := a.RenewContext(ctx, cert, nil)
 	if err != nil {
-		render.Error(w, errs.Wrap(http.StatusInternalServerError, err, "cahandler.Renew"))
+		render.Error(w, r, errs.Wrap(http.StatusInternalServerError, err, "cahandler.Renew"))
 		return
 	}
 	certChainPEM := certChainToPEM(certChain)
@@ -45,7 +46,7 @@ func Renew(w http.ResponseWriter, r *http.Request) {
 	}
 
 	LogCertificate(w, certChain[0])
-	render.JSONStatus(w, &SignResponse{
+	render.JSONStatus(w, r, &SignResponse{
 		ServerPEM:    certChainPEM[0],
 		CaPEM:        caPEM,
 		CertChainPEM: certChainPEM,

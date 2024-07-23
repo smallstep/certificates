@@ -66,12 +66,32 @@ type instrumentedKeyManager struct {
 	meter Meter
 }
 
+type instrumentedKeyAndDecrypterManager struct {
+	kms.KeyManager
+	decrypter kmsapi.Decrypter
+	meter     Meter
+}
+
+func newInstrumentedKeyManager(k kms.KeyManager, m Meter) kms.KeyManager {
+	decrypter, isDecrypter := k.(kmsapi.Decrypter)
+	switch {
+	case isDecrypter:
+		return &instrumentedKeyAndDecrypterManager{&instrumentedKeyManager{k, m}, decrypter, m}
+	default:
+		return &instrumentedKeyManager{k, m}
+	}
+}
+
 func (i *instrumentedKeyManager) CreateSigner(req *kmsapi.CreateSignerRequest) (s crypto.Signer, err error) {
 	if s, err = i.KeyManager.CreateSigner(req); err == nil {
 		s = &instrumentedKMSSigner{s, i.meter}
 	}
 
 	return
+}
+
+func (i *instrumentedKeyAndDecrypterManager) CreateDecrypter(req *kmsapi.CreateDecrypterRequest) (s crypto.Decrypter, err error) {
+	return i.decrypter.CreateDecrypter(req)
 }
 
 type instrumentedKMSSigner struct {
@@ -85,3 +105,7 @@ func (i *instrumentedKMSSigner) Sign(rand io.Reader, digest []byte, opts crypto.
 
 	return
 }
+
+var _ kms.KeyManager = (*instrumentedKeyManager)(nil)
+var _ kms.KeyManager = (*instrumentedKeyAndDecrypterManager)(nil)
+var _ kmsapi.Decrypter = (*instrumentedKeyAndDecrypterManager)(nil)

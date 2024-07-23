@@ -353,15 +353,15 @@ func Route(r Router) {
 // Version is an HTTP handler that returns the version of the server.
 func Version(w http.ResponseWriter, r *http.Request) {
 	v := mustAuthority(r.Context()).Version()
-	render.JSON(w, VersionResponse{
+	render.JSON(w, r, VersionResponse{
 		Version:                     v.Version,
 		RequireClientAuthentication: v.RequireClientAuthentication,
 	})
 }
 
 // Health is an HTTP handler that returns the status of the server.
-func Health(w http.ResponseWriter, _ *http.Request) {
-	render.JSON(w, HealthResponse{Status: "ok"})
+func Health(w http.ResponseWriter, r *http.Request) {
+	render.JSON(w, r, HealthResponse{Status: "ok"})
 }
 
 // Root is an HTTP handler that using the SHA256 from the URL, returns the root
@@ -372,11 +372,11 @@ func Root(w http.ResponseWriter, r *http.Request) {
 	// Load root certificate with the
 	cert, err := mustAuthority(r.Context()).Root(sum)
 	if err != nil {
-		render.Error(w, errs.Wrapf(http.StatusNotFound, err, "%s was not found", r.RequestURI))
+		render.Error(w, r, errs.Wrapf(http.StatusNotFound, err, "%s was not found", r.RequestURI))
 		return
 	}
 
-	render.JSON(w, &RootResponse{RootPEM: Certificate{cert}})
+	render.JSON(w, r, &RootResponse{RootPEM: Certificate{cert}})
 }
 
 func certChainToPEM(certChain []*x509.Certificate) []Certificate {
@@ -391,17 +391,17 @@ func certChainToPEM(certChain []*x509.Certificate) []Certificate {
 func Provisioners(w http.ResponseWriter, r *http.Request) {
 	cursor, limit, err := ParseCursor(r)
 	if err != nil {
-		render.Error(w, err)
+		render.Error(w, r, err)
 		return
 	}
 
 	p, next, err := mustAuthority(r.Context()).GetProvisioners(cursor, limit)
 	if err != nil {
-		render.Error(w, errs.InternalServerErr(err))
+		render.Error(w, r, errs.InternalServerErr(err))
 		return
 	}
 
-	render.JSON(w, &ProvisionersResponse{
+	render.JSON(w, r, &ProvisionersResponse{
 		Provisioners: p,
 		NextCursor:   next,
 	})
@@ -412,18 +412,18 @@ func ProvisionerKey(w http.ResponseWriter, r *http.Request) {
 	kid := chi.URLParam(r, "kid")
 	key, err := mustAuthority(r.Context()).GetEncryptedKey(kid)
 	if err != nil {
-		render.Error(w, errs.NotFoundErr(err))
+		render.Error(w, r, errs.NotFoundErr(err))
 		return
 	}
 
-	render.JSON(w, &ProvisionerKeyResponse{key})
+	render.JSON(w, r, &ProvisionerKeyResponse{key})
 }
 
 // Roots returns all the root certificates for the CA.
 func Roots(w http.ResponseWriter, r *http.Request) {
 	roots, err := mustAuthority(r.Context()).GetRoots()
 	if err != nil {
-		render.Error(w, errs.ForbiddenErr(err, "error getting roots"))
+		render.Error(w, r, errs.ForbiddenErr(err, "error getting roots"))
 		return
 	}
 
@@ -432,7 +432,7 @@ func Roots(w http.ResponseWriter, r *http.Request) {
 		certs[i] = Certificate{roots[i]}
 	}
 
-	render.JSONStatus(w, &RootsResponse{
+	render.JSONStatus(w, r, &RootsResponse{
 		Certificates: certs,
 	}, http.StatusCreated)
 }
@@ -441,7 +441,7 @@ func Roots(w http.ResponseWriter, r *http.Request) {
 func RootsPEM(w http.ResponseWriter, r *http.Request) {
 	roots, err := mustAuthority(r.Context()).GetRoots()
 	if err != nil {
-		render.Error(w, errs.InternalServerErr(err))
+		render.Error(w, r, errs.InternalServerErr(err))
 		return
 	}
 
@@ -454,7 +454,7 @@ func RootsPEM(w http.ResponseWriter, r *http.Request) {
 		})
 
 		if _, err := w.Write(block); err != nil {
-			log.Error(w, err)
+			log.Error(w, r, err)
 			return
 		}
 	}
@@ -464,7 +464,7 @@ func RootsPEM(w http.ResponseWriter, r *http.Request) {
 func Federation(w http.ResponseWriter, r *http.Request) {
 	federated, err := mustAuthority(r.Context()).GetFederation()
 	if err != nil {
-		render.Error(w, errs.ForbiddenErr(err, "error getting federated roots"))
+		render.Error(w, r, errs.ForbiddenErr(err, "error getting federated roots"))
 		return
 	}
 
@@ -473,7 +473,7 @@ func Federation(w http.ResponseWriter, r *http.Request) {
 		certs[i] = Certificate{federated[i]}
 	}
 
-	render.JSONStatus(w, &FederationResponse{
+	render.JSONStatus(w, r, &FederationResponse{
 		Certificates: certs,
 	}, http.StatusCreated)
 }

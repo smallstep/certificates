@@ -10,6 +10,7 @@ import (
 	"strings"
 
 	"github.com/pkg/errors"
+	kmsapi "go.step.sm/crypto/kms/apiv1"
 	"golang.org/x/crypto/ssh"
 
 	"github.com/smallstep/certificates/errs"
@@ -31,6 +32,31 @@ type Interface interface {
 	AuthorizeSSHRevoke(ctx context.Context, token string) error
 	AuthorizeSSHRenew(ctx context.Context, token string) (*ssh.Certificate, error)
 	AuthorizeSSHRekey(ctx context.Context, token string) (*ssh.Certificate, []SignOption, error)
+}
+
+// Uninitialized represents a disabled provisioner. Uninitialized provisioners
+// are created when the Init methods fails.
+type Uninitialized struct {
+	Interface
+	Reason error
+}
+
+// MarshalJSON returns the JSON encoding of the provisioner with the disabled
+// reason.
+func (p Uninitialized) MarshalJSON() ([]byte, error) {
+	provisionerJSON, err := json.Marshal(p.Interface)
+	if err != nil {
+		return nil, err
+	}
+	reasonJSON, err := json.Marshal(struct {
+		State       string `json:"state"`
+		StateReason string `json:"stateReason"`
+	}{"Uninitialized", p.Reason.Error()})
+	if err != nil {
+		return nil, err
+	}
+	reasonJSON[0] = ','
+	return append(provisionerJSON[:len(provisionerJSON)-1], reasonJSON...), nil
 }
 
 // ErrAllowTokenReuse is an error that is returned by provisioners that allows
@@ -206,6 +232,13 @@ type SSHKeys struct {
 	HostKeys []ssh.PublicKey
 }
 
+// SCEPKeyManager is a KMS interface that combines a KeyManager with a
+// Decrypter.
+type SCEPKeyManager interface {
+	kmsapi.KeyManager
+	kmsapi.Decrypter
+}
+
 // Config defines the default parameters used in the initialization of
 // provisioners.
 type Config struct {
@@ -226,6 +259,8 @@ type Config struct {
 	AuthorizeSSHRenewFunc AuthorizeSSHRenewFunc
 	// WebhookClient is an http client to use in webhook request
 	WebhookClient *http.Client
+	// SCEPKeyManager, if defined, is the interface used by SCEP provisioners.
+	SCEPKeyManager SCEPKeyManager
 }
 
 type provisioner struct {
@@ -320,7 +355,7 @@ func (b *base) AuthorizeSSHSign(context.Context, string) ([]SignOption, error) {
 	return nil, errs.Unauthorized("provisioner.AuthorizeSSHSign not implemented")
 }
 
-// AuthorizeRevoke returns an unimplemented error. Provisioners should overwrite
+// AuthorizeSSHRevoke returns an unimplemented error. Provisioners should overwrite
 // this method if they will support authorizing tokens for revoking SSH Certificates.
 func (b *base) AuthorizeSSHRevoke(context.Context, string) error {
 	return errs.Unauthorized("provisioner.AuthorizeSSHRevoke not implemented")

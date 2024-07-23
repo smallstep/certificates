@@ -1,6 +1,7 @@
 package apiv1
 
 import (
+	"crypto"
 	"crypto/x509"
 	"net/http"
 	"strings"
@@ -26,11 +27,18 @@ type CertificateAuthorityGetter interface {
 	GetCertificateAuthority(req *GetCertificateAuthorityRequest) (*GetCertificateAuthorityResponse, error)
 }
 
-// CertificateAuthorityCreator is an interface implamented by a
+// CertificateAuthorityCreator is an interface implemented by a
 // CertificateAuthorityService that has a method to create a new certificate
 // authority.
 type CertificateAuthorityCreator interface {
 	CreateCertificateAuthority(req *CreateCertificateAuthorityRequest) (*CreateCertificateAuthorityResponse, error)
+}
+
+// CertificateAuthoritySigner is an optional interface implemented by a
+// CertificateAuthorityService that has a method that returns a [crypto.Signer]
+// using the same key used to issue certificates.
+type CertificateAuthoritySigner interface {
+	GetSigner() (crypto.Signer, error)
 }
 
 // SignatureAlgorithmGetter is an optional implementation in a crypto.Signer

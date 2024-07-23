@@ -51,7 +51,7 @@ func (e badProtoJSONError) Error() string {
 }
 
 // Render implements render.RenderableError for badProtoJSONError
-func (e badProtoJSONError) Render(w http.ResponseWriter) {
+func (e badProtoJSONError) Render(w http.ResponseWriter, r *http.Request) {
 	v := struct {
 		Type    string `json:"type"`
 		Detail  string `json:"detail"`
@@ -62,5 +62,5 @@ func (e badProtoJSONError) Render(w http.ResponseWriter) {
 		// trim the proto prefix for the message
 		Message: strings.TrimSpace(strings.TrimPrefix(e.Error(), "proto:")),
 	}
-	render.JSONStatus(w, v, http.StatusBadRequest)
+	render.JSONStatus(w, r, v, http.StatusBadRequest)
 }

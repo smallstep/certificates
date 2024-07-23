@@ -82,23 +82,23 @@ func NewAccount(w http.ResponseWriter, r *http.Request) {
 
 	payload, err := payloadFromContext(ctx)
 	if err != nil {
-		render.Error(w, err)
+		render.Error(w, r, err)
 		return
 	}
 	var nar NewAccountRequest
 	if err := json.Unmarshal(payload.value, &nar); err != nil {
-		render.Error(w, acme.WrapError(acme.ErrorMalformedType, err,
+		render.Error(w, r, acme.WrapError(acme.ErrorMalformedType, err,
 			"failed to unmarshal new-account request payload"))
 		return
 	}
 	if err := nar.Validate(); err != nil {
-		render.Error(w, err)
+		render.Error(w, r, err)
 		return
 	}
 
 	prov, err := acmeProvisionerFromContext(ctx)
 	if err != nil {
-		render.Error(w, err)
+		render.Error(w, r, err)
 		return
 	}
 
@@ -108,26 +108,26 @@ func NewAccount(w http.ResponseWriter, r *http.Request) {
 		var acmeErr *acme.Error
 		if !errors.As(err, &acmeErr) || acmeErr.Status != http.StatusBadRequest {
 			// Something went wrong ...
-			render.Error(w, err)
+			render.Error(w, r, err)
 			return
 		}
 
 		// Account does not exist //
 		if nar.OnlyReturnExisting {
-			render.Error(w, acme.NewError(acme.ErrorAccountDoesNotExistType,
+			render.Error(w, r, acme.NewError(acme.ErrorAccountDoesNotExistType,
 				"account does not exist"))
 			return
 		}
 
 		jwk, err := jwkFromContext(ctx)
 		if err != nil {
-			render.Error(w, err)
+			render.Error(w, r, err)
 			return
 		}
 
 		eak, err := validateExternalAccountBinding(ctx, &nar)
 		if err != nil {
-			render.Error(w, err)
+			render.Error(w, r, err)
 			return
 		}
 
@@ -136,20 +136,21 @@ func NewAccount(w http.ResponseWriter, r *http.Request) {
 			Contact:         nar.Contact,
 			Status:          acme.StatusValid,
 			LocationPrefix:  getAccountLocationPath(ctx, linker, ""),
-			ProvisionerName: prov.GetName(),
+			ProvisionerID:   prov.ID,
+			ProvisionerName: prov.Name,
 		}
 		if err := db.CreateAccount(ctx, acc); err != nil {
-			render.Error(w, acme.WrapErrorISE(err, "error creating account"))
+			render.Error(w, r, acme.WrapErrorISE(err, "error creating account"))
 			return
 		}
 
 		if eak != nil { // means that we have a (valid) External Account Binding key that should be bound, updated and sent in the response
 			if err := eak.BindTo(acc); err != nil {
-				render.Error(w, err)
+				render.Error(w, r, err)
 				return
 			}
 			if err := db.UpdateExternalAccountKey(ctx, prov.ID, eak); err != nil {
-				render.Error(w, acme.WrapErrorISE(err, "error updating external account binding key"))
+				render.Error(w, r, acme.WrapErrorISE(err, "error updating external account binding key"))
 				return
 			}
 			acc.ExternalAccountBinding = nar.ExternalAccountBinding
@@ -162,7 +163,7 @@ func NewAccount(w http.ResponseWriter, r *http.Request) {
 	linker.LinkAccount(ctx, acc)
 
 	w.Header().Set("Location", getAccountLocationPath(ctx, linker, acc.ID))
-	render.JSONStatus(w, acc, httpStatus)
+	render.JSONStatus(w, r, acc, httpStatus)
 }
 
 // GetOrUpdateAccount is the api for updating an ACME account.
@@ -173,12 +174,12 @@ func GetOrUpdateAccount(w http.ResponseWriter, r *http.Request) {
 
 	acc, err := accountFromContext(ctx)
 	if err != nil {
-		render.Error(w, err)
+		render.Error(w, r, err)
 		return
 	}
 	payload, err := payloadFromContext(ctx)
 	if err != nil {
-		render.Error(w, err)
+		render.Error(w, r, err)
 		return
 	}
 
@@ -187,12 +188,12 @@ func GetOrUpdateAccount(w http.ResponseWriter, r *http.Request) {
 	if !payload.isPostAsGet {
 		var uar UpdateAccountRequest
 		if err := json.Unmarshal(payload.value, &uar); err != nil {
-			render.Error(w, acme.WrapError(acme.ErrorMalformedType, err,
+			render.Error(w, r, acme.WrapError(acme.ErrorMalformedType, err,
 				"failed to unmarshal new-account request payload"))
 			return
 		}
 		if err := uar.Validate(); err != nil {
-			render.Error(w, err)
+			render.Error(w, r, err)
 			return
 		}
 		if len(uar.Status) > 0 || len(uar.Contact) > 0 {
@@ -203,7 +204,7 @@ func GetOrUpdateAccount(w http.ResponseWriter, r *http.Request) {
 			}
 
 			if err := db.UpdateAccount(ctx, acc); err != nil {
-				render.Error(w, acme.WrapErrorISE(err, "error updating account"))
+				render.Error(w, r, acme.WrapErrorISE(err, "error updating account"))
 				return
 			}
 		}
@@ -212,7 +213,7 @@ func GetOrUpdateAccount(w http.ResponseWriter, r *http.Request) {
 	linker.LinkAccount(ctx, acc)
 
 	w.Header().Set("Location", linker.GetLink(ctx, acme.AccountLinkType, acc.ID))
-	render.JSON(w, acc)
+	render.JSON(w, r, acc)
 }
 
 func logOrdersByAccount(w http.ResponseWriter, oids []string) {
@@ -232,23 +233,23 @@ func GetOrdersByAccountID(w http.ResponseWriter, r *http.Request) {
 
 	acc, err := accountFromContext(ctx)
 	if err != nil {
-		render.Error(w, err)
+		render.Error(w, r, err)
 		return
 	}
 	accID := chi.URLParam(r, "accID")
 	if acc.ID != accID {
-		render.Error(w, acme.NewError(acme.ErrorUnauthorizedType, "account ID '%s' does not match url param '%s'", acc.ID, accID))
+		render.Error(w, r, acme.NewError(acme.ErrorUnauthorizedType, "account ID '%s' does not match url param '%s'", acc.ID, accID))
 		return
 	}
 
 	orders, err := db.GetOrdersByAccountID(ctx, acc.ID)
 	if err != nil {
-		render.Error(w, err)
+		render.Error(w, r, err)
 		return
 	}
 
 	linker.LinkOrdersByAccountID(ctx, orders)
 
-	render.JSON(w, orders)
+	render.JSON(w, r, orders)
 	logOrdersByAccount(w, orders)
 }

@@ -30,6 +30,7 @@ import (
 	"github.com/smallstep/certificates/authority/config"
 	"github.com/smallstep/certificates/authority/policy"
 	"github.com/smallstep/certificates/authority/provisioner"
+	"github.com/smallstep/certificates/cas/apiv1"
 	"github.com/smallstep/certificates/cas/softcas"
 	"github.com/smallstep/certificates/db"
 	"github.com/smallstep/certificates/errs"
@@ -240,7 +241,7 @@ func (e *testEnforcer) Enforce(cert *x509.Certificate) error {
 	return nil
 }
 
-func assertHasPrefix(t *testing.T, s, p string, msg ...interface{}) bool {
+func assertHasPrefix(t *testing.T, s, p string) bool {
 	t.Helper()
 	return assert.True(t, strings.HasPrefix(s, p), "%q is not a prefix of %q", p, s)
 }
@@ -424,7 +425,7 @@ ZYtQ9Ot36qc=
 			require.NoError(t, err)
 			testAuthority.db = &db.MockAuthDB{
 				MStoreCertificate: func(crt *x509.Certificate) error {
-					assert.Equal(t, crt.Subject.CommonName, "smallstep test")
+					assert.Equal(t, "smallstep test", crt.Subject.CommonName)
 					return nil
 				},
 			}
@@ -453,7 +454,7 @@ ZYtQ9Ot36qc=
 			require.NoError(t, err)
 			testAuthority.db = &db.MockAuthDB{
 				MStoreCertificate: func(crt *x509.Certificate) error {
-					assert.Equal(t, crt.Subject.CommonName, "smallstep test")
+					assert.Equal(t, "smallstep test", crt.Subject.CommonName)
 					return nil
 				},
 			}
@@ -482,7 +483,7 @@ ZYtQ9Ot36qc=
 			require.NoError(t, err)
 			testAuthority.db = &db.MockAuthDB{
 				MStoreCertificate: func(crt *x509.Certificate) error {
-					assert.Equal(t, crt.Subject.CommonName, "smallstep test")
+					assert.Equal(t, "smallstep test", crt.Subject.CommonName)
 					return nil
 				},
 			}
@@ -500,7 +501,7 @@ ZYtQ9Ot36qc=
 			aa := testAuthority(t)
 			aa.db = &db.MockAuthDB{
 				MStoreCertificate: func(crt *x509.Certificate) error {
-					assert.Equal(t, crt.Subject.CommonName, "smallstep test")
+					assert.Equal(t, "smallstep test", crt.Subject.CommonName)
 					return nil
 				},
 			}
@@ -525,7 +526,7 @@ ZYtQ9Ot36qc=
 			}))
 			aa.db = &db.MockAuthDB{
 				MStoreCertificate: func(crt *x509.Certificate) error {
-					assert.Equal(t, crt.Subject.CommonName, "smallstep test")
+					assert.Equal(t, "smallstep test", crt.Subject.CommonName)
 					return nil
 				},
 			}
@@ -545,7 +546,7 @@ ZYtQ9Ot36qc=
 			aa.db = &db.MockAuthDB{
 				MStoreCertificate: func(crt *x509.Certificate) error {
 					fmt.Println(crt.Subject)
-					assert.Equal(t, crt.Subject.CommonName, "smallstep test")
+					assert.Equal(t, "smallstep test", crt.Subject.CommonName)
 					return nil
 				},
 			}
@@ -643,7 +644,7 @@ ZYtQ9Ot36qc=
 			_a := testAuthority(t)
 			_a.db = &db.MockAuthDB{
 				MStoreCertificate: func(crt *x509.Certificate) error {
-					assert.Equal(t, crt.Subject.CommonName, "smallstep test")
+					assert.Equal(t, "smallstep test", crt.Subject.CommonName)
 					return nil
 				},
 			}
@@ -677,7 +678,7 @@ ZYtQ9Ot36qc=
 			_a := testAuthority(t)
 			_a.db = &db.MockAuthDB{
 				MStoreCertificate: func(crt *x509.Certificate) error {
-					assert.Equal(t, crt.Subject.CommonName, "smallstep test")
+					assert.Equal(t, "smallstep test", crt.Subject.CommonName)
 					return nil
 				},
 			}
@@ -711,7 +712,7 @@ ZYtQ9Ot36qc=
 			require.NoError(t, err)
 			testAuthority.db = &db.MockAuthDB{
 				MStoreCertificate: func(crt *x509.Certificate) error {
-					assert.Equal(t, crt.Subject.CommonName, "smallstep test")
+					assert.Equal(t, "smallstep test", crt.Subject.CommonName)
 					return nil
 				},
 			}
@@ -745,7 +746,7 @@ ZYtQ9Ot36qc=
 			require.NoError(t, err)
 			testAuthority.db = &db.MockAuthDB{
 				MStoreCertificate: func(crt *x509.Certificate) error {
-					assert.Equal(t, crt.Subject.CommonName, "smallstep test")
+					assert.Equal(t, "smallstep test", crt.Subject.CommonName)
 					return nil
 				},
 			}
@@ -782,7 +783,7 @@ ZYtQ9Ot36qc=
 			_a.config.AuthorityConfig.Template = &ASN1DN{}
 			_a.db = &db.MockAuthDB{
 				MStoreCertificate: func(crt *x509.Certificate) error {
-					assert.Equal(t, crt.Subject, pkix.Name{})
+					assert.Equal(t, pkix.Name{}, crt.Subject)
 					return nil
 				},
 			}
@@ -807,8 +808,8 @@ ZYtQ9Ot36qc=
 			aa.config.AuthorityConfig.Template = a.config.AuthorityConfig.Template
 			aa.db = &db.MockAuthDB{
 				MStoreCertificate: func(crt *x509.Certificate) error {
-					assert.Equal(t, crt.Subject.CommonName, "smallstep test")
-					assert.Equal(t, crt.CRLDistributionPoints, []string{"http://ca.example.org/leaf.crl"})
+					assert.Equal(t, "smallstep test", crt.Subject.CommonName)
+					assert.Equal(t, []string{"http://ca.example.org/leaf.crl"}, crt.CRLDistributionPoints)
 					return nil
 				},
 			}
@@ -866,8 +867,8 @@ ZYtQ9Ot36qc=
 						}, p.AttestationData())
 					}
 					if assert.Len(t, certs, 2) {
-						assert.Equal(t, certs[0].Subject.CommonName, "smallstep test")
-						assert.Equal(t, certs[1].Subject.CommonName, "smallstep Intermediate CA")
+						assert.Equal(t, "smallstep test", certs[0].Subject.CommonName)
+						assert.Equal(t, "smallstep Intermediate CA", certs[1].Subject.CommonName)
 					}
 					return nil
 				},
@@ -935,45 +936,44 @@ ZYtQ9Ot36qc=
 					assert.Nil(t, certChain)
 					var sc render.StatusCodedError
 					require.True(t, errors.As(err, &sc), "error does not implement StatusCodedError interface")
-					assert.Equal(t, sc.StatusCode(), tc.code)
+					assert.Equal(t, tc.code, sc.StatusCode())
 					assertHasPrefix(t, err.Error(), tc.err.Error())
 
 					var ctxErr *errs.Error
 					require.True(t, errors.As(err, &ctxErr), "error is not of type *errs.Error")
-					assert.Equal(t, ctxErr.Details["csr"], tc.csr)
-					assert.Equal(t, ctxErr.Details["signOptions"], tc.signOpts)
+					assert.Equal(t, tc.csr, ctxErr.Details["csr"])
+					assert.Equal(t, tc.signOpts, ctxErr.Details["signOptions"])
 				}
 			} else {
 				leaf := certChain[0]
 				intermediate := certChain[1]
 				if assert.Nil(t, tc.err) {
-					assert.Equal(t, leaf.NotBefore, tc.notBefore)
-					assert.Equal(t, leaf.NotAfter, tc.notAfter)
+					assert.Equal(t, tc.notBefore, leaf.NotBefore)
+					assert.Equal(t, tc.notAfter, leaf.NotAfter)
 					tmplt := a.config.AuthorityConfig.Template
 					if tc.csr.Subject.CommonName == "" {
-						assert.Equal(t, leaf.Subject, pkix.Name{})
+						assert.Equal(t, pkix.Name{}, leaf.Subject)
 					} else {
-						assert.Equal(t, leaf.Subject.String(),
-							pkix.Name{
-								Country:       []string{tmplt.Country},
-								Organization:  []string{tmplt.Organization},
-								Locality:      []string{tmplt.Locality},
-								StreetAddress: []string{tmplt.StreetAddress},
-								Province:      []string{tmplt.Province},
-								CommonName:    "smallstep test",
-							}.String())
-						assert.Equal(t, leaf.DNSNames, []string{"test.smallstep.com"})
+						assert.Equal(t, pkix.Name{
+							Country:       []string{tmplt.Country},
+							Organization:  []string{tmplt.Organization},
+							Locality:      []string{tmplt.Locality},
+							StreetAddress: []string{tmplt.StreetAddress},
+							Province:      []string{tmplt.Province},
+							CommonName:    "smallstep test",
+						}.String(), leaf.Subject.String())
+						assert.Equal(t, []string{"test.smallstep.com"}, leaf.DNSNames)
 					}
-					assert.Equal(t, leaf.Issuer, intermediate.Subject)
-					assert.Equal(t, leaf.SignatureAlgorithm, x509.ECDSAWithSHA256)
-					assert.Equal(t, leaf.PublicKeyAlgorithm, x509.ECDSA)
-					assert.Equal(t, leaf.ExtKeyUsage, []x509.ExtKeyUsage{x509.ExtKeyUsageServerAuth, x509.ExtKeyUsageClientAuth})
+					assert.Equal(t, intermediate.Subject, leaf.Issuer)
+					assert.Equal(t, x509.ECDSAWithSHA256, leaf.SignatureAlgorithm)
+					assert.Equal(t, x509.ECDSA, leaf.PublicKeyAlgorithm)
+					assert.Equal(t, []x509.ExtKeyUsage{x509.ExtKeyUsageServerAuth, x509.ExtKeyUsageClientAuth}, leaf.ExtKeyUsage)
 
 					issuer := getDefaultIssuer(a)
 					subjectKeyID, err := generateSubjectKeyID(pub)
 					require.NoError(t, err)
-					assert.Equal(t, leaf.SubjectKeyId, subjectKeyID)
-					assert.Equal(t, leaf.AuthorityKeyId, issuer.SubjectKeyId)
+					assert.Equal(t, subjectKeyID, leaf.SubjectKeyId)
+					assert.Equal(t, issuer.SubjectKeyId, leaf.AuthorityKeyId)
 
 					// Verify Provisioner OID
 					found := 0
@@ -984,9 +984,9 @@ ZYtQ9Ot36qc=
 							val := stepProvisionerASN1{}
 							_, err := asn1.Unmarshal(ext.Value, &val)
 							require.NoError(t, err)
-							assert.Equal(t, val.Type, provisionerTypeJWK)
-							assert.Equal(t, val.Name, []byte(p.Name))
-							assert.Equal(t, val.CredentialID, []byte(p.Key.KeyID))
+							assert.Equal(t, provisionerTypeJWK, val.Type)
+							assert.Equal(t, []byte(p.Name), val.Name)
+							assert.Equal(t, []byte(p.Key.KeyID), val.CredentialID)
 
 						// Basic Constraints
 						case ext.Id.Equal(asn1.ObjectIdentifier([]int{2, 5, 29, 19})):
@@ -1008,7 +1008,7 @@ ZYtQ9Ot36qc=
 					assert.Equal(t, found, 1)
 					realIntermediate, err := x509.ParseCertificate(issuer.Raw)
 					require.NoError(t, err)
-					assert.Equal(t, intermediate, realIntermediate)
+					assert.Equal(t, realIntermediate, intermediate)
 					assert.Len(t, leaf.Extensions, tc.extensionsCount)
 				}
 			}
@@ -1152,18 +1152,18 @@ func TestAuthority_Renew(t *testing.T) {
 					assert.Nil(t, certChain)
 					var sc render.StatusCodedError
 					require.True(t, errors.As(err, &sc), "error does not implement StatusCodedError interface")
-					assert.Equal(t, sc.StatusCode(), tc.code)
+					assert.Equal(t, tc.code, sc.StatusCode())
 					assertHasPrefix(t, err.Error(), tc.err.Error())
 
 					var ctxErr *errs.Error
 					require.True(t, errors.As(err, &ctxErr), "error is not of type *errs.Error")
-					assert.Equal(t, ctxErr.Details["serialNumber"], tc.cert.SerialNumber.String())
+					assert.Equal(t, tc.cert.SerialNumber.String(), ctxErr.Details["serialNumber"])
 				}
 			} else {
 				leaf := certChain[0]
 				intermediate := certChain[1]
 				if assert.Nil(t, tc.err) {
-					assert.Equal(t, leaf.NotAfter.Sub(leaf.NotBefore), tc.cert.NotAfter.Sub(cert.NotBefore))
+					assert.Equal(t, tc.cert.NotAfter.Sub(cert.NotBefore), leaf.NotAfter.Sub(leaf.NotBefore))
 
 					assert.True(t, leaf.NotBefore.After(now.Add(-2*time.Minute)))
 					assert.True(t, leaf.NotBefore.Before(now.Add(time.Minute)))
@@ -1173,30 +1173,29 @@ func TestAuthority_Renew(t *testing.T) {
 					assert.True(t, leaf.NotAfter.Before(expiry.Add(time.Hour)))
 
 					tmplt := a.config.AuthorityConfig.Template
-					assert.Equal(t, leaf.RawSubject, tc.cert.RawSubject)
-					assert.Equal(t, leaf.Subject.Country, []string{tmplt.Country})
-					assert.Equal(t, leaf.Subject.Organization, []string{tmplt.Organization})
-					assert.Equal(t, leaf.Subject.Locality, []string{tmplt.Locality})
-					assert.Equal(t, leaf.Subject.StreetAddress, []string{tmplt.StreetAddress})
-					assert.Equal(t, leaf.Subject.Province, []string{tmplt.Province})
-					assert.Equal(t, leaf.Subject.CommonName, tmplt.CommonName)
+					assert.Equal(t, tc.cert.RawSubject, leaf.RawSubject)
+					assert.Equal(t, []string{tmplt.Country}, leaf.Subject.Country)
+					assert.Equal(t, []string{tmplt.Organization}, leaf.Subject.Organization)
+					assert.Equal(t, []string{tmplt.Locality}, leaf.Subject.Locality)
+					assert.Equal(t, []string{tmplt.StreetAddress}, leaf.Subject.StreetAddress)
+					assert.Equal(t, []string{tmplt.Province}, leaf.Subject.Province)
+					assert.Equal(t, tmplt.CommonName, leaf.Subject.CommonName)
 
-					assert.Equal(t, leaf.Issuer, intermediate.Subject)
+					assert.Equal(t, intermediate.Subject, leaf.Issuer)
 
-					assert.Equal(t, leaf.SignatureAlgorithm, x509.ECDSAWithSHA256)
-					assert.Equal(t, leaf.PublicKeyAlgorithm, x509.ECDSA)
-					assert.Equal(t, leaf.ExtKeyUsage,
-						[]x509.ExtKeyUsage{x509.ExtKeyUsageServerAuth, x509.ExtKeyUsageClientAuth})
-					assert.Equal(t, leaf.DNSNames, []string{"test.smallstep.com", "test"})
+					assert.Equal(t, x509.ECDSAWithSHA256, leaf.SignatureAlgorithm)
+					assert.Equal(t, x509.ECDSA, leaf.PublicKeyAlgorithm)
+					assert.Equal(t, []x509.ExtKeyUsage{x509.ExtKeyUsageServerAuth, x509.ExtKeyUsageClientAuth}, leaf.ExtKeyUsage)
+					assert.Equal(t, []string{"test.smallstep.com", "test"}, leaf.DNSNames)
 
 					subjectKeyID, err := generateSubjectKeyID(leaf.PublicKey)
 					require.NoError(t, err)
-					assert.Equal(t, leaf.SubjectKeyId, subjectKeyID)
+					assert.Equal(t, subjectKeyID, leaf.SubjectKeyId)
 
 					// We did not change the intermediate before renewing.
 					authIssuer := getDefaultIssuer(tc.auth)
 					if issuer.SerialNumber == authIssuer.SerialNumber {
-						assert.Equal(t, leaf.AuthorityKeyId, issuer.SubjectKeyId)
+						assert.Equal(t, issuer.SubjectKeyId, leaf.AuthorityKeyId)
 						// Compare extensions: they can be in a different order
 						for _, ext1 := range tc.cert.Extensions {
 							//skip SubjectKeyIdentifier
@@ -1216,7 +1215,7 @@ func TestAuthority_Renew(t *testing.T) {
 						}
 					} else {
 						// We did change the intermediate before renewing.
-						assert.Equal(t, leaf.AuthorityKeyId, authIssuer.SubjectKeyId)
+						assert.Equal(t, authIssuer.SubjectKeyId, leaf.AuthorityKeyId)
 						// Compare extensions: they can be in a different order
 						for _, ext1 := range tc.cert.Extensions {
 							//skip SubjectKeyIdentifier
@@ -1245,7 +1244,7 @@ func TestAuthority_Renew(t *testing.T) {
 
 					realIntermediate, err := x509.ParseCertificate(authIssuer.Raw)
 					require.NoError(t, err)
-					assert.Equal(t, intermediate, realIntermediate)
+					assert.Equal(t, realIntermediate, intermediate)
 				}
 			}
 		})
@@ -1357,18 +1356,18 @@ func TestAuthority_Rekey(t *testing.T) {
 					assert.Nil(t, certChain)
 					var sc render.StatusCodedError
 					require.True(t, errors.As(err, &sc), "error does not implement StatusCodedError interface")
-					assert.Equal(t, sc.StatusCode(), tc.code)
+					assert.Equal(t, tc.code, sc.StatusCode())
 					assertHasPrefix(t, err.Error(), tc.err.Error())
 
 					var ctxErr *errs.Error
 					require.True(t, errors.As(err, &ctxErr), "error is not of type *errs.Error")
-					assert.Equal(t, ctxErr.Details["serialNumber"], tc.cert.SerialNumber.String())
+					assert.Equal(t, tc.cert.SerialNumber.String(), ctxErr.Details["serialNumber"])
 				}
 			} else {
 				leaf := certChain[0]
 				intermediate := certChain[1]
 				if assert.Nil(t, tc.err) {
-					assert.Equal(t, leaf.NotAfter.Sub(leaf.NotBefore), tc.cert.NotAfter.Sub(cert.NotBefore))
+					assert.Equal(t, tc.cert.NotAfter.Sub(cert.NotBefore), leaf.NotAfter.Sub(leaf.NotBefore))
 
 					assert.True(t, leaf.NotBefore.After(now.Add(-2*time.Minute)))
 					assert.True(t, leaf.NotBefore.Before(now.Add(time.Minute)))
@@ -1378,41 +1377,39 @@ func TestAuthority_Rekey(t *testing.T) {
 					assert.True(t, leaf.NotAfter.Before(expiry.Add(time.Hour)))
 
 					tmplt := a.config.AuthorityConfig.Template
-					assert.Equal(t, leaf.Subject.String(),
-						pkix.Name{
-							Country:       []string{tmplt.Country},
-							Organization:  []string{tmplt.Organization},
-							Locality:      []string{tmplt.Locality},
-							StreetAddress: []string{tmplt.StreetAddress},
-							Province:      []string{tmplt.Province},
-							CommonName:    tmplt.CommonName,
-						}.String())
-					assert.Equal(t, leaf.Issuer, intermediate.Subject)
+					assert.Equal(t, pkix.Name{
+						Country:       []string{tmplt.Country},
+						Organization:  []string{tmplt.Organization},
+						Locality:      []string{tmplt.Locality},
+						StreetAddress: []string{tmplt.StreetAddress},
+						Province:      []string{tmplt.Province},
+						CommonName:    tmplt.CommonName,
+					}.String(), leaf.Subject.String())
+					assert.Equal(t, intermediate.Subject, leaf.Issuer)
 
-					assert.Equal(t, leaf.SignatureAlgorithm, x509.ECDSAWithSHA256)
-					assert.Equal(t, leaf.PublicKeyAlgorithm, x509.ECDSA)
-					assert.Equal(t, leaf.ExtKeyUsage,
-						[]x509.ExtKeyUsage{x509.ExtKeyUsageServerAuth, x509.ExtKeyUsageClientAuth})
-					assert.Equal(t, leaf.DNSNames, []string{"test.smallstep.com", "test"})
+					assert.Equal(t, x509.ECDSAWithSHA256, leaf.SignatureAlgorithm)
+					assert.Equal(t, x509.ECDSA, leaf.PublicKeyAlgorithm)
+					assert.Equal(t, []x509.ExtKeyUsage{x509.ExtKeyUsageServerAuth, x509.ExtKeyUsageClientAuth}, leaf.ExtKeyUsage)
+					assert.Equal(t, []string{"test.smallstep.com", "test"}, leaf.DNSNames)
 
 					// Test Public Key and SubjectKeyId
 					expectedPK := tc.pk
 					if tc.pk == nil {
 						expectedPK = cert.PublicKey
 					}
-					assert.Equal(t, leaf.PublicKey, expectedPK)
+					assert.Equal(t, expectedPK, leaf.PublicKey)
 
 					subjectKeyID, err := generateSubjectKeyID(expectedPK)
 					require.NoError(t, err)
-					assert.Equal(t, leaf.SubjectKeyId, subjectKeyID)
+					assert.Equal(t, subjectKeyID, leaf.SubjectKeyId)
 					if tc.pk == nil {
-						assert.Equal(t, leaf.SubjectKeyId, cert.SubjectKeyId)
+						assert.Equal(t, cert.SubjectKeyId, leaf.SubjectKeyId)
 					}
 
 					// We did not change the intermediate before renewing.
 					authIssuer := getDefaultIssuer(tc.auth)
 					if issuer.SerialNumber == authIssuer.SerialNumber {
-						assert.Equal(t, leaf.AuthorityKeyId, issuer.SubjectKeyId)
+						assert.Equal(t, issuer.SubjectKeyId, leaf.AuthorityKeyId)
 						// Compare extensions: they can be in a different order
 						for _, ext1 := range tc.cert.Extensions {
 							//skip SubjectKeyIdentifier
@@ -1432,7 +1429,7 @@ func TestAuthority_Rekey(t *testing.T) {
 						}
 					} else {
 						// We did change the intermediate before renewing.
-						assert.Equal(t, leaf.AuthorityKeyId, authIssuer.SubjectKeyId)
+						assert.Equal(t, authIssuer.SubjectKeyId, leaf.AuthorityKeyId)
 						// Compare extensions: they can be in a different order
 						for _, ext1 := range tc.cert.Extensions {
 							//skip SubjectKeyIdentifier
@@ -1461,7 +1458,7 @@ func TestAuthority_Rekey(t *testing.T) {
 
 					realIntermediate, err := x509.ParseCertificate(authIssuer.Raw)
 					require.NoError(t, err)
-					assert.Equal(t, intermediate, realIntermediate)
+					assert.Equal(t, realIntermediate, intermediate)
 				}
 			}
 		})
@@ -1499,7 +1496,7 @@ func TestAuthority_GetTLSOptions(t *testing.T) {
 			require.NoError(t, err)
 
 			opts := tc.auth.GetTLSOptions()
-			assert.Equal(t, opts, tc.opts)
+			assert.Equal(t, tc.opts, opts)
 		})
 	}
 }
@@ -1569,9 +1566,9 @@ func TestAuthority_Revoke(t *testing.T) {
 				err:  errors.New("authority.Revoke; no persistence layer configured"),
 				code: http.StatusNotImplemented,
 				checkErrDetails: func(err *errs.Error) {
-					assert.Equal(t, err.Details["token"], raw)
-					assert.Equal(t, err.Details["tokenID"], "44")
-					assert.Equal(t, err.Details["provisionerID"], "step-cli:4UELJx8e0aS9m0CH3fZ0EB7D5aUPICb759zALHFejvc")
+					assert.Equal(t, raw, err.Details["token"])
+					assert.Equal(t, "44", err.Details["tokenID"])
+					assert.Equal(t, "step-cli:4UELJx8e0aS9m0CH3fZ0EB7D5aUPICb759zALHFejvc", err.Details["provisionerID"])
 				},
 			}
 		},
@@ -1609,9 +1606,9 @@ func TestAuthority_Revoke(t *testing.T) {
 				err:  errors.New("authority.Revoke: force"),
 				code: http.StatusInternalServerError,
 				checkErrDetails: func(err *errs.Error) {
-					assert.Equal(t, err.Details["token"], raw)
-					assert.Equal(t, err.Details["tokenID"], "44")
-					assert.Equal(t, err.Details["provisionerID"], "step-cli:4UELJx8e0aS9m0CH3fZ0EB7D5aUPICb759zALHFejvc")
+					assert.Equal(t, raw, err.Details["token"])
+					assert.Equal(t, "44", err.Details["tokenID"])
+					assert.Equal(t, "step-cli:4UELJx8e0aS9m0CH3fZ0EB7D5aUPICb759zALHFejvc", err.Details["provisionerID"])
 				},
 			}
 		},
@@ -1649,9 +1646,9 @@ func TestAuthority_Revoke(t *testing.T) {
 				err:  errors.New("certificate with serial number 'sn' is already revoked"),
 				code: http.StatusBadRequest,
 				checkErrDetails: func(err *errs.Error) {
-					assert.Equal(t, err.Details["token"], raw)
-					assert.Equal(t, err.Details["tokenID"], "44")
-					assert.Equal(t, err.Details["provisionerID"], "step-cli:4UELJx8e0aS9m0CH3fZ0EB7D5aUPICb759zALHFejvc")
+					assert.Equal(t, raw, err.Details["token"])
+					assert.Equal(t, "44", err.Details["tokenID"])
+					assert.Equal(t, "step-cli:4UELJx8e0aS9m0CH3fZ0EB7D5aUPICb759zALHFejvc", err.Details["provisionerID"])
 				},
 			}
 		},
@@ -1786,16 +1783,16 @@ func TestAuthority_Revoke(t *testing.T) {
 				if assert.NotNil(t, tc.err, fmt.Sprintf("unexpected error: %s", err)) {
 					var sc render.StatusCodedError
 					require.True(t, errors.As(err, &sc), "error does not implement StatusCodedError interface")
-					assert.Equal(t, sc.StatusCode(), tc.code)
+					assert.Equal(t, tc.code, sc.StatusCode())
 					assertHasPrefix(t, err.Error(), tc.err.Error())
 
 					var ctxErr *errs.Error
 					require.True(t, errors.As(err, &ctxErr), "error is not of type *errs.Error")
-					assert.Equal(t, ctxErr.Details["serialNumber"], tc.opts.Serial)
-					assert.Equal(t, ctxErr.Details["reasonCode"], tc.opts.ReasonCode)
-					assert.Equal(t, ctxErr.Details["reason"], tc.opts.Reason)
-					assert.Equal(t, ctxErr.Details["MTLS"], tc.opts.MTLS)
-					assert.Equal(t, ctxErr.Details["context"], provisioner.RevokeMethod.String())
+					assert.Equal(t, tc.opts.Serial, ctxErr.Details["serialNumber"])
+					assert.Equal(t, tc.opts.ReasonCode, ctxErr.Details["reasonCode"])
+					assert.Equal(t, tc.opts.Reason, ctxErr.Details["reason"])
+					assert.Equal(t, tc.opts.MTLS, ctxErr.Details["MTLS"])
+					assert.Equal(t, provisioner.RevokeMethod.String(), ctxErr.Details["context"])
 
 					if tc.checkErrDetails != nil {
 						tc.checkErrDetails(ctxErr)
@@ -2030,6 +2027,42 @@ func TestAuthority_CRL(t *testing.T) {
 			}
 
 			assert.Equal(t, tc.expected, cmpList)
+		})
+	}
+}
+
+type notImplementedCAS struct{}
+
+func (notImplementedCAS) CreateCertificate(req *apiv1.CreateCertificateRequest) (*apiv1.CreateCertificateResponse, error) {
+	return nil, apiv1.NotImplementedError{}
+}
+func (notImplementedCAS) RenewCertificate(req *apiv1.RenewCertificateRequest) (*apiv1.RenewCertificateResponse, error) {
+	return nil, apiv1.NotImplementedError{}
+}
+func (notImplementedCAS) RevokeCertificate(req *apiv1.RevokeCertificateRequest) (*apiv1.RevokeCertificateResponse, error) {
+	return nil, apiv1.NotImplementedError{}
+}
+
+func TestAuthority_GetX509Signer(t *testing.T) {
+	auth := testAuthority(t)
+	require.IsType(t, &softcas.SoftCAS{}, auth.x509CAService)
+	signer := auth.x509CAService.(*softcas.SoftCAS).Signer
+	require.NotNil(t, signer)
+
+	tests := []struct {
+		name      string
+		authority *Authority
+		want      crypto.Signer
+		assertion assert.ErrorAssertionFunc
+	}{
+		{"ok", auth, signer, assert.NoError},
+		{"fail", testAuthority(t, WithX509CAService(notImplementedCAS{})), nil, assert.Error},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, err := tt.authority.GetX509Signer()
+			tt.assertion(t, err)
+			assert.Equal(t, tt.want, got)
 		})
 	}
 }
