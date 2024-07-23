@@ -621,7 +621,7 @@ ZYtQ9Ot36qc=
 			// Create a token with cnf
 			tok, err := generateCustomToken("smallstep test", "step-cli", testAudiences.Sign[0], key, nil, map[string]any{
 				"sans": []string{"test.smallstep.com"},
-				"cnf":  map[string]any{"kid": "bad-fingerprint"},
+				"cnf":  map[string]any{"x5rt#S256": "bad-fingerprint"},
 			})
 			require.NoError(t, err)
 
@@ -907,7 +907,7 @@ ZYtQ9Ot36qc=
 			// Create a token with cnf
 			tok, err := generateCustomToken("smallstep test", "step-cli", testAudiences.Sign[0], key, nil, map[string]any{
 				"sans": []string{"test.smallstep.com"},
-				"cnf":  map[string]any{"kid": fingerprint},
+				"cnf":  map[string]any{"x5rt#S256": fingerprint},
 			})
 			require.NoError(t, err)
 

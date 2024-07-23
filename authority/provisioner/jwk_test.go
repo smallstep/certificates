@@ -249,7 +249,7 @@ func TestJWK_AuthorizeSign(t *testing.T) {
 	t2, err := generateToken("subject", p1.Name, testAudiences.Sign[0], "name@smallstep.com", []string{}, time.Now(), key1)
 	assert.FatalError(t, err)
 
-	t3, err := generateCustomToken("subject", p1.Name, testAudiences.Sign[0], key1, nil, map[string]any{"cnf": map[string]any{"kid": "fingerprint"}})
+	t3, err := generateCustomToken("subject", p1.Name, testAudiences.Sign[0], key1, nil, map[string]any{"cnf": map[string]any{"x5rt#S256": "fingerprint"}})
 	assert.FatalError(t, err)
 
 	// invalid signature

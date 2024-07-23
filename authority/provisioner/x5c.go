@@ -237,7 +237,7 @@ func (p *X5C) AuthorizeSign(ctx context.Context, token string) ([]SignOption, er
 	// Check the fingerprint of the certificate request if given.
 	var fingerprint string
 	if claims.Confirmation != nil {
-		fingerprint = claims.Confirmation.Kid
+		fingerprint = claims.Confirmation.Fingerprint
 	}
 
 	return []SignOption{

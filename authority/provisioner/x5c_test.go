@@ -469,7 +469,7 @@ func TestX5C_AuthorizeSign(t *testing.T) {
 			extraHeaders := map[string]any{"x5c": x5c}
 			extraClaims := map[string]any{
 				"sans": []string{"127.0.0.1", "foo", "max@smallstep.com"},
-				"cnf":  map[string]any{"kid": "fingerprint"},
+				"cnf":  map[string]any{"x5rt#S256": "fingerprint"},
 			}
 
 			tok, err := generateCustomToken("foo", p.GetName(), testAudiences.Sign[0], jwk, extraHeaders, extraClaims)
@@ -814,7 +814,7 @@ func TestX5C_AuthorizeSSHSign(t *testing.T) {
 					Principals: []string{"host.smallstep.com"},
 				}},
 				Confirmation: &cnfPayload{
-					Kid: "fingerprint",
+					Fingerprint: "fingerprint",
 				},
 			}
 			tok, err := generateX5CSSHToken(x5cJWK, claims, withX5CHdr(x5cCerts))

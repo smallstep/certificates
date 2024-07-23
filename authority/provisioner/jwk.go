@@ -30,7 +30,7 @@ type stepPayload struct {
 }
 
 type cnfPayload struct {
-	Kid string `json:"kid,omitempty"`
+	Fingerprint string `json:"x5rt#S256,omitempty"`
 }
 
 // JWK is the default provisioner, an entity that can sign tokens necessary for
@@ -191,7 +191,7 @@ func (p *JWK) AuthorizeSign(ctx context.Context, token string) ([]SignOption, er
 	// Check the fingerprint of the certificate request if given.
 	var fingerprint string
 	if claims.Confirmation != nil {
-		fingerprint = claims.Confirmation.Kid
+		fingerprint = claims.Confirmation.Fingerprint
 	}
 
 	return []SignOption{
