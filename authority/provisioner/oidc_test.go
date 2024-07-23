@@ -9,6 +9,7 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
+	"net/url"
 	"strings"
 	"testing"
 	"time"
@@ -70,8 +71,17 @@ func TestOIDC_Getters(t *testing.T) {
 func TestOIDC_Init(t *testing.T) {
 	srv := generateJWKServer(2)
 	defer srv.Close()
+
+	tlsSrv := generateTLSJWKServer(2)
+	defer tlsSrv.Close()
+
 	config := Config{
-		Claims: globalProvisionerClaims,
+		Claims:     globalProvisionerClaims,
+		HTTPClient: tlsSrv.Client(),
+	}
+	badHTTPClientConfig := Config{
+		Claims:     globalProvisionerClaims,
+		HTTPClient: http.DefaultClient,
 	}
 	badClaims := &Claims{
 		DefaultTLSDur: &Duration{0},
@@ -98,6 +108,7 @@ func TestOIDC_Init(t *testing.T) {
 		wantErr bool
 	}{
 		{"ok", fields{"oidc", "name", "client-id", "client-secret", srv.URL, nil, nil, nil, ""}, args{config}, false},
+		{"ok tls", fields{"oidc", "name", "client-id", "client-secret", tlsSrv.URL, nil, nil, nil, ""}, args{config}, false},
 		{"ok-admins", fields{"oidc", "name", "client-id", "client-secret", srv.URL + "/.well-known/openid-configuration", nil, []string{"foo@smallstep.com"}, nil, ""}, args{config}, false},
 		{"ok-domains", fields{"oidc", "name", "client-id", "client-secret", srv.URL, nil, nil, []string{"smallstep.com"}, ""}, args{config}, false},
 		{"ok-listen-port", fields{"oidc", "name", "client-id", "client-secret", srv.URL, nil, nil, nil, ":10000"}, args{config}, false},
@@ -112,6 +123,7 @@ func TestOIDC_Init(t *testing.T) {
 		{"bad-parse-url", fields{"oidc", "name", "client-id", "client-secret", ":", nil, nil, nil, ""}, args{config}, true},
 		{"bad-get-url", fields{"oidc", "name", "client-id", "client-secret", "https://", nil, nil, nil, ""}, args{config}, true},
 		{"bad-listen-address", fields{"oidc", "name", "client-id", "client-secret", srv.URL, nil, nil, nil, "127.0.0.1"}, args{config}, true},
+		{"bad-http-client", fields{"oidc", "name", "client-id", "client-secret", tlsSrv.URL, nil, nil, nil, ""}, args{badHTTPClientConfig}, true},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -131,9 +143,13 @@ func TestOIDC_Init(t *testing.T) {
 			}
 			if tt.wantErr == false {
 				assert.Len(t, 2, p.keyStore.keySet.Keys)
+
+				u, err := url.Parse(tt.fields.ConfigurationEndpoint)
+				require.NoError(t, err)
+
 				assert.Equals(t, openIDConfiguration{
 					Issuer:    "the-issuer",
-					JWKSetURI: srv.URL + "/jwks_uri",
+					JWKSetURI: u.ResolveReference(&url.URL{Path: "/jwks_uri"}).String(),
 				}, p.configuration)
 			}
 		})
@@ -145,7 +161,7 @@ func TestOIDC_authorizeToken(t *testing.T) {
 	defer srv.Close()
 
 	var keys jose.JSONWebKeySet
-	assert.FatalError(t, getAndDecode(srv.URL+"/private", &keys))
+	assert.FatalError(t, getAndDecode(srv.Client(), srv.URL+"/private", &keys))
 
 	issuer := "the-issuer"
 	tenantID := "ab800f7d-2c87-45fb-b1d0-f90d0bc5ec25"
@@ -263,7 +279,7 @@ func TestOIDC_AuthorizeSign(t *testing.T) {
 	defer srv.Close()
 
 	var keys jose.JSONWebKeySet
-	assert.FatalError(t, getAndDecode(srv.URL+"/private", &keys))
+	assert.FatalError(t, getAndDecode(srv.Client(), srv.URL+"/private", &keys))
 
 	// Create test provisioners
 	p1, err := generateOIDC()
@@ -356,7 +372,7 @@ func TestOIDC_AuthorizeRevoke(t *testing.T) {
 	defer srv.Close()
 
 	var keys jose.JSONWebKeySet
-	assert.FatalError(t, getAndDecode(srv.URL+"/private", &keys))
+	assert.FatalError(t, getAndDecode(srv.Client(), srv.URL+"/private", &keys))
 
 	// Create test provisioners
 	p1, err := generateOIDC()
@@ -467,7 +483,7 @@ func TestOIDC_AuthorizeSSHSign(t *testing.T) {
 	defer srv.Close()
 
 	var keys jose.JSONWebKeySet
-	assert.FatalError(t, getAndDecode(srv.URL+"/private", &keys))
+	assert.FatalError(t, getAndDecode(srv.Client(), srv.URL+"/private", &keys))
 
 	// Create test provisioners
 	p1, err := generateOIDC()
@@ -645,7 +661,7 @@ func TestOIDC_AuthorizeSSHRevoke(t *testing.T) {
 	srv := generateJWKServer(2)
 	defer srv.Close()
 	var keys jose.JSONWebKeySet
-	assert.FatalError(t, getAndDecode(srv.URL+"/private", &keys))
+	assert.FatalError(t, getAndDecode(srv.Client(), srv.URL+"/private", &keys))
 
 	config := Config{Claims: globalProvisionerClaims}
 	p1.ConfigurationEndpoint = srv.URL + "/.well-known/openid-configuration"

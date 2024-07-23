@@ -1066,7 +1066,7 @@ func parseAWSToken(token string) (*jose.JSONWebToken, *awsPayload, error) {
 	return tok, claims, nil
 }
 
-func generateJWKServer(n int) *httptest.Server {
+func generateJWKServerHandler(n int, srv *httptest.Server) http.Handler {
 	hits := struct {
 		Hits int `json:"hits"`
 	}{}
@@ -1089,8 +1089,7 @@ func generateJWKServer(n int) *httptest.Server {
 	}
 
 	defaultKeySet := must(generateJSONWebKeySet(n))[0].(jose.JSONWebKeySet)
-	srv := httptest.NewUnstartedServer(nil)
-	srv.Config.Handler = http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		hits.Hits++
 		switch r.RequestURI {
 		case "/error":
@@ -1116,8 +1115,19 @@ func generateJWKServer(n int) *httptest.Server {
 			writeJSON(w, getPublic(defaultKeySet))
 		}
 	})
+}
 
+func generateJWKServer(n int) *httptest.Server {
+	srv := httptest.NewUnstartedServer(nil)
+	srv.Config.Handler = generateJWKServerHandler(n, srv)
 	srv.Start()
+	return srv
+}
+
+func generateTLSJWKServer(n int) *httptest.Server {
+	srv := httptest.NewUnstartedServer(nil)
+	srv.Config.Handler = generateJWKServerHandler(n, srv)
+	srv.StartTLS()
 	return srv
 }
 
