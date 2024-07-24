@@ -89,6 +89,39 @@ func generateToken(sub, iss, aud string, sans []string, iat time.Time, jwk *jose
 	return jose.Signed(sig).Claims(claims).CompactSerialize()
 }
 
+func generateCustomToken(sub, iss, aud string, jwk *jose.JSONWebKey, extraHeaders, extraClaims map[string]any) (string, error) {
+	so := new(jose.SignerOptions)
+	so.WithType("JWT")
+	so.WithHeader("kid", jwk.KeyID)
+
+	for k, v := range extraHeaders {
+		so.WithHeader(jose.HeaderKey(k), v)
+	}
+
+	sig, err := jose.NewSigner(jose.SigningKey{Algorithm: jose.ES256, Key: jwk.Key}, so)
+	if err != nil {
+		return "", err
+	}
+
+	id, err := randutil.ASCII(64)
+	if err != nil {
+		return "", err
+	}
+
+	iat := time.Now()
+	claims := jose.Claims{
+		ID:        id,
+		Subject:   sub,
+		Issuer:    iss,
+		IssuedAt:  jose.NewNumericDate(iat),
+		NotBefore: jose.NewNumericDate(iat),
+		Expiry:    jose.NewNumericDate(iat.Add(5 * time.Minute)),
+		Audience:  []string{aud},
+	}
+
+	return jose.Signed(sig).Claims(claims).Claims(extraClaims).CompactSerialize()
+}
+
 func TestAuthority_authorizeToken(t *testing.T) {
 	a := testAuthority(t)
 
@@ -510,7 +543,7 @@ func TestAuthority_authorizeSign(t *testing.T) {
 				}
 			} else {
 				if assert.Nil(t, tc.err) {
-					assert.Equals(t, 10, len(got)) // number of provisioner.SignOptions returned
+					assert.Equals(t, 11, len(got)) // number of provisioner.SignOptions returned
 				}
 			}
 		})

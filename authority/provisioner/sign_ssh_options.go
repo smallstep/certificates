@@ -44,6 +44,13 @@ type SSHCertOptionsValidator interface {
 	Valid(got SignSSHOptions) error
 }
 
+// SSHPublicKeyValidator is the interface used to validate the public key of an
+// SSH certificate.
+type SSHPublicKeyValidator interface {
+	SignOption
+	Valid(got ssh.PublicKey) error
+}
+
 // SignSSHOptions contains the options that can be passed to the SignSSH method.
 type SignSSHOptions struct {
 	CertType     string          `json:"certType"`

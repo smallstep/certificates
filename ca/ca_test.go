@@ -625,7 +625,7 @@ func TestCARenew(t *testing.T) {
 			cert, err := x509util.NewCertificate(cr)
 			assert.FatalError(t, err)
 			crt := cert.GetCertificate()
-			crt.NotBefore = time.Now()
+			crt.NotBefore = now
 			crt.NotAfter = leafExpiry
 			crt, err = x509util.CreateCertificate(crt, intermediateCert, pub, intermediateKey.(crypto.Signer))
 			assert.FatalError(t, err)

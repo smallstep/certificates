@@ -21,9 +21,10 @@ import (
 // x5cPayload extends jwt.Claims with step attributes.
 type x5cPayload struct {
 	jose.Claims
-	SANs   []string     `json:"sans,omitempty"`
-	Step   *stepPayload `json:"step,omitempty"`
-	chains [][]*x509.Certificate
+	SANs         []string     `json:"sans,omitempty"`
+	Step         *stepPayload `json:"step,omitempty"`
+	Confirmation *cnfPayload  `json:"cnf,omitempty"`
+	chains       [][]*x509.Certificate
 }
 
 // X5C is the default provisioner, an entity that can sign tokens necessary for
@@ -233,6 +234,12 @@ func (p *X5C) AuthorizeSign(ctx context.Context, token string) ([]SignOption, er
 		}
 	}
 
+	// Check the fingerprint of the certificate request if given.
+	var fingerprint string
+	if claims.Confirmation != nil {
+		fingerprint = claims.Confirmation.Fingerprint
+	}
+
 	return []SignOption{
 		self,
 		templateOptions,
@@ -243,6 +250,7 @@ func (p *X5C) AuthorizeSign(ctx context.Context, token string) ([]SignOption, er
 			x5cLeaf.NotBefore, x5cLeaf.NotAfter,
 		},
 		// validators
+		csrFingerprintValidator(fingerprint),
 		commonNameValidator(claims.Subject),
 		newDefaultSANsValidator(ctx, claims.SANs),
 		defaultPublicKeyValidator{},
