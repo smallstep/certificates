@@ -148,6 +148,21 @@ func (o *Order) getAuthorizationFingerprint(ctx context.Context, db DB) (string,
 	return "", nil
 }
 
+func (o *Order) getAuthorizationExtraIdentifiers(ctx context.Context, db DB) ([]string, error) {
+	for _, azID := range o.AuthorizationIDs {
+		az, err := db.GetAuthorization(ctx, azID)
+		if err != nil {
+			return nil, WrapErrorISE(err, "error getting authorization %q", azID)
+		}
+		// There's no point on reading all the authorizations as there will
+		// be only one for a permanent identifier.
+		if az.ExtraIdentifiers != nil {
+			return az.ExtraIdentifiers, nil
+		}
+	}
+	return nil, nil
+}
+
 // Finalize signs a certificate if the necessary conditions for Order completion
 // have been met.
 //
@@ -191,6 +206,11 @@ func (o *Order) Finalize(ctx context.Context, db DB, csr *x509.CertificateReques
 		}
 	}
 
+	extraIdentifiers, err := o.getAuthorizationExtraIdentifiers(ctx, db)
+	if err != nil {
+		return err
+	}
+
 	// canonicalize the CSR to allow for comparison
 	csr = canonicalize(csr)
 
@@ -211,7 +231,7 @@ func (o *Order) Finalize(ctx context.Context, db DB, csr *x509.CertificateReques
 			// is rejected, because the Common Name hasn't been challenged in that case. This
 			// could result in unauthorized access if a relying system relies on the Common
 			// Name in its authorization logic.
-			if csr.Subject.CommonName != "" && csr.Subject.CommonName != permanentIdentifier {
+			if !SkipPermanentIdentiferValidation && (csr.Subject.CommonName != "") && (csr.Subject.CommonName != permanentIdentifier) {
 				return NewError(ErrorBadCSRType, "CSR Subject Common Name does not match identifiers exactly: "+
 					"CSR Subject Common Name = %s, Order Permanent Identifier = %s", csr.Subject.CommonName, permanentIdentifier)
 			}
@@ -228,6 +248,7 @@ func (o *Order) Finalize(ctx context.Context, db DB, csr *x509.CertificateReques
 		})
 		extraOptions = append(extraOptions, provisioner.AttestationData{
 			PermanentIdentifier: permanentIdentifier,
+			ExtraIdentifiers: extraIdentifiers,
 		})
 	} else {
 		defaultTemplate = x509util.DefaultLeafTemplate
