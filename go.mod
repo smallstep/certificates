@@ -3,7 +3,7 @@ module github.com/smallstep/certificates
 go 1.21
 
 require (
-	cloud.google.com/go/longrunning v0.5.10
+	cloud.google.com/go/longrunning v0.5.11
 	cloud.google.com/go/security v1.17.3
 	github.com/Masterminds/sprig/v3 v3.2.3
 	github.com/dgraph-io/badger v1.6.2
@@ -158,7 +158,7 @@ require (
 	golang.org/x/text v0.16.0 // indirect
 	golang.org/x/time v0.5.0 // indirect
 	google.golang.org/genproto v0.0.0-20240722135656-d784300faade // indirect
-	google.golang.org/genproto/googleapis/api v0.0.0-20240711142825-46eb208f015d // indirect
+	google.golang.org/genproto/googleapis/api v0.0.0-20240722135656-d784300faade // indirect
 	google.golang.org/genproto/googleapis/rpc v0.0.0-20240722135656-d784300faade // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 )
