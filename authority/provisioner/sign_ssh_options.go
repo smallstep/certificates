@@ -44,6 +44,13 @@ type SSHCertOptionsValidator interface {
 	Valid(got SignSSHOptions) error
 }
 
+// SSHPublicKeyValidator is the interface used to validate the public key of an
+// SSH certificate.
+type SSHPublicKeyValidator interface {
+	SignOption
+	Valid(got ssh.PublicKey) error
+}
+
 // SignSSHOptions contains the options that can be passed to the SignSSH method.
 type SignSSHOptions struct {
 	CertType     string          `json:"certType"`
@@ -276,14 +283,14 @@ func (v *sshCertValidityValidator) Valid(cert *ssh.Certificate, opts SignSSHOpti
 		return errs.BadRequest("ssh certificate validBefore cannot be before validAfter")
 	}
 
-	var min, max time.Duration
+	var minDur, maxDur time.Duration
 	switch cert.CertType {
 	case ssh.UserCert:
-		min = v.MinUserSSHCertDuration()
-		max = v.MaxUserSSHCertDuration()
+		minDur = v.MinUserSSHCertDuration()
+		maxDur = v.MaxUserSSHCertDuration()
 	case ssh.HostCert:
-		min = v.MinHostSSHCertDuration()
-		max = v.MaxHostSSHCertDuration()
+		minDur = v.MinHostSSHCertDuration()
+		maxDur = v.MaxHostSSHCertDuration()
 	case 0:
 		return errs.BadRequest("ssh certificate type has not been set")
 	default:
@@ -295,10 +302,10 @@ func (v *sshCertValidityValidator) Valid(cert *ssh.Certificate, opts SignSSHOpti
 	dur := time.Duration(cert.ValidBefore-cert.ValidAfter) * time.Second
 
 	switch {
-	case dur < min:
-		return errs.Forbidden("requested duration of %s is less than minimum accepted duration for selected provisioner of %s", dur, min)
-	case dur > max+opts.Backdate:
-		return errs.Forbidden("requested duration of %s is greater than maximum accepted duration for selected provisioner of %s", dur, max+opts.Backdate)
+	case dur < minDur:
+		return errs.Forbidden("requested duration of %s is less than minimum accepted duration for selected provisioner of %s", dur, minDur)
+	case dur > maxDur+opts.Backdate:
+		return errs.Forbidden("requested duration of %s is greater than maximum accepted duration for selected provisioner of %s", dur, maxDur+opts.Backdate)
 	default:
 		return nil
 	}

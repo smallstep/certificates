@@ -142,7 +142,8 @@ func Test_badProtoJSONError_Render(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 
 			w := httptest.NewRecorder()
-			tt.e.Render(w)
+			r := httptest.NewRequest("POST", "/test", http.NoBody)
+			tt.e.Render(w, r)
 			res := w.Result()
 			defer res.Body.Close()
 

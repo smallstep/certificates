@@ -14,6 +14,7 @@ import (
 	"time"
 
 	"github.com/go-chi/chi/v5"
+	"github.com/google/uuid"
 	"github.com/pkg/errors"
 
 	"go.step.sm/crypto/jose"
@@ -59,6 +60,19 @@ func (*fakeProvisioner) GetOptions() *provisioner.Options              { return 
 func newProv() acme.Provisioner {
 	// Initialize provisioners
 	p := &provisioner.ACME{
+		Type: "ACME",
+		Name: "test@acme-<test>provisioner.com",
+	}
+	if err := p.Init(provisioner.Config{Claims: globalProvisionerClaims}); err != nil {
+		fmt.Printf("%v", err)
+	}
+	return p
+}
+
+func newProvWithID() acme.Provisioner {
+	// Initialize provisioners
+	p := &provisioner.ACME{
+		ID:   uuid.NewString(),
 		Type: "ACME",
 		Name: "test@acme-<test>provisioner.com",
 	}

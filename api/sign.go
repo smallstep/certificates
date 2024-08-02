@@ -52,13 +52,13 @@ type SignResponse struct {
 func Sign(w http.ResponseWriter, r *http.Request) {
 	var body SignRequest
 	if err := read.JSON(r.Body, &body); err != nil {
-		render.Error(w, errs.BadRequestErr(err, "error reading request body"))
+		render.Error(w, r, errs.BadRequestErr(err, "error reading request body"))
 		return
 	}
 
 	logOtt(w, body.OTT)
 	if err := body.Validate(); err != nil {
-		render.Error(w, err)
+		render.Error(w, r, err)
 		return
 	}
 
@@ -74,13 +74,13 @@ func Sign(w http.ResponseWriter, r *http.Request) {
 	ctx = provisioner.NewContextWithMethod(ctx, provisioner.SignMethod)
 	signOpts, err := a.Authorize(ctx, body.OTT)
 	if err != nil {
-		render.Error(w, errs.UnauthorizedErr(err))
+		render.Error(w, r, errs.UnauthorizedErr(err))
 		return
 	}
 
 	certChain, err := a.SignWithContext(ctx, body.CsrPEM.CertificateRequest, opts, signOpts...)
 	if err != nil {
-		render.Error(w, errs.ForbiddenErr(err, "error signing certificate"))
+		render.Error(w, r, errs.ForbiddenErr(err, "error signing certificate"))
 		return
 	}
 	certChainPEM := certChainToPEM(certChain)
@@ -90,7 +90,7 @@ func Sign(w http.ResponseWriter, r *http.Request) {
 	}
 
 	LogCertificate(w, certChain[0])
-	render.JSONStatus(w, &SignResponse{
+	render.JSONStatus(w, r, &SignResponse{
 		ServerPEM:    certChainPEM[0],
 		CaPEM:        caPEM,
 		CertChainPEM: certChainPEM,

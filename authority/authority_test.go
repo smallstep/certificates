@@ -69,6 +69,15 @@ func testAuthority(t *testing.T, opts ...Option) *Authority {
 				EnableSSHCA: &enableSSHCA,
 			},
 		},
+		&provisioner.JWK{
+			Name: "uninitialized",
+			Type: "JWK",
+			Key:  clijwk,
+			Claims: &provisioner.Claims{
+				MinTLSDur: &provisioner.Duration{Duration: 5 * time.Minute},
+				MaxTLSDur: &provisioner.Duration{Duration: time.Minute},
+			},
+		},
 	}
 	c := &Config{
 		Address:          "127.0.0.1:443",
@@ -113,7 +122,7 @@ func TestAuthorityNew(t *testing.T) {
 			c.Root = []string{"foo"}
 			return &newTest{
 				config: c,
-				err:    errors.New("error reading foo: no such file or directory"),
+				err:    errors.New(`error reading "foo": no such file or directory`),
 			}
 		},
 		"fail bad password": func(t *testing.T) *newTest {
@@ -131,7 +140,7 @@ func TestAuthorityNew(t *testing.T) {
 			c.IntermediateCert = "wrong"
 			return &newTest{
 				config: c,
-				err:    errors.New("error reading wrong: no such file or directory"),
+				err:    errors.New(`error reading "wrong": no such file or directory`),
 			}
 		},
 	}

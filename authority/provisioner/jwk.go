@@ -19,13 +19,18 @@ import (
 // jwtPayload extends jwt.Claims with step attributes.
 type jwtPayload struct {
 	jose.Claims
-	SANs []string     `json:"sans,omitempty"`
-	Step *stepPayload `json:"step,omitempty"`
+	SANs         []string     `json:"sans,omitempty"`
+	Step         *stepPayload `json:"step,omitempty"`
+	Confirmation *cnfPayload  `json:"cnf,omitempty"`
 }
 
 type stepPayload struct {
 	SSH *SignSSHOptions `json:"ssh,omitempty"`
 	RA  *RAInfo         `json:"ra,omitempty"`
+}
+
+type cnfPayload struct {
+	Fingerprint string `json:"x5rt#S256,omitempty"`
 }
 
 // JWK is the default provisioner, an entity that can sign tokens necessary for
@@ -183,6 +188,12 @@ func (p *JWK) AuthorizeSign(ctx context.Context, token string) ([]SignOption, er
 		}
 	}
 
+	// Check the fingerprint of the certificate request if given.
+	var fingerprint string
+	if claims.Confirmation != nil {
+		fingerprint = claims.Confirmation.Fingerprint
+	}
+
 	return []SignOption{
 		self,
 		templateOptions,
@@ -190,6 +201,7 @@ func (p *JWK) AuthorizeSign(ctx context.Context, token string) ([]SignOption, er
 		newProvisionerExtensionOption(TypeJWK, p.Name, p.Key.KeyID).WithControllerOptions(p.ctl),
 		profileDefaultDuration(p.ctl.Claimer.DefaultTLSCertDuration()),
 		// validators
+		csrFingerprintValidator(fingerprint),
 		commonNameSliceValidator(append([]string{claims.Subject}, claims.SANs...)),
 		defaultPublicKeyValidator{},
 		newDefaultSANsValidator(ctx, claims.SANs),

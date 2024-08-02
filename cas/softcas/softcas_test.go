@@ -19,8 +19,11 @@ import (
 
 	"github.com/pkg/errors"
 	"github.com/smallstep/certificates/cas/apiv1"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	"go.step.sm/crypto/kms"
 	kmsapi "go.step.sm/crypto/kms/apiv1"
+	"go.step.sm/crypto/minica"
 	"go.step.sm/crypto/pemutil"
 	"go.step.sm/crypto/x509util"
 )
@@ -265,6 +268,45 @@ func TestSoftCAS_Type(t *testing.T) {
 			if got := c.Type(); got != tt.want {
 				t.Errorf("SoftCAS.Type() = %v, want %v", got, tt.want)
 			}
+		})
+	}
+}
+
+func TestSoftCAS_GetSigner(t *testing.T) {
+	ca, err := minica.New()
+	require.NoError(t, err)
+
+	type fields struct {
+		CertificateChain  []*x509.Certificate
+		Signer            crypto.Signer
+		CertificateSigner func() ([]*x509.Certificate, crypto.Signer, error)
+		KeyManager        kms.KeyManager
+	}
+	tests := []struct {
+		name      string
+		fields    fields
+		want      crypto.Signer
+		assertion assert.ErrorAssertionFunc
+	}{
+		{"ok signer", fields{[]*x509.Certificate{ca.Intermediate}, ca.Signer, nil, nil}, ca.Signer, assert.NoError},
+		{"ok certificateSigner", fields{[]*x509.Certificate{ca.Intermediate}, nil, func() ([]*x509.Certificate, crypto.Signer, error) {
+			return []*x509.Certificate{ca.Intermediate}, ca.Signer, nil
+		}, nil}, ca.Signer, assert.NoError},
+		{"fail certificateSigner", fields{[]*x509.Certificate{ca.Intermediate}, nil, func() ([]*x509.Certificate, crypto.Signer, error) {
+			return nil, nil, apiv1.NotImplementedError{}
+		}, nil}, nil, assert.Error},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			c := &SoftCAS{
+				CertificateChain:  tt.fields.CertificateChain,
+				Signer:            tt.fields.Signer,
+				CertificateSigner: tt.fields.CertificateSigner,
+				KeyManager:        tt.fields.KeyManager,
+			}
+			got, err := c.GetSigner()
+			tt.assertion(t, err)
+			assert.Equal(t, tt.want, got)
 		})
 	}
 }

@@ -68,12 +68,14 @@ func TestDB_getDBAccount(t *testing.T) {
 			jwk, err := jose.GenerateJWK("EC", "P-256", "ES256", "sig", "", 0)
 			assert.FatalError(t, err)
 			dbacc := &dbAccount{
-				ID:            accID,
-				Status:        acme.StatusDeactivated,
-				CreatedAt:     now,
-				DeactivatedAt: now,
-				Contact:       []string{"foo", "bar"},
-				Key:           jwk,
+				ID:              accID,
+				Status:          acme.StatusDeactivated,
+				CreatedAt:       now,
+				DeactivatedAt:   now,
+				Contact:         []string{"foo", "bar"},
+				Key:             jwk,
+				ProvisionerID:   "73d2c0f1-9753-448b-9b48-bf00fe434681",
+				ProvisionerName: "acme",
 			}
 			b, err := json.Marshal(dbacc)
 			assert.FatalError(t, err)

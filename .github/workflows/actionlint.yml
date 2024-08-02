@@ -1,0 +1,17 @@
+name: Lint GitHub Actions workflows
+on:
+  push:
+  workflow_call:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  actionlint:
+    uses: smallstep/workflows/.github/workflows/actionlint.yml@main
+    secrets: inherit

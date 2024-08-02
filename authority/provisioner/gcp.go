@@ -30,6 +30,12 @@ const gcpCertsURL = "https://www.googleapis.com/oauth2/v3/certs"
 // gcpIdentityURL is the base url for the identity document in GCP.
 const gcpIdentityURL = "http://metadata/computeMetadata/v1/instance/service-accounts/default/identity"
 
+// DefaultDisableSSHCAHost is the default value for SSH Host CA used when DisableSSHCAHost is not set
+var DefaultDisableSSHCAHost = false
+
+// DefaultDisableSSHCAUser is the default value for SSH User CA used when DisableSSHCAUser is not set
+var DefaultDisableSSHCAUser = true
+
 // gcpPayload extends jwt.Claims with custom GCP attributes.
 type gcpPayload struct {
 	jose.Claims
@@ -89,6 +95,8 @@ type GCP struct {
 	ProjectIDs             []string `json:"projectIDs"`
 	DisableCustomSANs      bool     `json:"disableCustomSANs"`
 	DisableTrustOnFirstUse bool     `json:"disableTrustOnFirstUse"`
+	DisableSSHCAUser       *bool    `json:"disableSSHCAUser,omitempty"`
+	DisableSSHCAHost       *bool    `json:"disableSSHCAHost,omitempty"`
 	InstanceAge            Duration `json:"instanceAge,omitempty"`
 	Claims                 *Claims  `json:"claims,omitempty"`
 	Options                *Options `json:"options,omitempty"`
@@ -199,6 +207,14 @@ func (p *GCP) GetIdentityToken(subject, caURL string) (string, error) {
 
 // Init validates and initializes the GCP provisioner.
 func (p *GCP) Init(config Config) (err error) {
+	if p.DisableSSHCAHost == nil {
+		p.DisableSSHCAHost = &DefaultDisableSSHCAHost
+	}
+
+	if p.DisableSSHCAUser == nil {
+		p.DisableSSHCAUser = &DefaultDisableSSHCAUser
+	}
+
 	switch {
 	case p.Type == "":
 		return errors.New("provisioner type cannot be empty")
@@ -387,31 +403,41 @@ func (p *GCP) authorizeToken(token string) (*gcpPayload, error) {
 }
 
 // AuthorizeSSHSign returns the list of SignOption for a SignSSH request.
-func (p *GCP) AuthorizeSSHSign(_ context.Context, token string) ([]SignOption, error) {
-	if !p.ctl.Claimer.IsSSHCAEnabled() {
-		return nil, errs.Unauthorized("gcp.AuthorizeSSHSign; sshCA is disabled for gcp provisioner '%s'", p.GetName())
+func (p *GCP) AuthorizeSSHSign(ctx context.Context, token string) ([]SignOption, error) {
+	certType, hasCertType := CertTypeFromContext(ctx)
+	if !hasCertType {
+		certType = SSHHostCert
 	}
+
+	err := p.isUnauthorizedToIssueSSHCert(certType)
+	if err != nil {
+		return nil, err
+	}
+
 	claims, err := p.authorizeToken(token)
 	if err != nil {
 		return nil, errs.Wrap(http.StatusInternalServerError, err, "gcp.AuthorizeSSHSign")
 	}
 
-	ce := claims.Google.ComputeEngine
+	var principals []string
+	var keyID string
+	var defaults SignSSHOptions
+	var ct sshutil.CertType
+	var template string
+
+	switch certType {
+	case SSHHostCert:
+		defaults, keyID, principals, ct, template = p.genHostOptions(ctx, claims)
+	case SSHUserCert:
+		defaults, keyID, principals, ct, template = p.genUserOptions(ctx, claims)
+	default:
+		return nil, errs.Unauthorized("gcp.AuthorizeSSHSign; invalid requested certType")
+	}
+
 	signOptions := []SignOption{}
 
-	// Enforce host certificate.
-	defaults := SignSSHOptions{
-		CertType: SSHHostCert,
-	}
-
-	// Validated principals.
-	principals := []string{
-		fmt.Sprintf("%s.c.%s.internal", ce.InstanceName, ce.ProjectID),
-		fmt.Sprintf("%s.%s.c.%s.internal", ce.InstanceName, ce.Zone, ce.ProjectID),
-	}
-
-	// Only enforce known principals if disable custom sans is true.
-	if p.DisableCustomSANs {
+	// Only enforce known principals if disable custom sans is true, or it is a user cert request
+	if p.DisableCustomSANs || certType == SSHUserCert {
 		defaults.Principals = principals
 	} else {
 		// Check that at least one principal is sent in the request.
@@ -421,12 +447,12 @@ func (p *GCP) AuthorizeSSHSign(_ context.Context, token string) ([]SignOption, e
 	}
 
 	// Certificate templates.
-	data := sshutil.CreateTemplateData(sshutil.HostCert, ce.InstanceName, principals)
+	data := sshutil.CreateTemplateData(ct, keyID, principals)
 	if v, err := unsafeParseSigned(token); err == nil {
 		data.SetToken(v)
 	}
 
-	templateOptions, err := CustomSSHTemplateOptions(p.Options, data, sshutil.DefaultIIDTemplate)
+	templateOptions, err := CustomSSHTemplateOptions(p.Options, data, template)
 	if err != nil {
 		return nil, errs.Wrap(http.StatusInternalServerError, err, "gcp.AuthorizeSSHSign")
 	}
@@ -445,12 +471,54 @@ func (p *GCP) AuthorizeSSHSign(_ context.Context, token string) ([]SignOption, e
 		// Require all the fields in the SSH certificate
 		&sshCertDefaultValidator{},
 		// Ensure that all principal names are allowed
-		newSSHNamePolicyValidator(p.ctl.getPolicy().getSSHHost(), nil),
+		newSSHNamePolicyValidator(p.ctl.getPolicy().getSSHHost(), p.ctl.getPolicy().getSSHUser()),
 		// Call webhooks
 		p.ctl.newWebhookController(
 			data,
 			linkedca.Webhook_SSH,
-			webhook.WithAuthorizationPrincipal(ce.InstanceID),
+			webhook.WithAuthorizationPrincipal(keyID),
 		),
 	), nil
+}
+
+func (p *GCP) genHostOptions(_ context.Context, claims *gcpPayload) (SignSSHOptions, string, []string, sshutil.CertType, string) {
+	ce := claims.Google.ComputeEngine
+	keyID := ce.InstanceName
+
+	principals := []string{
+		fmt.Sprintf("%s.c.%s.internal", ce.InstanceName, ce.ProjectID),
+		fmt.Sprintf("%s.%s.c.%s.internal", ce.InstanceName, ce.Zone, ce.ProjectID),
+	}
+
+	return SignSSHOptions{CertType: SSHHostCert}, keyID, principals, sshutil.HostCert, sshutil.DefaultIIDTemplate
+}
+
+func FormatServiceAccountUsername(serviceAccountID string) string {
+	return fmt.Sprintf("sa_%v", serviceAccountID)
+}
+
+func (p *GCP) genUserOptions(_ context.Context, claims *gcpPayload) (SignSSHOptions, string, []string, sshutil.CertType, string) {
+	keyID := claims.Email
+	principals := []string{
+		FormatServiceAccountUsername(claims.Subject),
+		claims.Email,
+	}
+
+	return SignSSHOptions{CertType: SSHUserCert}, keyID, principals, sshutil.UserCert, sshutil.DefaultTemplate
+}
+
+func (p *GCP) isUnauthorizedToIssueSSHCert(certType string) error {
+	if !p.ctl.Claimer.IsSSHCAEnabled() {
+		return errs.Unauthorized("gcp.AuthorizeSSHSign; sshCA is disabled for gcp provisioner '%s'", p.GetName())
+	}
+
+	if certType == SSHHostCert && *p.DisableSSHCAHost {
+		return errs.Unauthorized("gcp.AuthorizeSSHSign; sshCA for Hosts is disabled for gcp provisioner '%s'", p.GetName())
+	}
+
+	if certType == SSHUserCert && *p.DisableSSHCAUser {
+		return errs.Unauthorized("gcp.AuthorizeSSHSign; sshCA for Users is disabled for gcp provisioner '%s'", p.GetName())
+	}
+
+	return nil
 }
