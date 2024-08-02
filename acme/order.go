@@ -567,7 +567,7 @@ func uniqueSortedLowerNames(names []string) (unique []string) {
 	}
 	unique = make([]string, 0, len(nameMap))
 	for name := range nameMap {
-		if len(name) > 0 {
+		if name != "" {
 			unique = append(unique, name)
 		}
 	}
