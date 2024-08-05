@@ -16,6 +16,7 @@ import (
 
 	"github.com/smallstep/certificates/cas/apiv1"
 	"github.com/smallstep/certificates/cas/vaultcas/auth/approle"
+	"github.com/smallstep/certificates/cas/vaultcas/auth/aws"
 	"github.com/smallstep/certificates/cas/vaultcas/auth/kubernetes"
 
 	vault "github.com/hashicorp/vault/api"
@@ -84,6 +85,8 @@ func New(ctx context.Context, opts apiv1.Options) (*VaultCAS, error) {
 		method, err = kubernetes.NewKubernetesAuthMethod(vc.AuthMountPath, vc.AuthOptions)
 	case "approle":
 		method, err = approle.NewApproleAuthMethod(vc.AuthMountPath, vc.AuthOptions)
+	case "aws":
+		method, err = aws.NewAwsAuthMethod(vc.AuthMountPath, vc.AuthOptions)
 	default:
 		return nil, fmt.Errorf("unknown auth type: %s, only 'kubernetes' and 'approle' currently supported", vc.AuthType)
 	}
