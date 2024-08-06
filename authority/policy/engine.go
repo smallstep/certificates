@@ -91,7 +91,7 @@ func (e *Engine) IsSSHCertificateAllowed(cert *ssh.Certificate) error {
 		// when no host policy engine is configured, but a user policy engine is
 		// configured, the host certificate is denied.
 		if e.sshHostPolicy == nil && e.sshUserPolicy != nil {
-			return errors.New("authority not allowed to sign ssh host certificates")
+			return errors.New("authority not allowed to sign SSH host certificates when SSH user certificate policy is active")
 		}
 
 		// return result of SSH host policy evaluation
@@ -100,12 +100,12 @@ func (e *Engine) IsSSHCertificateAllowed(cert *ssh.Certificate) error {
 		// 	when no user policy engine is configured, but a host policy engine is
 		// 	configured, the user certificate is denied.
 		if e.sshUserPolicy == nil && e.sshHostPolicy != nil {
-			return errors.New("authority not allowed to sign ssh user certificates")
+			return errors.New("authority not allowed to sign SSH user certificates when SSH host certificate policy is active")
 		}
 
 		// return result of SSH user policy evaluation
 		return e.sshUserPolicy.IsSSHCertificateAllowed(cert)
 	default:
-		return fmt.Errorf("unexpected ssh certificate type %q", cert.CertType)
+		return fmt.Errorf("unexpected SSH certificate type %q", cert.CertType)
 	}
 }
