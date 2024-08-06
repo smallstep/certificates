@@ -228,7 +228,7 @@ func (p *GCP) Init(config Config) (err error) {
 	p.assertConfig()
 
 	// Initialize key store
-	if p.keyStore, err = newKeyStore(p.config.CertsURL); err != nil {
+	if p.keyStore, err = newKeyStore(http.DefaultClient, p.config.CertsURL); err != nil {
 		return
 	}
 

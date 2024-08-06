@@ -49,6 +49,7 @@ type Authority struct {
 	templates     *templates.Templates
 	linkedCAToken string
 	webhookClient *http.Client
+	httpClient    *http.Client
 
 	// X509 CA
 	password              []byte
@@ -489,6 +490,15 @@ func (a *Authority) init() error {
 	for _, crt := range a.federatedX509Certs {
 		sum := sha256.Sum256(crt.Raw)
 		a.certificates.Store(hex.EncodeToString(sum[:]), crt)
+	}
+
+	// Initialize HTTPClient with all root certs
+	clientRoots := make([]*x509.Certificate, 0, len(a.rootX509Certs)+len(a.federatedX509Certs))
+	clientRoots = append(clientRoots, a.rootX509Certs...)
+	clientRoots = append(clientRoots, a.federatedX509Certs...)
+	a.httpClient, err = newHTTPClient(clientRoots...)
+	if err != nil {
+		return err
 	}
 
 	// Decrypt and load SSH keys

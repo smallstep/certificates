@@ -9,13 +9,13 @@ import (
 	"testing"
 	"time"
 
+	"github.com/smallstep/certificates/authority/policy"
+	"github.com/smallstep/certificates/webhook"
+	"github.com/stretchr/testify/assert"
 	"go.step.sm/crypto/pemutil"
 	"go.step.sm/crypto/x509util"
 	"go.step.sm/linkedca"
 	"golang.org/x/crypto/ssh"
-
-	"github.com/smallstep/certificates/authority/policy"
-	"github.com/smallstep/certificates/webhook"
 )
 
 var trueValue = true
@@ -79,12 +79,14 @@ func TestNewController(t *testing.T) {
 		wantErr bool
 	}{
 		{"ok", args{&JWK{}, nil, Config{
-			Claims:    globalProvisionerClaims,
-			Audiences: testAudiences,
+			Claims:     globalProvisionerClaims,
+			Audiences:  testAudiences,
+			HTTPClient: &http.Client{},
 		}, nil}, &Controller{
-			Interface: &JWK{},
-			Audiences: &testAudiences,
-			Claimer:   mustClaimer(t, nil, globalProvisionerClaims),
+			Interface:  &JWK{},
+			Audiences:  &testAudiences,
+			Claimer:    mustClaimer(t, nil, globalProvisionerClaims),
+			httpClient: &http.Client{},
 		}, false},
 		{"ok with claims", args{&JWK{}, &Claims{
 			DisableRenewal: &defaultDisableRenewal,
@@ -141,6 +143,30 @@ func TestNewController(t *testing.T) {
 			if !reflect.DeepEqual(got, tt.want) {
 				t.Errorf("NewController() = %v, want %v", got, tt.want)
 			}
+		})
+	}
+}
+
+func TestController_GetHTTPClient(t *testing.T) {
+	srv := generateTLSJWKServer(2)
+	defer srv.Close()
+	type fields struct {
+		httpClient *http.Client
+	}
+	tests := []struct {
+		name   string
+		fields fields
+		want   *http.Client
+	}{
+		{"ok custom", fields{srv.Client()}, srv.Client()},
+		{"ok default", fields{http.DefaultClient}, http.DefaultClient},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			c := &Controller{
+				httpClient: tt.fields.httpClient,
+			}
+			assert.Equal(t, tt.want, c.GetHTTPClient())
 		})
 	}
 }
