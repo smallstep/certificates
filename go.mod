@@ -6,6 +6,7 @@ require (
 	cloud.google.com/go/longrunning v0.5.11
 	cloud.google.com/go/security v1.17.4
 	github.com/Masterminds/sprig/v3 v3.2.3
+	github.com/coreos/go-oidc/v3 v3.4.0
 	github.com/dgraph-io/badger v1.6.2
 	github.com/dgraph-io/badger/v2 v2.2007.4
 	github.com/fxamacker/cbor/v2 v2.7.0
@@ -160,5 +161,6 @@ require (
 	google.golang.org/genproto v0.0.0-20240730163845-b1a4ccb954bf // indirect
 	google.golang.org/genproto/googleapis/api v0.0.0-20240725223205-93522f1f2a9f // indirect
 	google.golang.org/genproto/googleapis/rpc v0.0.0-20240730163845-b1a4ccb954bf // indirect
+	gopkg.in/square/go-jose.v2 v2.6.0 // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 )

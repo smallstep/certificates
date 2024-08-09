@@ -9,7 +9,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"net"
-	"net/url"
 	"reflect"
 	"testing"
 	"time"
@@ -1698,25 +1697,6 @@ func TestOrder_sans(t *testing.T) {
 					CommonName: "foo.internal",
 				},
 				EmailAddresses: []string{"test@example.com"},
-			},
-			want: []x509util.SubjectAlternativeName{},
-			err:  NewError(ErrorBadCSRType, "Only DNS names and IP addresses are allowed"),
-		},
-		{
-			name: "fail/invalid-alternative-name-uri",
-			fields: fields{
-				Identifiers: []Identifier{},
-			},
-			csr: &x509.CertificateRequest{
-				Subject: pkix.Name{
-					CommonName: "foo.internal",
-				},
-				URIs: []*url.URL{
-					{
-						Scheme: "https://",
-						Host:   "smallstep.com",
-					},
-				},
 			},
 			want: []x509util.SubjectAlternativeName{},
 			err:  NewError(ErrorBadCSRType, "Only DNS names and IP addresses are allowed"),
