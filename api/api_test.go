@@ -31,6 +31,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"go.step.sm/crypto/jose"
+	"go.step.sm/crypto/minica"
 	"go.step.sm/crypto/x509util"
 	"golang.org/x/crypto/ssh"
 
@@ -147,6 +148,13 @@ nIHOI54lAqDeF7A0y73fPRVCiJEWmuxz0g==
 	privKey = "eyJhbGciOiJQQkVTMi1IUzI1NitBMTI4S1ciLCJjdHkiOiJqd2sranNvbiIsImVuYyI6IkEyNTZHQ00iLCJwMmMiOjEwMDAwMCwicDJzIjoiNEhBYjE0WDQ5OFM4LWxSb29JTnpqZyJ9.RbkJXGzI3kOsaP20KmZs0ELFLgpRddAE49AJHlEblw-uH_gg6SV3QA.M3MArEpHgI171lhm.gBlFySpzK9F7riBJbtLSNkb4nAw_gWokqs1jS-ZK1qxuqTK-9mtX5yILjRnftx9P9uFp5xt7rvv4Mgom1Ed4V9WtIyfNP_Cz3Pme1Eanp5nY68WCe_yG6iSB1RJdMDBUb2qBDZiBdhJim1DRXsOfgedOrNi7GGbppMlD77DEpId118owR5izA-c6Q_hg08hIE3tnMAnebDNQoF9jfEY99_AReVRH8G4hgwZEPCfXMTb3J-lowKGG4vXIbK5knFLh47SgOqG4M2M51SMS-XJ7oBz1Vjoamc90QIqKV51rvZ5m0N_sPFtxzcfV4E9yYH3XVd4O-CG4ydVKfKVyMtQ.mcKFZqBHp_n7Ytj2jz9rvw"
 )
 
+func mustJSON(t *testing.T, v any) []byte {
+	t.Helper()
+	var buf bytes.Buffer
+	require.NoError(t, json.NewEncoder(&buf).Encode(v))
+	return buf.Bytes()
+}
+
 func parseCertificate(data string) *x509.Certificate {
 	block, _ := pem.Decode([]byte(data))
 	if block == nil {
@@ -199,6 +207,7 @@ type mockAuthority struct {
 	revoke                       func(context.Context, *authority.RevokeOptions) error
 	getEncryptedKey              func(kid string) (string, error)
 	getRoots                     func() ([]*x509.Certificate, error)
+	getIntermediateCertificates  func() []*x509.Certificate
 	getFederation                func() ([]*x509.Certificate, error)
 	getCRL                       func() (*authority.CertificateRevocationListInfo, error)
 	signSSH                      func(ctx context.Context, key ssh.PublicKey, opts provisioner.SignSSHOptions, signOpts ...provisioner.SignOption) (*ssh.Certificate, error)
@@ -319,6 +328,13 @@ func (m *mockAuthority) GetRoots() ([]*x509.Certificate, error) {
 		return m.getRoots()
 	}
 	return m.ret1.([]*x509.Certificate), m.err
+}
+
+func (m *mockAuthority) GetIntermediateCertificates() []*x509.Certificate {
+	if m.getIntermediateCertificates != nil {
+		return m.getIntermediateCertificates()
+	}
+	return m.ret1.([]*x509.Certificate)
 }
 
 func (m *mockAuthority) GetFederation() ([]*x509.Certificate, error) {
@@ -1657,4 +1673,84 @@ func TestLogSSHCertificate(t *testing.T) {
 	assert.Equal(t, time.Unix(1674186851, 0).Format(time.RFC3339), fields["valid-to"])
 	assert.Equal(t, "AAAAKGVjZHNhLXNoYTItbmlzdHAyNTYtY2VydC12MDFAb3BlbnNzaC5jb20AAAAgLnkvSk4odlo3b1R+RDw+LmorL3RkN354IilCIVFVen4AAAAIbmlzdHAyNTYAAABBBHjKHss8WM2ffMYlavisoLXR0I6UEIU+cidV1ogEH1U6+/SYaFPrlzQo0tGLM5CNkMbhInbyasQsrHzn8F1Rt7nHg5/tcSf9qwAAAAEAAAAGaGVybWFuAAAACgAAAAZoZXJtYW4AAAAAY8kvJwAAAABjyhBjAAAAAAAAAIIAAAAVcGVybWl0LVgxMS1mb3J3YXJkaW5nAAAAAAAAABdwZXJtaXQtYWdlbnQtZm9yd2FyZGluZwAAAAAAAAAWcGVybWl0LXBvcnQtZm9yd2FyZGluZwAAAAAAAAAKcGVybWl0LXB0eQAAAAAAAAAOcGVybWl0LXVzZXItcmMAAAAAAAAAAAAAAGgAAAATZWNkc2Etc2hhMi1uaXN0cDI1NgAAAAhuaXN0cDI1NgAAAEEE/ayqpPrZZF5uA1UlDt4FreTf15agztQIzpxnWq/XoxAHzagRSkFGkdgFpjgsfiRpP8URHH3BZScqc0ZDCTxhoQAAAGQAAAATZWNkc2Etc2hhMi1uaXN0cDI1NgAAAEkAAAAhAJuP1wCVwoyrKrEtHGfFXrVbRHySDjvXtS1tVTdHyqymAAAAIBa/CSSzfZb4D2NLP+eEmOOMJwSjYOiNM8fiOoAaqglI", fields["certificate"])
 	assert.Equal(t, "SHA256:RvkDPGwl/G9d7LUFm1kmWhvOD9I/moPq4yxcb0STwr0 (ECDSA-CERT)", fields["public-key"])
+}
+
+func TestIntermediates(t *testing.T) {
+	ca, err := minica.New()
+	require.NoError(t, err)
+
+	getRequest := func(t *testing.T, crt []*x509.Certificate) *http.Request {
+		mockMustAuthority(t, &mockAuthority{
+			ret1: crt,
+		})
+		return httptest.NewRequest("GET", "/intermediates", http.NoBody)
+	}
+
+	type args struct {
+		crts []*x509.Certificate
+	}
+	tests := []struct {
+		name           string
+		args           args
+		wantStatusCode int
+		wantBody       []byte
+	}{
+		{"ok", args{[]*x509.Certificate{ca.Intermediate}}, http.StatusCreated, mustJSON(t, IntermediatesResponse{
+			Certificates: []Certificate{{ca.Intermediate}},
+		})},
+		{"ok multiple", args{[]*x509.Certificate{ca.Root, ca.Intermediate}}, http.StatusCreated, mustJSON(t, IntermediatesResponse{
+			Certificates: []Certificate{{ca.Root}, {ca.Intermediate}},
+		})},
+		{"fail", args{}, http.StatusNotImplemented, mustJSON(t, errs.NotImplemented("not implemented"))},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			w := httptest.NewRecorder()
+			r := getRequest(t, tt.args.crts)
+			Intermediates(w, r)
+			assert.Equal(t, tt.wantStatusCode, w.Result().StatusCode)
+			assert.Equal(t, tt.wantBody, w.Body.Bytes())
+		})
+	}
+}
+
+func TestIntermediatesPEM(t *testing.T) {
+	ca, err := minica.New()
+	require.NoError(t, err)
+
+	getRequest := func(t *testing.T, crt []*x509.Certificate) *http.Request {
+		mockMustAuthority(t, &mockAuthority{
+			ret1: crt,
+		})
+		return httptest.NewRequest("GET", "/intermediates.pem", http.NoBody)
+	}
+
+	type args struct {
+		crts []*x509.Certificate
+	}
+	tests := []struct {
+		name           string
+		args           args
+		wantStatusCode int
+		wantBody       []byte
+	}{
+		{"ok", args{[]*x509.Certificate{ca.Intermediate}}, http.StatusOK, pem.EncodeToMemory(&pem.Block{
+			Type: "CERTIFICATE", Bytes: ca.Intermediate.Raw,
+		})},
+		{"ok multiple", args{[]*x509.Certificate{ca.Root, ca.Intermediate}}, http.StatusOK, append(pem.EncodeToMemory(&pem.Block{
+			Type: "CERTIFICATE", Bytes: ca.Root.Raw,
+		}), pem.EncodeToMemory(&pem.Block{
+			Type: "CERTIFICATE", Bytes: ca.Intermediate.Raw,
+		})...)},
+		{"fail", args{}, http.StatusNotImplemented, mustJSON(t, errs.NotImplemented("not implemented"))},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			w := httptest.NewRecorder()
+			r := getRequest(t, tt.args.crts)
+			IntermediatesPEM(w, r)
+			assert.Equal(t, tt.wantStatusCode, w.Result().StatusCode)
+			assert.Equal(t, tt.wantBody, w.Body.Bytes())
+		})
+	}
 }

@@ -52,6 +52,7 @@ type Authority interface {
 	Revoke(context.Context, *authority.RevokeOptions) error
 	GetEncryptedKey(kid string) (string, error)
 	GetRoots() ([]*x509.Certificate, error)
+	GetIntermediateCertificates() []*x509.Certificate
 	GetFederation() ([]*x509.Certificate, error)
 	Version() authority.Version
 	GetCertificateRevocationList() (*authority.CertificateRevocationListInfo, error)
@@ -295,6 +296,11 @@ type RootsResponse struct {
 	Certificates []Certificate `json:"crts"`
 }
 
+// IntermediatesResponse is the response object of the intermediates request.
+type IntermediatesResponse struct {
+	Certificates []Certificate `json:"crts"`
+}
+
 // FederationResponse is the response object of the federation request.
 type FederationResponse struct {
 	Certificates []Certificate `json:"crts"`
@@ -330,7 +336,10 @@ func Route(r Router) {
 	r.MethodFunc("GET", "/provisioners/{kid}/encrypted-key", ProvisionerKey)
 	r.MethodFunc("GET", "/roots", Roots)
 	r.MethodFunc("GET", "/roots.pem", RootsPEM)
+	r.MethodFunc("GET", "/intermediates", Intermediates)
+	r.MethodFunc("GET", "/intermediates.pem", IntermediatesPEM)
 	r.MethodFunc("GET", "/federation", Federation)
+
 	// SSH CA
 	r.MethodFunc("POST", "/ssh/sign", SSHSign)
 	r.MethodFunc("POST", "/ssh/renew", SSHRenew)
@@ -451,6 +460,47 @@ func RootsPEM(w http.ResponseWriter, r *http.Request) {
 		block := pem.EncodeToMemory(&pem.Block{
 			Type:  "CERTIFICATE",
 			Bytes: root.Raw,
+		})
+
+		if _, err := w.Write(block); err != nil {
+			log.Error(w, r, err)
+			return
+		}
+	}
+}
+
+// Intermediates returns all the intermediate certificates of the CA.
+func Intermediates(w http.ResponseWriter, r *http.Request) {
+	intermediates := mustAuthority(r.Context()).GetIntermediateCertificates()
+	if len(intermediates) == 0 {
+		render.Error(w, r, errs.NotImplemented("error getting intermediates: method not implemented"))
+		return
+	}
+
+	certs := make([]Certificate, len(intermediates))
+	for i := range intermediates {
+		certs[i] = Certificate{intermediates[i]}
+	}
+
+	render.JSONStatus(w, r, &IntermediatesResponse{
+		Certificates: certs,
+	}, http.StatusCreated)
+}
+
+// IntermediatesPEM returns all the intermediate certificates for the CA in PEM format.
+func IntermediatesPEM(w http.ResponseWriter, r *http.Request) {
+	intermediates := mustAuthority(r.Context()).GetIntermediateCertificates()
+	if len(intermediates) == 0 {
+		render.Error(w, r, errs.NotImplemented("error getting intermediates: method not implemented"))
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/x-pem-file")
+
+	for _, crt := range intermediates {
+		block := pem.EncodeToMemory(&pem.Block{
+			Type:  "CERTIFICATE",
+			Bytes: crt.Raw,
 		})
 
 		if _, err := w.Write(block); err != nil {
