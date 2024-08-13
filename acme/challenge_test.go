@@ -962,14 +962,16 @@ MCowBQYDK2VwAyEA5c+4NKZSNQcR1T8qN6SjwgdPZQ0Ge12Ylx/YeGAJ35k=
 				payload: payload,
 				ctx:     ctx,
 				jwk:     jwk,
-				db: &MockDB{
-					MockUpdateChallenge: func(ctx context.Context, updch *Challenge) error {
-						assert.Equal(t, "chID", updch.ID)
-						assert.Equal(t, "token", updch.Token)
-						assert.Equal(t, StatusValid, updch.Status)
-						assert.Equal(t, ChallengeType("wire-oidc-01"), updch.Type)
-						assert.Equal(t, string(valueBytes), updch.Value)
-						return nil
+				db: &MockWireDB{
+					MockDB: MockDB{
+						MockUpdateChallenge: func(ctx context.Context, updch *Challenge) error {
+							assert.Equal(t, "chID", updch.ID)
+							assert.Equal(t, "token", updch.Token)
+							assert.Equal(t, StatusValid, updch.Status)
+							assert.Equal(t, ChallengeType("wire-oidc-01"), updch.Type)
+							assert.Equal(t, string(valueBytes), updch.Value)
+							return nil
+						},
 					},
 					MockGetAllOrdersByAccountID: func(ctx context.Context, accountID string) ([]string, error) {
 						assert.Equal(t, "accID", accountID)
@@ -1111,14 +1113,16 @@ MCowBQYDK2VwAyEA5c+4NKZSNQcR1T8qN6SjwgdPZQ0Ge12Ylx/YeGAJ35k=
 				payload: payload,
 				ctx:     ctx,
 				jwk:     jwk,
-				db: &MockDB{
-					MockUpdateChallenge: func(ctx context.Context, updch *Challenge) error {
-						assert.Equal(t, "chID", updch.ID)
-						assert.Equal(t, "token", updch.Token)
-						assert.Equal(t, StatusValid, updch.Status)
-						assert.Equal(t, ChallengeType("wire-dpop-01"), updch.Type)
-						assert.Equal(t, string(valueBytes), updch.Value)
-						return nil
+				db: &MockWireDB{
+					MockDB: MockDB{
+						MockUpdateChallenge: func(ctx context.Context, updch *Challenge) error {
+							assert.Equal(t, "chID", updch.ID)
+							assert.Equal(t, "token", updch.Token)
+							assert.Equal(t, StatusValid, updch.Status)
+							assert.Equal(t, ChallengeType("wire-dpop-01"), updch.Type)
+							assert.Equal(t, string(valueBytes), updch.Value)
+							return nil
+						},
 					},
 					MockGetAllOrdersByAccountID: func(ctx context.Context, accountID string) ([]string, error) {
 						assert.Equal(t, "accID", accountID)

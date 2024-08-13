@@ -35,9 +35,22 @@ MCowBQYDK2VwAyEA5c+4NKZSNQcR1T8qN6SjwgdPZQ0Ge12Ylx/YeGAJ35k=
 		expectedErr *Error
 	}
 	tests := map[string]func(t *testing.T) test{
+		"fail/no-wire-db": func(t *testing.T) test {
+			return test{
+				ctx: context.Background(),
+				db:  &MockDB{},
+				expectedErr: &Error{
+					Type:   "urn:ietf:params:acme:error:serverInternal",
+					Detail: "The server experienced an internal error",
+					Status: 500,
+					Err:    errors.New("db *acme.MockDB is not a WireDB"),
+				},
+			}
+		},
 		"fail/no-provisioner": func(t *testing.T) test {
 			return test{
 				ctx: context.Background(),
+				db:  &MockWireDB{},
 				expectedErr: &Error{
 					Type:   "urn:ietf:params:acme:error:serverInternal",
 					Detail: "The server experienced an internal error",
@@ -68,6 +81,7 @@ MCowBQYDK2VwAyEA5c+4NKZSNQcR1T8qN6SjwgdPZQ0Ge12Ylx/YeGAJ35k=
 			}))
 			return test{
 				ctx: ctx,
+				db:  &MockWireDB{},
 				expectedErr: &Error{
 					Type:   "urn:ietf:params:acme:error:serverInternal",
 					Detail: "The server experienced an internal error",
@@ -109,6 +123,7 @@ MCowBQYDK2VwAyEA5c+4NKZSNQcR1T8qN6SjwgdPZQ0Ge12Ylx/YeGAJ35k=
 					Status:          StatusPending,
 					Value:           "1234",
 				},
+				db: &MockWireDB{},
 				expectedErr: &Error{
 					Type:   "urn:ietf:params:acme:error:malformed",
 					Detail: "The request message was malformed",
@@ -150,6 +165,7 @@ MCowBQYDK2VwAyEA5c+4NKZSNQcR1T8qN6SjwgdPZQ0Ge12Ylx/YeGAJ35k=
 					Status:          StatusPending,
 					Value:           "1234",
 				},
+				db: &MockWireDB{},
 				expectedErr: &Error{
 					Type:   "urn:ietf:params:acme:error:serverInternal",
 					Detail: "The server experienced an internal error",
@@ -203,6 +219,7 @@ MCowBQYDK2VwAyEA5c+4NKZSNQcR1T8qN6SjwgdPZQ0Ge12Ylx/YeGAJ35k=
 					Status:          StatusPending,
 					Value:           string(valueBytes),
 				},
+				db: &MockWireDB{},
 				expectedErr: &Error{
 					Type:   "urn:ietf:params:acme:error:serverInternal",
 					Detail: "The server experienced an internal error",
@@ -259,25 +276,27 @@ MCowBQYDK2VwAyEA5c+4NKZSNQcR1T8qN6SjwgdPZQ0Ge12Ylx/YeGAJ35k=
 					Status:          StatusPending,
 					Value:           string(valueBytes),
 				},
-				db: &MockDB{
-					MockUpdateChallenge: func(ctx context.Context, ch *Challenge) error {
-						assert.Equal(t, "chID", ch.ID)
-						assert.Equal(t, "azID", ch.AuthorizationID)
-						assert.Equal(t, "accID", ch.AccountID)
-						assert.Equal(t, "token", ch.Token)
-						assert.Equal(t, ChallengeType("wire-dpop-01"), ch.Type)
-						assert.Equal(t, StatusInvalid, ch.Status)
-						assert.Equal(t, string(valueBytes), ch.Value)
-						if assert.NotNil(t, ch.Error) {
-							var k *Error // NOTE: the error is not returned up, but stored with the challenge instead
-							if errors.As(ch.Error, &k) {
-								assert.Equal(t, "urn:ietf:params:acme:error:rejectedIdentifier", k.Type)
-								assert.Equal(t, "The server will not issue certificates for the identifier", k.Detail)
-								assert.Equal(t, 400, k.Status)
-								assert.Equal(t, `failed validating Wire access token: failed parsing token: go-jose/go-jose: compact JWS format must have three parts`, k.Err.Error())
+				db: &MockWireDB{
+					MockDB: MockDB{
+						MockUpdateChallenge: func(ctx context.Context, ch *Challenge) error {
+							assert.Equal(t, "chID", ch.ID)
+							assert.Equal(t, "azID", ch.AuthorizationID)
+							assert.Equal(t, "accID", ch.AccountID)
+							assert.Equal(t, "token", ch.Token)
+							assert.Equal(t, ChallengeType("wire-dpop-01"), ch.Type)
+							assert.Equal(t, StatusInvalid, ch.Status)
+							assert.Equal(t, string(valueBytes), ch.Value)
+							if assert.NotNil(t, ch.Error) {
+								var k *Error // NOTE: the error is not returned up, but stored with the challenge instead
+								if errors.As(ch.Error, &k) {
+									assert.Equal(t, "urn:ietf:params:acme:error:rejectedIdentifier", k.Type)
+									assert.Equal(t, "The server will not issue certificates for the identifier", k.Detail)
+									assert.Equal(t, 400, k.Status)
+									assert.Equal(t, `failed validating Wire access token: failed parsing token: go-jose/go-jose: compact JWS format must have three parts`, k.Err.Error())
+								}
 							}
-						}
-						return nil
+							return nil
+						},
 					},
 				},
 			}
@@ -410,14 +429,16 @@ MCowBQYDK2VwAyEA5c+4NKZSNQcR1T8qN6SjwgdPZQ0Ge12Ylx/YeGAJ35k=
 				payload: payload,
 				ctx:     ctx,
 				jwk:     jwk,
-				db: &MockDB{
-					MockUpdateChallenge: func(ctx context.Context, updch *Challenge) error {
-						assert.Equal(t, "chID", updch.ID)
-						assert.Equal(t, "token", updch.Token)
-						assert.Equal(t, StatusValid, updch.Status)
-						assert.Equal(t, ChallengeType("wire-dpop-01"), updch.Type)
-						assert.Equal(t, string(valueBytes), updch.Value)
-						return errors.New("fail")
+				db: &MockWireDB{
+					MockDB: MockDB{
+						MockUpdateChallenge: func(ctx context.Context, updch *Challenge) error {
+							assert.Equal(t, "chID", updch.ID)
+							assert.Equal(t, "token", updch.Token)
+							assert.Equal(t, StatusValid, updch.Status)
+							assert.Equal(t, ChallengeType("wire-dpop-01"), updch.Type)
+							assert.Equal(t, string(valueBytes), updch.Value)
+							return errors.New("fail")
+						},
 					},
 				},
 				expectedErr: &Error{
@@ -556,14 +577,16 @@ MCowBQYDK2VwAyEA5c+4NKZSNQcR1T8qN6SjwgdPZQ0Ge12Ylx/YeGAJ35k=
 				payload: payload,
 				ctx:     ctx,
 				jwk:     jwk,
-				db: &MockDB{
-					MockUpdateChallenge: func(ctx context.Context, updch *Challenge) error {
-						assert.Equal(t, "chID", updch.ID)
-						assert.Equal(t, "token", updch.Token)
-						assert.Equal(t, StatusValid, updch.Status)
-						assert.Equal(t, ChallengeType("wire-dpop-01"), updch.Type)
-						assert.Equal(t, string(valueBytes), updch.Value)
-						return nil
+				db: &MockWireDB{
+					MockDB: MockDB{
+						MockUpdateChallenge: func(ctx context.Context, updch *Challenge) error {
+							assert.Equal(t, "chID", updch.ID)
+							assert.Equal(t, "token", updch.Token)
+							assert.Equal(t, StatusValid, updch.Status)
+							assert.Equal(t, ChallengeType("wire-dpop-01"), updch.Type)
+							assert.Equal(t, string(valueBytes), updch.Value)
+							return nil
+						},
 					},
 					MockGetAllOrdersByAccountID: func(ctx context.Context, accountID string) ([]string, error) {
 						assert.Equal(t, "accID", accountID)
@@ -706,14 +729,16 @@ MCowBQYDK2VwAyEA5c+4NKZSNQcR1T8qN6SjwgdPZQ0Ge12Ylx/YeGAJ35k=
 				payload: payload,
 				ctx:     ctx,
 				jwk:     jwk,
-				db: &MockDB{
-					MockUpdateChallenge: func(ctx context.Context, updch *Challenge) error {
-						assert.Equal(t, "chID", updch.ID)
-						assert.Equal(t, "token", updch.Token)
-						assert.Equal(t, StatusValid, updch.Status)
-						assert.Equal(t, ChallengeType("wire-dpop-01"), updch.Type)
-						assert.Equal(t, string(valueBytes), updch.Value)
-						return nil
+				db: &MockWireDB{
+					MockDB: MockDB{
+						MockUpdateChallenge: func(ctx context.Context, updch *Challenge) error {
+							assert.Equal(t, "chID", updch.ID)
+							assert.Equal(t, "token", updch.Token)
+							assert.Equal(t, StatusValid, updch.Status)
+							assert.Equal(t, ChallengeType("wire-dpop-01"), updch.Type)
+							assert.Equal(t, string(valueBytes), updch.Value)
+							return nil
+						},
 					},
 					MockGetAllOrdersByAccountID: func(ctx context.Context, accountID string) ([]string, error) {
 						assert.Equal(t, "accID", accountID)
@@ -856,14 +881,16 @@ MCowBQYDK2VwAyEA5c+4NKZSNQcR1T8qN6SjwgdPZQ0Ge12Ylx/YeGAJ35k=
 				payload: payload,
 				ctx:     ctx,
 				jwk:     jwk,
-				db: &MockDB{
-					MockUpdateChallenge: func(ctx context.Context, updch *Challenge) error {
-						assert.Equal(t, "chID", updch.ID)
-						assert.Equal(t, "token", updch.Token)
-						assert.Equal(t, StatusValid, updch.Status)
-						assert.Equal(t, ChallengeType("wire-dpop-01"), updch.Type)
-						assert.Equal(t, string(valueBytes), updch.Value)
-						return nil
+				db: &MockWireDB{
+					MockDB: MockDB{
+						MockUpdateChallenge: func(ctx context.Context, updch *Challenge) error {
+							assert.Equal(t, "chID", updch.ID)
+							assert.Equal(t, "token", updch.Token)
+							assert.Equal(t, StatusValid, updch.Status)
+							assert.Equal(t, ChallengeType("wire-dpop-01"), updch.Type)
+							assert.Equal(t, string(valueBytes), updch.Value)
+							return nil
+						},
 					},
 					MockGetAllOrdersByAccountID: func(ctx context.Context, accountID string) ([]string, error) {
 						assert.Equal(t, "accID", accountID)
@@ -1012,14 +1039,16 @@ MCowBQYDK2VwAyEA5c+4NKZSNQcR1T8qN6SjwgdPZQ0Ge12Ylx/YeGAJ35k=
 				payload: payload,
 				ctx:     ctx,
 				jwk:     jwk,
-				db: &MockDB{
-					MockUpdateChallenge: func(ctx context.Context, updch *Challenge) error {
-						assert.Equal(t, "chID", updch.ID)
-						assert.Equal(t, "token", updch.Token)
-						assert.Equal(t, StatusValid, updch.Status)
-						assert.Equal(t, ChallengeType("wire-dpop-01"), updch.Type)
-						assert.Equal(t, string(valueBytes), updch.Value)
-						return nil
+				db: &MockWireDB{
+					MockDB: MockDB{
+						MockUpdateChallenge: func(ctx context.Context, updch *Challenge) error {
+							assert.Equal(t, "chID", updch.ID)
+							assert.Equal(t, "token", updch.Token)
+							assert.Equal(t, StatusValid, updch.Status)
+							assert.Equal(t, ChallengeType("wire-dpop-01"), updch.Type)
+							assert.Equal(t, string(valueBytes), updch.Value)
+							return nil
+						},
 					},
 					MockGetAllOrdersByAccountID: func(ctx context.Context, accountID string) ([]string, error) {
 						assert.Equal(t, "accID", accountID)
@@ -1072,9 +1101,22 @@ MCowBQYDK2VwAyEA5c+4NKZSNQcR1T8qN6SjwgdPZQ0Ge12Ylx/YeGAJ35k=
 		expectedErr *Error
 	}
 	tests := map[string]func(t *testing.T) test{
+		"fail/no-wire-db": func(t *testing.T) test {
+			return test{
+				ctx: context.Background(),
+				db:  &MockDB{},
+				expectedErr: &Error{
+					Type:   "urn:ietf:params:acme:error:serverInternal",
+					Detail: "The server experienced an internal error",
+					Status: 500,
+					Err:    errors.New("db *acme.MockDB is not a WireDB"),
+				},
+			}
+		},
 		"fail/no-provisioner": func(t *testing.T) test {
 			return test{
 				ctx: context.Background(),
+				db:  &MockWireDB{},
 				expectedErr: &Error{
 					Type:   "urn:ietf:params:acme:error:serverInternal",
 					Detail: "The server experienced an internal error",
@@ -1105,6 +1147,7 @@ MCowBQYDK2VwAyEA5c+4NKZSNQcR1T8qN6SjwgdPZQ0Ge12Ylx/YeGAJ35k=
 			}))
 			return test{
 				ctx: ctx,
+				db:  &MockWireDB{},
 				expectedErr: &Error{
 					Type:   "urn:ietf:params:acme:error:serverInternal",
 					Detail: "The server experienced an internal error",
@@ -1146,10 +1189,12 @@ MCowBQYDK2VwAyEA5c+4NKZSNQcR1T8qN6SjwgdPZQ0Ge12Ylx/YeGAJ35k=
 					Status:          StatusPending,
 					Value:           "1234",
 				},
-				db: &MockDB{
-					MockUpdateChallenge: func(ctx context.Context, ch *Challenge) error {
-						assert.Equal(t, "chID", ch.ID)
-						return nil
+				db: &MockWireDB{
+					MockDB: MockDB{
+						MockUpdateChallenge: func(ctx context.Context, ch *Challenge) error {
+							assert.Equal(t, "chID", ch.ID)
+							return nil
+						},
 					},
 				},
 				expectedErr: &Error{
@@ -1193,6 +1238,7 @@ MCowBQYDK2VwAyEA5c+4NKZSNQcR1T8qN6SjwgdPZQ0Ge12Ylx/YeGAJ35k=
 					Status:          StatusPending,
 					Value:           "1234",
 				},
+				db: &MockWireDB{},
 				expectedErr: &Error{
 					Type:   "urn:ietf:params:acme:error:serverInternal",
 					Detail: "The server experienced an internal error",
@@ -1288,23 +1334,25 @@ MCowBQYDK2VwAyEA5c+4NKZSNQcR1T8qN6SjwgdPZQ0Ge12Ylx/YeGAJ35k=
 				payload: payload,
 				ctx:     ctx,
 				jwk:     jwk,
-				db: &MockDB{
-					MockUpdateChallenge: func(ctx context.Context, updch *Challenge) error {
-						assert.Equal(t, "chID", updch.ID)
-						assert.Equal(t, "token", updch.Token)
-						assert.Equal(t, StatusInvalid, updch.Status)
-						assert.Equal(t, ChallengeType("wire-oidc-01"), updch.Type)
-						assert.Equal(t, string(valueBytes), updch.Value)
-						if assert.NotNil(t, updch.Error) {
-							var k *Error // NOTE: the error is not returned up, but stored with the challenge instead
-							if errors.As(updch.Error, &k) {
-								assert.Equal(t, "urn:ietf:params:acme:error:rejectedIdentifier", k.Type)
-								assert.Equal(t, "The server will not issue certificates for the identifier", k.Detail)
-								assert.Equal(t, 400, k.Status)
-								assert.Equal(t, `error verifying ID token signature: failed to verify signature: failed to verify id token signature`, k.Err.Error())
+				db: &MockWireDB{
+					MockDB: MockDB{
+						MockUpdateChallenge: func(ctx context.Context, updch *Challenge) error {
+							assert.Equal(t, "chID", updch.ID)
+							assert.Equal(t, "token", updch.Token)
+							assert.Equal(t, StatusInvalid, updch.Status)
+							assert.Equal(t, ChallengeType("wire-oidc-01"), updch.Type)
+							assert.Equal(t, string(valueBytes), updch.Value)
+							if assert.NotNil(t, updch.Error) {
+								var k *Error // NOTE: the error is not returned up, but stored with the challenge instead
+								if errors.As(updch.Error, &k) {
+									assert.Equal(t, "urn:ietf:params:acme:error:rejectedIdentifier", k.Type)
+									assert.Equal(t, "The server will not issue certificates for the identifier", k.Detail)
+									assert.Equal(t, 400, k.Status)
+									assert.Equal(t, `error verifying ID token signature: failed to verify signature: failed to verify id token signature`, k.Err.Error())
+								}
 							}
-						}
-						return nil
+							return nil
+						},
 					},
 				},
 			}
@@ -1394,23 +1442,25 @@ MCowBQYDK2VwAyEA5c+4NKZSNQcR1T8qN6SjwgdPZQ0Ge12Ylx/YeGAJ35k=
 				payload: payload,
 				ctx:     ctx,
 				jwk:     jwk,
-				db: &MockDB{
-					MockUpdateChallenge: func(ctx context.Context, updch *Challenge) error {
-						assert.Equal(t, "chID", updch.ID)
-						assert.Equal(t, "token", updch.Token)
-						assert.Equal(t, StatusInvalid, updch.Status)
-						assert.Equal(t, ChallengeType("wire-oidc-01"), updch.Type)
-						assert.Equal(t, string(valueBytes), updch.Value)
-						if assert.NotNil(t, updch.Error) {
-							var k *Error // NOTE: the error is not returned up, but stored with the challenge instead
-							if errors.As(updch.Error, &k) {
-								assert.Equal(t, "urn:ietf:params:acme:error:rejectedIdentifier", k.Type)
-								assert.Equal(t, "The server will not issue certificates for the identifier", k.Detail)
-								assert.Equal(t, 400, k.Status)
-								assert.Contains(t, k.Err.Error(), "keyAuthorization does not match")
+				db: &MockWireDB{
+					MockDB: MockDB{
+						MockUpdateChallenge: func(ctx context.Context, updch *Challenge) error {
+							assert.Equal(t, "chID", updch.ID)
+							assert.Equal(t, "token", updch.Token)
+							assert.Equal(t, StatusInvalid, updch.Status)
+							assert.Equal(t, ChallengeType("wire-oidc-01"), updch.Type)
+							assert.Equal(t, string(valueBytes), updch.Value)
+							if assert.NotNil(t, updch.Error) {
+								var k *Error // NOTE: the error is not returned up, but stored with the challenge instead
+								if errors.As(updch.Error, &k) {
+									assert.Equal(t, "urn:ietf:params:acme:error:rejectedIdentifier", k.Type)
+									assert.Equal(t, "The server will not issue certificates for the identifier", k.Detail)
+									assert.Equal(t, 400, k.Status)
+									assert.Contains(t, k.Err.Error(), "keyAuthorization does not match")
+								}
 							}
-						}
-						return nil
+							return nil
+						},
 					},
 				},
 			}
@@ -1500,23 +1550,25 @@ MCowBQYDK2VwAyEA5c+4NKZSNQcR1T8qN6SjwgdPZQ0Ge12Ylx/YeGAJ35k=
 				payload: payload,
 				ctx:     ctx,
 				jwk:     jwk,
-				db: &MockDB{
-					MockUpdateChallenge: func(ctx context.Context, updch *Challenge) error {
-						assert.Equal(t, "chID", updch.ID)
-						assert.Equal(t, "token", updch.Token)
-						assert.Equal(t, StatusInvalid, updch.Status)
-						assert.Equal(t, ChallengeType("wire-oidc-01"), updch.Type)
-						assert.Equal(t, string(valueBytes), updch.Value)
-						if assert.NotNil(t, updch.Error) {
-							var k *Error // NOTE: the error is not returned up, but stored with the challenge instead
-							if errors.As(updch.Error, &k) {
-								assert.Equal(t, "urn:ietf:params:acme:error:rejectedIdentifier", k.Type)
-								assert.Equal(t, "The server will not issue certificates for the identifier", k.Detail)
-								assert.Equal(t, 400, k.Status)
-								assert.Equal(t, `claims in OIDC ID token don't match: invalid 'preferred_username' "wireapp://%40bob@wire.com" after transformation`, k.Err.Error())
+				db: &MockWireDB{
+					MockDB: MockDB{
+						MockUpdateChallenge: func(ctx context.Context, updch *Challenge) error {
+							assert.Equal(t, "chID", updch.ID)
+							assert.Equal(t, "token", updch.Token)
+							assert.Equal(t, StatusInvalid, updch.Status)
+							assert.Equal(t, ChallengeType("wire-oidc-01"), updch.Type)
+							assert.Equal(t, string(valueBytes), updch.Value)
+							if assert.NotNil(t, updch.Error) {
+								var k *Error // NOTE: the error is not returned up, but stored with the challenge instead
+								if errors.As(updch.Error, &k) {
+									assert.Equal(t, "urn:ietf:params:acme:error:rejectedIdentifier", k.Type)
+									assert.Equal(t, "The server will not issue certificates for the identifier", k.Detail)
+									assert.Equal(t, 400, k.Status)
+									assert.Equal(t, `claims in OIDC ID token don't match: invalid 'preferred_username' "wireapp://%40bob@wire.com" after transformation`, k.Err.Error())
+								}
 							}
-						}
-						return nil
+							return nil
+						},
 					},
 				},
 			}
@@ -1606,14 +1658,16 @@ MCowBQYDK2VwAyEA5c+4NKZSNQcR1T8qN6SjwgdPZQ0Ge12Ylx/YeGAJ35k=
 				payload: payload,
 				ctx:     ctx,
 				jwk:     jwk,
-				db: &MockDB{
-					MockUpdateChallenge: func(ctx context.Context, updch *Challenge) error {
-						assert.Equal(t, "chID", updch.ID)
-						assert.Equal(t, "token", updch.Token)
-						assert.Equal(t, StatusValid, updch.Status)
-						assert.Equal(t, ChallengeType("wire-oidc-01"), updch.Type)
-						assert.Equal(t, string(valueBytes), updch.Value)
-						return errors.New("fail")
+				db: &MockWireDB{
+					MockDB: MockDB{
+						MockUpdateChallenge: func(ctx context.Context, updch *Challenge) error {
+							assert.Equal(t, "chID", updch.ID)
+							assert.Equal(t, "token", updch.Token)
+							assert.Equal(t, StatusValid, updch.Status)
+							assert.Equal(t, ChallengeType("wire-oidc-01"), updch.Type)
+							assert.Equal(t, string(valueBytes), updch.Value)
+							return errors.New("fail")
+						},
 					},
 				},
 				expectedErr: &Error{
@@ -1709,14 +1763,16 @@ MCowBQYDK2VwAyEA5c+4NKZSNQcR1T8qN6SjwgdPZQ0Ge12Ylx/YeGAJ35k=
 				payload: payload,
 				ctx:     ctx,
 				jwk:     jwk,
-				db: &MockDB{
-					MockUpdateChallenge: func(ctx context.Context, updch *Challenge) error {
-						assert.Equal(t, "chID", updch.ID)
-						assert.Equal(t, "token", updch.Token)
-						assert.Equal(t, StatusValid, updch.Status)
-						assert.Equal(t, ChallengeType("wire-oidc-01"), updch.Type)
-						assert.Equal(t, string(valueBytes), updch.Value)
-						return nil
+				db: &MockWireDB{
+					MockDB: MockDB{
+						MockUpdateChallenge: func(ctx context.Context, updch *Challenge) error {
+							assert.Equal(t, "chID", updch.ID)
+							assert.Equal(t, "token", updch.Token)
+							assert.Equal(t, StatusValid, updch.Status)
+							assert.Equal(t, ChallengeType("wire-oidc-01"), updch.Type)
+							assert.Equal(t, string(valueBytes), updch.Value)
+							return nil
+						},
 					},
 					MockGetAllOrdersByAccountID: func(ctx context.Context, accountID string) ([]string, error) {
 						assert.Equal(t, "accID", accountID)
@@ -1816,14 +1872,16 @@ MCowBQYDK2VwAyEA5c+4NKZSNQcR1T8qN6SjwgdPZQ0Ge12Ylx/YeGAJ35k=
 				payload: payload,
 				ctx:     ctx,
 				jwk:     jwk,
-				db: &MockDB{
-					MockUpdateChallenge: func(ctx context.Context, updch *Challenge) error {
-						assert.Equal(t, "chID", updch.ID)
-						assert.Equal(t, "token", updch.Token)
-						assert.Equal(t, StatusValid, updch.Status)
-						assert.Equal(t, ChallengeType("wire-oidc-01"), updch.Type)
-						assert.Equal(t, string(valueBytes), updch.Value)
-						return nil
+				db: &MockWireDB{
+					MockDB: MockDB{
+						MockUpdateChallenge: func(ctx context.Context, updch *Challenge) error {
+							assert.Equal(t, "chID", updch.ID)
+							assert.Equal(t, "token", updch.Token)
+							assert.Equal(t, StatusValid, updch.Status)
+							assert.Equal(t, ChallengeType("wire-oidc-01"), updch.Type)
+							assert.Equal(t, string(valueBytes), updch.Value)
+							return nil
+						},
 					},
 					MockGetAllOrdersByAccountID: func(ctx context.Context, accountID string) ([]string, error) {
 						assert.Equal(t, "accID", accountID)
@@ -1923,14 +1981,16 @@ MCowBQYDK2VwAyEA5c+4NKZSNQcR1T8qN6SjwgdPZQ0Ge12Ylx/YeGAJ35k=
 				payload: payload,
 				ctx:     ctx,
 				jwk:     jwk,
-				db: &MockDB{
-					MockUpdateChallenge: func(ctx context.Context, updch *Challenge) error {
-						assert.Equal(t, "chID", updch.ID)
-						assert.Equal(t, "token", updch.Token)
-						assert.Equal(t, StatusValid, updch.Status)
-						assert.Equal(t, ChallengeType("wire-oidc-01"), updch.Type)
-						assert.Equal(t, string(valueBytes), updch.Value)
-						return nil
+				db: &MockWireDB{
+					MockDB: MockDB{
+						MockUpdateChallenge: func(ctx context.Context, updch *Challenge) error {
+							assert.Equal(t, "chID", updch.ID)
+							assert.Equal(t, "token", updch.Token)
+							assert.Equal(t, StatusValid, updch.Status)
+							assert.Equal(t, ChallengeType("wire-oidc-01"), updch.Type)
+							assert.Equal(t, string(valueBytes), updch.Value)
+							return nil
+						},
 					},
 					MockGetAllOrdersByAccountID: func(ctx context.Context, accountID string) ([]string, error) {
 						assert.Equal(t, "accID", accountID)
@@ -2036,14 +2096,16 @@ MCowBQYDK2VwAyEA5c+4NKZSNQcR1T8qN6SjwgdPZQ0Ge12Ylx/YeGAJ35k=
 				payload: payload,
 				ctx:     ctx,
 				jwk:     jwk,
-				db: &MockDB{
-					MockUpdateChallenge: func(ctx context.Context, updch *Challenge) error {
-						assert.Equal(t, "chID", updch.ID)
-						assert.Equal(t, "token", updch.Token)
-						assert.Equal(t, StatusValid, updch.Status)
-						assert.Equal(t, ChallengeType("wire-oidc-01"), updch.Type)
-						assert.Equal(t, string(valueBytes), updch.Value)
-						return nil
+				db: &MockWireDB{
+					MockDB: MockDB{
+						MockUpdateChallenge: func(ctx context.Context, updch *Challenge) error {
+							assert.Equal(t, "chID", updch.ID)
+							assert.Equal(t, "token", updch.Token)
+							assert.Equal(t, StatusValid, updch.Status)
+							assert.Equal(t, ChallengeType("wire-oidc-01"), updch.Type)
+							assert.Equal(t, string(valueBytes), updch.Value)
+							return nil
+						},
 					},
 					MockGetAllOrdersByAccountID: func(ctx context.Context, accountID string) ([]string, error) {
 						assert.Equal(t, "accID", accountID)
