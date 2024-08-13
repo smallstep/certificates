@@ -29,24 +29,12 @@ MCowBQYDK2VwAyEA5c+4NKZSNQcR1T8qN6SjwgdPZQ0Ge12Ylx/YeGAJ35k=
 	type test struct {
 		ch          *Challenge
 		jwk         *jose.JSONWebKey
-		db          DB
+		db          WireDB
 		payload     []byte
 		ctx         context.Context
 		expectedErr *Error
 	}
 	tests := map[string]func(t *testing.T) test{
-		"fail/no-wire-db": func(t *testing.T) test {
-			return test{
-				ctx: context.Background(),
-				db:  &MockDB{},
-				expectedErr: &Error{
-					Type:   "urn:ietf:params:acme:error:serverInternal",
-					Detail: "The server experienced an internal error",
-					Status: 500,
-					Err:    errors.New("db *acme.MockDB is not a WireDB"),
-				},
-			}
-		},
 		"fail/no-provisioner": func(t *testing.T) test {
 			return test{
 				ctx: context.Background(),
@@ -1094,25 +1082,13 @@ MCowBQYDK2VwAyEA5c+4NKZSNQcR1T8qN6SjwgdPZQ0Ge12Ylx/YeGAJ35k=
 	type test struct {
 		ch          *Challenge
 		jwk         *jose.JSONWebKey
-		db          DB
+		db          WireDB
 		payload     []byte
 		srv         *httptest.Server
 		ctx         context.Context
 		expectedErr *Error
 	}
 	tests := map[string]func(t *testing.T) test{
-		"fail/no-wire-db": func(t *testing.T) test {
-			return test{
-				ctx: context.Background(),
-				db:  &MockDB{},
-				expectedErr: &Error{
-					Type:   "urn:ietf:params:acme:error:serverInternal",
-					Detail: "The server experienced an internal error",
-					Status: 500,
-					Err:    errors.New("db *acme.MockDB is not a WireDB"),
-				},
-			}
-		},
 		"fail/no-provisioner": func(t *testing.T) test {
 			return test{
 				ctx: context.Background(),

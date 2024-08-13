@@ -117,9 +117,17 @@ func (ch *Challenge) Validate(ctx context.Context, db DB, jwk *jose.JSONWebKey, 
 	case DEVICEATTEST01:
 		return deviceAttest01Validate(ctx, ch, db, jwk, payload)
 	case WIREOIDC01:
-		return wireOIDC01Validate(ctx, ch, db, jwk, payload)
+		wireDB, ok := db.(WireDB)
+		if !ok {
+			return NewErrorISE("db %T is not a WireDB", db)
+		}
+		return wireOIDC01Validate(ctx, ch, wireDB, jwk, payload)
 	case WIREDPOP01:
-		return wireDPOP01Validate(ctx, ch, db, jwk, payload)
+		wireDB, ok := db.(WireDB)
+		if !ok {
+			return NewErrorISE("db %T is not a WireDB", db)
+		}
+		return wireDPOP01Validate(ctx, ch, wireDB, jwk, payload)
 	default:
 		return NewErrorISE("unexpected challenge type %q", ch.Type)
 	}
@@ -392,11 +400,7 @@ type wireOidcPayload struct {
 	IDToken string `json:"id_token"`
 }
 
-func wireOIDC01Validate(ctx context.Context, ch *Challenge, db DB, jwk *jose.JSONWebKey, payload []byte) error {
-	wireDB, ok := db.(WireDB)
-	if !ok {
-		return NewErrorISE("db %T is not a WireDB", db)
-	}
+func wireOIDC01Validate(ctx context.Context, ch *Challenge, db WireDB, jwk *jose.JSONWebKey, payload []byte) error {
 	prov, ok := ProvisionerFromContext(ctx)
 	if !ok {
 		return NewErrorISE("missing provisioner")
@@ -476,7 +480,7 @@ func wireOIDC01Validate(ctx context.Context, ch *Challenge, db DB, jwk *jose.JSO
 		return WrapErrorISE(err, "error updating challenge")
 	}
 
-	orders, err := wireDB.GetAllOrdersByAccountID(ctx, ch.AccountID)
+	orders, err := db.GetAllOrdersByAccountID(ctx, ch.AccountID)
 	if err != nil {
 		return WrapErrorISE(err, "could not retrieve current order by account id")
 	}
@@ -485,7 +489,7 @@ func wireOIDC01Validate(ctx context.Context, ch *Challenge, db DB, jwk *jose.JSO
 	}
 
 	order := orders[len(orders)-1]
-	if err := wireDB.CreateOidcToken(ctx, order, transformedIDToken); err != nil {
+	if err := db.CreateOidcToken(ctx, order, transformedIDToken); err != nil {
 		return WrapErrorISE(err, "failed storing OIDC id token")
 	}
 
@@ -526,11 +530,7 @@ type wireDpopPayload struct {
 	AccessToken string `json:"access_token"`
 }
 
-func wireDPOP01Validate(ctx context.Context, ch *Challenge, db DB, accountJWK *jose.JSONWebKey, payload []byte) error {
-	wireDB, ok := db.(WireDB)
-	if !ok {
-		return NewErrorISE("db %T is not a WireDB", db)
-	}
+func wireDPOP01Validate(ctx context.Context, ch *Challenge, db WireDB, accountJWK *jose.JSONWebKey, payload []byte) error {
 	prov, ok := ProvisionerFromContext(ctx)
 	if !ok {
 		return NewErrorISE("missing provisioner")
@@ -594,7 +594,7 @@ func wireDPOP01Validate(ctx context.Context, ch *Challenge, db DB, accountJWK *j
 		return WrapErrorISE(err, "error updating challenge")
 	}
 
-	orders, err := wireDB.GetAllOrdersByAccountID(ctx, ch.AccountID)
+	orders, err := db.GetAllOrdersByAccountID(ctx, ch.AccountID)
 	if err != nil {
 		return WrapErrorISE(err, "could not find current order by account id")
 	}
@@ -603,7 +603,7 @@ func wireDPOP01Validate(ctx context.Context, ch *Challenge, db DB, accountJWK *j
 	}
 
 	order := orders[len(orders)-1]
-	if err := wireDB.CreateDpopToken(ctx, order, map[string]any(*dpop)); err != nil {
+	if err := db.CreateDpopToken(ctx, order, map[string]any(*dpop)); err != nil {
 		return WrapErrorISE(err, "failed storing DPoP token")
 	}
 
