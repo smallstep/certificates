@@ -261,6 +261,9 @@ type Config struct {
 	WebhookClient *http.Client
 	// SCEPKeyManager, if defined, is the interface used by SCEP provisioners.
 	SCEPKeyManager SCEPKeyManager
+	// HTTPClient is an HTTP client that trust the system cert pool and the CA
+	// roots.
+	HTTPClient *http.Client
 }
 
 type provisioner struct {

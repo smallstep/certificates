@@ -26,6 +26,7 @@ type Controller struct {
 	policy                *policyEngine
 	webhookClient         *http.Client
 	webhooks              []*Webhook
+	httpClient            *http.Client
 }
 
 // NewController initializes a new provisioner controller.
@@ -48,7 +49,17 @@ func NewController(p Interface, claims *Claims, config Config, options *Options)
 		policy:                policy,
 		webhookClient:         config.WebhookClient,
 		webhooks:              options.GetWebhooks(),
+		httpClient:            config.HTTPClient,
 	}, nil
+}
+
+// GetHTTPClient returns the configured HTTP client or the default one if none
+// is configured.
+func (c *Controller) GetHTTPClient() *http.Client {
+	if c.httpClient != nil {
+		return c.httpClient
+	}
+	return &http.Client{}
 }
 
 // GetIdentity returns the identity for a given email.

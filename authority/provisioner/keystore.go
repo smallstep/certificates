@@ -22,6 +22,7 @@ var maxAgeRegex = regexp.MustCompile(`max-age=(\d+)`)
 
 type keyStore struct {
 	sync.RWMutex
+	client *http.Client
 	uri    string
 	keySet jose.JSONWebKeySet
 	timer  *time.Timer
@@ -29,12 +30,13 @@ type keyStore struct {
 	jitter time.Duration
 }
 
-func newKeyStore(uri string) (*keyStore, error) {
-	keys, age, err := getKeysFromJWKsURI(uri)
+func newKeyStore(client *http.Client, uri string) (*keyStore, error) {
+	keys, age, err := getKeysFromJWKsURI(client, uri)
 	if err != nil {
 		return nil, err
 	}
 	ks := &keyStore{
+		client: client,
 		uri:    uri,
 		keySet: keys,
 		expiry: getExpirationTime(age),
@@ -64,7 +66,7 @@ func (ks *keyStore) Get(kid string) (keys []jose.JSONWebKey) {
 
 func (ks *keyStore) reload() {
 	var next time.Duration
-	keys, age, err := getKeysFromJWKsURI(ks.uri)
+	keys, age, err := getKeysFromJWKsURI(ks.client, ks.uri)
 	if err != nil {
 		next = ks.nextReloadDuration(ks.jitter / 2)
 	} else {
@@ -90,9 +92,9 @@ func (ks *keyStore) nextReloadDuration(age time.Duration) time.Duration {
 	return abs(age)
 }
 
-func getKeysFromJWKsURI(uri string) (jose.JSONWebKeySet, time.Duration, error) {
+func getKeysFromJWKsURI(client *http.Client, uri string) (jose.JSONWebKeySet, time.Duration, error) {
 	var keys jose.JSONWebKeySet
-	resp, err := http.Get(uri) //nolint:gosec // openid-configuration jwks_uri
+	resp, err := client.Get(uri)
 	if err != nil {
 		return keys, 0, errors.Wrapf(err, "failed to connect to %s", uri)
 	}
