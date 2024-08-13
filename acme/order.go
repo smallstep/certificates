@@ -208,6 +208,10 @@ func (o *Order) Finalize(ctx context.Context, db DB, csr *x509.CertificateReques
 	// Template data
 	data := x509util.NewTemplateData()
 	if o.containsWireIdentifiers() {
+		wireDB, ok := db.(WireDB)
+		if !ok {
+			return fmt.Errorf("db %T is not a WireDB", db)
+		}
 		subject, err := createWireSubject(o, csr)
 		if err != nil {
 			return fmt.Errorf("failed creating Wire subject: %w", err)
@@ -215,13 +219,13 @@ func (o *Order) Finalize(ctx context.Context, db DB, csr *x509.CertificateReques
 		data.SetSubject(subject)
 
 		// Inject Wire's custom challenges into the template once they have been validated
-		dpop, err := db.GetDpopToken(ctx, o.ID)
+		dpop, err := wireDB.GetDpopToken(ctx, o.ID)
 		if err != nil {
 			return fmt.Errorf("failed getting Wire DPoP token: %w", err)
 		}
 		data.Set("Dpop", dpop)
 
-		oidc, err := db.GetOidcToken(ctx, o.ID)
+		oidc, err := wireDB.GetOidcToken(ctx, o.ID)
 		if err != nil {
 			return fmt.Errorf("failed getting Wire OIDC token: %w", err)
 		}

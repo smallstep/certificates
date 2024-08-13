@@ -54,8 +54,14 @@ type DB interface {
 	GetOrder(ctx context.Context, id string) (*Order, error)
 	GetOrdersByAccountID(ctx context.Context, accountID string) ([]string, error)
 	UpdateOrder(ctx context.Context, o *Order) error
+}
 
-	// TODO(hs): put in a different interface
+// WireDB is the interface used for operations on ACME Orders for Wire identifiers. This
+// is not a general purpose interface, and it should only be used when Wire identifiers
+// are enabled in the CA configuration. Currently it provides a runtime assertion only;
+// not at compile time.
+type WireDB interface {
+	DB
 	GetAllOrdersByAccountID(ctx context.Context, accountID string) ([]string, error)
 	CreateDpopToken(ctx context.Context, orderID string, dpop map[string]interface{}) error
 	GetDpopToken(ctx context.Context, orderID string) (map[string]interface{}, error)
@@ -126,14 +132,20 @@ type MockDB struct {
 	MockGetOrdersByAccountID func(ctx context.Context, accountID string) ([]string, error)
 	MockUpdateOrder          func(ctx context.Context, o *Order) error
 
+	MockRet1  interface{}
+	MockError error
+}
+
+// MockWireDB is an implementation of the WireDB interface that should only be used as
+// a mock in tests. It embeds the MockDB, as it is an extension of the existing database
+// methods.
+type MockWireDB struct {
+	MockDB
 	MockGetAllOrdersByAccountID func(ctx context.Context, accountID string) ([]string, error)
 	MockGetDpopToken            func(ctx context.Context, orderID string) (map[string]interface{}, error)
 	MockCreateDpopToken         func(ctx context.Context, orderID string, dpop map[string]interface{}) error
 	MockGetOidcToken            func(ctx context.Context, orderID string) (map[string]interface{}, error)
 	MockCreateOidcToken         func(ctx context.Context, orderID string, idToken map[string]interface{}) error
-
-	MockRet1  interface{}
-	MockError error
 }
 
 // CreateAccount mock.
@@ -407,7 +419,7 @@ func (m *MockDB) GetOrdersByAccountID(ctx context.Context, accID string) ([]stri
 }
 
 // GetAllOrdersByAccountID returns a list of any order IDs owned by the account.
-func (m *MockDB) GetAllOrdersByAccountID(ctx context.Context, accountID string) ([]string, error) {
+func (m *MockWireDB) GetAllOrdersByAccountID(ctx context.Context, accountID string) ([]string, error) {
 	if m.MockGetAllOrdersByAccountID != nil {
 		return m.MockGetAllOrdersByAccountID(ctx, accountID)
 	} else if m.MockError != nil {
@@ -417,7 +429,7 @@ func (m *MockDB) GetAllOrdersByAccountID(ctx context.Context, accountID string) 
 }
 
 // GetDpop retrieves a DPoP from the database.
-func (m *MockDB) GetDpopToken(ctx context.Context, orderID string) (map[string]any, error) {
+func (m *MockWireDB) GetDpopToken(ctx context.Context, orderID string) (map[string]any, error) {
 	if m.MockGetDpopToken != nil {
 		return m.MockGetDpopToken(ctx, orderID)
 	} else if m.MockError != nil {
@@ -427,7 +439,7 @@ func (m *MockDB) GetDpopToken(ctx context.Context, orderID string) (map[string]a
 }
 
 // CreateDpop creates DPoP resources and saves them to the DB.
-func (m *MockDB) CreateDpopToken(ctx context.Context, orderID string, dpop map[string]any) error {
+func (m *MockWireDB) CreateDpopToken(ctx context.Context, orderID string, dpop map[string]any) error {
 	if m.MockCreateDpopToken != nil {
 		return m.MockCreateDpopToken(ctx, orderID, dpop)
 	}
@@ -435,7 +447,7 @@ func (m *MockDB) CreateDpopToken(ctx context.Context, orderID string, dpop map[s
 }
 
 // GetOidcToken retrieves an oidc token from the database.
-func (m *MockDB) GetOidcToken(ctx context.Context, orderID string) (map[string]any, error) {
+func (m *MockWireDB) GetOidcToken(ctx context.Context, orderID string) (map[string]any, error) {
 	if m.MockGetOidcToken != nil {
 		return m.MockGetOidcToken(ctx, orderID)
 	} else if m.MockError != nil {
@@ -445,7 +457,7 @@ func (m *MockDB) GetOidcToken(ctx context.Context, orderID string) (map[string]a
 }
 
 // CreateOidcToken creates oidc token resources and saves them to the DB.
-func (m *MockDB) CreateOidcToken(ctx context.Context, orderID string, idToken map[string]any) error {
+func (m *MockWireDB) CreateOidcToken(ctx context.Context, orderID string, idToken map[string]any) error {
 	if m.MockCreateOidcToken != nil {
 		return m.MockCreateOidcToken(ctx, orderID, idToken)
 	}

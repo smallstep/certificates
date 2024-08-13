@@ -117,9 +117,17 @@ func (ch *Challenge) Validate(ctx context.Context, db DB, jwk *jose.JSONWebKey, 
 	case DEVICEATTEST01:
 		return deviceAttest01Validate(ctx, ch, db, jwk, payload)
 	case WIREOIDC01:
-		return wireOIDC01Validate(ctx, ch, db, jwk, payload)
+		wireDB, ok := db.(WireDB)
+		if !ok {
+			return NewErrorISE("db %T is not a WireDB", db)
+		}
+		return wireOIDC01Validate(ctx, ch, wireDB, jwk, payload)
 	case WIREDPOP01:
-		return wireDPOP01Validate(ctx, ch, db, jwk, payload)
+		wireDB, ok := db.(WireDB)
+		if !ok {
+			return NewErrorISE("db %T is not a WireDB", db)
+		}
+		return wireDPOP01Validate(ctx, ch, wireDB, jwk, payload)
 	default:
 		return NewErrorISE("unexpected challenge type %q", ch.Type)
 	}
@@ -392,7 +400,7 @@ type wireOidcPayload struct {
 	IDToken string `json:"id_token"`
 }
 
-func wireOIDC01Validate(ctx context.Context, ch *Challenge, db DB, jwk *jose.JSONWebKey, payload []byte) error {
+func wireOIDC01Validate(ctx context.Context, ch *Challenge, db WireDB, jwk *jose.JSONWebKey, payload []byte) error {
 	prov, ok := ProvisionerFromContext(ctx)
 	if !ok {
 		return NewErrorISE("missing provisioner")
@@ -522,7 +530,7 @@ type wireDpopPayload struct {
 	AccessToken string `json:"access_token"`
 }
 
-func wireDPOP01Validate(ctx context.Context, ch *Challenge, db DB, accountJWK *jose.JSONWebKey, payload []byte) error {
+func wireDPOP01Validate(ctx context.Context, ch *Challenge, db WireDB, accountJWK *jose.JSONWebKey, payload []byte) error {
 	prov, ok := ProvisionerFromContext(ctx)
 	if !ok {
 		return NewErrorISE("missing provisioner")
