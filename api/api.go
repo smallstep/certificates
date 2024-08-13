@@ -482,12 +482,12 @@ func Intermediates(w http.ResponseWriter, r *http.Request) {
 		certs[i] = Certificate{intermediates[i]}
 	}
 
-	render.JSONStatus(w, r, &RootsResponse{
+	render.JSONStatus(w, r, &IntermediatesResponse{
 		Certificates: certs,
 	}, http.StatusCreated)
 }
 
-// RootsPEM returns all the root certificates for the CA in PEM format.
+// IntermediatesPEM returns all the intermediate certificates for the CA in PEM format.
 func IntermediatesPEM(w http.ResponseWriter, r *http.Request) {
 	intermediates := mustAuthority(r.Context()).GetIntermediateCertificates()
 	if len(intermediates) == 0 {
