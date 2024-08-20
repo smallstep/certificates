@@ -306,7 +306,7 @@ func (i *Identity) Renew(client Renewer) error {
 			return err
 		}
 
-		if sign.CertChainPEM == nil || len(sign.CertChainPEM) == 0 {
+		if len(sign.CertChainPEM) == 0 {
 			sign.CertChainPEM = []api.Certificate{sign.ServerPEM, sign.CaPEM}
 		}
 

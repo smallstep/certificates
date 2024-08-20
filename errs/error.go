@@ -177,7 +177,7 @@ func StatusCodeError(code int, e error, opts ...Option) error {
 	}
 }
 
-var (
+const (
 	seeLogs = "Please see the certificate authority logs for more info."
 	// BadRequestDefaultMsg 400 default msg
 	BadRequestDefaultMsg = "The request could not be completed; malformed or missing data. " + seeLogs
@@ -193,7 +193,7 @@ var (
 	NotImplementedDefaultMsg = "The requested method is not implemented by the certificate authority. " + seeLogs
 )
 
-var (
+const (
 	// BadRequestPrefix is the prefix added to the bad request messages that are
 	// directly sent to the cli.
 	BadRequestPrefix = "The request could not be completed: "

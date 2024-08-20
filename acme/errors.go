@@ -294,14 +294,14 @@ type Subproblem struct {
 }
 
 // NewError creates a new Error.
-func NewError(pt ProblemType, msg string, args ...interface{}) *Error {
+func NewError(pt ProblemType, msg string, args ...any) *Error {
 	return newError(pt, errors.Errorf(msg, args...))
 }
 
 // NewDetailedError creates a new Error that includes the error
 // message in the details, providing more information to the
 // ACME client.
-func NewDetailedError(pt ProblemType, msg string, args ...interface{}) *Error {
+func NewDetailedError(pt ProblemType, msg string, args ...any) *Error {
 	return NewError(pt, msg, args...).withDetail()
 }
 
@@ -324,7 +324,7 @@ func (e *Error) AddSubproblems(subproblems ...Subproblem) *Error {
 // NewSubproblem creates a new Subproblem. The msg and args
 // are used to create a new error, which is set as the Detail, allowing
 // for more detailed error messages to be returned to the ACME client.
-func NewSubproblem(pt ProblemType, msg string, args ...interface{}) Subproblem {
+func NewSubproblem(pt ProblemType, msg string, args ...any) Subproblem {
 	e := newError(pt, fmt.Errorf(msg, args...))
 	s := Subproblem{
 		Type:   e.Type,
@@ -335,7 +335,7 @@ func NewSubproblem(pt ProblemType, msg string, args ...interface{}) Subproblem {
 
 // NewSubproblemWithIdentifier creates a new Subproblem with a specific ACME
 // Identifier. It calls NewSubproblem and sets the Identifier.
-func NewSubproblemWithIdentifier(pt ProblemType, identifier Identifier, msg string, args ...interface{}) Subproblem {
+func NewSubproblemWithIdentifier(pt ProblemType, identifier Identifier, msg string, args ...any) Subproblem {
 	s := NewSubproblem(pt, msg, args...)
 	s.Identifier = &identifier
 	return s
@@ -362,12 +362,12 @@ func newError(pt ProblemType, err error) *Error {
 }
 
 // NewErrorISE creates a new ErrorServerInternalType Error.
-func NewErrorISE(msg string, args ...interface{}) *Error {
+func NewErrorISE(msg string, args ...any) *Error {
 	return NewError(ErrorServerInternalType, msg, args...)
 }
 
 // WrapError attempts to wrap the internal error.
-func WrapError(typ ProblemType, err error, msg string, args ...interface{}) *Error {
+func WrapError(typ ProblemType, err error, msg string, args ...any) *Error {
 	var e *Error
 	switch {
 	case err == nil:
@@ -384,12 +384,12 @@ func WrapError(typ ProblemType, err error, msg string, args ...interface{}) *Err
 	}
 }
 
-func WrapDetailedError(typ ProblemType, err error, msg string, args ...interface{}) *Error {
+func WrapDetailedError(typ ProblemType, err error, msg string, args ...any) *Error {
 	return WrapError(typ, err, msg, args...).withDetail()
 }
 
 // WrapErrorISE shortcut to wrap an internal server error type.
-func WrapErrorISE(err error, msg string, args ...interface{}) *Error {
+func WrapErrorISE(err error, msg string, args ...any) *Error {
 	return WrapError(ErrorServerInternalType, err, msg, args...)
 }
 
@@ -415,7 +415,7 @@ func (e *Error) Cause() error {
 }
 
 // ToLog implements the EnableLogger interface.
-func (e *Error) ToLog() (interface{}, error) {
+func (e *Error) ToLog() (any, error) {
 	b, err := json.Marshal(e)
 	if err != nil {
 		return nil, WrapErrorISE(err, "error marshaling acme.Error for logging")

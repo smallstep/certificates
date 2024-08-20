@@ -4,7 +4,7 @@ import (
 	"bytes"
 	"context"
 	"crypto"
-	"crypto/dsa" //nolint:staticcheck // support legacy algorithms
+	"crypto/dsa" // support legacy algorithms
 	"crypto/ecdsa"
 	"crypto/ed25519"
 	"crypto/rsa"

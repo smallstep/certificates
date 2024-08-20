@@ -246,7 +246,7 @@ type Config struct {
 	Claims Claims
 	// Audiences are the audiences used in the default provisioner, (JWK).
 	Audiences Audiences
-	// SSHKeys are the root SSH public keys
+	// SSHKeys are the root SSH public keys.
 	SSHKeys *SSHKeys
 	// GetIdentityFunc is a function that returns an identity that will be
 	// used by the provisioner to populate certificate attributes.
@@ -257,11 +257,11 @@ type Config struct {
 	// AuthorizeSSHRenewFunc is a function that returns nil if a given SSH
 	// certificate can be renewed.
 	AuthorizeSSHRenewFunc AuthorizeSSHRenewFunc
-	// WebhookClient is an http client to use in webhook request
+	// WebhookClient is an HTTP client used when performing webhook requests.
 	WebhookClient *http.Client
 	// SCEPKeyManager, if defined, is the interface used by SCEP provisioners.
 	SCEPKeyManager SCEPKeyManager
-	// HTTPClient is an HTTP client that trust the system cert pool and the CA
+	// HTTPClient is an HTTP client that trusts the system cert pool and the CA
 	// roots.
 	HTTPClient *http.Client
 }
