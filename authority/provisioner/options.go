@@ -11,6 +11,7 @@ import (
 	"go.step.sm/crypto/x509util"
 
 	"github.com/smallstep/certificates/authority/policy"
+	"github.com/smallstep/certificates/authority/provisioner/wire"
 )
 
 // CertificateOptions is an interface that returns a list of options passed when
@@ -30,9 +31,10 @@ func (fn certificateOptionsFunc) Options(so SignOptions) []x509util.Option {
 type Options struct {
 	X509 *X509Options `json:"x509,omitempty"`
 	SSH  *SSHOptions  `json:"ssh,omitempty"`
-
 	// Webhooks is a list of webhooks that can augment template data
 	Webhooks []*Webhook `json:"webhooks,omitempty"`
+	// Wire holds the options used for the ACME Wire integration
+	Wire *wire.Options `json:"wire,omitempty"`
 }
 
 // GetX509Options returns the X.509 options.
@@ -49,6 +51,18 @@ func (o *Options) GetSSHOptions() *SSHOptions {
 		return nil
 	}
 	return o.SSH
+}
+
+// GetWireOptions returns the Wire options if available. It
+// returns an error if they're not available.
+func (o *Options) GetWireOptions() (*wire.Options, error) {
+	if o == nil {
+		return nil, errors.New("no options available")
+	}
+	if o.Wire == nil {
+		return nil, errors.New("no Wire options available")
+	}
+	return o.Wire, nil
 }
 
 // GetWebhooks returns the webhooks options.

@@ -223,13 +223,13 @@ func GetDirectory(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	acmeProv, err := acmeProvisionerFromContext(ctx)
 	if err != nil {
-		render.Error(w, err)
+		render.Error(w, r, err)
 		return
 	}
 
 	linker := acme.MustLinkerFromContext(ctx)
 
-	render.JSON(w, &Directory{
+	render.JSON(w, r, &Directory{
 		NewNonce:   linker.GetLink(ctx, acme.NewNonceLinkType),
 		NewAccount: linker.GetLink(ctx, acme.NewAccountLinkType),
 		NewOrder:   linker.GetLink(ctx, acme.NewOrderLinkType),
@@ -273,8 +273,8 @@ func shouldAddMetaObject(p *provisioner.ACME) bool {
 
 // NotImplemented returns a 501 and is generally a placeholder for functionality which
 // MAY be added at some point in the future but is not in any way a guarantee of such.
-func NotImplemented(w http.ResponseWriter, _ *http.Request) {
-	render.Error(w, acme.NewError(acme.ErrorNotImplementedType, "this API is not implemented"))
+func NotImplemented(w http.ResponseWriter, r *http.Request) {
+	render.Error(w, r, acme.NewError(acme.ErrorNotImplementedType, "this API is not implemented"))
 }
 
 // GetAuthorization ACME api for retrieving an Authz.
@@ -285,28 +285,28 @@ func GetAuthorization(w http.ResponseWriter, r *http.Request) {
 
 	acc, err := accountFromContext(ctx)
 	if err != nil {
-		render.Error(w, err)
+		render.Error(w, r, err)
 		return
 	}
 	az, err := db.GetAuthorization(ctx, chi.URLParam(r, "authzID"))
 	if err != nil {
-		render.Error(w, acme.WrapErrorISE(err, "error retrieving authorization"))
+		render.Error(w, r, acme.WrapErrorISE(err, "error retrieving authorization"))
 		return
 	}
 	if acc.ID != az.AccountID {
-		render.Error(w, acme.NewError(acme.ErrorUnauthorizedType,
+		render.Error(w, r, acme.NewError(acme.ErrorUnauthorizedType,
 			"account '%s' does not own authorization '%s'", acc.ID, az.ID))
 		return
 	}
 	if err = az.UpdateStatus(ctx, db); err != nil {
-		render.Error(w, acme.WrapErrorISE(err, "error updating authorization status"))
+		render.Error(w, r, acme.WrapErrorISE(err, "error updating authorization status"))
 		return
 	}
 
 	linker.LinkAuthorization(ctx, az)
 
 	w.Header().Set("Location", linker.GetLink(ctx, acme.AuthzLinkType, az.ID))
-	render.JSON(w, az)
+	render.JSON(w, r, az)
 }
 
 // GetChallenge ACME api for retrieving a Challenge.
@@ -317,13 +317,13 @@ func GetChallenge(w http.ResponseWriter, r *http.Request) {
 
 	acc, err := accountFromContext(ctx)
 	if err != nil {
-		render.Error(w, err)
+		render.Error(w, r, err)
 		return
 	}
 
 	payload, err := payloadFromContext(ctx)
 	if err != nil {
-		render.Error(w, err)
+		render.Error(w, r, err)
 		return
 	}
 
@@ -336,22 +336,22 @@ func GetChallenge(w http.ResponseWriter, r *http.Request) {
 	azID := chi.URLParam(r, "authzID")
 	ch, err := db.GetChallenge(ctx, chi.URLParam(r, "chID"), azID)
 	if err != nil {
-		render.Error(w, acme.WrapErrorISE(err, "error retrieving challenge"))
+		render.Error(w, r, acme.WrapErrorISE(err, "error retrieving challenge"))
 		return
 	}
 	ch.AuthorizationID = azID
 	if acc.ID != ch.AccountID {
-		render.Error(w, acme.NewError(acme.ErrorUnauthorizedType,
+		render.Error(w, r, acme.NewError(acme.ErrorUnauthorizedType,
 			"account '%s' does not own challenge '%s'", acc.ID, ch.ID))
 		return
 	}
 	jwk, err := jwkFromContext(ctx)
 	if err != nil {
-		render.Error(w, err)
+		render.Error(w, r, err)
 		return
 	}
 	if err = ch.Validate(ctx, db, jwk, payload.value); err != nil {
-		render.Error(w, acme.WrapErrorISE(err, "error validating challenge"))
+		render.Error(w, r, acme.WrapErrorISE(err, "error validating challenge"))
 		return
 	}
 
@@ -359,7 +359,7 @@ func GetChallenge(w http.ResponseWriter, r *http.Request) {
 
 	w.Header().Add("Link", link(linker.GetLink(ctx, acme.AuthzLinkType, azID), "up"))
 	w.Header().Set("Location", linker.GetLink(ctx, acme.ChallengeLinkType, azID, ch.ID))
-	render.JSON(w, ch)
+	render.JSON(w, r, ch)
 }
 
 // GetCertificate ACME api for retrieving a Certificate.
@@ -369,18 +369,18 @@ func GetCertificate(w http.ResponseWriter, r *http.Request) {
 
 	acc, err := accountFromContext(ctx)
 	if err != nil {
-		render.Error(w, err)
+		render.Error(w, r, err)
 		return
 	}
 
 	certID := chi.URLParam(r, "certID")
 	cert, err := db.GetCertificate(ctx, certID)
 	if err != nil {
-		render.Error(w, acme.WrapErrorISE(err, "error retrieving certificate"))
+		render.Error(w, r, acme.WrapErrorISE(err, "error retrieving certificate"))
 		return
 	}
 	if cert.AccountID != acc.ID {
-		render.Error(w, acme.NewError(acme.ErrorUnauthorizedType,
+		render.Error(w, r, acme.NewError(acme.ErrorUnauthorizedType,
 			"account '%s' does not own certificate '%s'", acc.ID, certID))
 		return
 	}

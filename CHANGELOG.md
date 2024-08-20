@@ -25,6 +25,94 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
 
 ---
 
+## [0.27.2] - 2024-07-18
+
+### Added
+
+- `--console` option to default step-ssh config (smallstep/certificates#1931)
+
+
+## [0.27.1] - 2024-07-12
+
+### Changed
+
+- Enable use of strict FQDN with a flag (smallstep/certificates#1926)
+    - This reverses a change in 0.27.0 that required the use of strict FQDNs (smallstep/certificate#1910)
+
+
+## [0.27.0] - 2024-07-11
+
+### Added
+
+- Support for validity windows in templates (smallstep/certificates#1903)
+- Create identity certificate with host URI when using any provisioner (smallstep/certificates#1922)
+
+### Changed
+
+- Do strict DNS lookup on ACME (smallstep/certificates#1910)
+
+### Fixed
+
+- Handle bad attestation object in deviceAttest01 validation (smallstep/certificates#1913)
+
+
+## [0.26.2] - 2024-06-13
+
+### Added
+
+- Add provisionerID to ACME accounts (smallstep/certificates#1830)
+- Enable verifying ACME provisioner using provisionerID if available (smallstep/certificates#1844)
+- Add methods to Authority to get intermediate certificates (smallstep/certificates#1848)
+- Add GetX509Signer method (smallstep/certificates#1850)
+
+### Changed
+
+- Make ISErrNotFound more flexible (smallstep/certificates#1819)
+- Log errors using slog.Logger (smallstep/certificates#1849)
+- Update hardcoded AWS certificates (smallstep/certificates#1881)
+
+
+## [0.26.1] - 2024-04-22
+
+### Added
+
+- Allow configuration of a custom SCEP key manager (smallstep/certificates#1797)
+
+### Fixed
+
+- id-scep-failInfoText OID (smallstep/certificates#1794)
+- CA startup with Vault RA configuration (smallstep/certificates#1803)
+
+
+## [0.26.0] - 2024-03-28
+
+### Added 
+
+- [TPM KMS](https://github.com/smallstep/crypto/tree/master/kms/tpmkms) support for CA keys (smallstep/certificates#1772)
+- Propagation of HTTP request identifier using X-Request-Id header (smallstep/certificates#1743, smallstep/certificates#1542)
+- Expires header in CRL response (smallstep/certificates#1708)
+- Support for providing TLS configuration programmatically (smallstep/certificates#1685)
+- Support for providing external CAS implementation (smallstep/certificates#1684)
+- AWS `ca-west-1` identity document root certificate (smallstep/certificates#1715)
+- [COSE RS1](https://www.rfc-editor.org/rfc/rfc8812.html#section-2) as a supported algorithm with ACME `device-attest-01` challenge (smallstep/certificates#1663)
+
+### Changed 
+
+- In an RA setup, let the CA decide the RA certificate lifetime (smallstep/certificates#1764)
+- Use Debian Bookworm in Docker containers (smallstep/certificates#1615)
+- Error message for CSR validation (smallstep/certificates#1665)
+- Updated dependencies
+
+### Fixed
+
+- Stop CA when any of the required servers fails to start (smallstep/certificates#1751). Before the fix, the CA would continue running and only log the server failure when stopped.
+- Configuration loading errors when not using context were not returned. Fixed in [cli-utils/109](https://github.com/smallstep/cli-utils/pull/109).
+- HTTP_PROXY and HTTPS_PROXY support for ACME validation client (smallstep/certificates#1658).
+
+### Security
+
+- Upgrade to using cosign v2 for signing artifacts
+
 ## [0.25.1] - 2023-11-28
 
 ### Added
@@ -36,7 +124,7 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
 
 - Generation of first provisioner name on `step ca init` in (smallstep/certificates#1566)
 - Processing of SCEP Get PKIOperation requests in (smallstep/certificates#1570)
-- Support for signing identity certificate during SSH sign by skipping URI validation in  (smallstep/certificates#1572)
+- Support for signing identity certificate during SSH sign by skipping URI validation in (smallstep/certificates#1572)
 - Dependency on `micromdm/scep` and `go.mozilla.org/pkcs7` to use Smallstep forks in (smallstep/certificates#1600)
 - Make the Common Name validator for JWK provisioners accept values from SANs too in (smallstep/certificates#1609)
 

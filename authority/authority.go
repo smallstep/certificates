@@ -49,6 +49,7 @@ type Authority struct {
 	templates     *templates.Templates
 	linkedCAToken string
 	webhookClient *http.Client
+	httpClient    *http.Client
 
 	// X509 CA
 	password              []byte
@@ -62,9 +63,10 @@ type Authority struct {
 	x509Enforcers         []provisioner.CertificateEnforcer
 
 	// SCEP CA
-	scepOptions   *scep.Options
-	validateSCEP  bool
-	scepAuthority *scep.Authority
+	scepOptions    *scep.Options
+	validateSCEP   bool
+	scepAuthority  *scep.Authority
+	scepKeyManager provisioner.SCEPKeyManager
 
 	// SSH CA
 	sshHostPassword         []byte
@@ -104,6 +106,9 @@ type Authority struct {
 
 	// If true, do not output initialization logs
 	quietInit bool
+
+	// Called whenever applicable, in order to instrument the authority.
+	meter Meter
 }
 
 // Info contains information about the authority.
@@ -126,6 +131,7 @@ func New(cfg *config.Config, opts ...Option) (*Authority, error) {
 		config:       cfg,
 		certificates: new(sync.Map),
 		validateSCEP: true,
+		meter:        noopMeter{},
 	}
 
 	// Apply options.
@@ -133,6 +139,9 @@ func New(cfg *config.Config, opts ...Option) (*Authority, error) {
 		if err := fn(a); err != nil {
 			return nil, err
 		}
+	}
+	if a.keyManager != nil {
+		a.keyManager = newInstrumentedKeyManager(a.keyManager, a.meter)
 	}
 
 	if !a.skipInit {
@@ -151,6 +160,7 @@ func NewEmbedded(opts ...Option) (*Authority, error) {
 	a := &Authority{
 		config:       &config.Config{},
 		certificates: new(sync.Map),
+		meter:        noopMeter{},
 	}
 
 	// Apply options.
@@ -158,6 +168,9 @@ func NewEmbedded(opts ...Option) (*Authority, error) {
 		if err := fn(a); err != nil {
 			return nil, err
 		}
+	}
+	if a.keyManager != nil {
+		a.keyManager = newInstrumentedKeyManager(a.keyManager, a.meter)
 	}
 
 	// Validate required options
@@ -244,7 +257,10 @@ func (a *Authority) ReloadAdminResources(ctx context.Context) error {
 	provClxn := provisioner.NewCollection(provisionerConfig.Audiences)
 	for _, p := range provList {
 		if err := p.Init(provisionerConfig); err != nil {
-			return err
+			log.Printf("failed to initialize %s provisioner %q: %v\n", p.GetType(), p.GetName(), err)
+			p = provisioner.Uninitialized{
+				Interface: p, Reason: err,
+			}
 		}
 		if err := provClxn.Store(p); err != nil {
 			return err
@@ -337,6 +353,8 @@ func (a *Authority) init() error {
 		if err != nil {
 			return err
 		}
+
+		a.keyManager = newInstrumentedKeyManager(a.keyManager, a.meter)
 	}
 
 	// Initialize linkedca client if necessary. On a linked RA, the issuer
@@ -433,6 +451,7 @@ func (a *Authority) init() error {
 				return err
 			}
 			a.rootX509Certs = append(a.rootX509Certs, resp.RootCertificate)
+			a.intermediateX509Certs = append(a.intermediateX509Certs, resp.IntermediateCertificates...)
 		}
 	}
 
@@ -471,6 +490,15 @@ func (a *Authority) init() error {
 	for _, crt := range a.federatedX509Certs {
 		sum := sha256.Sum256(crt.Raw)
 		a.certificates.Store(hex.EncodeToString(sum[:]), crt)
+	}
+
+	// Initialize HTTPClient with all root certs
+	clientRoots := make([]*x509.Certificate, 0, len(a.rootX509Certs)+len(a.federatedX509Certs))
+	clientRoots = append(clientRoots, a.rootX509Certs...)
+	clientRoots = append(clientRoots, a.federatedX509Certs...)
+	a.httpClient, err = newHTTPClient(clientRoots...)
+	if err != nil {
+		return err
 	}
 
 	// Decrypt and load SSH keys
@@ -681,32 +709,42 @@ func (a *Authority) init() error {
 			options := &scep.Options{
 				Roots:         a.rootX509Certs,
 				Intermediates: a.intermediateX509Certs,
-				SignerCert:    a.intermediateX509Certs[0],
 			}
-			if options.Signer, err = a.keyManager.CreateSigner(&kmsapi.CreateSignerRequest{
-				SigningKey: a.config.IntermediateKey,
-				Password:   a.password,
-			}); err != nil {
-				return err
+
+			// intermediate certificates can be empty in RA mode
+			if len(a.intermediateX509Certs) > 0 {
+				options.SignerCert = a.intermediateX509Certs[0]
 			}
-			// TODO(hs): instead of creating the decrypter here, pass the
-			// intermediate key + chain down to the SCEP authority,
-			// and only instantiate it when required there. Is that possible?
-			// Also with entering passwords?
-			// TODO(hs): if moving the logic, try improving the logic for the
-			// decrypter password too? Right now it needs to be entered multiple
-			// times; I've observed it to be three times maximum, every time
-			// the intermediate key is read.
-			_, isRSA := options.Signer.Public().(*rsa.PublicKey)
-			if km, ok := a.keyManager.(kmsapi.Decrypter); ok && isRSA {
-				if decrypter, err := km.CreateDecrypter(&kmsapi.CreateDecrypterRequest{
-					DecryptionKey: a.config.IntermediateKey,
-					Password:      a.password,
-				}); err == nil {
-					// only pass the decrypter down when it was successfully created,
-					// meaning it's an RSA key, and `CreateDecrypter` did not fail.
-					options.Decrypter = decrypter
-					options.DecrypterCert = options.Intermediates[0]
+
+			// attempt to create the (default) SCEP signer if the intermediate
+			// key is configured.
+			if a.config.IntermediateKey != "" {
+				if options.Signer, err = a.keyManager.CreateSigner(&kmsapi.CreateSignerRequest{
+					SigningKey: a.config.IntermediateKey,
+					Password:   a.password,
+				}); err != nil {
+					return err
+				}
+
+				// TODO(hs): instead of creating the decrypter here, pass the
+				// intermediate key + chain down to the SCEP authority,
+				// and only instantiate it when required there. Is that possible?
+				// Also with entering passwords?
+				// TODO(hs): if moving the logic, try improving the logic for the
+				// decrypter password too? Right now it needs to be entered multiple
+				// times; I've observed it to be three times maximum, every time
+				// the intermediate key is read.
+				_, isRSAKey := options.Signer.Public().(*rsa.PublicKey)
+				if km, ok := a.keyManager.(kmsapi.Decrypter); ok && isRSAKey {
+					if decrypter, err := km.CreateDecrypter(&kmsapi.CreateDecrypterRequest{
+						DecryptionKey: a.config.IntermediateKey,
+						Password:      a.password,
+					}); err == nil {
+						// only pass the decrypter down when it was successfully created,
+						// meaning it's an RSA key, and `CreateDecrypter` did not fail.
+						options.Decrypter = decrypter
+						options.DecrypterCert = options.Intermediates[0]
+					}
 				}
 			}
 

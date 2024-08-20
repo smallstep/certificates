@@ -11,6 +11,17 @@ var now = func() time.Time {
 	return time.Now().UTC()
 }
 
+// timeOr returns the first of its arguments that is not equal to the zero time.
+// This method can be replaced with cmp.Or when step-ca requires Go 1.22.
+func timeOr(ts ...time.Time) time.Time {
+	for _, t := range ts {
+		if !t.IsZero() {
+			return t
+		}
+	}
+	return time.Time{}
+}
+
 // TimeDuration is a type that represents a time but the JSON unmarshaling can
 // use a time using the RFC 3339 format or a time.Duration string. If a duration
 // is used, the time will be set on the first call to TimeDuration.Time.

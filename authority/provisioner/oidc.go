@@ -93,6 +93,8 @@ type OIDC struct {
 	ListenAddress         string   `json:"listenAddress,omitempty"`
 	Claims                *Claims  `json:"claims,omitempty"`
 	Options               *Options `json:"options,omitempty"`
+	Scopes                []string `json:"scopes,omitempty"`
+	AuthParams            []string `json:"authParams,omitempty"`
 	configuration         openIDConfiguration
 	keyStore              *keyStore
 	ctl                   *Controller
@@ -182,23 +184,29 @@ func (o *OIDC) Init(config Config) (err error) {
 	if !strings.Contains(u.Path, "/.well-known/openid-configuration") {
 		u.Path = path.Join(u.Path, "/.well-known/openid-configuration")
 	}
-	if err := getAndDecode(u.String(), &o.configuration); err != nil {
+
+	// Initialize the common provisioner controller
+	o.ctl, err = NewController(o, o.Claims, config, o.Options)
+	if err != nil {
+		return err
+	}
+
+	// Decode and validate openid-configuration
+	httpClient := o.ctl.GetHTTPClient()
+	if err := getAndDecode(httpClient, u.String(), &o.configuration); err != nil {
 		return err
 	}
 	if err := o.configuration.Validate(); err != nil {
 		return errors.Wrapf(err, "error parsing %s", o.ConfigurationEndpoint)
 	}
+
 	// Replace {tenantid} with the configured one
 	if o.TenantID != "" {
 		o.configuration.Issuer = strings.ReplaceAll(o.configuration.Issuer, "{tenantid}", o.TenantID)
 	}
-	// Get JWK key set
-	o.keyStore, err = newKeyStore(o.configuration.JWKSetURI)
-	if err != nil {
-		return err
-	}
 
-	o.ctl, err = NewController(o, o.Claims, config, o.Options)
+	// Get JWK key set
+	o.keyStore, err = newKeyStore(httpClient, o.configuration.JWKSetURI)
 	return
 }
 
@@ -477,8 +485,8 @@ func (o *OIDC) AuthorizeSSHRevoke(_ context.Context, token string) error {
 	return errs.Unauthorized("oidc.AuthorizeSSHRevoke; cannot revoke with non-admin oidc token")
 }
 
-func getAndDecode(uri string, v interface{}) error {
-	resp, err := http.Get(uri) //nolint:gosec // openid-configuration uri
+func getAndDecode(client *http.Client, uri string, v interface{}) error {
+	resp, err := client.Get(uri)
 	if err != nil {
 		return errors.Wrapf(err, "failed to connect to %s", uri)
 	}

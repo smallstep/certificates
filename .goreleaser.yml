@@ -1,6 +1,6 @@
-# This is an example .goreleaser.yml file with some sane defaults.
-# Make sure to check the documentation at http://goreleaser.com
+# Documentation: https://goreleaser.com/customization/
 project_name: step-ca
+version: 2
 
 before:
   hooks:
@@ -98,7 +98,7 @@ signs:
 - cmd: cosign
   signature: "${artifact}.sig"
   certificate: "${artifact}.pem"
-  args: ["sign-blob", "--oidc-issuer=https://token.actions.githubusercontent.com", "--output-certificate=${certificate}", "--output-signature=${signature}", "${artifact}"]
+  args: ["sign-blob", "--oidc-issuer=https://token.actions.githubusercontent.com", "--output-certificate=${certificate}", "--output-signature=${signature}", "${artifact}", "--yes"]
   artifacts: all
 
 snapshot:
@@ -180,7 +180,7 @@ release:
 
     Those were the changes on {{ .Tag }}!
 
-    Come join us on [Discord](https://discord.gg/X2RKGwEbV9) to ask questions, chat about PKI, or get a sneak peak at the freshest PKI memes.
+    Come join us on [Discord](https://discord.gg/X2RKGwEbV9) to ask questions, chat about PKI, or get a sneak peek at the freshest PKI memes.
 
   # You can disable this pipe in order to not upload any artifacts.
   # Defaults to false.
@@ -268,7 +268,7 @@ winget:
     # Release notes URL.
     #
     # Templates: allowed
-    release_notes_url: "https://github.com/smallstep/certificates/releases/tag/{{.Version}}"
+    release_notes_url: "https://github.com/smallstep/certificates/releases/tag/{{ .Tag }}"
 
     # Create the PR - for testing
     skip_upload: auto
@@ -283,7 +283,7 @@ winget:
     repository:
       owner: smallstep
       name: winget-pkgs
-      branch: step
+      branch: "step-ca-{{.Version}}"
 
       # Optionally a token can be provided, if it differs from the token
       # provided to GoReleaser

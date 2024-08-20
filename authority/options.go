@@ -167,6 +167,15 @@ func WithKeyManager(k kms.KeyManager) Option {
 	}
 }
 
+// WithX509CAService allows the consumer to provide an externally implemented
+// API implementation of apiv1.CertificateAuthorityService
+func WithX509CAService(svc casapi.CertificateAuthorityService) Option {
+	return func(a *Authority) error {
+		a.x509CAService = svc
+		return nil
+	}
+}
+
 // WithX509Signer defines the signer used to sign X509 certificates.
 func WithX509Signer(crt *x509.Certificate, s crypto.Signer) Option {
 	return WithX509SignerChain([]*x509.Certificate{crt}, s)
@@ -213,6 +222,16 @@ func WithFullSCEPOptions(options *scep.Options) Option {
 	return func(a *Authority) error {
 		a.scepOptions = options
 		a.validateSCEP = false
+		return nil
+	}
+}
+
+// WithSCEPKeyManager defines the key manager used on SCEP provisioners.
+//
+// This feature is EXPERIMENTAL and might change at any time.
+func WithSCEPKeyManager(skm provisioner.SCEPKeyManager) Option {
+	return func(a *Authority) error {
+		a.scepKeyManager = skm
 		return nil
 	}
 }
@@ -380,4 +399,17 @@ func readCertificateBundle(pemCerts []byte) ([]*x509.Certificate, error) {
 		certs = append(certs, cert)
 	}
 	return certs, nil
+}
+
+// WithMeter is an option that sets the authority's [Meter] to the provided one.
+func WithMeter(m Meter) Option {
+	if m == nil {
+		m = noopMeter{}
+	}
+
+	return func(a *Authority) (_ error) {
+		a.meter = m
+
+		return
+	}
 }

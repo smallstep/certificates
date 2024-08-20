@@ -1,6 +1,7 @@
 package authority
 
 import (
+	"context"
 	"crypto"
 	"crypto/rand"
 	"crypto/sha256"
@@ -68,6 +69,15 @@ func testAuthority(t *testing.T, opts ...Option) *Authority {
 				EnableSSHCA: &enableSSHCA,
 			},
 		},
+		&provisioner.JWK{
+			Name: "uninitialized",
+			Type: "JWK",
+			Key:  clijwk,
+			Claims: &provisioner.Claims{
+				MinTLSDur: &provisioner.Duration{Duration: 5 * time.Minute},
+				MaxTLSDur: &provisioner.Duration{Duration: time.Minute},
+			},
+		},
 	}
 	c := &Config{
 		Address:          "127.0.0.1:443",
@@ -112,7 +122,7 @@ func TestAuthorityNew(t *testing.T) {
 			c.Root = []string{"foo"}
 			return &newTest{
 				config: c,
-				err:    errors.New("error reading foo: no such file or directory"),
+				err:    errors.New(`error reading "foo": no such file or directory`),
 			}
 		},
 		"fail bad password": func(t *testing.T) *newTest {
@@ -130,7 +140,7 @@ func TestAuthorityNew(t *testing.T) {
 			c.IntermediateCert = "wrong"
 			return &newTest{
 				config: c,
-				err:    errors.New("error reading wrong: no such file or directory"),
+				err:    errors.New(`error reading "wrong": no such file or directory`),
 			}
 		},
 	}
@@ -414,7 +424,7 @@ func TestNewEmbedded_Sign(t *testing.T) {
 	csr, err := x509.ParseCertificateRequest(cr)
 	assert.FatalError(t, err)
 
-	cert, err := a.Sign(csr, provisioner.SignOptions{})
+	cert, err := a.SignWithContext(context.Background(), csr, provisioner.SignOptions{})
 	assert.FatalError(t, err)
 	assert.Equals(t, []string{"foo.bar.zar"}, cert[0].DNSNames)
 	assert.Equals(t, crt, cert[1])

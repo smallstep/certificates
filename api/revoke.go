@@ -57,12 +57,12 @@ func (r *RevokeRequest) Validate() (err error) {
 func Revoke(w http.ResponseWriter, r *http.Request) {
 	var body RevokeRequest
 	if err := read.JSON(r.Body, &body); err != nil {
-		render.Error(w, errs.BadRequestErr(err, "error reading request body"))
+		render.Error(w, r, errs.BadRequestErr(err, "error reading request body"))
 		return
 	}
 
 	if err := body.Validate(); err != nil {
-		render.Error(w, err)
+		render.Error(w, r, err)
 		return
 	}
 
@@ -78,10 +78,10 @@ func Revoke(w http.ResponseWriter, r *http.Request) {
 
 	// A token indicates that we are using the api via a provisioner token,
 	// otherwise it is assumed that the certificate is revoking itself over mTLS.
-	if len(body.OTT) > 0 {
+	if body.OTT != "" {
 		logOtt(w, body.OTT)
 		if _, err := a.Authorize(ctx, body.OTT); err != nil {
-			render.Error(w, errs.UnauthorizedErr(err))
+			render.Error(w, r, errs.UnauthorizedErr(err))
 			return
 		}
 		opts.OTT = body.OTT
@@ -90,12 +90,12 @@ func Revoke(w http.ResponseWriter, r *http.Request) {
 		// the client certificate Serial Number must match the serial number
 		// being revoked.
 		if r.TLS == nil || len(r.TLS.PeerCertificates) == 0 {
-			render.Error(w, errs.BadRequest("missing ott or client certificate"))
+			render.Error(w, r, errs.BadRequest("missing ott or client certificate"))
 			return
 		}
 		opts.Crt = r.TLS.PeerCertificates[0]
 		if opts.Crt.SerialNumber.String() != opts.Serial {
-			render.Error(w, errs.BadRequest("serial number in client certificate different than body"))
+			render.Error(w, r, errs.BadRequest("serial number in client certificate different than body"))
 			return
 		}
 		// TODO: should probably be checking if the certificate was revoked here.
@@ -106,12 +106,12 @@ func Revoke(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if err := a.Revoke(ctx, opts); err != nil {
-		render.Error(w, errs.ForbiddenErr(err, "error revoking certificate"))
+		render.Error(w, r, errs.ForbiddenErr(err, "error revoking certificate"))
 		return
 	}
 
 	logRevoke(w, opts)
-	render.JSON(w, &RevokeResponse{Status: "ok"})
+	render.JSON(w, r, &RevokeResponse{Status: "ok"})
 }
 
 func logRevoke(w http.ResponseWriter, ri *authority.RevokeOptions) {

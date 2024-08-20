@@ -1,6 +1,7 @@
 package acme
 
 import (
+	"bytes"
 	"context"
 	"crypto"
 	"crypto/ecdsa"
@@ -25,18 +26,19 @@ import (
 	"strings"
 	"time"
 
+	"github.com/coreos/go-oidc/v3/oidc"
 	"github.com/fxamacker/cbor/v2"
 	"github.com/google/go-tpm/legacy/tpm2"
-	"golang.org/x/exp/slices"
-
 	"github.com/smallstep/go-attestation/attest"
-
 	"go.step.sm/crypto/jose"
 	"go.step.sm/crypto/keyutil"
 	"go.step.sm/crypto/pemutil"
 	"go.step.sm/crypto/x509util"
+	"golang.org/x/exp/slices"
 
+	"github.com/smallstep/certificates/acme/wire"
 	"github.com/smallstep/certificates/authority/provisioner"
+	wireprovisioner "github.com/smallstep/certificates/authority/provisioner/wire"
 )
 
 type ChallengeType string
@@ -50,6 +52,10 @@ const (
 	TLSALPN01 ChallengeType = "tls-alpn-01"
 	// DEVICEATTEST01 is the device-attest-01 ACME challenge type
 	DEVICEATTEST01 ChallengeType = "device-attest-01"
+	// WIREOIDC01 is the Wire OIDC challenge type
+	WIREOIDC01 ChallengeType = "wire-oidc-01"
+	// WIREDPOP01 is the Wire DPoP challenge type
+	WIREDPOP01 ChallengeType = "wire-dpop-01"
 )
 
 var (
@@ -62,6 +68,11 @@ var (
 	//
 	// This variable can be used for testing purposes.
 	InsecurePortTLSALPN01 int
+
+	// StrictFQDN allows to enforce a fully qualified domain name in the DNS
+	// resolution. By default it allows domain resolution using a search list
+	// defined in the resolv.conf or similar configuration.
+	StrictFQDN bool
 )
 
 // Challenge represents an ACME response Challenge type.
@@ -75,6 +86,7 @@ type Challenge struct {
 	Token           string        `json:"token"`
 	ValidatedAt     string        `json:"validated,omitempty"`
 	URL             string        `json:"url"`
+	Target          string        `json:"target,omitempty"`
 	Error           *Error        `json:"error,omitempty"`
 }
 
@@ -104,22 +116,37 @@ func (ch *Challenge) Validate(ctx context.Context, db DB, jwk *jose.JSONWebKey, 
 		return tlsalpn01Validate(ctx, ch, db, jwk)
 	case DEVICEATTEST01:
 		return deviceAttest01Validate(ctx, ch, db, jwk, payload)
+	case WIREOIDC01:
+		wireDB, ok := db.(WireDB)
+		if !ok {
+			return NewErrorISE("db %T is not a WireDB", db)
+		}
+		return wireOIDC01Validate(ctx, ch, wireDB, jwk, payload)
+	case WIREDPOP01:
+		wireDB, ok := db.(WireDB)
+		if !ok {
+			return NewErrorISE("db %T is not a WireDB", db)
+		}
+		return wireDPOP01Validate(ctx, ch, wireDB, jwk, payload)
 	default:
-		return NewErrorISE("unexpected challenge type '%s'", ch.Type)
+		return NewErrorISE("unexpected challenge type %q", ch.Type)
 	}
 }
 
 func http01Validate(ctx context.Context, ch *Challenge, db DB, jwk *jose.JSONWebKey) error {
-	u := &url.URL{Scheme: "http", Host: http01ChallengeHost(ch.Value), Path: fmt.Sprintf("/.well-known/acme-challenge/%s", ch.Token)}
+	u := &url.URL{Scheme: "http", Host: ch.Value, Path: fmt.Sprintf("/.well-known/acme-challenge/%s", ch.Token)}
+	challengeURL := &url.URL{Scheme: "http", Host: http01ChallengeHost(ch.Value), Path: fmt.Sprintf("/.well-known/acme-challenge/%s", ch.Token)}
 
 	// Append insecure port if set.
 	// Only used for testing purposes.
 	if InsecurePortHTTP01 != 0 {
-		u.Host += ":" + strconv.Itoa(InsecurePortHTTP01)
+		insecurePort := strconv.Itoa(InsecurePortHTTP01)
+		u.Host += ":" + insecurePort
+		challengeURL.Host += ":" + insecurePort
 	}
 
 	vc := MustClientFromContext(ctx)
-	resp, err := vc.Get(u.String())
+	resp, err := vc.Get(challengeURL.String())
 	if err != nil {
 		return storeError(ctx, db, ch, false, WrapError(ErrorConnectionType, err,
 			"error doing http GET for url %s", u))
@@ -157,15 +184,42 @@ func http01Validate(ctx context.Context, ch *Challenge, db DB, jwk *jose.JSONWeb
 	return nil
 }
 
+// rootedName adds a trailing "." to a given domain name.
+func rootedName(name string) string {
+	if StrictFQDN {
+		if name == "" || name[len(name)-1] != '.' {
+			return name + "."
+		}
+	}
+	return name
+}
+
 // http01ChallengeHost checks if a Challenge value is an IPv6 address
 // and adds square brackets if that's the case, so that it can be used
 // as a hostname. Returns the original Challenge value as the host to
 // use in other cases.
 func http01ChallengeHost(value string) string {
-	if ip := net.ParseIP(value); ip != nil && ip.To4() == nil {
-		value = "[" + value + "]"
+	if ip := net.ParseIP(value); ip != nil {
+		if ip.To4() == nil {
+			value = "[" + value + "]"
+		}
+		return value
 	}
-	return value
+	return rootedName(value)
+}
+
+// tlsAlpn01ChallengeHost returns the rooted DNS used on TLS-ALPN-01
+// validations.
+func tlsAlpn01ChallengeHost(name string) string {
+	if ip := net.ParseIP(name); ip != nil {
+		return name
+	}
+	return rootedName(name)
+}
+
+// dns01ChallengeHost returns the TXT record used in DNS-01 validations.
+func dns01ChallengeHost(domain string) string {
+	return "_acme-challenge." + rootedName(domain)
 }
 
 func tlsAlert(err error) uint8 {
@@ -190,13 +244,12 @@ func tlsalpn01Validate(ctx context.Context, ch *Challenge, db DB, jwk *jose.JSON
 		InsecureSkipVerify: true, //nolint:gosec // we expect a self-signed challenge certificate
 	}
 
-	var hostPort string
-
 	// Allow to change TLS port for testing purposes.
+	hostPort := tlsAlpn01ChallengeHost(ch.Value)
 	if port := InsecurePortTLSALPN01; port == 0 {
-		hostPort = net.JoinHostPort(ch.Value, "443")
+		hostPort = net.JoinHostPort(hostPort, "443")
 	} else {
-		hostPort = net.JoinHostPort(ch.Value, strconv.Itoa(port))
+		hostPort = net.JoinHostPort(hostPort, strconv.Itoa(port))
 	}
 
 	vc := MustClientFromContext(ctx)
@@ -211,7 +264,7 @@ func tlsalpn01Validate(ctx context.Context, ch *Challenge, db DB, jwk *jose.JSON
 				"cannot negotiate ALPN acme-tls/1 protocol for tls-alpn-01 challenge"))
 		}
 		return storeError(ctx, db, ch, false, WrapError(ErrorConnectionType, err,
-			"error doing TLS dial for %s", hostPort))
+			"error doing TLS dial for %s", ch.Value))
 	}
 	defer conn.Close()
 
@@ -307,7 +360,7 @@ func dns01Validate(ctx context.Context, ch *Challenge, db DB, jwk *jose.JSONWebK
 	domain := strings.TrimPrefix(ch.Value, "*.")
 
 	vc := MustClientFromContext(ctx)
-	txtRecords, err := vc.LookupTxt("_acme-challenge." + domain)
+	txtRecords, err := vc.LookupTxt(dns01ChallengeHost(domain))
 	if err != nil {
 		return storeError(ctx, db, ch, false, WrapError(ErrorDNSType, err,
 			"error looking up TXT records for domain %s", domain))
@@ -342,6 +395,387 @@ func dns01Validate(ctx context.Context, ch *Challenge, db DB, jwk *jose.JSONWebK
 	return nil
 }
 
+type wireOidcPayload struct {
+	// IDToken contains the OIDC identity token
+	IDToken string `json:"id_token"`
+}
+
+func wireOIDC01Validate(ctx context.Context, ch *Challenge, db WireDB, jwk *jose.JSONWebKey, payload []byte) error {
+	prov, ok := ProvisionerFromContext(ctx)
+	if !ok {
+		return NewErrorISE("missing provisioner")
+	}
+	wireOptions, err := prov.GetOptions().GetWireOptions()
+	if err != nil {
+		return WrapErrorISE(err, "failed getting Wire options")
+	}
+	linker, ok := LinkerFromContext(ctx)
+	if !ok {
+		return NewErrorISE("missing linker")
+	}
+
+	var oidcPayload wireOidcPayload
+	if err := json.Unmarshal(payload, &oidcPayload); err != nil {
+		return WrapError(ErrorMalformedType, err, "error unmarshalling Wire OIDC challenge payload")
+	}
+
+	wireID, err := wire.ParseUserID(ch.Value)
+	if err != nil {
+		return WrapErrorISE(err, "error unmarshalling challenge data")
+	}
+
+	oidcOptions := wireOptions.GetOIDCOptions()
+	verifier, err := oidcOptions.GetVerifier(ctx)
+	if err != nil {
+		return WrapErrorISE(err, "no OIDC verifier available")
+	}
+
+	idToken, err := verifier.Verify(ctx, oidcPayload.IDToken)
+	if err != nil {
+		return storeError(ctx, db, ch, true, WrapError(ErrorRejectedIdentifierType, err,
+			"error verifying ID token signature"))
+	}
+
+	var claims struct {
+		Name         string `json:"preferred_username,omitempty"`
+		Handle       string `json:"name"`
+		Issuer       string `json:"iss,omitempty"`
+		GivenName    string `json:"given_name,omitempty"`
+		KeyAuth      string `json:"keyauth"`
+		ACMEAudience string `json:"acme_aud,omitempty"`
+	}
+	if err := idToken.Claims(&claims); err != nil {
+		return storeError(ctx, db, ch, true, WrapError(ErrorRejectedIdentifierType, err,
+			"error retrieving claims from ID token"))
+	}
+
+	// TODO(hs): move this into validation below?
+	expectedKeyAuth, err := KeyAuthorization(ch.Token, jwk)
+	if err != nil {
+		return WrapErrorISE(err, "error determining key authorization")
+	}
+	if expectedKeyAuth != claims.KeyAuth {
+		return storeError(ctx, db, ch, true, NewError(ErrorRejectedIdentifierType,
+			"keyAuthorization does not match; expected %q, but got %q", expectedKeyAuth, claims.KeyAuth))
+	}
+
+	// audience is the full URL to the challenge
+	acmeAudience := linker.GetLink(ctx, ChallengeLinkType, ch.AuthorizationID, ch.ID)
+	if claims.ACMEAudience != acmeAudience {
+		return storeError(ctx, db, ch, true, NewError(ErrorRejectedIdentifierType,
+			"invalid 'acme_aud' %q", claims.ACMEAudience))
+	}
+
+	transformedIDToken, err := validateWireOIDCClaims(oidcOptions, idToken, wireID)
+	if err != nil {
+		return storeError(ctx, db, ch, true, WrapError(ErrorRejectedIdentifierType, err, "claims in OIDC ID token don't match"))
+	}
+
+	// Update and store the challenge.
+	ch.Status = StatusValid
+	ch.Error = nil
+	ch.ValidatedAt = clock.Now().Format(time.RFC3339)
+
+	if err = db.UpdateChallenge(ctx, ch); err != nil {
+		return WrapErrorISE(err, "error updating challenge")
+	}
+
+	orders, err := db.GetAllOrdersByAccountID(ctx, ch.AccountID)
+	if err != nil {
+		return WrapErrorISE(err, "could not retrieve current order by account id")
+	}
+	if len(orders) == 0 {
+		return NewErrorISE("there are not enough orders for this account for this custom OIDC challenge")
+	}
+
+	order := orders[len(orders)-1]
+	if err := db.CreateOidcToken(ctx, order, transformedIDToken); err != nil {
+		return WrapErrorISE(err, "failed storing OIDC id token")
+	}
+
+	return nil
+}
+
+func validateWireOIDCClaims(o *wireprovisioner.OIDCOptions, token *oidc.IDToken, wireID wire.UserID) (map[string]any, error) {
+	var m map[string]any
+	if err := token.Claims(&m); err != nil {
+		return nil, fmt.Errorf("failed extracting OIDC ID token claims: %w", err)
+	}
+	transformed, err := o.Transform(m)
+	if err != nil {
+		return nil, fmt.Errorf("failed transforming OIDC ID token: %w", err)
+	}
+
+	name, ok := transformed["name"]
+	if !ok {
+		return nil, fmt.Errorf("transformed OIDC ID token does not contain 'name'")
+	}
+	if wireID.Name != name {
+		return nil, fmt.Errorf("invalid 'name' %q after transformation", name)
+	}
+
+	preferredUsername, ok := transformed["preferred_username"]
+	if !ok {
+		return nil, fmt.Errorf("transformed OIDC ID token does not contain 'preferred_username'")
+	}
+	if wireID.Handle != preferredUsername {
+		return nil, fmt.Errorf("invalid 'preferred_username' %q after transformation", preferredUsername)
+	}
+
+	return transformed, nil
+}
+
+type wireDpopPayload struct {
+	// AccessToken is the token generated by wire-server
+	AccessToken string `json:"access_token"`
+}
+
+func wireDPOP01Validate(ctx context.Context, ch *Challenge, db WireDB, accountJWK *jose.JSONWebKey, payload []byte) error {
+	prov, ok := ProvisionerFromContext(ctx)
+	if !ok {
+		return NewErrorISE("missing provisioner")
+	}
+	wireOptions, err := prov.GetOptions().GetWireOptions()
+	if err != nil {
+		return WrapErrorISE(err, "failed getting Wire options")
+	}
+	linker, ok := LinkerFromContext(ctx)
+	if !ok {
+		return NewErrorISE("missing linker")
+	}
+
+	var dpopPayload wireDpopPayload
+	if err := json.Unmarshal(payload, &dpopPayload); err != nil {
+		return WrapError(ErrorMalformedType, err, "error unmarshalling Wire DPoP challenge payload")
+	}
+
+	wireID, err := wire.ParseDeviceID(ch.Value)
+	if err != nil {
+		return WrapErrorISE(err, "error unmarshalling challenge data")
+	}
+
+	clientID, err := wire.ParseClientID(wireID.ClientID)
+	if err != nil {
+		return WrapErrorISE(err, "error parsing device id")
+	}
+
+	dpopOptions := wireOptions.GetDPOPOptions()
+	issuer, err := dpopOptions.EvaluateTarget(clientID.DeviceID)
+	if err != nil {
+		return WrapErrorISE(err, "invalid Go template registered for 'target'")
+	}
+
+	// audience is the full URL to the challenge
+	audience := linker.GetLink(ctx, ChallengeLinkType, ch.AuthorizationID, ch.ID)
+
+	params := wireVerifyParams{
+		token:     dpopPayload.AccessToken,
+		tokenKey:  dpopOptions.GetSigningKey(),
+		dpopKey:   accountJWK.Public(),
+		dpopKeyID: accountJWK.KeyID,
+		issuer:    issuer,
+		audience:  audience,
+		wireID:    wireID,
+		chToken:   ch.Token,
+		t:         clock.Now().UTC(),
+	}
+	_, dpop, err := parseAndVerifyWireAccessToken(params)
+	if err != nil {
+		return storeError(ctx, db, ch, true, WrapError(ErrorRejectedIdentifierType, err,
+			"failed validating Wire access token"))
+	}
+
+	// Update and store the challenge.
+	ch.Status = StatusValid
+	ch.Error = nil
+	ch.ValidatedAt = clock.Now().Format(time.RFC3339)
+
+	if err = db.UpdateChallenge(ctx, ch); err != nil {
+		return WrapErrorISE(err, "error updating challenge")
+	}
+
+	orders, err := db.GetAllOrdersByAccountID(ctx, ch.AccountID)
+	if err != nil {
+		return WrapErrorISE(err, "could not find current order by account id")
+	}
+	if len(orders) == 0 {
+		return NewErrorISE("there are not enough orders for this account for this custom OIDC challenge")
+	}
+
+	order := orders[len(orders)-1]
+	if err := db.CreateDpopToken(ctx, order, map[string]any(*dpop)); err != nil {
+		return WrapErrorISE(err, "failed storing DPoP token")
+	}
+
+	return nil
+}
+
+type wireCnf struct {
+	Kid string `json:"kid"`
+}
+
+type wireAccessToken struct {
+	jose.Claims
+	Challenge  string  `json:"chal"`
+	Nonce      string  `json:"nonce"`
+	Cnf        wireCnf `json:"cnf"`
+	Proof      string  `json:"proof"`
+	ClientID   string  `json:"client_id"`
+	APIVersion int     `json:"api_version"`
+	Scope      string  `json:"scope"`
+}
+
+type wireDpopJwt struct {
+	jose.Claims
+	ClientID  string `json:"client_id"`
+	Challenge string `json:"chal"`
+	Nonce     string `json:"nonce"`
+	HTU       string `json:"htu"`
+}
+
+type wireDpopToken map[string]any
+
+type wireVerifyParams struct {
+	token     string
+	tokenKey  crypto.PublicKey
+	dpopKey   crypto.PublicKey
+	dpopKeyID string
+	issuer    string
+	audience  string
+	wireID    wire.DeviceID
+	chToken   string
+	t         time.Time
+}
+
+func parseAndVerifyWireAccessToken(v wireVerifyParams) (*wireAccessToken, *wireDpopToken, error) {
+	jwt, err := jose.ParseSigned(v.token)
+	if err != nil {
+		return nil, nil, fmt.Errorf("failed parsing token: %w", err)
+	}
+
+	if len(jwt.Headers) != 1 {
+		return nil, nil, fmt.Errorf("token has wrong number of headers %d", len(jwt.Headers))
+	}
+	keyID, err := KeyToID(&jose.JSONWebKey{Key: v.tokenKey})
+	if err != nil {
+		return nil, nil, fmt.Errorf("failed calculating token key ID: %w", err)
+	}
+	jwtKeyID := jwt.Headers[0].KeyID
+	if jwtKeyID == "" {
+		if jwtKeyID, err = KeyToID(jwt.Headers[0].JSONWebKey); err != nil {
+			return nil, nil, fmt.Errorf("failed extracting token key ID: %w", err)
+		}
+	}
+	if jwtKeyID != keyID {
+		return nil, nil, fmt.Errorf("invalid token key ID %q", jwtKeyID)
+	}
+
+	var accessToken wireAccessToken
+	if err = jwt.Claims(v.tokenKey, &accessToken); err != nil {
+		return nil, nil, fmt.Errorf("failed validating Wire DPoP token claims: %w", err)
+	}
+
+	if err := accessToken.ValidateWithLeeway(jose.Expected{
+		Time:     v.t,
+		Issuer:   v.issuer,
+		Audience: jose.Audience{v.audience},
+	}, 1*time.Minute); err != nil {
+		return nil, nil, fmt.Errorf("failed validation: %w", err)
+	}
+
+	if accessToken.Challenge == "" {
+		return nil, nil, errors.New("access token challenge 'chal' must not be empty")
+	}
+	if accessToken.Cnf.Kid == "" || accessToken.Cnf.Kid != v.dpopKeyID {
+		return nil, nil, fmt.Errorf("expected 'kid' %q; got %q", v.dpopKeyID, accessToken.Cnf.Kid)
+	}
+	if accessToken.ClientID != v.wireID.ClientID {
+		return nil, nil, fmt.Errorf("invalid Wire 'client_id' %q", accessToken.ClientID)
+	}
+	if accessToken.Expiry.Time().After(v.t.Add(time.Hour)) {
+		return nil, nil, fmt.Errorf("token expiry 'exp' %s is too far into the future", accessToken.Expiry.Time().String())
+	}
+	if accessToken.Scope != "wire_client_id" {
+		return nil, nil, fmt.Errorf("invalid Wire 'scope' %q", accessToken.Scope)
+	}
+
+	dpopJWT, err := jose.ParseSigned(accessToken.Proof)
+	if err != nil {
+		return nil, nil, fmt.Errorf("invalid Wire DPoP token: %w", err)
+	}
+	if len(dpopJWT.Headers) != 1 {
+		return nil, nil, fmt.Errorf("DPoP token has wrong number of headers %d", len(jwt.Headers))
+	}
+	dpopJwtKeyID := dpopJWT.Headers[0].KeyID
+	if dpopJwtKeyID == "" {
+		if dpopJwtKeyID, err = KeyToID(dpopJWT.Headers[0].JSONWebKey); err != nil {
+			return nil, nil, fmt.Errorf("failed extracting DPoP token key ID: %w", err)
+		}
+	}
+	if dpopJwtKeyID != v.dpopKeyID {
+		return nil, nil, fmt.Errorf("invalid DPoP token key ID %q", dpopJWT.Headers[0].KeyID)
+	}
+
+	var wireDpop wireDpopJwt
+	if err := dpopJWT.Claims(v.dpopKey, &wireDpop); err != nil {
+		return nil, nil, fmt.Errorf("failed validating Wire DPoP token claims: %w", err)
+	}
+
+	if err := wireDpop.ValidateWithLeeway(jose.Expected{
+		Time:     v.t,
+		Audience: jose.Audience{v.audience},
+	}, 1*time.Minute); err != nil {
+		return nil, nil, fmt.Errorf("failed DPoP validation: %w", err)
+	}
+	if wireDpop.HTU == "" || wireDpop.HTU != v.issuer { // DPoP doesn't contains "iss" claim, but has it in the "htu" claim
+		return nil, nil, fmt.Errorf("DPoP contains invalid issuer 'htu' %q", wireDpop.HTU)
+	}
+	if wireDpop.Expiry.Time().After(v.t.Add(time.Hour)) {
+		return nil, nil, fmt.Errorf("'exp' %s is too far into the future", wireDpop.Expiry.Time().String())
+	}
+	if wireDpop.Subject != v.wireID.ClientID {
+		return nil, nil, fmt.Errorf("DPoP contains invalid Wire client ID %q", wireDpop.ClientID)
+	}
+	if wireDpop.Nonce == "" || wireDpop.Nonce != accessToken.Nonce {
+		return nil, nil, fmt.Errorf("DPoP contains invalid 'nonce' %q", wireDpop.Nonce)
+	}
+	if wireDpop.Challenge == "" || wireDpop.Challenge != accessToken.Challenge {
+		return nil, nil, fmt.Errorf("DPoP contains invalid challenge 'chal' %q", wireDpop.Challenge)
+	}
+
+	// TODO(hs): can we use the wireDpopJwt and map that instead of doing Claims() twice?
+	var dpopToken wireDpopToken
+	if err := dpopJWT.Claims(v.dpopKey, &dpopToken); err != nil {
+		return nil, nil, fmt.Errorf("failed validating Wire DPoP token claims: %w", err)
+	}
+
+	challenge, ok := dpopToken["chal"].(string)
+	if !ok {
+		return nil, nil, fmt.Errorf("invalid challenge 'chal' in Wire DPoP token")
+	}
+	if challenge == "" || challenge != v.chToken {
+		return nil, nil, fmt.Errorf("invalid Wire DPoP challenge 'chal' %q", challenge)
+	}
+
+	handle, ok := dpopToken["handle"].(string)
+	if !ok {
+		return nil, nil, fmt.Errorf("invalid 'handle' in Wire DPoP token")
+	}
+	if handle == "" || handle != v.wireID.Handle {
+		return nil, nil, fmt.Errorf("invalid Wire client 'handle' %q", handle)
+	}
+
+	name, ok := dpopToken["name"].(string)
+	if !ok {
+		return nil, nil, fmt.Errorf("invalid display 'name' in Wire DPoP token")
+	}
+	if name == "" || name != v.wireID.Name {
+		return nil, nil, fmt.Errorf("invalid Wire client display 'name' %q", name)
+	}
+
+	return &accessToken, &dpopToken, nil
+}
+
 type payloadType struct {
 	AttObj string `json:"attObj"`
 	Error  string `json:"error"`
@@ -372,12 +806,26 @@ func deviceAttest01Validate(ctx context.Context, ch *Challenge, db DB, jwk *jose
 
 	attObj, err := base64.RawURLEncoding.DecodeString(p.AttObj)
 	if err != nil {
-		return WrapErrorISE(err, "error base64 decoding attObj")
+		return storeError(ctx, db, ch, true, NewDetailedError(ErrorBadAttestationStatementType, "failed base64 decoding attObj %q", p.AttObj))
+	}
+
+	if len(attObj) == 0 || bytes.Equal(attObj, []byte("{}")) {
+		return storeError(ctx, db, ch, true, NewDetailedError(ErrorBadAttestationStatementType, "attObj must not be empty"))
+	}
+
+	cborDecoderOptions := cbor.DecOptions{}
+	cborDecoder, err := cborDecoderOptions.DecMode()
+	if err != nil {
+		return WrapErrorISE(err, "failed creating CBOR decoder")
+	}
+
+	if err := cborDecoder.Wellformed(attObj); err != nil {
+		return storeError(ctx, db, ch, true, NewDetailedError(ErrorBadAttestationStatementType, "attObj is not well formed CBOR: %v", err))
 	}
 
 	att := attestationObject{}
-	if err := cbor.Unmarshal(attObj, &att); err != nil {
-		return WrapErrorISE(err, "error unmarshalling CBOR")
+	if err := cborDecoder.Unmarshal(attObj, &att); err != nil {
+		return WrapErrorISE(err, "failed unmarshalling CBOR")
 	}
 
 	format := att.Format
@@ -528,6 +976,7 @@ type coseAlgorithmIdentifier int32
 const (
 	coseAlgES256 coseAlgorithmIdentifier = -7
 	coseAlgRS256 coseAlgorithmIdentifier = -257
+	coseAlgRS1   coseAlgorithmIdentifier = -65535 // deprecated, but (still) often used in TPMs
 )
 
 func doTPMAttestationFormat(_ context.Context, prov Provisioner, ch *Challenge, jwk *jose.JSONWebKey, att *attestationObject) (*tpmAttestationData, error) {
@@ -652,14 +1101,15 @@ func doTPMAttestationFormat(_ context.Context, prov Provisioner, ch *Challenge, 
 		return nil, NewDetailedError(ErrorBadAttestationStatementType, "invalid alg in attestation statement")
 	}
 
-	// only RS256 and ES256 are allowed
-	coseAlg := coseAlgorithmIdentifier(alg)
-	if coseAlg != coseAlgRS256 && coseAlg != coseAlgES256 {
+	var hash crypto.Hash
+	switch coseAlgorithmIdentifier(alg) {
+	case coseAlgRS256, coseAlgES256:
+		hash = crypto.SHA256
+	case coseAlgRS1:
+		hash = crypto.SHA1
+	default:
 		return nil, NewDetailedError(ErrorBadAttestationStatementType, "invalid alg %d in attestation statement", alg)
 	}
-
-	// set the hash algorithm to use to SHA256
-	hash := crypto.SHA256
 
 	// recreate the generated key certification parameter values and verify
 	// the attested key using the public key of the AK.
@@ -724,7 +1174,7 @@ var (
 	oidTCGKpAIKCertificate       = asn1.ObjectIdentifier{2, 23, 133, 8, 3}
 )
 
-// validateAKCertifiate validates the X.509 AK certificate to be
+// validateAKCertificate validates the X.509 AK certificate to be
 // in accordance with the required properties. The requirements come from:
 // https://www.w3.org/TR/webauthn-2/#sctn-tpm-cert-requirements.
 //
@@ -733,7 +1183,7 @@ var (
 //   - The Subject Alternative Name extension MUST be set as defined
 //     in [TPMv2-EK-Profile] section 3.2.9.
 //   - The Extended Key Usage extension MUST contain the OID 2.23.133.8.3
-//     ("joint-iso-itu-t(2) internationalorganizations(23) 133 tcg-kp(8) tcg-kp-AIKCertificate(3)").
+//     ("joint-iso-itu-t(2) international-organizations(23) 133 tcg-kp(8) tcg-kp-AIKCertificate(3)").
 //   - The Basic Constraints extension MUST have the CA component set to false.
 //   - An Authority Information Access (AIA) extension with entry id-ad-ocsp
 //     and a CRL Distribution Point extension [RFC5280] are both OPTIONAL as
@@ -1056,14 +1506,10 @@ func doStepAttestationFormat(_ context.Context, prov Provisioner, ch *Challenge,
 // should be the ARPA address https://datatracker.ietf.org/doc/html/rfc8738#section-6.
 // It also references TLS Extensions [RFC6066].
 func serverName(ch *Challenge) string {
-	var serverName string
-	ip := net.ParseIP(ch.Value)
-	if ip != nil {
-		serverName = reverseAddr(ip)
-	} else {
-		serverName = ch.Value
+	if ip := net.ParseIP(ch.Value); ip != nil {
+		return reverseAddr(ip)
 	}
-	return serverName
+	return ch.Value
 }
 
 // reverseaddr returns the in-addr.arpa. or ip6.arpa. hostname of the IP

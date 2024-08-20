@@ -71,28 +71,28 @@ func (war *webhookAdminResponder) CreateProvisionerWebhook(w http.ResponseWriter
 
 	var newWebhook = new(linkedca.Webhook)
 	if err := read.ProtoJSON(r.Body, newWebhook); err != nil {
-		render.Error(w, err)
+		render.Error(w, r, err)
 		return
 	}
 
 	if err := validateWebhook(newWebhook); err != nil {
-		render.Error(w, err)
+		render.Error(w, r, err)
 		return
 	}
 	if newWebhook.Secret != "" {
 		err := admin.NewError(admin.ErrorBadRequestType, "webhook secret must not be set")
-		render.Error(w, err)
+		render.Error(w, r, err)
 		return
 	}
 	if newWebhook.Id != "" {
 		err := admin.NewError(admin.ErrorBadRequestType, "webhook ID must not be set")
-		render.Error(w, err)
+		render.Error(w, r, err)
 		return
 	}
 
 	id, err := randutil.UUIDv4()
 	if err != nil {
-		render.Error(w, admin.WrapErrorISE(err, "error generating webhook id"))
+		render.Error(w, r, admin.WrapErrorISE(err, "error generating webhook id"))
 		return
 	}
 	newWebhook.Id = id
@@ -101,14 +101,14 @@ func (war *webhookAdminResponder) CreateProvisionerWebhook(w http.ResponseWriter
 	for _, wh := range prov.Webhooks {
 		if wh.Name == newWebhook.Name {
 			err := admin.NewError(admin.ErrorConflictType, "provisioner %q already has a webhook with the name %q", prov.Name, newWebhook.Name)
-			render.Error(w, err)
+			render.Error(w, r, err)
 			return
 		}
 	}
 
 	secret, err := randutil.Bytes(64)
 	if err != nil {
-		render.Error(w, admin.WrapErrorISE(err, "error generating webhook secret"))
+		render.Error(w, r, admin.WrapErrorISE(err, "error generating webhook secret"))
 		return
 	}
 	newWebhook.Secret = base64.StdEncoding.EncodeToString(secret)
@@ -117,11 +117,11 @@ func (war *webhookAdminResponder) CreateProvisionerWebhook(w http.ResponseWriter
 
 	if err := auth.UpdateProvisioner(ctx, prov); err != nil {
 		if isBadRequest(err) {
-			render.Error(w, admin.WrapError(admin.ErrorBadRequestType, err, "error creating provisioner webhook"))
+			render.Error(w, r, admin.WrapError(admin.ErrorBadRequestType, err, "error creating provisioner webhook"))
 			return
 		}
 
-		render.Error(w, admin.WrapErrorISE(err, "error creating provisioner webhook"))
+		render.Error(w, r, admin.WrapErrorISE(err, "error creating provisioner webhook"))
 		return
 	}
 
@@ -145,21 +145,21 @@ func (war *webhookAdminResponder) DeleteProvisionerWebhook(w http.ResponseWriter
 		}
 	}
 	if !found {
-		render.JSONStatus(w, DeleteResponse{Status: "ok"}, http.StatusOK)
+		render.JSONStatus(w, r, DeleteResponse{Status: "ok"}, http.StatusOK)
 		return
 	}
 
 	if err := auth.UpdateProvisioner(ctx, prov); err != nil {
 		if isBadRequest(err) {
-			render.Error(w, admin.WrapError(admin.ErrorBadRequestType, err, "error deleting provisioner webhook"))
+			render.Error(w, r, admin.WrapError(admin.ErrorBadRequestType, err, "error deleting provisioner webhook"))
 			return
 		}
 
-		render.Error(w, admin.WrapErrorISE(err, "error deleting provisioner webhook"))
+		render.Error(w, r, admin.WrapErrorISE(err, "error deleting provisioner webhook"))
 		return
 	}
 
-	render.JSONStatus(w, DeleteResponse{Status: "ok"}, http.StatusOK)
+	render.JSONStatus(w, r, DeleteResponse{Status: "ok"}, http.StatusOK)
 }
 
 func (war *webhookAdminResponder) UpdateProvisionerWebhook(w http.ResponseWriter, r *http.Request) {
@@ -170,12 +170,12 @@ func (war *webhookAdminResponder) UpdateProvisionerWebhook(w http.ResponseWriter
 
 	var newWebhook = new(linkedca.Webhook)
 	if err := read.ProtoJSON(r.Body, newWebhook); err != nil {
-		render.Error(w, err)
+		render.Error(w, r, err)
 		return
 	}
 
 	if err := validateWebhook(newWebhook); err != nil {
-		render.Error(w, err)
+		render.Error(w, r, err)
 		return
 	}
 
@@ -186,13 +186,13 @@ func (war *webhookAdminResponder) UpdateProvisionerWebhook(w http.ResponseWriter
 		}
 		if newWebhook.Secret != "" && newWebhook.Secret != wh.Secret {
 			err := admin.NewError(admin.ErrorBadRequestType, "webhook secret cannot be updated")
-			render.Error(w, err)
+			render.Error(w, r, err)
 			return
 		}
 		newWebhook.Secret = wh.Secret
 		if newWebhook.Id != "" && newWebhook.Id != wh.Id {
 			err := admin.NewError(admin.ErrorBadRequestType, "webhook ID cannot be updated")
-			render.Error(w, err)
+			render.Error(w, r, err)
 			return
 		}
 		newWebhook.Id = wh.Id
@@ -202,18 +202,18 @@ func (war *webhookAdminResponder) UpdateProvisionerWebhook(w http.ResponseWriter
 	}
 	if !found {
 		msg := fmt.Sprintf("provisioner %q has no webhook with the name %q", prov.Name, newWebhook.Name)
-		err := admin.NewError(admin.ErrorNotFoundType, msg)
-		render.Error(w, err)
+		err := admin.NewError(admin.ErrorNotFoundType, msg) //nolint:govet // allow non-constant error messages
+		render.Error(w, r, err)
 		return
 	}
 
 	if err := auth.UpdateProvisioner(ctx, prov); err != nil {
 		if isBadRequest(err) {
-			render.Error(w, admin.WrapError(admin.ErrorBadRequestType, err, "error updating provisioner webhook"))
+			render.Error(w, r, admin.WrapError(admin.ErrorBadRequestType, err, "error updating provisioner webhook"))
 			return
 		}
 
-		render.Error(w, admin.WrapErrorISE(err, "error updating provisioner webhook"))
+		render.Error(w, r, admin.WrapErrorISE(err, "error updating provisioner webhook"))
 		return
 	}
 

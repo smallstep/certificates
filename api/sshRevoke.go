@@ -51,12 +51,12 @@ func (r *SSHRevokeRequest) Validate() (err error) {
 func SSHRevoke(w http.ResponseWriter, r *http.Request) {
 	var body SSHRevokeRequest
 	if err := read.JSON(r.Body, &body); err != nil {
-		render.Error(w, errs.BadRequestErr(err, "error reading request body"))
+		render.Error(w, r, errs.BadRequestErr(err, "error reading request body"))
 		return
 	}
 
 	if err := body.Validate(); err != nil {
-		render.Error(w, err)
+		render.Error(w, r, err)
 		return
 	}
 
@@ -75,18 +75,18 @@ func SSHRevoke(w http.ResponseWriter, r *http.Request) {
 	logOtt(w, body.OTT)
 
 	if _, err := a.Authorize(ctx, body.OTT); err != nil {
-		render.Error(w, errs.UnauthorizedErr(err))
+		render.Error(w, r, errs.UnauthorizedErr(err))
 		return
 	}
 	opts.OTT = body.OTT
 
 	if err := a.Revoke(ctx, opts); err != nil {
-		render.Error(w, errs.ForbiddenErr(err, "error revoking ssh certificate"))
+		render.Error(w, r, errs.ForbiddenErr(err, "error revoking ssh certificate"))
 		return
 	}
 
 	logSSHRevoke(w, opts)
-	render.JSON(w, &SSHRevokeResponse{Status: "ok"})
+	render.JSON(w, r, &SSHRevokeResponse{Status: "ok"})
 }
 
 func logSSHRevoke(w http.ResponseWriter, ri *authority.RevokeOptions) {

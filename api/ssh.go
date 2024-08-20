@@ -6,8 +6,11 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"net/http"
+	"net/url"
+	"strings"
 	"time"
 
+	"github.com/google/uuid"
 	"github.com/pkg/errors"
 	"golang.org/x/crypto/ssh"
 
@@ -253,19 +256,19 @@ type SSHBastionResponse struct {
 func SSHSign(w http.ResponseWriter, r *http.Request) {
 	var body SSHSignRequest
 	if err := read.JSON(r.Body, &body); err != nil {
-		render.Error(w, errs.BadRequestErr(err, "error reading request body"))
+		render.Error(w, r, errs.BadRequestErr(err, "error reading request body"))
 		return
 	}
 
 	logOtt(w, body.OTT)
 	if err := body.Validate(); err != nil {
-		render.Error(w, err)
+		render.Error(w, r, err)
 		return
 	}
 
 	publicKey, err := ssh.ParsePublicKey(body.PublicKey)
 	if err != nil {
-		render.Error(w, errs.BadRequestErr(err, "error parsing publicKey"))
+		render.Error(w, r, errs.BadRequestErr(err, "error parsing publicKey"))
 		return
 	}
 
@@ -273,7 +276,7 @@ func SSHSign(w http.ResponseWriter, r *http.Request) {
 	if body.AddUserPublicKey != nil {
 		addUserPublicKey, err = ssh.ParsePublicKey(body.AddUserPublicKey)
 		if err != nil {
-			render.Error(w, errs.BadRequestErr(err, "error parsing addUserPublicKey"))
+			render.Error(w, r, errs.BadRequestErr(err, "error parsing addUserPublicKey"))
 			return
 		}
 	}
@@ -289,17 +292,18 @@ func SSHSign(w http.ResponseWriter, r *http.Request) {
 
 	ctx := provisioner.NewContextWithMethod(r.Context(), provisioner.SSHSignMethod)
 	ctx = provisioner.NewContextWithToken(ctx, body.OTT)
+	ctx = provisioner.NewContextWithCertType(ctx, opts.CertType)
 
 	a := mustAuthority(ctx)
 	signOpts, err := a.Authorize(ctx, body.OTT)
 	if err != nil {
-		render.Error(w, errs.UnauthorizedErr(err))
+		render.Error(w, r, errs.UnauthorizedErr(err))
 		return
 	}
 
 	cert, err := a.SignSSH(ctx, publicKey, opts, signOpts...)
 	if err != nil {
-		render.Error(w, errs.ForbiddenErr(err, "error signing ssh certificate"))
+		render.Error(w, r, errs.ForbiddenErr(err, "error signing ssh certificate"))
 		return
 	}
 
@@ -307,7 +311,7 @@ func SSHSign(w http.ResponseWriter, r *http.Request) {
 	if addUserPublicKey != nil && authority.IsValidForAddUser(cert) == nil {
 		addUserCert, err := a.SignSSHAddUser(ctx, addUserPublicKey, cert)
 		if err != nil {
-			render.Error(w, errs.ForbiddenErr(err, "error signing ssh certificate"))
+			render.Error(w, r, errs.ForbiddenErr(err, "error signing ssh certificate"))
 			return
 		}
 		addUserCertificate = &SSHCertificate{addUserCert}
@@ -320,26 +324,27 @@ func SSHSign(w http.ResponseWriter, r *http.Request) {
 		ctx = provisioner.NewContextWithMethod(ctx, provisioner.SignIdentityMethod)
 		signOpts, err := a.Authorize(ctx, body.OTT)
 		if err != nil {
-			render.Error(w, errs.UnauthorizedErr(err))
+			render.Error(w, r, errs.UnauthorizedErr(err))
 			return
 		}
 
 		// Enforce the same duration as ssh certificate.
 		signOpts = append(signOpts, &identityModifier{
+			Identity:  getIdentityURI(cr),
 			NotBefore: time.Unix(int64(cert.ValidAfter), 0),
 			NotAfter:  time.Unix(int64(cert.ValidBefore), 0),
 		})
 
-		certChain, err := a.Sign(cr, provisioner.SignOptions{}, signOpts...)
+		certChain, err := a.SignWithContext(ctx, cr, provisioner.SignOptions{}, signOpts...)
 		if err != nil {
-			render.Error(w, errs.ForbiddenErr(err, "error signing identity certificate"))
+			render.Error(w, r, errs.ForbiddenErr(err, "error signing identity certificate"))
 			return
 		}
 		identityCertificate = certChainToPEM(certChain)
 	}
 
 	LogSSHCertificate(w, cert)
-	render.JSONStatus(w, &SSHSignResponse{
+	render.JSONStatus(w, r, &SSHSignResponse{
 		Certificate:         SSHCertificate{cert},
 		AddUserCertificate:  addUserCertificate,
 		IdentityCertificate: identityCertificate,
@@ -352,12 +357,12 @@ func SSHRoots(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	keys, err := mustAuthority(ctx).GetSSHRoots(ctx)
 	if err != nil {
-		render.Error(w, errs.InternalServerErr(err))
+		render.Error(w, r, errs.InternalServerErr(err))
 		return
 	}
 
 	if len(keys.HostKeys) == 0 && len(keys.UserKeys) == 0 {
-		render.Error(w, errs.NotFound("no keys found"))
+		render.Error(w, r, errs.NotFound("no keys found"))
 		return
 	}
 
@@ -369,7 +374,7 @@ func SSHRoots(w http.ResponseWriter, r *http.Request) {
 		resp.UserKeys = append(resp.UserKeys, SSHPublicKey{PublicKey: k})
 	}
 
-	render.JSON(w, resp)
+	render.JSON(w, r, resp)
 }
 
 // SSHFederation is an HTTP handler that returns the federated SSH public keys
@@ -378,12 +383,12 @@ func SSHFederation(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	keys, err := mustAuthority(ctx).GetSSHFederation(ctx)
 	if err != nil {
-		render.Error(w, errs.InternalServerErr(err))
+		render.Error(w, r, errs.InternalServerErr(err))
 		return
 	}
 
 	if len(keys.HostKeys) == 0 && len(keys.UserKeys) == 0 {
-		render.Error(w, errs.NotFound("no keys found"))
+		render.Error(w, r, errs.NotFound("no keys found"))
 		return
 	}
 
@@ -395,7 +400,7 @@ func SSHFederation(w http.ResponseWriter, r *http.Request) {
 		resp.UserKeys = append(resp.UserKeys, SSHPublicKey{PublicKey: k})
 	}
 
-	render.JSON(w, resp)
+	render.JSON(w, r, resp)
 }
 
 // SSHConfig is an HTTP handler that returns rendered templates for ssh clients
@@ -403,18 +408,18 @@ func SSHFederation(w http.ResponseWriter, r *http.Request) {
 func SSHConfig(w http.ResponseWriter, r *http.Request) {
 	var body SSHConfigRequest
 	if err := read.JSON(r.Body, &body); err != nil {
-		render.Error(w, errs.BadRequestErr(err, "error reading request body"))
+		render.Error(w, r, errs.BadRequestErr(err, "error reading request body"))
 		return
 	}
 	if err := body.Validate(); err != nil {
-		render.Error(w, err)
+		render.Error(w, r, err)
 		return
 	}
 
 	ctx := r.Context()
 	ts, err := mustAuthority(ctx).GetSSHConfig(ctx, body.Type, body.Data)
 	if err != nil {
-		render.Error(w, errs.InternalServerErr(err))
+		render.Error(w, r, errs.InternalServerErr(err))
 		return
 	}
 
@@ -425,32 +430,32 @@ func SSHConfig(w http.ResponseWriter, r *http.Request) {
 	case provisioner.SSHHostCert:
 		cfg.HostTemplates = ts
 	default:
-		render.Error(w, errs.InternalServer("it should hot get here"))
+		render.Error(w, r, errs.InternalServer("it should hot get here"))
 		return
 	}
 
-	render.JSON(w, cfg)
+	render.JSON(w, r, cfg)
 }
 
 // SSHCheckHost is the HTTP handler that returns if a hosts certificate exists or not.
 func SSHCheckHost(w http.ResponseWriter, r *http.Request) {
 	var body SSHCheckPrincipalRequest
 	if err := read.JSON(r.Body, &body); err != nil {
-		render.Error(w, errs.BadRequestErr(err, "error reading request body"))
+		render.Error(w, r, errs.BadRequestErr(err, "error reading request body"))
 		return
 	}
 	if err := body.Validate(); err != nil {
-		render.Error(w, err)
+		render.Error(w, r, err)
 		return
 	}
 
 	ctx := r.Context()
 	exists, err := mustAuthority(ctx).CheckSSHHost(ctx, body.Principal, body.Token)
 	if err != nil {
-		render.Error(w, errs.InternalServerErr(err))
+		render.Error(w, r, errs.InternalServerErr(err))
 		return
 	}
-	render.JSON(w, &SSHCheckPrincipalResponse{
+	render.JSON(w, r, &SSHCheckPrincipalResponse{
 		Exists: exists,
 	})
 }
@@ -465,10 +470,10 @@ func SSHGetHosts(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	hosts, err := mustAuthority(ctx).GetSSHHosts(ctx, cert)
 	if err != nil {
-		render.Error(w, errs.InternalServerErr(err))
+		render.Error(w, r, errs.InternalServerErr(err))
 		return
 	}
-	render.JSON(w, &SSHGetHostsResponse{
+	render.JSON(w, r, &SSHGetHostsResponse{
 		Hosts: hosts,
 	})
 }
@@ -477,35 +482,63 @@ func SSHGetHosts(w http.ResponseWriter, r *http.Request) {
 func SSHBastion(w http.ResponseWriter, r *http.Request) {
 	var body SSHBastionRequest
 	if err := read.JSON(r.Body, &body); err != nil {
-		render.Error(w, errs.BadRequestErr(err, "error reading request body"))
+		render.Error(w, r, errs.BadRequestErr(err, "error reading request body"))
 		return
 	}
 	if err := body.Validate(); err != nil {
-		render.Error(w, err)
+		render.Error(w, r, err)
 		return
 	}
 
 	ctx := r.Context()
 	bastion, err := mustAuthority(ctx).GetSSHBastion(ctx, body.User, body.Hostname)
 	if err != nil {
-		render.Error(w, errs.InternalServerErr(err))
+		render.Error(w, r, errs.InternalServerErr(err))
 		return
 	}
 
-	render.JSON(w, &SSHBastionResponse{
+	render.JSON(w, r, &SSHBastionResponse{
 		Hostname: body.Hostname,
 		Bastion:  bastion,
 	})
 }
 
-// identityModifier is a custom modifier used to force a fixed duration.
+// identityModifier is a custom modifier used to force a fixed duration, and set
+// the identity URI.
 type identityModifier struct {
+	Identity  *url.URL
 	NotBefore time.Time
 	NotAfter  time.Time
 }
 
+// Enforce implements the enforcer interface and sets the validity bounds and
+// the identity uri to the certificate.
 func (m *identityModifier) Enforce(cert *x509.Certificate) error {
 	cert.NotBefore = m.NotBefore
 	cert.NotAfter = m.NotAfter
+	if m.Identity != nil {
+		var identityURL = m.Identity.String()
+		for _, u := range cert.URIs {
+			if u.String() == identityURL {
+				return nil
+			}
+		}
+		cert.URIs = append(cert.URIs, m.Identity)
+	}
+
+	return nil
+}
+
+// getIdentityURI returns the first valid UUID URN from the given CSR.
+func getIdentityURI(cr *x509.CertificateRequest) *url.URL {
+	for _, u := range cr.URIs {
+		s := u.String()
+		// urn:uuid:xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx
+		if len(s) == 9+36 && strings.EqualFold(s[:9], "urn:uuid:") {
+			if _, err := uuid.Parse(s); err == nil {
+				return u
+			}
+		}
+	}
 	return nil
 }

@@ -289,6 +289,9 @@ ZEp7knvU2psWRw==
 
 			if assert.Equals(t, rr.Code, tc.status) {
 				body := &ClosingBuffer{rr.Body}
+				resp := &http.Response{
+					Body: body,
+				}
 				if rr.Code < http.StatusBadRequest {
 					var sign api.SignResponse
 					assert.FatalError(t, readJSON(body, &sign))
@@ -325,7 +328,7 @@ ZEp7knvU2psWRw==
 					assert.FatalError(t, err)
 					assert.Equals(t, intermediate, realIntermediate)
 				} else {
-					err := readError(body)
+					err := readError(resp)
 					if tc.errMsg == "" {
 						assert.FatalError(t, errors.New("must validate response error"))
 					}
@@ -369,6 +372,9 @@ func TestCAProvisioners(t *testing.T) {
 
 			if assert.Equals(t, rr.Code, tc.status) {
 				body := &ClosingBuffer{rr.Body}
+				resp := &http.Response{
+					Body: body,
+				}
 				if rr.Code < http.StatusBadRequest {
 					var resp api.ProvisionersResponse
 
@@ -379,7 +385,7 @@ func TestCAProvisioners(t *testing.T) {
 					assert.FatalError(t, err)
 					assert.Equals(t, a, b)
 				} else {
-					err := readError(body)
+					err := readError(resp)
 					if tc.errMsg == "" {
 						assert.FatalError(t, errors.New("must validate response error"))
 					}
@@ -436,12 +442,15 @@ func TestCAProvisionerEncryptedKey(t *testing.T) {
 
 			if assert.Equals(t, rr.Code, tc.status) {
 				body := &ClosingBuffer{rr.Body}
+				resp := &http.Response{
+					Body: body,
+				}
 				if rr.Code < http.StatusBadRequest {
 					var ek api.ProvisionerKeyResponse
 					assert.FatalError(t, readJSON(body, &ek))
 					assert.Equals(t, ek.Key, tc.expectedKey)
 				} else {
-					err := readError(body)
+					err := readError(resp)
 					if tc.errMsg == "" {
 						assert.FatalError(t, errors.New("must validate response error"))
 					}
@@ -498,12 +507,15 @@ func TestCARoot(t *testing.T) {
 
 			if assert.Equals(t, rr.Code, tc.status) {
 				body := &ClosingBuffer{rr.Body}
+				resp := &http.Response{
+					Body: body,
+				}
 				if rr.Code < http.StatusBadRequest {
 					var root api.RootResponse
 					assert.FatalError(t, readJSON(body, &root))
 					assert.Equals(t, root.RootPEM.Certificate, rootCrt)
 				} else {
-					err := readError(body)
+					err := readError(resp)
 					if tc.errMsg == "" {
 						assert.FatalError(t, errors.New("must validate response error"))
 					}
@@ -613,7 +625,7 @@ func TestCARenew(t *testing.T) {
 			cert, err := x509util.NewCertificate(cr)
 			assert.FatalError(t, err)
 			crt := cert.GetCertificate()
-			crt.NotBefore = time.Now()
+			crt.NotBefore = now
 			crt.NotAfter = leafExpiry
 			crt, err = x509util.CreateCertificate(crt, intermediateCert, pub, intermediateKey.(crypto.Signer))
 			assert.FatalError(t, err)
@@ -641,6 +653,9 @@ func TestCARenew(t *testing.T) {
 
 			if assert.Equals(t, rr.Code, tc.status) {
 				body := &ClosingBuffer{rr.Body}
+				resp := &http.Response{
+					Body: body,
+				}
 				if rr.Code < http.StatusBadRequest {
 					var sign api.SignResponse
 					assert.FatalError(t, readJSON(body, &sign))
@@ -673,7 +688,7 @@ func TestCARenew(t *testing.T) {
 
 					assert.Equals(t, *sign.TLSOptions, authority.DefaultTLSOptions)
 				} else {
-					err := readError(body)
+					err := readError(resp)
 					if tc.errMsg == "" {
 						assert.FatalError(t, errors.New("must validate response error"))
 					}

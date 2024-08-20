@@ -49,10 +49,11 @@ func WithKeyVal(key string, val interface{}) Option {
 
 // Error represents the CA API errors.
 type Error struct {
-	Status  int
-	Err     error
-	Msg     string
-	Details map[string]interface{}
+	Status    int
+	Err       error
+	Msg       string
+	Details   map[string]interface{}
+	RequestID string `json:"-"`
 }
 
 // ErrorResponse represents an error in JSON format.
@@ -79,7 +80,7 @@ func (e *Error) StatusCode() int {
 
 // Message returns a user friendly error, if one is set.
 func (e *Error) Message() string {
-	if len(e.Msg) > 0 {
+	if e.Msg != "" {
 		return e.Msg
 	}
 	return e.Err.Error()
@@ -122,7 +123,7 @@ func Wrapf(status int, e error, format string, args ...interface{}) error {
 // MarshalJSON implements json.Marshaller interface for the Error struct.
 func (e *Error) MarshalJSON() ([]byte, error) {
 	var msg string
-	if len(e.Msg) > 0 {
+	if e.Msg != "" {
 		msg = e.Msg
 	} else {
 		msg = http.StatusText(e.Status)
@@ -176,7 +177,7 @@ func StatusCodeError(code int, e error, opts ...Option) error {
 	}
 }
 
-var (
+const (
 	seeLogs = "Please see the certificate authority logs for more info."
 	// BadRequestDefaultMsg 400 default msg
 	BadRequestDefaultMsg = "The request could not be completed; malformed or missing data. " + seeLogs
@@ -192,7 +193,7 @@ var (
 	NotImplementedDefaultMsg = "The requested method is not implemented by the certificate authority. " + seeLogs
 )
 
-var (
+const (
 	// BadRequestPrefix is the prefix added to the bad request messages that are
 	// directly sent to the cli.
 	BadRequestPrefix = "The request could not be completed: "

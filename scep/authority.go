@@ -60,7 +60,7 @@ func MustFromContext(ctx context.Context) *Authority {
 
 // SignAuthority is the interface for a signing authority
 type SignAuthority interface {
-	Sign(cr *x509.CertificateRequest, opts provisioner.SignOptions, signOpts ...provisioner.SignOption) ([]*x509.Certificate, error)
+	SignWithContext(ctx context.Context, cr *x509.CertificateRequest, opts provisioner.SignOptions, signOpts ...provisioner.SignOption) ([]*x509.Certificate, error)
 	LoadProvisionerByName(string) (provisioner.Interface, error)
 }
 
@@ -306,9 +306,9 @@ func (a *Authority) SignCSR(ctx context.Context, csr *x509.CertificateRequest, m
 	}
 	signOps = append(signOps, templateOptions)
 
-	certChain, err := a.signAuth.Sign(csr, opts, signOps...)
+	certChain, err := a.signAuth.SignWithContext(ctx, csr, opts, signOps...)
 	if err != nil {
-		return nil, fmt.Errorf("error generating certificate for order: %w", err)
+		return nil, fmt.Errorf("error generating certificate: %w", err)
 	}
 
 	// take the issued certificate (only); https://tools.ietf.org/html/rfc8894#section-3.3.2

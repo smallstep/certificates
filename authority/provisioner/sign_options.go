@@ -5,7 +5,10 @@ import (
 	"crypto/ecdsa"
 	"crypto/ed25519"
 	"crypto/rsa"
+	"crypto/sha256"
+	"crypto/subtle"
 	"crypto/x509"
+	"encoding/base64"
 	"encoding/json"
 	"net"
 	"net/http"
@@ -299,14 +302,19 @@ func (v defaultSANsValidator) Valid(req *x509.CertificateRequest) (err error) {
 // duration.
 type profileDefaultDuration time.Duration
 
+// Modify sets the certificate NotBefore and NotAfter using the following order:
+//   - From the SignOptions that we get from flags.
+//   - From x509.Certificate that we get from the template.
+//   - NotBefore from the current time with a backdate.
+//   - NotAfter from NotBefore plus the duration in v.
 func (v profileDefaultDuration) Modify(cert *x509.Certificate, so SignOptions) error {
 	var backdate time.Duration
-	notBefore := so.NotBefore.Time()
+	notBefore := timeOr(so.NotBefore.Time(), cert.NotBefore)
 	if notBefore.IsZero() {
 		notBefore = now()
 		backdate = -1 * so.Backdate
 	}
-	notAfter := so.NotAfter.RelativeTime(notBefore)
+	notAfter := timeOr(so.NotAfter.RelativeTime(notBefore), cert.NotAfter)
 	if notAfter.IsZero() {
 		if v != 0 {
 			notAfter = notBefore.Add(time.Duration(v))
@@ -327,11 +335,17 @@ type profileLimitDuration struct {
 	notBefore, notAfter time.Time
 }
 
-// Option returns an x509util option that limits the validity period of a
-// certificate to one that is superficially imposed.
+// Modify sets the certificate NotBefore and NotAfter but limits the validity
+// period to the certificate to one that is superficially imposed.
+//
+// The expected NotBefore and NotAfter are set using the following order:
+//   - From the SignOptions that we get from flags.
+//   - From x509.Certificate that we get from the template.
+//   - NotBefore from the current time with a backdate.
+//   - NotAfter from NotBefore plus the duration v or the notAfter in v if lower.
 func (v profileLimitDuration) Modify(cert *x509.Certificate, so SignOptions) error {
 	var backdate time.Duration
-	notBefore := so.NotBefore.Time()
+	notBefore := timeOr(so.NotBefore.Time(), cert.NotBefore)
 	if notBefore.IsZero() {
 		notBefore = now()
 		backdate = -1 * so.Backdate
@@ -342,7 +356,7 @@ func (v profileLimitDuration) Modify(cert *x509.Certificate, so SignOptions) err
 			notBefore, v.notBefore)
 	}
 
-	notAfter := so.NotAfter.RelativeTime(notBefore)
+	notAfter := timeOr(so.NotAfter.RelativeTime(notBefore), cert.NotAfter)
 	if notAfter.After(v.notAfter) {
 		return errs.Forbidden(
 			"requested certificate notAfter (%s) is after the expiration of the provisioning credential (%s)",
@@ -369,8 +383,8 @@ type validityValidator struct {
 }
 
 // newValidityValidator return a new validity validator.
-func newValidityValidator(min, max time.Duration) *validityValidator {
-	return &validityValidator{min: min, max: max}
+func newValidityValidator(minDur, maxDur time.Duration) *validityValidator {
+	return &validityValidator{min: minDur, max: maxDur}
 }
 
 // Valid validates the certificate validity settings (notBefore/notAfter) and
@@ -490,5 +504,23 @@ func (o *provisionerExtensionOption) Modify(cert *x509.Certificate, _ SignOption
 		}
 	}
 	cert.ExtraExtensions = append(cert.ExtraExtensions, ext)
+	return nil
+}
+
+// csrFingerprintValidator is a CertificateRequestValidator that checks the
+// fingerprint of the certificate request with the provided one.
+type csrFingerprintValidator string
+
+func (s csrFingerprintValidator) Valid(cr *x509.CertificateRequest) error {
+	if s != "" {
+		expected, err := base64.RawURLEncoding.DecodeString(string(s))
+		if err != nil {
+			return errs.ForbiddenErr(err, "error decoding fingerprint")
+		}
+		sum := sha256.Sum256(cr.Raw)
+		if subtle.ConstantTimeCompare(expected, sum[:]) != 1 {
+			return errs.Forbidden("certificate request fingerprint does not match %q", s)
+		}
+	}
 	return nil
 }

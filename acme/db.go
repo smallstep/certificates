@@ -2,6 +2,7 @@ package acme
 
 import (
 	"context"
+	"database/sql"
 
 	"github.com/pkg/errors"
 )
@@ -15,7 +16,7 @@ var ErrNotFound = errors.New("not found")
 // IsErrNotFound returns true if the error is a "not found" error. Returns false
 // otherwise.
 func IsErrNotFound(err error) bool {
-	return errors.Is(err, ErrNotFound)
+	return errors.Is(err, ErrNotFound) || errors.Is(err, sql.ErrNoRows)
 }
 
 // DB is the DB interface expected by the step-ca ACME API.
@@ -53,6 +54,19 @@ type DB interface {
 	GetOrder(ctx context.Context, id string) (*Order, error)
 	GetOrdersByAccountID(ctx context.Context, accountID string) ([]string, error)
 	UpdateOrder(ctx context.Context, o *Order) error
+}
+
+// WireDB is the interface used for operations on ACME Orders for Wire identifiers. This
+// is not a general purpose interface, and it should only be used when Wire identifiers
+// are enabled in the CA configuration. Currently it provides a runtime assertion only;
+// not at compile time.
+type WireDB interface {
+	DB
+	GetAllOrdersByAccountID(ctx context.Context, accountID string) ([]string, error)
+	CreateDpopToken(ctx context.Context, orderID string, dpop map[string]interface{}) error
+	GetDpopToken(ctx context.Context, orderID string) (map[string]interface{}, error)
+	CreateOidcToken(ctx context.Context, orderID string, idToken map[string]interface{}) error
+	GetOidcToken(ctx context.Context, orderID string) (map[string]interface{}, error)
 }
 
 type dbKey struct{}
@@ -120,6 +134,18 @@ type MockDB struct {
 
 	MockRet1  interface{}
 	MockError error
+}
+
+// MockWireDB is an implementation of the WireDB interface that should only be used as
+// a mock in tests. It embeds the MockDB, as it is an extension of the existing database
+// methods.
+type MockWireDB struct {
+	MockDB
+	MockGetAllOrdersByAccountID func(ctx context.Context, accountID string) ([]string, error)
+	MockGetDpopToken            func(ctx context.Context, orderID string) (map[string]interface{}, error)
+	MockCreateDpopToken         func(ctx context.Context, orderID string, dpop map[string]interface{}) error
+	MockGetOidcToken            func(ctx context.Context, orderID string) (map[string]interface{}, error)
+	MockCreateOidcToken         func(ctx context.Context, orderID string, idToken map[string]interface{}) error
 }
 
 // CreateAccount mock.
@@ -390,4 +416,50 @@ func (m *MockDB) GetOrdersByAccountID(ctx context.Context, accID string) ([]stri
 		return nil, m.MockError
 	}
 	return m.MockRet1.([]string), m.MockError
+}
+
+// GetAllOrdersByAccountID returns a list of any order IDs owned by the account.
+func (m *MockWireDB) GetAllOrdersByAccountID(ctx context.Context, accountID string) ([]string, error) {
+	if m.MockGetAllOrdersByAccountID != nil {
+		return m.MockGetAllOrdersByAccountID(ctx, accountID)
+	} else if m.MockError != nil {
+		return nil, m.MockError
+	}
+	return m.MockRet1.([]string), m.MockError
+}
+
+// GetDpop retrieves a DPoP from the database.
+func (m *MockWireDB) GetDpopToken(ctx context.Context, orderID string) (map[string]any, error) {
+	if m.MockGetDpopToken != nil {
+		return m.MockGetDpopToken(ctx, orderID)
+	} else if m.MockError != nil {
+		return nil, m.MockError
+	}
+	return m.MockRet1.(map[string]any), m.MockError
+}
+
+// CreateDpop creates DPoP resources and saves them to the DB.
+func (m *MockWireDB) CreateDpopToken(ctx context.Context, orderID string, dpop map[string]any) error {
+	if m.MockCreateDpopToken != nil {
+		return m.MockCreateDpopToken(ctx, orderID, dpop)
+	}
+	return m.MockError
+}
+
+// GetOidcToken retrieves an oidc token from the database.
+func (m *MockWireDB) GetOidcToken(ctx context.Context, orderID string) (map[string]any, error) {
+	if m.MockGetOidcToken != nil {
+		return m.MockGetOidcToken(ctx, orderID)
+	} else if m.MockError != nil {
+		return nil, m.MockError
+	}
+	return m.MockRet1.(map[string]any), m.MockError
+}
+
+// CreateOidcToken creates oidc token resources and saves them to the DB.
+func (m *MockWireDB) CreateOidcToken(ctx context.Context, orderID string, idToken map[string]any) error {
+	if m.MockCreateOidcToken != nil {
+		return m.MockCreateOidcToken(ctx, orderID, idToken)
+	}
+	return m.MockError
 }

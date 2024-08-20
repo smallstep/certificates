@@ -5,6 +5,7 @@ import (
 	"crypto/x509"
 	"encoding/base64"
 	"encoding/json"
+	"fmt"
 	"net"
 	"net/http"
 	"strings"
@@ -16,6 +17,7 @@ import (
 	"go.step.sm/crypto/x509util"
 
 	"github.com/smallstep/certificates/acme"
+	"github.com/smallstep/certificates/acme/wire"
 	"github.com/smallstep/certificates/api/render"
 	"github.com/smallstep/certificates/authority/policy"
 	"github.com/smallstep/certificates/authority/provisioner"
@@ -48,14 +50,84 @@ func (n *NewOrderRequest) Validate() error {
 			if id.Value == "" {
 				return acme.NewError(acme.ErrorMalformedType, "permanent identifier cannot be empty")
 			}
+		case acme.WireUser, acme.WireDevice:
+			// validation of Wire identifiers is performed in `validateWireIdentifiers`, but
+			// marked here as known and supported types.
+			continue
 		default:
 			return acme.NewError(acme.ErrorMalformedType, "identifier type unsupported: %s", id.Type)
 		}
-
-		// TODO(hs): add some validations for DNS domains?
-		// TODO(hs): combine the errors from this with allow/deny policy, like example error in https://datatracker.ietf.org/doc/html/rfc8555#section-6.7.1
 	}
+
+	if err := n.validateWireIdentifiers(); err != nil {
+		return acme.WrapError(acme.ErrorMalformedType, err, "failed validating Wire identifiers")
+	}
+
+	// TODO(hs): add some validations for DNS domains?
+	// TODO(hs): combine the errors from this with allow/deny policy, like example error in https://datatracker.ietf.org/doc/html/rfc8555#section-6.7.1
+
 	return nil
+}
+
+func (n *NewOrderRequest) validateWireIdentifiers() error {
+	if !n.hasWireIdentifiers() {
+		return nil
+	}
+
+	userIdentifiers := identifiersOfType(acme.WireUser, n.Identifiers)
+	deviceIdentifiers := identifiersOfType(acme.WireDevice, n.Identifiers)
+
+	if len(userIdentifiers) != 1 {
+		return fmt.Errorf("expected exactly one Wire UserID identifier; got %d", len(userIdentifiers))
+	}
+	if len(deviceIdentifiers) != 1 {
+		return fmt.Errorf("expected exactly one Wire DeviceID identifier, got %d", len(deviceIdentifiers))
+	}
+
+	wireUserID, err := wire.ParseUserID(userIdentifiers[0].Value)
+	if err != nil {
+		return fmt.Errorf("failed parsing Wire UserID: %w", err)
+	}
+
+	wireDeviceID, err := wire.ParseDeviceID(deviceIdentifiers[0].Value)
+	if err != nil {
+		return fmt.Errorf("failed parsing Wire DeviceID: %w", err)
+	}
+	if _, err := wire.ParseClientID(wireDeviceID.ClientID); err != nil {
+		return fmt.Errorf("invalid Wire client ID %q: %w", wireDeviceID.ClientID, err)
+	}
+
+	switch {
+	case wireUserID.Domain != wireDeviceID.Domain:
+		return fmt.Errorf("UserID domain %q does not match DeviceID domain %q", wireUserID.Domain, wireDeviceID.Domain)
+	case wireUserID.Name != wireDeviceID.Name:
+		return fmt.Errorf("UserID name %q does not match DeviceID name %q", wireUserID.Name, wireDeviceID.Name)
+	case wireUserID.Handle != wireDeviceID.Handle:
+		return fmt.Errorf("UserID handle %q does not match DeviceID handle %q", wireUserID.Handle, wireDeviceID.Handle)
+	}
+
+	return nil
+}
+
+// hasWireIdentifiers returns whether the [NewOrderRequest] contains
+// Wire identifiers.
+func (n *NewOrderRequest) hasWireIdentifiers() bool {
+	for _, i := range n.Identifiers {
+		if i.Type == acme.WireUser || i.Type == acme.WireDevice {
+			return true
+		}
+	}
+	return false
+}
+
+// identifiersOfType returns the Identifiers that are of type typ.
+func identifiersOfType(typ acme.IdentifierType, ids []acme.Identifier) (result []acme.Identifier) {
+	for _, id := range ids {
+		if id.Type == typ {
+			result = append(result, id)
+		}
+	}
+	return
 }
 
 // FinalizeRequest captures the body for a Finalize order request.
@@ -99,29 +171,29 @@ func NewOrder(w http.ResponseWriter, r *http.Request) {
 
 	acc, err := accountFromContext(ctx)
 	if err != nil {
-		render.Error(w, err)
+		render.Error(w, r, err)
 		return
 	}
 	prov, err := provisionerFromContext(ctx)
 	if err != nil {
-		render.Error(w, err)
+		render.Error(w, r, err)
 		return
 	}
 	payload, err := payloadFromContext(ctx)
 	if err != nil {
-		render.Error(w, err)
+		render.Error(w, r, err)
 		return
 	}
 
 	var nor NewOrderRequest
 	if err := json.Unmarshal(payload.value, &nor); err != nil {
-		render.Error(w, acme.WrapError(acme.ErrorMalformedType, err,
+		render.Error(w, r, acme.WrapError(acme.ErrorMalformedType, err,
 			"failed to unmarshal new-order request payload"))
 		return
 	}
 
 	if err := nor.Validate(); err != nil {
-		render.Error(w, err)
+		render.Error(w, r, err)
 		return
 	}
 
@@ -130,39 +202,39 @@ func NewOrder(w http.ResponseWriter, r *http.Request) {
 
 	acmeProv, err := acmeProvisionerFromContext(ctx)
 	if err != nil {
-		render.Error(w, err)
+		render.Error(w, r, err)
 		return
 	}
 
 	var eak *acme.ExternalAccountKey
 	if acmeProv.RequireEAB {
 		if eak, err = db.GetExternalAccountKeyByAccountID(ctx, prov.GetID(), acc.ID); err != nil {
-			render.Error(w, acme.WrapErrorISE(err, "error retrieving external account binding key"))
+			render.Error(w, r, acme.WrapErrorISE(err, "error retrieving external account binding key"))
 			return
 		}
 	}
 
 	acmePolicy, err := newACMEPolicyEngine(eak)
 	if err != nil {
-		render.Error(w, acme.WrapErrorISE(err, "error creating ACME policy engine"))
+		render.Error(w, r, acme.WrapErrorISE(err, "error creating ACME policy engine"))
 		return
 	}
 
 	for _, identifier := range nor.Identifiers {
 		// evaluate the ACME account level policy
 		if err = isIdentifierAllowed(acmePolicy, identifier); err != nil {
-			render.Error(w, acme.WrapError(acme.ErrorRejectedIdentifierType, err, "not authorized"))
+			render.Error(w, r, acme.WrapError(acme.ErrorRejectedIdentifierType, err, "not authorized"))
 			return
 		}
 		// evaluate the provisioner level policy
 		orderIdentifier := provisioner.ACMEIdentifier{Type: provisioner.ACMEIdentifierType(identifier.Type), Value: identifier.Value}
 		if err = prov.AuthorizeOrderIdentifier(ctx, orderIdentifier); err != nil {
-			render.Error(w, acme.WrapError(acme.ErrorRejectedIdentifierType, err, "not authorized"))
+			render.Error(w, r, acme.WrapError(acme.ErrorRejectedIdentifierType, err, "not authorized"))
 			return
 		}
 		// evaluate the authority level policy
 		if err = ca.AreSANsAllowed(ctx, []string{identifier.Value}); err != nil {
-			render.Error(w, acme.WrapError(acme.ErrorRejectedIdentifierType, err, "not authorized"))
+			render.Error(w, r, acme.WrapError(acme.ErrorRejectedIdentifierType, err, "not authorized"))
 			return
 		}
 	}
@@ -188,7 +260,7 @@ func NewOrder(w http.ResponseWriter, r *http.Request) {
 			Status:     acme.StatusPending,
 		}
 		if err := newAuthorization(ctx, az); err != nil {
-			render.Error(w, err)
+			render.Error(w, r, err)
 			return
 		}
 		o.AuthorizationIDs[i] = az.ID
@@ -207,14 +279,14 @@ func NewOrder(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if err := db.CreateOrder(ctx, o); err != nil {
-		render.Error(w, acme.WrapErrorISE(err, "error creating order"))
+		render.Error(w, r, acme.WrapErrorISE(err, "error creating order"))
 		return
 	}
 
 	linker.LinkOrder(ctx, o)
 
 	w.Header().Set("Location", linker.GetLink(ctx, acme.OrderLinkType, o.ID))
-	render.JSONStatus(w, o, http.StatusCreated)
+	render.JSONStatus(w, r, o, http.StatusCreated)
 }
 
 func isIdentifierAllowed(acmePolicy policy.X509Policy, identifier acme.Identifier) error {
@@ -226,6 +298,7 @@ func isIdentifierAllowed(acmePolicy policy.X509Policy, identifier acme.Identifie
 
 func newACMEPolicyEngine(eak *acme.ExternalAccountKey) (policy.X509Policy, error) {
 	if eak == nil {
+		//nolint:nilnil,nolintlint // expected values
 		return nil, nil
 	}
 	return policy.NewX509PolicyEngine(eak.Policy)
@@ -262,12 +335,43 @@ func newAuthorization(ctx context.Context, az *acme.Authorization) error {
 			continue
 		}
 
+		var target string
+		switch az.Identifier.Type {
+		case acme.WireUser:
+			wireOptions, err := prov.GetOptions().GetWireOptions()
+			if err != nil {
+				return acme.WrapErrorISE(err, "failed getting Wire options")
+			}
+			target, err = wireOptions.GetOIDCOptions().EvaluateTarget("") // TODO(hs): determine if required by Wire
+			if err != nil {
+				return acme.WrapError(acme.ErrorMalformedType, err, "invalid Go template registered for 'target'")
+			}
+		case acme.WireDevice:
+			wireID, err := wire.ParseDeviceID(az.Identifier.Value)
+			if err != nil {
+				return acme.WrapError(acme.ErrorMalformedType, err, "failed parsing WireDevice")
+			}
+			clientID, err := wire.ParseClientID(wireID.ClientID)
+			if err != nil {
+				return acme.WrapError(acme.ErrorMalformedType, err, "failed parsing ClientID")
+			}
+			wireOptions, err := prov.GetOptions().GetWireOptions()
+			if err != nil {
+				return acme.WrapErrorISE(err, "failed getting Wire options")
+			}
+			target, err = wireOptions.GetDPOPOptions().EvaluateTarget(clientID.DeviceID)
+			if err != nil {
+				return acme.WrapError(acme.ErrorMalformedType, err, "invalid Go template registered for 'target'")
+			}
+		}
+
 		ch := &acme.Challenge{
 			AccountID: az.AccountID,
 			Value:     az.Identifier.Value,
 			Type:      typ,
 			Token:     az.Token,
 			Status:    acme.StatusPending,
+			Target:    target,
 		}
 		if err := db.CreateChallenge(ctx, ch); err != nil {
 			return acme.WrapErrorISE(err, "error creating challenge")
@@ -288,39 +392,39 @@ func GetOrder(w http.ResponseWriter, r *http.Request) {
 
 	acc, err := accountFromContext(ctx)
 	if err != nil {
-		render.Error(w, err)
+		render.Error(w, r, err)
 		return
 	}
 	prov, err := provisionerFromContext(ctx)
 	if err != nil {
-		render.Error(w, err)
+		render.Error(w, r, err)
 		return
 	}
 
 	o, err := db.GetOrder(ctx, chi.URLParam(r, "ordID"))
 	if err != nil {
-		render.Error(w, acme.WrapErrorISE(err, "error retrieving order"))
+		render.Error(w, r, acme.WrapErrorISE(err, "error retrieving order"))
 		return
 	}
 	if acc.ID != o.AccountID {
-		render.Error(w, acme.NewError(acme.ErrorUnauthorizedType,
+		render.Error(w, r, acme.NewError(acme.ErrorUnauthorizedType,
 			"account '%s' does not own order '%s'", acc.ID, o.ID))
 		return
 	}
 	if prov.GetID() != o.ProvisionerID {
-		render.Error(w, acme.NewError(acme.ErrorUnauthorizedType,
+		render.Error(w, r, acme.NewError(acme.ErrorUnauthorizedType,
 			"provisioner '%s' does not own order '%s'", prov.GetID(), o.ID))
 		return
 	}
 	if err = o.UpdateStatus(ctx, db); err != nil {
-		render.Error(w, acme.WrapErrorISE(err, "error updating order status"))
+		render.Error(w, r, acme.WrapErrorISE(err, "error updating order status"))
 		return
 	}
 
 	linker.LinkOrder(ctx, o)
 
 	w.Header().Set("Location", linker.GetLink(ctx, acme.OrderLinkType, o.ID))
-	render.JSON(w, o)
+	render.JSON(w, r, o)
 }
 
 // FinalizeOrder attempts to finalize an order and create a certificate.
@@ -331,56 +435,56 @@ func FinalizeOrder(w http.ResponseWriter, r *http.Request) {
 
 	acc, err := accountFromContext(ctx)
 	if err != nil {
-		render.Error(w, err)
+		render.Error(w, r, err)
 		return
 	}
 	prov, err := provisionerFromContext(ctx)
 	if err != nil {
-		render.Error(w, err)
+		render.Error(w, r, err)
 		return
 	}
 	payload, err := payloadFromContext(ctx)
 	if err != nil {
-		render.Error(w, err)
+		render.Error(w, r, err)
 		return
 	}
 	var fr FinalizeRequest
 	if err := json.Unmarshal(payload.value, &fr); err != nil {
-		render.Error(w, acme.WrapError(acme.ErrorMalformedType, err,
+		render.Error(w, r, acme.WrapError(acme.ErrorMalformedType, err,
 			"failed to unmarshal finalize-order request payload"))
 		return
 	}
 	if err := fr.Validate(); err != nil {
-		render.Error(w, err)
+		render.Error(w, r, err)
 		return
 	}
 
 	o, err := db.GetOrder(ctx, chi.URLParam(r, "ordID"))
 	if err != nil {
-		render.Error(w, acme.WrapErrorISE(err, "error retrieving order"))
+		render.Error(w, r, acme.WrapErrorISE(err, "error retrieving order"))
 		return
 	}
 	if acc.ID != o.AccountID {
-		render.Error(w, acme.NewError(acme.ErrorUnauthorizedType,
+		render.Error(w, r, acme.NewError(acme.ErrorUnauthorizedType,
 			"account '%s' does not own order '%s'", acc.ID, o.ID))
 		return
 	}
 	if prov.GetID() != o.ProvisionerID {
-		render.Error(w, acme.NewError(acme.ErrorUnauthorizedType,
+		render.Error(w, r, acme.NewError(acme.ErrorUnauthorizedType,
 			"provisioner '%s' does not own order '%s'", prov.GetID(), o.ID))
 		return
 	}
 
 	ca := mustAuthority(ctx)
 	if err = o.Finalize(ctx, db, fr.csr, ca, prov); err != nil {
-		render.Error(w, acme.WrapErrorISE(err, "error finalizing order"))
+		render.Error(w, r, acme.WrapErrorISE(err, "error finalizing order"))
 		return
 	}
 
 	linker.LinkOrder(ctx, o)
 
 	w.Header().Set("Location", linker.GetLink(ctx, acme.OrderLinkType, o.ID))
-	render.JSON(w, o)
+	render.JSON(w, r, o)
 }
 
 // challengeTypes determines the types of challenges that should be used
@@ -399,6 +503,10 @@ func challengeTypes(az *acme.Authorization) []acme.ChallengeType {
 		}
 	case acme.PermanentIdentifier:
 		chTypes = []acme.ChallengeType{acme.DEVICEATTEST01}
+	case acme.WireUser:
+		chTypes = []acme.ChallengeType{acme.WIREOIDC01}
+	case acme.WireDevice:
+		chTypes = []acme.ChallengeType{acme.WIREDPOP01}
 	default:
 		chTypes = []acme.ChallengeType{}
 	}

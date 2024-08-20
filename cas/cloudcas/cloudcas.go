@@ -154,6 +154,11 @@ func New(ctx context.Context, opts apiv1.Options) (*CloudCAS, error) {
 	}, nil
 }
 
+// Type returns the type of this CertificateAuthorityService.
+func (c *CloudCAS) Type() apiv1.Type {
+	return apiv1.CloudCAS
+}
+
 // GetCertificateAuthority returns the root certificate for the given
 // certificate authority. It implements apiv1.CertificateAuthorityGetter
 // interface.

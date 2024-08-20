@@ -21,7 +21,7 @@ var clock Clock
 
 // CertificateAuthority is the interface implemented by a CA authority.
 type CertificateAuthority interface {
-	Sign(cr *x509.CertificateRequest, opts provisioner.SignOptions, signOpts ...provisioner.SignOption) ([]*x509.Certificate, error)
+	SignWithContext(ctx context.Context, cr *x509.CertificateRequest, opts provisioner.SignOptions, signOpts ...provisioner.SignOption) ([]*x509.Certificate, error)
 	AreSANsAllowed(ctx context.Context, sans []string) error
 	IsRevoked(sn string) (bool, error)
 	Revoke(context.Context, *authority.RevokeOptions) error
@@ -130,7 +130,7 @@ func (m *MockProvisioner) GetName() string {
 	return m.Mret1.(string)
 }
 
-// AuthorizeOrderIdentifiers mock
+// AuthorizeOrderIdentifier mock
 func (m *MockProvisioner) AuthorizeOrderIdentifier(ctx context.Context, identifier provisioner.ACMEIdentifier) error {
 	if m.MauthorizeOrderIdentifier != nil {
 		return m.MauthorizeOrderIdentifier(ctx, identifier)

@@ -13,7 +13,9 @@ import (
 	"testing"
 	"time"
 
+	"go.step.sm/crypto/fingerprint"
 	"go.step.sm/crypto/jose"
+	"golang.org/x/crypto/ssh"
 
 	"github.com/smallstep/assert"
 	"github.com/smallstep/certificates/api/render"
@@ -247,6 +249,9 @@ func TestJWK_AuthorizeSign(t *testing.T) {
 	t2, err := generateToken("subject", p1.Name, testAudiences.Sign[0], "name@smallstep.com", []string{}, time.Now(), key1)
 	assert.FatalError(t, err)
 
+	t3, err := generateCustomToken("subject", p1.Name, testAudiences.Sign[0], key1, nil, map[string]any{"cnf": map[string]any{"x5rt#S256": "fingerprint"}})
+	assert.FatalError(t, err)
+
 	// invalid signature
 	failSig := t1[0 : len(t1)-2]
 
@@ -254,12 +259,13 @@ func TestJWK_AuthorizeSign(t *testing.T) {
 		token string
 	}
 	tests := []struct {
-		name string
-		prov *JWK
-		args args
-		code int
-		err  error
-		sans []string
+		name        string
+		prov        *JWK
+		args        args
+		code        int
+		err         error
+		sans        []string
+		fingerprint string
 	}{
 		{
 			name: "fail-signature",
@@ -284,6 +290,15 @@ func TestJWK_AuthorizeSign(t *testing.T) {
 			err:  nil,
 			sans: []string{"subject"},
 		},
+		{
+			name:        "ok-cnf",
+			prov:        p1,
+			args:        args{t3},
+			code:        http.StatusOK,
+			err:         nil,
+			sans:        []string{"subject"},
+			fingerprint: "fingerprint",
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -297,7 +312,7 @@ func TestJWK_AuthorizeSign(t *testing.T) {
 				}
 			} else {
 				if assert.NotNil(t, got) {
-					assert.Equals(t, 10, len(got))
+					assert.Equals(t, 11, len(got))
 					for _, o := range got {
 						switch v := o.(type) {
 						case *JWK:
@@ -321,6 +336,8 @@ func TestJWK_AuthorizeSign(t *testing.T) {
 						case *x509NamePolicyValidator:
 							assert.Equals(t, nil, v.policyEngine)
 						case *WebhookController:
+						case csrFingerprintValidator:
+							assert.Equals(t, tt.fingerprint, string(v))
 						default:
 							assert.FatalError(t, fmt.Errorf("unexpected sign option of type %T", v))
 						}
@@ -393,17 +410,6 @@ func TestJWK_AuthorizeSSHSign(t *testing.T) {
 	jwk, err := decryptJSONWebKey(p1.EncryptedKey)
 	assert.FatalError(t, err)
 
-	iss, aud := p1.Name, testAudiences.SSHSign[0]
-
-	t1, err := generateSimpleSSHUserToken(iss, aud, jwk)
-	assert.FatalError(t, err)
-
-	t2, err := generateSimpleSSHHostToken(iss, aud, jwk)
-	assert.FatalError(t, err)
-
-	// invalid signature
-	failSig := t1[0 : len(t1)-2]
-
 	key, err := generateJSONWebKey()
 	assert.FatalError(t, err)
 
@@ -416,6 +422,39 @@ func TestJWK_AuthorizeSSHSign(t *testing.T) {
 	//nolint:gosec // tests minimum size of the key
 	rsa1024, err := rsa.GenerateKey(rand.Reader, 1024)
 	assert.FatalError(t, err)
+
+	// Calculate fingerprint
+	sshPub, err := ssh.NewPublicKey(pub)
+	assert.FatalError(t, err)
+	fp, err := fingerprint.New(sshPub.Marshal(), crypto.SHA256, fingerprint.Base64RawURLFingerprint)
+	assert.FatalError(t, err)
+
+	iss, aud := p1.Name, testAudiences.SSHSign[0]
+
+	t1, err := generateSimpleSSHUserToken(iss, aud, jwk)
+	assert.FatalError(t, err)
+
+	t2, err := generateSimpleSSHHostToken(iss, aud, jwk)
+	assert.FatalError(t, err)
+
+	t3, err := generateCustomToken("sub", iss, aud, jwk, nil, map[string]any{
+		"step": map[string]any{
+			"ssh": map[string]any{"certType": "host", "principals": []string{"smallstep.com"}},
+		},
+		"cnf": map[string]any{"kid": fp},
+	})
+	assert.FatalError(t, err)
+
+	t4, err := generateCustomToken("sub", iss, aud, jwk, nil, map[string]any{
+		"step": map[string]any{
+			"ssh": map[string]any{"certType": "host", "principals": []string{"smallstep.com"}},
+		},
+		"cnf": map[string]any{"kid": "bad-fingerprint"},
+	})
+	assert.FatalError(t, err)
+
+	// invalid signature
+	failSig := t1[0 : len(t1)-2]
 
 	userDuration := p1.ctl.Claimer.DefaultUserSSHCertDuration()
 	hostDuration := p1.ctl.Claimer.DefaultHostSSHCertDuration()
@@ -451,9 +490,11 @@ func TestJWK_AuthorizeSSHSign(t *testing.T) {
 		{"host-type", p1, args{t2, SignSSHOptions{CertType: "host"}, pub}, expectedHostOptions, http.StatusOK, false, false},
 		{"host-principals", p1, args{t2, SignSSHOptions{Principals: []string{"smallstep.com"}}, pub}, expectedHostOptions, http.StatusOK, false, false},
 		{"host-options", p1, args{t2, SignSSHOptions{CertType: "host", Principals: []string{"smallstep.com"}}, pub}, expectedHostOptions, http.StatusOK, false, false},
+		{"host-cnf", p1, args{t3, SignSSHOptions{CertType: "host", Principals: []string{"smallstep.com"}}, pub}, expectedHostOptions, http.StatusOK, false, false},
+		{"ignore-bad-cnf", p1, args{t4, SignSSHOptions{CertType: "host", Principals: []string{"smallstep.com"}}, pub}, expectedHostOptions, http.StatusOK, false, false},
 		{"fail-sshCA-disabled", p2, args{"foo", SignSSHOptions{}, pub}, expectedUserOptions, http.StatusUnauthorized, true, false},
 		{"fail-signature", p1, args{failSig, SignSSHOptions{}, pub}, nil, http.StatusUnauthorized, true, false},
-		{"rail-rsa1024", p1, args{t1, SignSSHOptions{}, rsa1024.Public()}, expectedUserOptions, http.StatusOK, false, true},
+		{"fail-rsa1024", p1, args{t1, SignSSHOptions{}, rsa1024.Public()}, expectedUserOptions, http.StatusOK, false, true},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {

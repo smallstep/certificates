@@ -83,6 +83,10 @@ Requires **--insecure** flag.`,
 			Usage: `the <port> used on tls-alpn-01 challenges. It can be changed for testing purposes.
 Requires **--insecure** flag.`,
 		},
+		cli.BoolFlag{
+			Name:  "acme-strict-fqdn",
+			Usage: `enable strict DNS resolution using a fully qualified domain name.`,
+		},
 		cli.StringFlag{
 			Name:  "pidfile",
 			Usage: "the path to the <file> to write the process ID.",
@@ -125,6 +129,9 @@ func appAction(ctx *cli.Context) error {
 			return fmt.Errorf("flag '--acme-tls-port' requires the '--insecure' flag")
 		}
 	}
+
+	// Set the strict DNS resolution on ACME challenges. Defaults to false.
+	acme.StrictFQDN = ctx.Bool("acme-strict-fqdn")
 
 	// Allow custom contexts.
 	if caCtx := ctx.String("context"); caCtx != "" {
@@ -239,7 +246,7 @@ To get a linked authority token:
 	// replace resolver if requested
 	if resolver != "" {
 		net.DefaultResolver.PreferGo = true
-		net.DefaultResolver.Dial = func(ctx context.Context, network, address string) (net.Conn, error) {
+		net.DefaultResolver.Dial = func(_ context.Context, network, _ string) (net.Conn, error) {
 			return net.Dial(network, resolver)
 		}
 	}
@@ -251,7 +258,8 @@ To get a linked authority token:
 		ca.WithSSHUserPassword(sshUserPassword),
 		ca.WithIssuerPassword(issuerPassword),
 		ca.WithLinkedCAToken(token),
-		ca.WithQuiet(quiet))
+		ca.WithQuiet(quiet),
+	)
 	if err != nil {
 		fatal(err)
 	}

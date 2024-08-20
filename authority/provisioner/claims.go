@@ -234,24 +234,24 @@ func (c *Claimer) IsSSHCAEnabled() bool {
 // Validate validates and modifies the Claims with default values.
 func (c *Claimer) Validate() error {
 	var (
-		min = c.MinTLSCertDuration()
-		max = c.MaxTLSCertDuration()
-		def = c.DefaultTLSCertDuration()
+		minDur = c.MinTLSCertDuration()
+		maxDur = c.MaxTLSCertDuration()
+		defDur = c.DefaultTLSCertDuration()
 	)
 	switch {
-	case min <= 0:
+	case minDur <= 0:
 		return errors.Errorf("claims: MinTLSCertDuration must be greater than 0")
-	case max <= 0:
+	case maxDur <= 0:
 		return errors.Errorf("claims: MaxTLSCertDuration must be greater than 0")
-	case def <= 0:
+	case defDur <= 0:
 		return errors.Errorf("claims: DefaultTLSCertDuration must be greater than 0")
-	case max < min:
+	case maxDur < minDur:
 		return errors.Errorf("claims: MaxCertDuration cannot be less "+
-			"than MinCertDuration: MaxCertDuration - %v, MinCertDuration - %v", max, min)
-	case def < min:
-		return errors.Errorf("claims: DefaultCertDuration cannot be less than MinCertDuration: DefaultCertDuration - %v, MinCertDuration - %v", def, min)
-	case max < def:
-		return errors.Errorf("claims: MaxCertDuration cannot be less than DefaultCertDuration: MaxCertDuration - %v, DefaultCertDuration - %v", max, def)
+			"than MinCertDuration: MaxCertDuration - %v, MinCertDuration - %v", maxDur, minDur)
+	case defDur < minDur:
+		return errors.Errorf("claims: DefaultCertDuration cannot be less than MinCertDuration: DefaultCertDuration - %v, MinCertDuration - %v", defDur, minDur)
+	case maxDur < defDur:
+		return errors.Errorf("claims: MaxCertDuration cannot be less than DefaultCertDuration: MaxCertDuration - %v, DefaultCertDuration - %v", maxDur, defDur)
 	default:
 		return nil
 	}

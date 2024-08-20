@@ -7,6 +7,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/stretchr/testify/require"
+
 	"go.step.sm/crypto/jose"
 	"go.step.sm/crypto/pemutil"
 	"go.step.sm/crypto/x509util"
@@ -41,14 +43,12 @@ func getTestProvisioner(t *testing.T, caURL string) *Provisioner {
 }
 
 func TestNewProvisioner(t *testing.T) {
-	ca := startCATestServer()
+	ca := startCATestServer(t)
 	defer ca.Close()
 	want := getTestProvisioner(t, ca.URL)
 
 	caBundle, err := os.ReadFile("testdata/secrets/root_ca.crt")
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
 
 	type args struct {
 		name         string

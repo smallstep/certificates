@@ -110,7 +110,7 @@ func newLinkedCAClient(token string) (*linkedCaClient, error) {
 	tlsConfig.GetClientCertificate = renewer.GetClientCertificate
 
 	// Start mTLS client
-	conn, err := grpc.Dial(u.Host, grpc.WithTransportCredentials(credentials.NewTLS(tlsConfig)))
+	conn, err := grpc.NewClient(u.Host, grpc.WithTransportCredentials(credentials.NewTLS(tlsConfig)))
 	if err != nil {
 		return nil, errors.Wrapf(err, "error connecting %s", u.Host)
 	}
@@ -478,10 +478,7 @@ func getAuthority(sans []string) (string, error) {
 // getRootCertificate creates an insecure majordomo client and returns the
 // verified root certificate.
 func getRootCertificate(endpoint, fingerprint string) (*x509.Certificate, error) {
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
-
-	conn, err := grpc.DialContext(ctx, endpoint, grpc.WithTransportCredentials(credentials.NewTLS(&tls.Config{
+	conn, err := grpc.NewClient(endpoint, grpc.WithTransportCredentials(credentials.NewTLS(&tls.Config{
 		//nolint:gosec // used in bootstrap protocol
 		InsecureSkipVerify: true, // lgtm[go/disabled-certificate-check]
 	})))
@@ -489,7 +486,7 @@ func getRootCertificate(endpoint, fingerprint string) (*x509.Certificate, error)
 		return nil, errors.Wrapf(err, "error connecting %s", endpoint)
 	}
 
-	ctx, cancel = context.WithTimeout(context.Background(), 15*time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
 	defer cancel()
 
 	client := linkedca.NewMajordomoClient(conn)
@@ -531,11 +528,7 @@ func getRootCertificate(endpoint, fingerprint string) (*x509.Certificate, error)
 // login creates a new majordomo client with just the root ca pool and returns
 // the signed certificate and tls configuration.
 func login(authority, token string, csr *x509.CertificateRequest, signer crypto.PrivateKey, endpoint string, rootCAs *x509.CertPool) (*tls.Certificate, *tls.Config, error) {
-	// Connect to majordomo
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
-
-	conn, err := grpc.DialContext(ctx, endpoint, grpc.WithTransportCredentials(credentials.NewTLS(&tls.Config{
+	conn, err := grpc.NewClient(endpoint, grpc.WithTransportCredentials(credentials.NewTLS(&tls.Config{
 		MinVersion: tls.VersionTLS12,
 		RootCAs:    rootCAs,
 	})))
@@ -544,7 +537,7 @@ func login(authority, token string, csr *x509.CertificateRequest, signer crypto.
 	}
 
 	// Login to get the signed certificate
-	ctx, cancel = context.WithTimeout(context.Background(), 15*time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
 	defer cancel()
 
 	client := linkedca.NewMajordomoClient(conn)
