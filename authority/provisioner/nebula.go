@@ -2,9 +2,13 @@ package provisioner
 
 import (
 	"context"
+	"crypto/ecdh"
+	"crypto/ecdsa"
 	"crypto/ed25519"
+	"crypto/elliptic"
 	"crypto/x509"
 	"encoding/base64"
+	"math/big"
 	"net"
 	"time"
 
@@ -337,10 +341,23 @@ func (p *Nebula) authorizeToken(token string, audiences []string) (*nebula.Nebul
 		return nil, nil, errs.Unauthorized("token is not valid: failed to verify certificate against configured CA")
 	}
 
-	var pub interface{}
-	if c.Details.IsCA {
+	var pub any
+	switch {
+	case c.Details.Curve == nebula.Curve_P256:
+		// When Nebula is used with ECDSA P-256 keys, both CAs and clients use the same type.
+		ecdhPub, err := ecdh.P256().NewPublicKey(c.Details.PublicKey)
+		if err != nil {
+			return nil, nil, errs.UnauthorizedErr(err, errs.WithMessage("failed to parse nebula public key"))
+		}
+		publicKeyBytes := ecdhPub.Bytes()
+		pub = &ecdsa.PublicKey{ // convert back to *ecdsa.PublicKey, because our jose package nor go-jose supports *ecdh.PublicKey
+			Curve: elliptic.P256(),
+			X:     big.NewInt(0).SetBytes(publicKeyBytes[1:33]),
+			Y:     big.NewInt(0).SetBytes(publicKeyBytes[33:]),
+		}
+	case c.Details.IsCA:
 		pub = ed25519.PublicKey(c.Details.PublicKey)
-	} else {
+	default:
 		pub = x25519.PublicKey(c.Details.PublicKey)
 	}
 
@@ -358,6 +375,7 @@ func (p *Nebula) authorizeToken(token string, audiences []string) (*nebula.Nebul
 	}, time.Minute); err != nil {
 		return nil, nil, errs.UnauthorizedErr(err, errs.WithMessage("token is not valid: invalid claims"))
 	}
+
 	// Validate token and subject too.
 	if !matchesAudience(claims.Audience, audiences) {
 		return nil, nil, errs.Unauthorized("token is not valid: invalid claims")
