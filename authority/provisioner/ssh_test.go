@@ -90,7 +90,7 @@ func signSSHCertificate(key crypto.PublicKey, opts SignSSHOptions, signOpts []Si
 		var templErr *sshutil.TemplateError
 		if errors.As(err, &templErr) {
 			return nil, errs.NewErr(http.StatusBadRequest, templErr,
-				errs.WithMessage(templErr.Error()),
+				errs.WithMessage(templErr.Error()), //nolint:govet // allow non-constant error messages
 				errs.WithKeyVal("signOptions", signOpts),
 			)
 		}
