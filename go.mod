@@ -4,7 +4,7 @@ go 1.21
 
 require (
 	cloud.google.com/go/longrunning v0.5.11
-	cloud.google.com/go/security v1.17.4
+	cloud.google.com/go/security v1.17.5
 	github.com/Masterminds/sprig/v3 v3.2.3
 	github.com/coreos/go-oidc/v3 v3.11.0
 	github.com/dgraph-io/badger v1.6.2
@@ -46,7 +46,7 @@ require (
 
 require (
 	cloud.google.com/go v0.115.0 // indirect
-	cloud.google.com/go/auth v0.7.3 // indirect
+	cloud.google.com/go/auth v0.8.0 // indirect
 	cloud.google.com/go/auth/oauth2adapt v0.2.3 // indirect
 	cloud.google.com/go/compute/metadata v0.5.0 // indirect
 	cloud.google.com/go/iam v1.1.12 // indirect
