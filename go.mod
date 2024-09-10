@@ -36,7 +36,7 @@ require (
 	go.step.sm/cli-utils v0.9.0
 	go.step.sm/crypto v0.51.2
 	go.step.sm/linkedca v0.22.1
-	golang.org/x/crypto v0.26.0
+	golang.org/x/crypto v0.27.0
 	golang.org/x/exp v0.0.0-20240318143956-a85f2c67cd81
 	golang.org/x/net v0.28.0
 	google.golang.org/api v0.195.0
@@ -156,8 +156,8 @@ require (
 	go.opentelemetry.io/otel/trace v1.28.0 // indirect
 	golang.org/x/oauth2 v0.22.0 // indirect
 	golang.org/x/sync v0.8.0 // indirect
-	golang.org/x/sys v0.24.0 // indirect
-	golang.org/x/text v0.17.0 // indirect
+	golang.org/x/sys v0.25.0 // indirect
+	golang.org/x/text v0.18.0 // indirect
 	golang.org/x/time v0.6.0 // indirect
 	google.golang.org/genproto v0.0.0-20240823204242-4ba0660f739c // indirect
 	google.golang.org/genproto/googleapis/api v0.0.0-20240814211410-ddb44dafa142 // indirect
