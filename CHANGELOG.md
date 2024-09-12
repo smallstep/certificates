@@ -25,6 +25,24 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
 
 ---
 
+## [0.27.3] - 2024-09-13
+
+### Added
+
+- AWS auth method for Vault RA mode (smallstep/certificates#1976)
+- API endpoints for retrieving Intermediate certificates (smallstep/certificates#1962)
+- Enable use of OIDC provisioner with private identity providers and a certificate from step-ca (smallstep/certificates#1940)
+- Support for verifying `cnf` and `x5rt#S256` claim when provided in token (smallstep/certificates#1660)
+- Add Wire integration to ACME provisioner (smallstep/certificates#1666)
+
+### Changed
+
+- Clarified SSH certificate policy errors (smallstep/certificates#1951)
+
+### Fixed
+
+- Nebula ECDSA P-256 support (smallstep/certificates#1662)
+
 ## [0.27.2] - 2024-07-18
 
 ### Added
