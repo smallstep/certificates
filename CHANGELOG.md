@@ -25,6 +25,19 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
 
 ---
 
+## [0.27.3] - 2024-09-13
+
+### Added
+
+- AWS auth method for Vault RA mode (smallstep/certificates#1976)
+- API endpoints for retrieving Intermediate certificates (smallstep/certificates#1962)
+- Enable use of OIDC provisioner with private identity providers and a certificate from step-ca (smallstep/certificates#1940)
+
+### Changed
+
+- Use run time Type assertion for WireDB integration (smallstep/certificates#1960)
+
+
 ## [0.27.2] - 2024-07-18
 
 ### Added
