@@ -349,7 +349,7 @@ func PKIOperation(ctx context.Context, req request) (Response, error) {
 	microMsg, err := smallscep.ParsePKIMessage(req.Message)
 	if err != nil {
 		// return the error, because we can't use the msg for creating a CertRep
-		return Response{}, err
+		return Response{}, fmt.Errorf("failed parsing SCEP request: %w", err)
 	}
 
 	// this is essentially doing the same as smallscep.ParsePKIMessage, but
