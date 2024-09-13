@@ -13,8 +13,8 @@ func init() {
 	// enable the fallback X509 certificate parser to support parsing
 	// Windows SCEP enrollment certificates that contain a critical
 	// authority key identifier extension. Starting with Go 1.23 those
-	// fail to be parsed by the crypto/x509. Enabling the legacy
-	// fallback parser is a workaround for that.
+	// fail to be parsed by crypto/x509. Enabling the legacy fallback
+	// parser is a workaround for that.
 	pkcs7.SetFallbackLegacyX509CertificateParserEnabled(true)
 }
 
