@@ -143,3 +143,120 @@ func TestHandlingRegardlessOfOptions(t *testing.T) {
 		})
 	}
 }
+
+// TestLogRealIP ensures that the real originating IP is logged instead of the
+// proxy IP when STEP_LOGGER_LOG_REAL_IP is set to true and specific headers are
+// present.
+func TestLogRealIP(t *testing.T) {
+	statusHandler := func(statusCode int) http.HandlerFunc {
+		return func(w http.ResponseWriter, _ *http.Request) {
+			w.WriteHeader(statusCode)
+			w.Write([]byte("{}"))
+		}
+	}
+
+	proxyIP := "1.1.1.1"
+
+	tests := []struct {
+		name      string
+		logRealIP string
+		headers   map[string]string
+		expected  string
+	}{
+		{
+			name:      "setting is turned on, no header is set",
+			logRealIP: "true",
+			expected:  "1.1.1.1",
+			headers:   map[string]string{},
+		},
+		{
+			name:      "setting is turned on, True-Client-IP header is set",
+			logRealIP: "true",
+			headers: map[string]string{
+				"True-Client-IP": "2.2.2.2",
+			},
+			expected: "2.2.2.2",
+		},
+		{
+			name:      "setting is turned on, True-Client-IP header is set with invalid value",
+			logRealIP: "true",
+			headers: map[string]string{
+				"True-Client-IP": "a.b.c.d",
+			},
+			expected: "1.1.1.1",
+		},
+		{
+			name:      "setting is turned on, X-Real-IP header is set",
+			logRealIP: "true",
+			headers: map[string]string{
+				"X-Real-IP": "3.3.3.3",
+			},
+			expected: "3.3.3.3",
+		},
+		{
+			name:      "setting is turned on, X-Forwarded-For header is set",
+			logRealIP: "true",
+			headers: map[string]string{
+				"X-Forwarded-For": "4.4.4.4",
+			},
+			expected: "4.4.4.4",
+		},
+		{
+			name:      "setting is turned on, X-Forwarded-For header is set with multiple IPs",
+			logRealIP: "true",
+			headers: map[string]string{
+				"X-Forwarded-For": "4.4.4.4, 5.5.5.5, 6.6.6.6",
+			},
+			expected: "4.4.4.4",
+		},
+		{
+			name:      "setting is turned on, all headers are set",
+			logRealIP: "true",
+			headers: map[string]string{
+				"True-Client-IP":  "2.2.2.2",
+				"X-Real-IP":       "3.3.3.3",
+				"X-Forwarded-For": "4.4.4.4",
+			},
+			expected: "2.2.2.2",
+		},
+		{
+			name:      "setting is turned off, True-Client-IP header is set",
+			logRealIP: "false",
+			expected:  "1.1.1.1",
+			headers: map[string]string{
+				"True-Client-IP": "2.2.2.2",
+			},
+		},
+		{
+			name:      "setting is turned off, no header is set",
+			logRealIP: "false",
+			expected:  "1.1.1.1",
+			headers:   map[string]string{},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Setenv("STEP_LOGGER_LOG_REAL_IP", tt.logRealIP)
+
+			baseLogger, hook := test.NewNullLogger()
+			logger := &Logger{
+				Logger: baseLogger,
+			}
+			l := NewLoggerHandler("test", logger, statusHandler(http.StatusOK))
+
+			r := httptest.NewRequest("GET", "/test", http.NoBody)
+			r.RemoteAddr = proxyIP
+			for k, v := range tt.headers {
+				r.Header.Set(k, v)
+			}
+			w := httptest.NewRecorder()
+			l.ServeHTTP(w, r)
+
+			if assert.Equals(t, 1, len(hook.AllEntries())) {
+				entry := hook.LastEntry()
+				assert.Equals(t, tt.expected, entry.Data["remote-address"])
+			}
+		})
+	}
+}
