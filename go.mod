@@ -18,7 +18,7 @@ require (
 	github.com/google/uuid v1.6.0
 	github.com/googleapis/gax-go/v2 v2.13.0
 	github.com/hashicorp/vault/api v1.15.0
-	github.com/hashicorp/vault/api/auth/approle v0.7.0
+	github.com/hashicorp/vault/api/auth/approle v0.8.0
 	github.com/hashicorp/vault/api/auth/aws v0.8.0
 	github.com/hashicorp/vault/api/auth/kubernetes v0.7.0
 	github.com/newrelic/go-agent/v3 v3.34.0
