@@ -266,8 +266,8 @@ github.com/hashicorp/vault/api/auth/approle v0.8.0 h1:FuVtWZ0xD6+wz1x0l5s0b4852R
 github.com/hashicorp/vault/api/auth/approle v0.8.0/go.mod h1:NV7O9r5JUtNdVnqVZeMHva81AIdpG0WoIQohNt1VCPM=
 github.com/hashicorp/vault/api/auth/aws v0.8.0 h1:6E14D7eHjV+Ytk8HmKLbTGS/LaXD9hP2FXe7IIKCrHc=
 github.com/hashicorp/vault/api/auth/aws v0.8.0/go.mod h1:SweK5366gCeO5krBk6Fpjz/MX2oa+iiIZz/Nu8/nMZw=
-github.com/hashicorp/vault/api/auth/kubernetes v0.7.0 h1:pHCbeeyD6E5KmMMCc9vwwZZ5OVlM6yFayxFHWodiOUU=
-github.com/hashicorp/vault/api/auth/kubernetes v0.7.0/go.mod h1:Eey0x0X2g+b2LYWgBrQFyf5W0fp+Y1HGrEckP8Q0wns=
+github.com/hashicorp/vault/api/auth/kubernetes v0.8.0 h1:6jPcORq7OHwf+MCbaaUmiBvMhETAaZ7+i97WfZtF5kc=
+github.com/hashicorp/vault/api/auth/kubernetes v0.8.0/go.mod h1:nfl5sRUUork0ZSfV3xf+pgAFQSD5kSkL0k9axg523DM=
 github.com/huandu/xstrings v1.5.0 h1:2ag3IFq9ZDANvthTwTiqSSZLjDc+BedvHPAp5tJy2TI=
 github.com/huandu/xstrings v1.5.0/go.mod h1:y5/lhBue+AyNmUVz9RLU9xbLR0o4KIIExikq4ovT0aE=
 github.com/inconshreveable/mousetrap v1.0.0/go.mod h1:PxqpIevigyE2G7u3NXJIT2ANytuPF1OarO4DADm73n8=
