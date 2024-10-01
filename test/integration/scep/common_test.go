@@ -4,8 +4,11 @@ import (
 	"context"
 	"crypto/rand"
 	"crypto/rsa"
+	"crypto/sha1"
 	"crypto/tls"
 	"crypto/x509"
+	"crypto/x509/pkix"
+	"encoding/asn1"
 	"encoding/base64"
 	"errors"
 	"fmt"
@@ -173,6 +176,156 @@ func (c *client) requestCertificate(t *testing.T, commonName string, sans []stri
 		return nil, fmt.Errorf("failed creating self signed certificate: %w", err)
 	}
 	selfSignedCertificate, err := x509.ParseCertificate(selfSigned)
+	if err != nil {
+		return nil, fmt.Errorf("failed parsing self signed certificate: %w", err)
+	}
+
+	msgTmpl := &scep.PKIMessage{
+		TransactionID: "test-1",
+		MessageType:   scep.PKCSReq,
+		SenderNonce:   []byte("test-nonce-1"),
+		Recipients:    []*x509.Certificate{c.caCert},
+		SignerCert:    selfSignedCertificate,
+		SignerKey:     signer,
+	}
+
+	msg, err := scep.NewCSRRequest(csr, msgTmpl)
+	if err != nil {
+		return nil, fmt.Errorf("failed creating SCEP PKCSReq message: %w", err)
+	}
+
+	t.Log(string(msg.Raw))
+
+	u, err := url.Parse(c.caURL)
+	if err != nil {
+		return nil, fmt.Errorf("failed parsing CA URL: %w", err)
+	}
+
+	opURL := u.ResolveReference(&url.URL{RawQuery: fmt.Sprintf("operation=PKIOperation&message=%s", url.QueryEscape(base64.StdEncoding.EncodeToString(msg.Raw)))})
+	resp, err := c.httpClient.Get(opURL.String())
+	if err != nil {
+		return nil, fmt.Errorf("failed get request: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if ct := resp.Header.Get("Content-Type"); ct != "application/x-pki-message" {
+		return nil, fmt.Errorf("received unexpected content type %q", ct)
+	}
+
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, fmt.Errorf("failed reading response body: %w", err)
+	}
+
+	t.Log(string(body))
+
+	signedData, err := pkcs7.Parse(body)
+	if err != nil {
+		return nil, fmt.Errorf("failed parsing response body: %w", err)
+	}
+
+	// TODO: verify the signature?
+
+	p7, err := pkcs7.Parse(signedData.Content)
+	if err != nil {
+		return nil, fmt.Errorf("failed decrypting inner p7: %w", err)
+	}
+
+	content, err := p7.Decrypt(selfSignedCertificate, signer)
+	if err != nil {
+		return nil, fmt.Errorf("failed decrypting response: %w", err)
+	}
+
+	p7, err = pkcs7.Parse(content)
+	if err != nil {
+		return nil, fmt.Errorf("failed parsing p7 content: %w", err)
+	}
+
+	cert := p7.Certificates[0]
+
+	return cert, nil
+}
+
+var (
+	oidExtensionAuthorityKeyId = asn1.ObjectIdentifier{2, 5, 29, 35}
+	oidExtensionSubjectKeyId   = asn1.ObjectIdentifier{2, 5, 29, 14}
+)
+
+type authorityKeyId struct {
+	Id []byte `asn1:"optional,tag:0"`
+}
+
+type pkcs1PublicKey struct {
+	N *big.Int
+	E int
+}
+
+type parseFunc = func(der []byte) (*x509.Certificate, error)
+
+func (c *client) requestCertificateEmulatingWindowsClient(t *testing.T, commonName string, sans []string, parseCertificate parseFunc) (*x509.Certificate, error) {
+	if err := c.getCACert(t); err != nil {
+		return nil, fmt.Errorf("failed getting CA certificate: %w", err)
+	}
+
+	signer, err := rsa.GenerateKey(rand.Reader, 2048)
+	if err != nil {
+		return nil, fmt.Errorf("failed creating SCEP private key: %w", err)
+	}
+
+	csr, err := x509util.CreateCertificateRequest(commonName, sans, signer)
+	if err != nil {
+		return nil, fmt.Errorf("failed creating CSR: %w", err)
+	}
+
+	// on Windows the self-signed certificate contains an authority key identifier
+	// extension that is marked critical
+	value, err := asn1.Marshal(authorityKeyId{[]byte("bla")}) // fake value
+	if err != nil {
+		return nil, fmt.Errorf("failed marshaling authority key ID")
+	}
+	authorityKeyIDExtension := pkix.Extension{
+		Id:       oidExtensionAuthorityKeyId,
+		Critical: true,
+		Value:    value,
+	}
+
+	// determine the subject key ID
+	publicKeyBytes, err := asn1.Marshal(pkcs1PublicKey{
+		N: signer.N,
+		E: signer.E,
+	})
+	if err != nil {
+		return nil, fmt.Errorf("failed marshaling RSA public key: %w", err)
+	}
+
+	h := sha1.Sum(publicKeyBytes)
+	subjectKeyId := h[:]
+
+	// add subject key ID extension
+	value, err = asn1.Marshal(subjectKeyId)
+	if err != nil {
+		return nil, fmt.Errorf("failed marshaling subject key ID: %w", err)
+	}
+	subjectKeyIDExtension := pkix.Extension{
+		Id:    oidExtensionSubjectKeyId,
+		Value: value,
+	}
+
+	tmpl := &x509.Certificate{
+		Subject:            pkix.Name{CommonName: "SCEP Protocol Certificate"},
+		SignatureAlgorithm: x509.SHA1WithRSA,
+		PublicKey:          signer.Public(),
+		SerialNumber:       big.NewInt(1),
+		NotBefore:          time.Now().Add(-1 * time.Hour),
+		NotAfter:           time.Now().Add(365 * 24 * time.Hour),
+		ExtraExtensions:    []pkix.Extension{authorityKeyIDExtension, subjectKeyIDExtension},
+	}
+
+	selfSignedDER, err := x509.CreateCertificate(rand.Reader, tmpl, tmpl, signer.Public(), signer)
+	if err != nil {
+		return nil, fmt.Errorf("failed creating self signed certificate: %w", err)
+	}
+	selfSignedCertificate, err := parseCertificate(selfSignedDER)
 	if err != nil {
 		return nil, fmt.Errorf("failed parsing self signed certificate: %w", err)
 	}
