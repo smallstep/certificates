@@ -18,6 +18,8 @@
 // On macOS and Windows, certificate verification is handled by system APIs, but
 // the package aims to apply consistent validation rules across operating
 // systems.
+
+//nolint:gosec,unused // code copied from crypto/x509
 package legacyx509
 
 import (

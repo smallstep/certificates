@@ -335,12 +335,12 @@ func (c *client) requestCertificate(t *testing.T, commonName string, sans []stri
 }
 
 var (
-	oidExtensionAuthorityKeyId = asn1.ObjectIdentifier{2, 5, 29, 35}
-	oidExtensionSubjectKeyId   = asn1.ObjectIdentifier{2, 5, 29, 14}
+	oidExtensionAuthorityKeyID = asn1.ObjectIdentifier{2, 5, 29, 35}
+	oidExtensionSubjectKeyID   = asn1.ObjectIdentifier{2, 5, 29, 14}
 )
 
-type authorityKeyId struct {
-	Id []byte `asn1:"optional,tag:0"`
+type authorityKeyID struct {
+	ID []byte `asn1:"optional,tag:0"`
 }
 
 type pkcs1PublicKey struct {
@@ -367,12 +367,12 @@ func (c *client) requestCertificateEmulatingWindowsClient(t *testing.T, commonNa
 
 	// on Windows the self-signed certificate contains an authority key identifier
 	// extension that is marked critical
-	value, err := asn1.Marshal(authorityKeyId{[]byte("bla")}) // fake value
+	value, err := asn1.Marshal(authorityKeyID{[]byte("bla")}) // fake value
 	if err != nil {
 		return nil, fmt.Errorf("failed marshaling authority key ID")
 	}
 	authorityKeyIDExtension := pkix.Extension{
-		Id:       oidExtensionAuthorityKeyId,
+		Id:       oidExtensionAuthorityKeyID,
 		Critical: true,
 		Value:    value,
 	}
@@ -387,15 +387,15 @@ func (c *client) requestCertificateEmulatingWindowsClient(t *testing.T, commonNa
 	}
 
 	h := sha1.Sum(publicKeyBytes)
-	subjectKeyId := h[:]
+	subjectKeyID := h[:]
 
 	// create subject key ID extension
-	value, err = asn1.Marshal(subjectKeyId)
+	value, err = asn1.Marshal(subjectKeyID)
 	if err != nil {
 		return nil, fmt.Errorf("failed marshaling subject key ID: %w", err)
 	}
 	subjectKeyIDExtension := pkix.Extension{
-		Id:    oidExtensionSubjectKeyId,
+		Id:    oidExtensionSubjectKeyID,
 		Value: value,
 	}
 
