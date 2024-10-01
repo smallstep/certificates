@@ -32,7 +32,7 @@ func TestIssuesCertificateToEmulatedWindowsClientGo123(t *testing.T) {
 
 	go func() {
 		defer wg.Done()
-		err := c.Run()
+		err := c.run()
 		require.ErrorIs(t, err, http.ErrServerClosed)
 	}()
 
@@ -49,7 +49,7 @@ func TestIssuesCertificateToEmulatedWindowsClientGo123(t *testing.T) {
 	assert.Equal(t, "Step E2E | SCEP Regular w/ Windows Client Intermediate CA", cert.Issuer.CommonName)
 
 	// done testing; stop and wait for the server to quit
-	err = c.Stop()
+	err = c.stop()
 	require.NoError(t, err)
 
 	wg.Wait()
