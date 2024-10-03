@@ -30,8 +30,8 @@ require (
 	github.com/smallstep/assert v0.0.0-20200723003110-82e2b9b3b262
 	github.com/smallstep/go-attestation v0.4.4-0.20240109183208-413678f90935
 	github.com/smallstep/nosql v0.7.0
-	github.com/smallstep/pkcs7 v0.0.0-20231024181729-3b98ecc1ca81
-	github.com/smallstep/scep v0.0.0-20231024192529-aee96d7ad34d
+	github.com/smallstep/pkcs7 v0.0.0-20240911091500-b1cae6277023
+	github.com/smallstep/scep v0.0.0-20240926084937-8cf1ca453101
 	github.com/stretchr/testify v1.9.0
 	github.com/urfave/cli v1.22.15
 	go.step.sm/cli-utils v0.9.0
@@ -92,9 +92,6 @@ require (
 	github.com/fatih/color v1.16.0 // indirect
 	github.com/felixge/httpsnoop v1.0.4 // indirect
 	github.com/go-jose/go-jose/v4 v4.0.2 // indirect
-	github.com/go-kit/kit v0.13.0 // indirect
-	github.com/go-kit/log v0.2.1 // indirect
-	github.com/go-logfmt/logfmt v0.6.0 // indirect
 	github.com/go-logr/logr v1.4.2 // indirect
 	github.com/go-logr/stdr v1.2.2 // indirect
 	github.com/go-piv/piv-go v1.11.0 // indirect
@@ -105,7 +102,7 @@ require (
 	github.com/golang/protobuf v1.5.4 // indirect
 	github.com/golang/snappy v0.0.4 // indirect
 	github.com/google/btree v1.1.2 // indirect
-	github.com/google/certificate-transparency-go v1.1.6 // indirect
+	github.com/google/certificate-transparency-go v1.1.7 // indirect
 	github.com/google/go-tpm-tools v0.4.4 // indirect
 	github.com/google/go-tspi v0.3.0 // indirect
 	github.com/google/s2a-go v0.1.8 // indirect
