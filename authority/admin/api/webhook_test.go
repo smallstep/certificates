@@ -186,8 +186,8 @@ func TestWebhookAdminResponder_CreateProvisionerWebhook(t *testing.T) {
 				Name: "provName",
 			}
 			ctx := linkedca.NewContextWithProvisioner(context.Background(), prov)
-			adminErr := admin.NewError(admin.ErrorBadRequestType, `(line 5:13): invalid value for enum type: "UNSUPPORTED"`)
-			adminErr.Message = `(line 5:13): invalid value for enum type: "UNSUPPORTED"`
+			adminErr := admin.NewError(admin.ErrorBadRequestType, `(line 5:13): invalid value for enum field kind: "UNSUPPORTED"`)
+			adminErr.Message = `(line 5:13): invalid value for enum field kind: "UNSUPPORTED"`
 			body := []byte(`
 			{
 				"name": "metadata",
