@@ -865,7 +865,7 @@ func deviceAttest01Validate(ctx context.Context, ch *Challenge, db DB, jwk *jose
 		// identifiers.
 		//
 		// Note: We might want to use an external service for this.
-		if data.UDID != ch.Value && data.SerialNumber != ch.Value {
+		if !SkipPermanentIdentiferValidation && (data.UDID != ch.Value) && (data.SerialNumber != ch.Value) {
 			subproblem := NewSubproblemWithIdentifier(
 				ErrorRejectedIdentifierType,
 				Identifier{Type: "permanent-identifier", Value: ch.Value},
@@ -893,7 +893,7 @@ func deviceAttest01Validate(ctx context.Context, ch *Challenge, db DB, jwk *jose
 		// certificate with the challenged Order value.
 		//
 		// Note: We might want to use an external service for this.
-		if data.SerialNumber != ch.Value {
+		if !SkipPermanentIdentiferValidation && (data.SerialNumber != ch.Value) {
 			subproblem := NewSubproblemWithIdentifier(
 				ErrorRejectedIdentifierType,
 				Identifier{Type: "permanent-identifier", Value: ch.Value},
@@ -904,6 +904,7 @@ func deviceAttest01Validate(ctx context.Context, ch *Challenge, db DB, jwk *jose
 
 		// Update attestation key fingerprint to compare against the CSR
 		az.Fingerprint = data.Fingerprint
+		az.ExtraIdentifiers = []string{data.SerialNumber, p.AttObj}
 
 	case "tpm":
 		data, err := doTPMAttestationFormat(ctx, prov, ch, jwk, &att)
@@ -923,7 +924,7 @@ func deviceAttest01Validate(ctx context.Context, ch *Challenge, db DB, jwk *jose
 		// haven't implemented a way for AK certs requested by the CLI to always contain the requested
 		// PermanentIdentifier. Omitting the check below doesn't allow just any request, as the Order can
 		// still fail if the challenge value isn't equal to the CSR subject.
-		if len(data.PermanentIdentifiers) > 0 && !slices.Contains(data.PermanentIdentifiers, ch.Value) { // TODO(hs): add support for HardwareModuleName
+		if (!SkipPermanentIdentiferValidation) && (len(data.PermanentIdentifiers) > 0) && (!slices.Contains(data.PermanentIdentifiers, ch.Value)) { // TODO(hs): add support for HardwareModuleName
 			subproblem := NewSubproblemWithIdentifier(
 				ErrorRejectedIdentifierType,
 				Identifier{Type: "permanent-identifier", Value: ch.Value},
@@ -934,6 +935,7 @@ func deviceAttest01Validate(ctx context.Context, ch *Challenge, db DB, jwk *jose
 
 		// Update attestation key fingerprint to compare against the CSR
 		az.Fingerprint = data.Fingerprint
+
 	default:
 		return storeError(ctx, db, ch, true, NewDetailedError(ErrorBadAttestationStatementType, "unsupported attestation object format %q", format))
 	}
@@ -946,7 +948,7 @@ func deviceAttest01Validate(ctx context.Context, ch *Challenge, db DB, jwk *jose
 	// Store the fingerprint in the authorization.
 	//
 	// TODO: add method to update authorization and challenge atomically.
-	if az.Fingerprint != "" {
+	if az.Fingerprint != "" || az.ExtraIdentifiers != nil {
 		if err := db.UpdateAuthorization(ctx, az); err != nil {
 			return WrapErrorISE(err, "error updating authorization")
 		}
