@@ -102,4 +102,19 @@ func Test_newHTTPClient(t *testing.T) {
 			assert.Error(t, err)
 		})
 	})
+
+	t.Run("custom transport", func(t *testing.T) {
+		tmp := http.DefaultTransport
+		t.Cleanup(func() {
+			http.DefaultTransport = tmp
+		})
+		transport := struct {
+			http.RoundTripper
+		}{http.DefaultTransport}
+		http.DefaultTransport = transport
+
+		client, err := newHTTPClient(auth.rootX509Certs...)
+		assert.NoError(t, err)
+		assert.Equal(t, &http.Client{}, client)
+	})
 }
