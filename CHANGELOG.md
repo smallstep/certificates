@@ -25,6 +25,17 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
 
 ---
 
+## [0.27.5] - 2024-10-17
+
+### Added
+
+- Option to log real IP (x-forwarded-for) in logging middleware (smallstep/certificates#2002)
+
+### Fixed
+
+- Pulled in updates to smallstep/pkcs7 to fix failing Windows SCEP enrollment certificates (smallstep/certificates#1994)
+
+
 ## [0.27.4] - 2024-09-13
 
 ### Fixed
