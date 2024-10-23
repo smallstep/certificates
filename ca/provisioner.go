@@ -85,6 +85,7 @@ func (p *Provisioner) SetFingerprint(sum string) {
 
 // Token generates a bootstrap token for a subject.
 func (p *Provisioner) Token(subject string, sans ...string) (string, error) {
+	p.endpoint.ResolveReference(&url.URL{Path: "/1.0/renew"})
 	if len(sans) == 0 {
 		sans = []string{subject}
 	}
@@ -116,6 +117,15 @@ func (p *Provisioner) Token(subject string, sans ...string) (string, error) {
 	}
 
 	return tok.SignedString(p.jwk.Algorithm, p.jwk.Key)
+}
+
+func (p *Provisioner) RenewalToken(subject string, sans ...string) (string, error) {
+	oldAudience := p.audience
+	u := p.endpoint.ResolveReference(&url.URL{Path: "/1.0/renew"}).String()
+	p.audience = u
+	response, err := p.Token(subject, sans...)
+	p.audience = oldAudience
+	return response, err
 }
 
 // SSHToken generates a SSH token.
