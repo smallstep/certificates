@@ -118,6 +118,7 @@ func (p *Provisioner) Token(subject string, sans ...string) (string, error) {
 	return tok.SignedString(p.jwk.Algorithm, p.jwk.Key)
 }
 
+// RenewalToken generates a token for use with renewing certificates
 func (p *Provisioner) RenewalToken(subject string, sans ...string) (string, error) {
 	oldAudience := p.audience
 	u := p.endpoint.ResolveReference(&url.URL{Path: "/1.0/renew"}).String()
