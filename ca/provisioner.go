@@ -85,7 +85,6 @@ func (p *Provisioner) SetFingerprint(sum string) {
 
 // Token generates a bootstrap token for a subject.
 func (p *Provisioner) Token(subject string, sans ...string) (string, error) {
-	p.endpoint.ResolveReference(&url.URL{Path: "/1.0/renew"})
 	if len(sans) == 0 {
 		sans = []string{subject}
 	}
