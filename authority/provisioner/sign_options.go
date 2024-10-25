@@ -190,7 +190,7 @@ func (v dnsNamesValidator) Valid(req *x509.CertificateRequest) error {
 	return nil
 }
 
-// dnsNamesSubsetValidator validates the DNS names SAN of a certificate request.
+// dnsNamesSubsetValidator validates the DNS name SANs of a certificate request.
 type dnsNamesSubsetValidator []string
 
 // Valid checks that all DNS Names in the certificate request are present in
