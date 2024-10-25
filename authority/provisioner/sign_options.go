@@ -199,9 +199,9 @@ func (v dnsNamesSubsetValidator) Valid(req *x509.CertificateRequest) error {
 	if len(req.DNSNames) == 0 {
 		return nil
 	}
-	allowed := make(map[string]bool)
+	allowed := make(map[string]struct{}, len(v))
 	for _, s := range v {
-		allowed[s] = true
+		allowed[s] = struct{}{}
 	}
 	for _, s := range req.DNSNames {
 		if _, ok := allowed[s]; !ok {
