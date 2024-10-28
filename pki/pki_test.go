@@ -5,16 +5,18 @@ import (
 	"path/filepath"
 	"testing"
 
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+
+	"github.com/smallstep/cli-utils/step"
+	"github.com/smallstep/nosql"
+
 	"github.com/smallstep/certificates/authority/admin"
 	admindb "github.com/smallstep/certificates/authority/admin/db/nosql"
 	authconfig "github.com/smallstep/certificates/authority/config"
 	"github.com/smallstep/certificates/authority/provisioner"
 	"github.com/smallstep/certificates/cas/apiv1"
 	"github.com/smallstep/certificates/db"
-	"github.com/smallstep/nosql"
-	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
-	"go.step.sm/cli-utils/step"
 )
 
 func withDBDataSource(t *testing.T, dataSource string) func(c *authconfig.Config) error {

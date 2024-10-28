@@ -5,10 +5,12 @@ import (
 	"path/filepath"
 
 	"github.com/pkg/errors"
+
+	"github.com/smallstep/cli-utils/errs"
+	"github.com/smallstep/cli-utils/fileutil"
+	"github.com/smallstep/cli-utils/step"
+
 	"github.com/smallstep/certificates/templates"
-	"go.step.sm/cli-utils/errs"
-	"go.step.sm/cli-utils/fileutil"
-	"go.step.sm/cli-utils/step"
 )
 
 // getTemplates returns all the templates enabled

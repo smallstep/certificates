@@ -11,8 +11,8 @@ import (
 
 	"github.com/pkg/errors"
 
-	"go.step.sm/cli-utils/step"
-	"go.step.sm/cli-utils/ui"
+	"github.com/smallstep/cli-utils/step"
+	"github.com/smallstep/cli-utils/ui"
 	"go.step.sm/crypto/jose"
 	"go.step.sm/linkedca"
 

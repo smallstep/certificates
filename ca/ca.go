@@ -18,6 +18,11 @@ import (
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
 	"github.com/pkg/errors"
+
+	"github.com/smallstep/cli-utils/step"
+	"github.com/smallstep/nosql"
+	"go.step.sm/crypto/x509util"
+
 	"github.com/smallstep/certificates/acme"
 	acmeAPI "github.com/smallstep/certificates/acme/api"
 	acmeNoSQL "github.com/smallstep/certificates/acme/db/nosql"
@@ -35,9 +40,6 @@ import (
 	"github.com/smallstep/certificates/scep"
 	scepAPI "github.com/smallstep/certificates/scep/api"
 	"github.com/smallstep/certificates/server"
-	"github.com/smallstep/nosql"
-	"go.step.sm/cli-utils/step"
-	"go.step.sm/crypto/x509util"
 )
 
 type options struct {
