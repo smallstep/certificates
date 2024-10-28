@@ -24,21 +24,23 @@ import (
 	"strings"
 
 	"github.com/pkg/errors"
+	"golang.org/x/net/http2"
+	"google.golang.org/protobuf/encoding/protojson"
+	"google.golang.org/protobuf/proto"
+
+	"github.com/smallstep/cli-utils/step"
+	"go.step.sm/crypto/jose"
+	"go.step.sm/crypto/keyutil"
+	"go.step.sm/crypto/pemutil"
+	"go.step.sm/crypto/randutil"
+	"go.step.sm/crypto/x509util"
+
 	"github.com/smallstep/certificates/api"
 	"github.com/smallstep/certificates/authority"
 	"github.com/smallstep/certificates/authority/provisioner"
 	"github.com/smallstep/certificates/ca/client"
 	"github.com/smallstep/certificates/ca/identity"
 	"github.com/smallstep/certificates/errs"
-	"go.step.sm/cli-utils/step"
-	"go.step.sm/crypto/jose"
-	"go.step.sm/crypto/keyutil"
-	"go.step.sm/crypto/pemutil"
-	"go.step.sm/crypto/randutil"
-	"go.step.sm/crypto/x509util"
-	"golang.org/x/net/http2"
-	"google.golang.org/protobuf/encoding/protojson"
-	"google.golang.org/protobuf/proto"
 )
 
 // DisableIdentity is a global variable to disable the identity.
