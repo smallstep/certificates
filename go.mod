@@ -28,13 +28,13 @@ require (
 	github.com/sirupsen/logrus v1.9.3
 	github.com/slackhq/nebula v1.9.4
 	github.com/smallstep/assert v0.0.0-20200723003110-82e2b9b3b262
+	github.com/smallstep/cli-utils v0.10.0
 	github.com/smallstep/go-attestation v0.4.4-0.20240109183208-413678f90935
 	github.com/smallstep/nosql v0.7.0
 	github.com/smallstep/pkcs7 v0.0.0-20240911091500-b1cae6277023
 	github.com/smallstep/scep v0.0.0-20240926084937-8cf1ca453101
 	github.com/stretchr/testify v1.9.0
 	github.com/urfave/cli v1.22.16
-	go.step.sm/cli-utils v0.9.0
 	go.step.sm/crypto v0.54.0
 	go.step.sm/linkedca v0.22.1
 	golang.org/x/crypto v0.28.0

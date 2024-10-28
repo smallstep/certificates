@@ -8,13 +8,14 @@ import (
 	"unicode"
 
 	"github.com/pkg/errors"
-	"github.com/smallstep/certificates/authority"
-	"github.com/smallstep/certificates/authority/config"
 	"github.com/urfave/cli"
 	"google.golang.org/protobuf/encoding/protojson"
 
-	"go.step.sm/cli-utils/command"
-	"go.step.sm/cli-utils/errs"
+	"github.com/smallstep/cli-utils/command"
+	"github.com/smallstep/cli-utils/errs"
+
+	"github.com/smallstep/certificates/authority"
+	"github.com/smallstep/certificates/authority/config"
 )
 
 func init() {

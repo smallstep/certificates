@@ -8,10 +8,12 @@ import (
 	"strings"
 
 	"github.com/pkg/errors"
-	"github.com/smallstep/certificates/authority/provisioner"
-	"go.step.sm/cli-utils/step"
-	"go.step.sm/linkedca"
 	"google.golang.org/protobuf/types/known/structpb"
+
+	"github.com/smallstep/cli-utils/step"
+	"go.step.sm/linkedca"
+
+	"github.com/smallstep/certificates/authority/provisioner"
 )
 
 // Export creates a linkedca configuration form the current ca.json and loaded

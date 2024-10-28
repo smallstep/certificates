@@ -16,14 +16,15 @@ import (
 	//nolint:gosec // profile server, if enabled runs on a different port
 	_ "net/http/pprof"
 
+	"github.com/urfave/cli"
+
 	"github.com/smallstep/certificates/authority"
 	"github.com/smallstep/certificates/commands"
-	"github.com/urfave/cli"
-	"go.step.sm/cli-utils/command"
-	"go.step.sm/cli-utils/command/version"
-	"go.step.sm/cli-utils/step"
-	"go.step.sm/cli-utils/ui"
-	"go.step.sm/cli-utils/usage"
+	"github.com/smallstep/cli-utils/command"
+	"github.com/smallstep/cli-utils/command/version"
+	"github.com/smallstep/cli-utils/step"
+	"github.com/smallstep/cli-utils/ui"
+	"github.com/smallstep/cli-utils/usage"
 	"go.step.sm/crypto/pemutil"
 
 	// Enabled kms interfaces.

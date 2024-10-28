@@ -6,11 +6,13 @@ import (
 	"time"
 
 	"github.com/pkg/errors"
-	"github.com/smallstep/certificates/authority/provisioner"
-	"go.step.sm/cli-utils/token"
-	"go.step.sm/cli-utils/token/provision"
+
+	"github.com/smallstep/cli-utils/token"
+	"github.com/smallstep/cli-utils/token/provision"
 	"go.step.sm/crypto/jose"
 	"go.step.sm/crypto/randutil"
+
+	"github.com/smallstep/certificates/authority/provisioner"
 )
 
 const tokenLifetime = 5 * time.Minute
