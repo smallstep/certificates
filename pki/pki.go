@@ -17,6 +17,19 @@ import (
 	"time"
 
 	"github.com/pkg/errors"
+	"golang.org/x/crypto/ssh"
+
+	"github.com/smallstep/cli-utils/errs"
+	"github.com/smallstep/cli-utils/fileutil"
+	"github.com/smallstep/cli-utils/step"
+	"github.com/smallstep/cli-utils/ui"
+	"github.com/smallstep/nosql"
+	"go.step.sm/crypto/jose"
+	"go.step.sm/crypto/kms"
+	kmsapi "go.step.sm/crypto/kms/apiv1"
+	"go.step.sm/crypto/pemutil"
+	"go.step.sm/linkedca"
+
 	"github.com/smallstep/certificates/authority"
 	"github.com/smallstep/certificates/authority/admin"
 	admindb "github.com/smallstep/certificates/authority/admin/db/nosql"
@@ -26,17 +39,6 @@ import (
 	"github.com/smallstep/certificates/cas"
 	"github.com/smallstep/certificates/cas/apiv1"
 	"github.com/smallstep/certificates/db"
-	"github.com/smallstep/nosql"
-	"go.step.sm/cli-utils/errs"
-	"go.step.sm/cli-utils/fileutil"
-	"go.step.sm/cli-utils/step"
-	"go.step.sm/cli-utils/ui"
-	"go.step.sm/crypto/jose"
-	"go.step.sm/crypto/kms"
-	kmsapi "go.step.sm/crypto/kms/apiv1"
-	"go.step.sm/crypto/pemutil"
-	"go.step.sm/linkedca"
-	"golang.org/x/crypto/ssh"
 )
 
 // DeploymentType defines witch type of deployment a user is initializing

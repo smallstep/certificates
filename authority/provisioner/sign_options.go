@@ -190,6 +190,27 @@ func (v dnsNamesValidator) Valid(req *x509.CertificateRequest) error {
 	return nil
 }
 
+// dnsNamesSubsetValidator validates the DNS name SANs of a certificate request.
+type dnsNamesSubsetValidator []string
+
+// Valid checks that all DNS name SANs in the certificate request are present in
+// the allowed list of DNS names.
+func (v dnsNamesSubsetValidator) Valid(req *x509.CertificateRequest) error {
+	if len(req.DNSNames) == 0 {
+		return nil
+	}
+	allowed := make(map[string]struct{}, len(v))
+	for _, s := range v {
+		allowed[s] = struct{}{}
+	}
+	for _, s := range req.DNSNames {
+		if _, ok := allowed[s]; !ok {
+			return errs.Forbidden("certificate request contains unauthorized DNS names - got %v, allowed %v", req.DNSNames, v)
+		}
+	}
+	return nil
+}
+
 // ipAddressesValidator validates the IP addresses SAN of a certificate request.
 type ipAddressesValidator []net.IP
 

@@ -265,7 +265,7 @@ func (p *GCP) AuthorizeSign(ctx context.Context, token string) ([]SignOption, er
 			commonNameSliceValidator([]string{
 				ce.InstanceName, ce.InstanceID, dnsName1, dnsName2,
 			}),
-			dnsNamesValidator([]string{
+			dnsNamesSubsetValidator([]string{
 				dnsName1, dnsName2,
 			}),
 			ipAddressesValidator(nil),

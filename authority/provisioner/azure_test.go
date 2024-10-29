@@ -563,7 +563,7 @@ func TestAzure_AuthorizeSign(t *testing.T) {
 					case *urisValidator:
 						assert.Equals(t, v.uris, nil)
 						assert.Equals(t, MethodFromContext(v.ctx), SignMethod)
-					case dnsNamesValidator:
+					case dnsNamesSubsetValidator:
 						assert.Equals(t, []string(v), []string{"virtualMachine"})
 					case *x509NamePolicyValidator:
 						assert.Equals(t, nil, v.policyEngine)

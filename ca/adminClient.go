@@ -15,8 +15,8 @@ import (
 	"github.com/pkg/errors"
 	"google.golang.org/protobuf/encoding/protojson"
 
-	"go.step.sm/cli-utils/token"
-	"go.step.sm/cli-utils/token/provision"
+	"github.com/smallstep/cli-utils/token"
+	"github.com/smallstep/cli-utils/token/provision"
 	"go.step.sm/crypto/jose"
 	"go.step.sm/crypto/randutil"
 	"go.step.sm/linkedca"

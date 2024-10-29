@@ -579,7 +579,7 @@ func TestGCP_AuthorizeSign(t *testing.T) {
 					case *urisValidator:
 						assert.Equals(t, v.uris, nil)
 						assert.Equals(t, MethodFromContext(v.ctx), SignMethod)
-					case dnsNamesValidator:
+					case dnsNamesSubsetValidator:
 						assert.Equals(t, []string(v), []string{"instance-name.c.project-id.internal", "instance-name.zone.c.project-id.internal"})
 					case *x509NamePolicyValidator:
 						assert.Equals(t, nil, v.policyEngine)

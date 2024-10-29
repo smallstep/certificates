@@ -14,9 +14,11 @@ import (
 	"time"
 
 	"github.com/pkg/errors"
-	"github.com/smallstep/certificates/api"
-	"go.step.sm/cli-utils/step"
+
+	"github.com/smallstep/cli-utils/step"
 	"go.step.sm/crypto/pemutil"
+
+	"github.com/smallstep/certificates/api"
 )
 
 // Type represents the different types of identity files.

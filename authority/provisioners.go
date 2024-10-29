@@ -11,8 +11,8 @@ import (
 
 	"github.com/pkg/errors"
 
-	"go.step.sm/cli-utils/step"
-	"go.step.sm/cli-utils/ui"
+	"github.com/smallstep/cli-utils/step"
+	"github.com/smallstep/cli-utils/ui"
 	"go.step.sm/crypto/jose"
 	"go.step.sm/linkedca"
 
@@ -955,6 +955,8 @@ func ProvisionerToCertificates(p *linkedca.Provisioner) (provisioner.Interface, 
 			ProjectIDs:             cfg.ProjectIds,
 			DisableCustomSANs:      cfg.DisableCustomSans,
 			DisableTrustOnFirstUse: cfg.DisableTrustOnFirstUse,
+			DisableSSHCAUser:       cfg.DisableSshCaUser,
+			DisableSSHCAHost:       cfg.DisableSshCaHost,
 			InstanceAge:            instanceAge,
 			Claims:                 claims,
 			Options:                options,
@@ -1095,6 +1097,8 @@ func ProvisionerToLinkedca(p provisioner.Interface) (*linkedca.Provisioner, erro
 						ProjectIds:             p.ProjectIDs,
 						DisableCustomSans:      p.DisableCustomSANs,
 						DisableTrustOnFirstUse: p.DisableTrustOnFirstUse,
+						DisableSshCaUser:       p.DisableSSHCAUser,
+						DisableSshCaHost:       p.DisableSSHCAHost,
 						InstanceAge:            p.InstanceAge.String(),
 					},
 				},
