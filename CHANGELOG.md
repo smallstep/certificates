@@ -25,6 +25,19 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
 
 ---
 
+## [0.28.0] - 2024-10-29
+
+### Added
+
+- Add options to GCP IID provisioner to enable or disable signing of SSH user and host certificates (smallstep/certificates#2045)
+
+### Changed
+
+- For IID provisioners with disableCustomSANs set to true, validate that the 
+  requested DNS names are a subset of the allowed DNS names (based on the IID token), 
+  rather than requiring an exact match to the entire list of allowed DNS names. (smallstep/certificates#2044)
+
+
 ## [0.27.5] - 2024-10-17
 
 ### Added
