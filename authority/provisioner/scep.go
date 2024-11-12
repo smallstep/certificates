@@ -15,6 +15,7 @@ import (
 
 	"go.step.sm/crypto/kms"
 	kmsapi "go.step.sm/crypto/kms/apiv1"
+	"go.step.sm/crypto/x509util"
 	"go.step.sm/linkedca"
 
 	"github.com/smallstep/certificates/webhook"
@@ -145,25 +146,33 @@ var (
 // that case, the other webhooks will be skipped. If none of
 // the webhooks indicates the value of the challenge was accepted,
 // an error is returned.
-func (c *challengeValidationController) Validate(ctx context.Context, csr *x509.CertificateRequest, provisionerName, challenge, transactionID string) error {
+func (c *challengeValidationController) Validate(ctx context.Context, csr *x509.CertificateRequest, provisionerName, challenge, transactionID string) ([]SignCSROption, error) {
+	var opts []SignCSROption
+
 	for _, wh := range c.webhooks {
 		req, err := webhook.NewRequestBody(webhook.WithX509CertificateRequest(csr))
 		if err != nil {
-			return fmt.Errorf("failed creating new webhook request: %w", err)
+			return nil, fmt.Errorf("failed creating new webhook request: %w", err)
 		}
 		req.ProvisionerName = provisionerName
 		req.SCEPChallenge = challenge
 		req.SCEPTransactionID = transactionID
 		resp, err := wh.DoWithContext(ctx, c.client, req, nil) // TODO(hs): support templated URL? Requires some refactoring
 		if err != nil {
-			return fmt.Errorf("failed executing webhook request: %w", err)
+			return nil, fmt.Errorf("failed executing webhook request: %w", err)
 		}
 		if resp.Allow {
-			return nil // return early when response is positive
+			opts = append(opts, TemplateDataModifierFunc(func(data x509util.TemplateData) {
+				data.SetWebhook(wh.Name, resp.Data)
+			}))
 		}
 	}
 
-	return ErrSCEPChallengeInvalid
+	if len(opts) == 0 {
+		return nil, ErrSCEPChallengeInvalid
+	}
+
+	return opts, nil
 }
 
 type notificationController struct {
@@ -440,18 +449,18 @@ func (s *SCEP) GetContentEncryptionAlgorithm() int {
 // ValidateChallenge validates the provided challenge. It starts by
 // selecting the validation method to use, then performs validation
 // according to that method.
-func (s *SCEP) ValidateChallenge(ctx context.Context, csr *x509.CertificateRequest, challenge, transactionID string) error {
+func (s *SCEP) ValidateChallenge(ctx context.Context, csr *x509.CertificateRequest, challenge, transactionID string) ([]SignCSROption, error) {
 	if s.challengeValidationController == nil {
-		return fmt.Errorf("provisioner %q wasn't initialized", s.Name)
+		return nil, fmt.Errorf("provisioner %q wasn't initialized", s.Name)
 	}
 	switch s.selectValidationMethod() {
 	case validationMethodWebhook:
 		return s.challengeValidationController.Validate(ctx, csr, s.Name, challenge, transactionID)
 	default:
 		if subtle.ConstantTimeCompare([]byte(s.ChallengePassword), []byte(challenge)) == 0 {
-			return errors.New("invalid challenge password provided")
+			return nil, errors.New("invalid challenge password provided")
 		}
-		return nil
+		return []SignCSROption{}, nil
 	}
 }
 
