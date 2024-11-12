@@ -545,3 +545,28 @@ func (s csrFingerprintValidator) Valid(cr *x509.CertificateRequest) error {
 	}
 	return nil
 }
+
+// SignCSROption is the interface used to collect extra option in the SignCSR
+// method of the SCEP authority.
+type SignCSROption interface{}
+
+// TemplateDataModifier in an interface that allows to modify template data.
+type TemplateDataModifier interface {
+	Modify(data x509util.TemplateData)
+}
+
+type templateDataModifier struct {
+	fn func(x509util.TemplateData)
+}
+
+func (t *templateDataModifier) Modify(data x509util.TemplateData) {
+	t.fn(data)
+}
+
+// TemplateDataModifierFunc returns a TemplateDataModifier with the given
+// function.
+func TemplateDataModifierFunc(fn func(data x509util.TemplateData)) TemplateDataModifier {
+	return &templateDataModifier{
+		fn: fn,
+	}
+}
