@@ -312,7 +312,7 @@ func (o *Order) Finalize(ctx context.Context, db DB, csr *x509.CertificateReques
 			//nolint:govet // ignore non-constant format string
 			acmeError := NewDetailedError(ErrorUnauthorizedType, webhookErr.Error())
 			acmeError.AddSubproblems(Subproblem{
-				Type:   fmt.Sprintf("urn:smallstep:webhook:error:%s", webhookErr.Code),
+				Type:   fmt.Sprintf("urn:smallstep:acme:error:%s", webhookErr.Code),
 				Detail: webhookErr.Message,
 			})
 			return acmeError
