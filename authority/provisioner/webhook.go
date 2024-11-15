@@ -65,6 +65,9 @@ func (wc *WebhookController) Enrich(ctx context.Context, req *webhook.RequestBod
 			return err
 		}
 		if !resp.Allow {
+			if resp.Error != nil {
+				return resp.Error
+			}
 			return ErrWebhookDenied
 		}
 		wc.TemplateData.SetWebhook(wh.Name, resp.Data)
@@ -101,6 +104,9 @@ func (wc *WebhookController) Authorize(ctx context.Context, req *webhook.Request
 			return err
 		}
 		if !resp.Allow {
+			if resp.Error != nil {
+				return resp.Error
+			}
 			return ErrWebhookDenied
 		}
 	}

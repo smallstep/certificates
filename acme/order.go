@@ -7,6 +7,7 @@ import (
 	"crypto/x509"
 	"encoding/asn1"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"net"
 	"net/url"
@@ -19,6 +20,7 @@ import (
 
 	"github.com/smallstep/certificates/acme/wire"
 	"github.com/smallstep/certificates/authority/provisioner"
+	"github.com/smallstep/certificates/webhook"
 )
 
 type IdentifierType string
@@ -304,6 +306,17 @@ func (o *Order) Finalize(ctx context.Context, db DB, csr *x509.CertificateReques
 		NotAfter:  provisioner.NewTimeDuration(o.NotAfter),
 	}, signOps...)
 	if err != nil {
+		// Add subproblem for webhook errors, others can be added later.
+		var webhookErr *webhook.Error
+		if errors.As(err, &webhookErr) {
+			acmeError := NewDetailedError(ErrorUnauthorizedType, webhookErr.Error())
+			acmeError.AddSubproblems(Subproblem{
+				Type:   fmt.Sprintf("urn:smallstep:webhook:error:%s", webhookErr.Code),
+				Detail: webhookErr.Message,
+			})
+			return acmeError
+		}
+
 		return WrapErrorISE(err, "error signing certificate for order %s", o.ID)
 	}
 

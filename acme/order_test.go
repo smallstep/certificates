@@ -18,6 +18,8 @@ import (
 	"github.com/smallstep/assert"
 	"github.com/smallstep/certificates/authority"
 	"github.com/smallstep/certificates/authority/provisioner"
+	"github.com/smallstep/certificates/errs"
+	"github.com/smallstep/certificates/webhook"
 	"go.step.sm/crypto/keyutil"
 	"go.step.sm/crypto/x509util"
 )
@@ -588,6 +590,55 @@ func TestOrder_Finalize(t *testing.T) {
 					},
 				},
 				err: NewErrorISE("error signing certificate for order oID: force"),
+			}
+		},
+		"fail/webhook-error": func(t *testing.T) test {
+			now := clock.Now()
+			o := &Order{
+				ID:               "oID",
+				AccountID:        "accID",
+				Status:           StatusReady,
+				ExpiresAt:        now.Add(5 * time.Minute),
+				AuthorizationIDs: []string{"a", "b"},
+				Identifiers: []Identifier{
+					{Type: "dns", Value: "foo.internal"},
+					{Type: "dns", Value: "bar.internal"},
+				},
+			}
+			csr := &x509.CertificateRequest{
+				Subject: pkix.Name{
+					CommonName: "foo.internal",
+				},
+				DNSNames: []string{"bar.internal"},
+			}
+
+			return test{
+				o:   o,
+				csr: csr,
+				prov: &MockProvisioner{
+					MauthorizeSign: func(ctx context.Context, token string) ([]provisioner.SignOption, error) {
+						assert.Equals(t, token, "")
+						return nil, nil
+					},
+					MgetOptions: func() *provisioner.Options {
+						return nil
+					},
+				},
+				ca: &mockSignAuth{
+					signWithContext: func(_ context.Context, _csr *x509.CertificateRequest, signOpts provisioner.SignOptions, extraOpts ...provisioner.SignOption) ([]*x509.Certificate, error) {
+						assert.Equals(t, _csr, csr)
+						return nil, errs.ForbiddenErr(&webhook.Error{Code: "theCode", Message: "The message"}, "forbidden error")
+					},
+				},
+				db: &MockDB{
+					MockGetAuthorization: func(ctx context.Context, id string) (*Authorization, error) {
+						return &Authorization{ID: id, Status: StatusValid}, nil
+					},
+				},
+				err: NewDetailedError(ErrorUnauthorizedType, "The message (theCode)").AddSubproblems(Subproblem{
+					Type:   "urn:smallstep:webhook:error:theCode",
+					Detail: "The message",
+				}),
 			}
 		},
 		"fail/error-db.CreateCertificate": func(t *testing.T) test {
@@ -1217,6 +1268,7 @@ func TestOrder_Finalize(t *testing.T) {
 						assert.Equals(t, k.Status, tc.err.Status)
 						assert.Equals(t, k.Err.Error(), tc.err.Err.Error())
 						assert.Equals(t, k.Detail, tc.err.Detail)
+						assert.Equals(t, k.Subproblems, tc.err.Subproblems)
 					} else {
 						assert.FatalError(t, errors.New("unexpected error type"))
 					}
