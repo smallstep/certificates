@@ -636,7 +636,7 @@ func TestOrder_Finalize(t *testing.T) {
 					},
 				},
 				err: NewDetailedError(ErrorUnauthorizedType, "The message (theCode)").AddSubproblems(Subproblem{
-					Type:   "urn:smallstep:webhook:error:theCode",
+					Type:   "urn:smallstep:acme:error:theCode",
 					Detail: "The message",
 				}),
 			}
