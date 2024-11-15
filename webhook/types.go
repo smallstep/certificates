@@ -1,6 +1,7 @@
 package webhook
 
 import (
+	"fmt"
 	"time"
 
 	"go.step.sm/crypto/sshutil"
@@ -9,8 +10,19 @@ import (
 
 // ResponseBody is the body returned by webhook servers.
 type ResponseBody struct {
-	Data  any  `json:"data"`
-	Allow bool `json:"allow"`
+	Data  any    `json:"data"`
+	Allow bool   `json:"allow"`
+	Error *Error `json:"error,omitempty"`
+}
+
+// Error provides details explaining why the webhook was not permitted.
+type Error struct {
+	Code    string `json:"code"`
+	Message string `json:"message"`
+}
+
+func (e *Error) Error() string {
+	return fmt.Sprintf("%s (%s)", e.Message, e.Code)
 }
 
 // X509CertificateRequest is the certificate request sent to webhook servers for
