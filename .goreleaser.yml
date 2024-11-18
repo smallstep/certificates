@@ -1,11 +1,22 @@
 # Documentation: https://goreleaser.com/customization/
+# yaml-language-server: $schema=https://goreleaser.com/static/schema-pro.json
 project_name: step-ca
 version: 2
+
+variables:
+  packageName: step-ca
+  packageRelease: 1 # Manually update release: in the nfpm section to match this value if you change this
 
 before:
   hooks:
     # You may remove this if you don't use go modules.
     - go mod download
+
+after:
+  hooks:
+    # This script depends on IS_PRERELEASE env being set. This is set by CI in the Is Pre-release step.
+    - cmd: bash scripts/package-repo-import.sh {{ .Var.packageName }} {{ .Version }}
+      output: true
 
 builds:
   -
@@ -61,10 +72,16 @@ nfpms:
   # Package metadata: dpkg --info dist/step_....deb
   #
   - &NFPM
+    id: packages
     builds:
       - step-ca
-    package_name: step-ca
-    file_name_template: "{{ .PackageName }}_{{ .Version }}_{{ .Arch }}{{ if .Arm }}v{{ .Arm }}{{ end }}{{ if .Mips }}_{{ .Mips }}{{ end }}"
+    package_name: "{{ .Var.packageName }}"
+    release: "1"
+    file_name_template: >-
+      {{- trimsuffix .ConventionalFileName .ConventionalExtension -}}
+      {{- if and (eq .Arm "6") (eq .ConventionalExtension ".deb") }}6{{ end -}}
+      {{- if not (eq .Amd64 "v1")}}{{ .Amd64 }}{{ end -}}
+      {{- .ConventionalExtension -}}
     vendor: Smallstep Labs
     homepage: https://github.com/smallstep/certificates
     maintainer: Smallstep <techadmin@smallstep.com>
@@ -80,6 +97,13 @@ nfpms:
     contents:
       - src: debian/copyright
         dst: /usr/share/doc/step-ca/copyright
+    rpm:
+      signature:
+          key_file: "{{ .Env.GPG_PRIVATE_KEY_FILE }}"
+    deb:
+      signature:
+          key_file: "{{ .Env.GPG_PRIVATE_KEY_FILE }}"
+          type: origin
   -
     << : *NFPM
     id: unversioned
@@ -100,6 +124,12 @@ signs:
   certificate: "${artifact}.pem"
   args: ["sign-blob", "--oidc-issuer=https://token.actions.githubusercontent.com", "--output-certificate=${certificate}", "--output-signature=${signature}", "${artifact}", "--yes"]
   artifacts: all
+
+publishers:
+- name: Google Cloud Artifact Registry
+  ids:
+  - packages
+  cmd: ./scripts/package-upload.sh {{ abs .ArtifactPath }} {{ .Var.packageName }} {{ .Version }} {{ .Var.packageRelease }}
 
 snapshot:
   name_template: "{{ .Tag }}-next"
@@ -140,7 +170,10 @@ release:
     #### Linux
 
     - 📦 [step-ca_linux_{{ .Version }}_amd64.tar.gz](https://dl.smallstep.com/gh-release/certificates/gh-release-header/{{ .Tag }}/step-ca_linux_{{ .Version }}_amd64.tar.gz)
-    - 📦 [step-ca_{{ .Version }}_amd64.deb](https://dl.smallstep.com/gh-release/certificates/gh-release-header/{{ .Tag }}/step-ca_{{ .Version }}_amd64.deb)
+    - 📦 [step-ca_{{ replace .Version "-" "." }}-{{ .Var.packageRelease }}_amd64.deb](https://dl.smallstep.com/gh-release/cli/gh-release-header/{{ .Tag }}/step-ca_{{ replace .Version "-" "." }}-{{ .Var.packageRelease }}_amd64.deb)
+    - 📦 [step-ca-{{ replace .Version "-" "." }}-{{ .Var.packageRelease }}.x86_64.rpm](https://dl.smallstep.com/gh-release/cli/gh-release-header/{{ .Tag }}/step-ca-{{ replace .Version "-" "." }}-{{ .Var.packageRelease }}.x86_64.rpm)
+    - 📦 [step-ca_{{ replace .Version "-" "." }}-{{ .Var.packageRelease }}_arm64.deb](https://dl.smallstep.com/gh-release/cli/gh-release-header/{{ .Tag }}/step-ca_{{ replace .Version "-" "." }}-{{ .Var.packageRelease }}_arm64.deb)
+    - 📦 [step-ca-{{ replace .Version "-" "." }}-{{ .Var.packageRelease }}.aarch64.rpm](https://dl.smallstep.com/gh-release/cli/gh-release-header/{{ .Tag }}/step-ca-{{ replace .Version "-" "." }}-{{ .Var.packageRelease }}.aarch64.rpm)
 
     #### OSX Darwin
 
@@ -198,7 +231,7 @@ release:
   #  - glob: ./glob/foo/to/bar/file/foobar/override_from_previous
 
 winget:
-  - 
+  -
     # IDs of the archives to use.
     # Empty means all IDs.
     ids: [ default ]
