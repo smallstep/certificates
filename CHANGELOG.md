@@ -25,6 +25,14 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
 
 ---
 
+## [0.28.1] - 2024-11-19
+
+### Added
+
+- Support for using template data from SCEPCHALLENGE webhooks (smallstep/certificates#2065)
+- New field to Webhook response that allows for propagation of human readable errors to the client (smallstep/certificates#2066)
+
+
 ## [0.28.0] - 2024-10-29
 
 ### Added
