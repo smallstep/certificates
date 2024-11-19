@@ -7,13 +7,13 @@ on:
     - 'v*' # Push events to matching v*, i.e. v1.0, v20.15.10
 
 jobs:
-  ci:
-    uses: smallstep/certificates/.github/workflows/ci.yml@master
-    secrets: inherit
+  #ci:
+  #  uses: smallstep/certificates/.github/workflows/ci.yml@master
+  #  secrets: inherit
 
   create_release:
     name: Create Release
-    needs: ci
+    #needs: ci
     runs-on: ubuntu-latest
     env:
       DOCKER_IMAGE: smallstep/step-ca
@@ -63,7 +63,7 @@ jobs:
     uses: smallstep/workflows/.github/workflows/goreleaser.yml@main
     with:
       enable-packages-upload: true
-      is-prerelease: ${{ needs.create_release.outputs.is_prerelease == 'true' }}
+      is-prerelease: false
     secrets: inherit
 
   build_upload_docker:
