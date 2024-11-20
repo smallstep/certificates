@@ -31,6 +31,12 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
 
 - Support for using template data from SCEPCHALLENGE webhooks (smallstep/certificates#2065)
 - New field to Webhook response that allows for propagation of human readable errors to the client (smallstep/certificates#2066)
+- CICD for pushing DEB and RPM packages to packages.smallstep.com on releases (smallstep/certificates#2076)
+- PKCS11 utilities in HSM container image (smallstep/certificates#2077)
+
+### Changed
+
+- Artifact names for RPM and DEB packages in conformance with standards (smallstep/certificates#2076)
 
 
 ## [0.28.0] - 2024-10-29
