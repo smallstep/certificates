@@ -32,7 +32,7 @@ require (
 	github.com/smallstep/nosql v0.7.0
 	github.com/smallstep/pkcs7 v0.0.0-20240911091500-b1cae6277023
 	github.com/smallstep/scep v0.0.0-20240926084937-8cf1ca453101
-	github.com/stretchr/testify v1.9.0
+	github.com/stretchr/testify v1.10.0
 	github.com/urfave/cli v1.22.16
 	go.step.sm/crypto v0.54.2
 	go.step.sm/linkedca v0.22.2
