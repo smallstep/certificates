@@ -37,6 +37,7 @@ import (
 	"github.com/smallstep/certificates/authority/provisioner"
 	"github.com/smallstep/certificates/ca"
 	"github.com/smallstep/certificates/cas/apiv1"
+	"github.com/smallstep/certificates/internal/httptransport"
 )
 
 func newCAClient(t *testing.T, caURL, rootFilepath string) *ca.Client {
@@ -170,7 +171,7 @@ func createSCEPClient(t *testing.T, caURL string, root *x509.Certificate) *clien
 	t.Helper()
 	trustedRoots := x509.NewCertPool()
 	trustedRoots.AddCert(root)
-	transport := http.DefaultTransport.(*http.Transport).Clone()
+	transport := httptransport.New()
 	transport.TLSClientConfig = &tls.Config{
 		RootCAs: trustedRoots,
 	}
