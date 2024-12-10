@@ -62,9 +62,13 @@ func (p *Nebula) Init(config Config) (err error) {
 		return errors.New("provisioner root(s) cannot be empty")
 	}
 
-	p.caPool, err = nebula.NewCAPoolFromBytes(p.Roots)
+	var certErrors []error
+	p.caPool, certErrors, err = nebula.NewCAPoolFromBytes(p.Roots)
 	if err != nil {
-		return errs.InternalServer("failed to create ca pool: %v", err)
+		return errs.InternalServer("failed to create CA pool: %v", err)
+	}
+	if len(certErrors) > 0 {
+		return errs.InternalServer("failed to create CA pool: %v", certErrors)
 	}
 
 	config.Audiences = config.Audiences.WithFragment(p.GetIDForToken())
