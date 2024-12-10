@@ -15,10 +15,13 @@ import (
 	"time"
 
 	"github.com/pkg/errors"
+
+	"go.step.sm/linkedca"
+
+	"github.com/smallstep/certificates/internal/httptransport"
 	"github.com/smallstep/certificates/middleware/requestid"
 	"github.com/smallstep/certificates/templates"
 	"github.com/smallstep/certificates/webhook"
-	"go.step.sm/linkedca"
 )
 
 var ErrWebhookDenied = errors.New("webhook server did not allow request")
@@ -200,13 +203,16 @@ retry:
 	if w.DisableTLSClientAuth {
 		transport, ok := client.Transport.(*http.Transport)
 		if !ok {
-			return nil, errors.New("client transport is not a *http.Transport")
+			transport = httptransport.New()
+		} else {
+			transport = transport.Clone()
 		}
-		transport = transport.Clone()
-		tlsConfig := transport.TLSClientConfig.Clone()
-		tlsConfig.GetClientCertificate = nil
-		tlsConfig.Certificates = nil
-		transport.TLSClientConfig = tlsConfig
+
+		if transport.TLSClientConfig != nil {
+			transport.TLSClientConfig.GetClientCertificate = nil
+			transport.TLSClientConfig.Certificates = nil
+		}
+
 		client = &http.Client{
 			Transport: transport,
 		}

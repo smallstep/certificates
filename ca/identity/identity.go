@@ -19,6 +19,7 @@ import (
 	"go.step.sm/crypto/pemutil"
 
 	"github.com/smallstep/certificates/api"
+	"github.com/smallstep/certificates/internal/httptransport"
 )
 
 // Type represents the different types of identity files.
@@ -295,7 +296,7 @@ func (i *Identity) Renew(client Renewer) error {
 			return err
 		}
 
-		tr := http.DefaultTransport.(*http.Transport).Clone()
+		tr := httptransport.New()
 		tr.TLSClientConfig = &tls.Config{
 			Certificates:             []tls.Certificate{cert},
 			RootCAs:                  client.GetRootCAs(),

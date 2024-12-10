@@ -33,6 +33,7 @@ import (
 	"github.com/smallstep/certificates/authority/config"
 	"github.com/smallstep/certificates/cas/apiv1"
 	"github.com/smallstep/certificates/db"
+	"github.com/smallstep/certificates/internal/httptransport"
 	"github.com/smallstep/certificates/internal/metrix"
 	"github.com/smallstep/certificates/logging"
 	"github.com/smallstep/certificates/middleware/requestid"
@@ -196,7 +197,7 @@ func (ca *CA) Init(cfg *config.Config) (*CA, error) {
 		opts = append(opts, authority.WithMeter(meter))
 	}
 
-	webhookTransport := http.DefaultTransport.(*http.Transport).Clone()
+	webhookTransport := httptransport.New()
 	opts = append(opts, authority.WithWebhookClient(&http.Client{Transport: webhookTransport}))
 
 	auth, err := authority.New(cfg, opts...)

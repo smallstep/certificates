@@ -24,6 +24,7 @@ import (
 	"go.step.sm/crypto/x509util"
 	"go.step.sm/linkedca"
 
+	"github.com/smallstep/certificates/internal/httptransport"
 	"github.com/smallstep/certificates/middleware/requestid"
 	"github.com/smallstep/certificates/webhook"
 )
@@ -647,7 +648,8 @@ func TestWebhook_Do(t *testing.T) {
 		}
 		cert, err := tls.LoadX509KeyPair("testdata/certs/foo.crt", "testdata/secrets/foo.key")
 		require.NoError(t, err)
-		transport := http.DefaultTransport.(*http.Transport).Clone()
+
+		transport := httptransport.New()
 		transport.TLSClientConfig = &tls.Config{
 			InsecureSkipVerify: true,
 			Certificates:       []tls.Certificate{cert},
