@@ -62,6 +62,31 @@ func mustNebulaCA(t *testing.T) (*cert.NebulaCertificate, ed25519.PrivateKey) {
 	return nc, priv
 }
 
+func mustExpiredNebulaCA(t *testing.T) (*cert.NebulaCertificate, ed25519.PrivateKey) {
+	t.Helper()
+	pub, priv, err := ed25519.GenerateKey(rand.Reader)
+	require.NoError(t, err)
+	nc := &cert.NebulaCertificate{
+		Details: cert.NebulaCertificateDetails{
+			Name:   "ExpiredTestCA",
+			Groups: []string{"expired"},
+			Ips: []*net.IPNet{
+				mustNebulaIPNet(t, "10.2.0.0/16"),
+			},
+			Subnets:   []*net.IPNet{},
+			NotBefore: time.Now().Add(-2 * time.Hour),
+			NotAfter:  time.Now().Add(-1 * time.Hour),
+			PublicKey: pub,
+			IsCA:      true,
+			Curve:     cert.Curve_CURVE25519,
+		},
+	}
+	err = nc.Sign(cert.Curve_CURVE25519, priv)
+	require.NoError(t, err)
+
+	return nc, priv
+}
+
 func mustNebulaP256CA(t *testing.T) (*cert.NebulaCertificate, *ecdsa.PrivateKey) {
 	t.Helper()
 
@@ -298,6 +323,10 @@ func TestNebula_Init(t *testing.T) {
 	nc, _ := mustNebulaCA(t)
 	ncPem, err := nc.MarshalToPEM()
 	require.NoError(t, err)
+	expiredNC, _ := mustExpiredNebulaCA(t)
+	expiredPEM, err := expiredNC.MarshalToPEM()
+	require.NoError(t, err)
+	expiredPEM = append(expiredPEM, ncPem...) // needed so that regular error isn't triggered
 
 	cfg := Config{
 		Claims:    globalProvisionerClaims,
@@ -326,6 +355,7 @@ func TestNebula_Init(t *testing.T) {
 		{"fail type", fields{"", "Nebulous", ncPem, nil, nil}, args{cfg}, true},
 		{"fail name", fields{"Nebula", "", ncPem, nil, nil}, args{cfg}, true},
 		{"fail root", fields{"Nebula", "Nebulous", nil, nil, nil}, args{cfg}, true},
+		{"fail expired root", fields{"Nebula", "Nebulous", expiredPEM, nil, nil}, args{cfg}, true},
 		{"fail bad root", fields{"Nebula", "Nebulous", ncPem[:16], nil, nil}, args{cfg}, true},
 		{"fail bad claims", fields{"Nebula", "Nebulous", ncPem, &Claims{
 			MinTLSDur: &Duration{Duration: 0},
