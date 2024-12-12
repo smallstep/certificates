@@ -80,14 +80,16 @@ func TestNewController(t *testing.T) {
 		wantErr bool
 	}{
 		{"ok", args{&JWK{}, nil, Config{
-			Claims:     globalProvisionerClaims,
-			Audiences:  testAudiences,
-			HTTPClient: &http.Client{},
+			Claims:        globalProvisionerClaims,
+			Audiences:     testAudiences,
+			HTTPClient:    &http.Client{},
+			WrapTransport: httptransport.NoopWrapper(),
 		}, nil}, &Controller{
-			Interface:  &JWK{},
-			Audiences:  &testAudiences,
-			Claimer:    mustClaimer(t, nil, globalProvisionerClaims),
-			httpClient: &http.Client{},
+			Interface:     &JWK{},
+			Audiences:     &testAudiences,
+			Claimer:       mustClaimer(t, nil, globalProvisionerClaims),
+			httpClient:    &http.Client{},
+			wrapTransport: httptransport.NoopWrapper(),
 		}, false},
 		{"ok with claims", args{&JWK{}, &Claims{
 			DisableRenewal: &defaultDisableRenewal,
@@ -100,6 +102,7 @@ func TestNewController(t *testing.T) {
 			Claimer: mustClaimer(t, &Claims{
 				DisableRenewal: &defaultDisableRenewal,
 			}, globalProvisionerClaims),
+			wrapTransport: httptransport.NoopWrapper(),
 		}, false},
 		{"ok with claims and options", args{&JWK{}, &Claims{
 			DisableRenewal: &defaultDisableRenewal,
@@ -112,7 +115,8 @@ func TestNewController(t *testing.T) {
 			Claimer: mustClaimer(t, &Claims{
 				DisableRenewal: &defaultDisableRenewal,
 			}, globalProvisionerClaims),
-			policy: mustNewPolicyEngine(t, options),
+			policy:        mustNewPolicyEngine(t, options),
+			wrapTransport: httptransport.NoopWrapper(),
 		}, false},
 		{"fail claimer", args{&JWK{}, &Claims{
 			MinTLSDur: mustDuration(t, "24h"),
@@ -141,6 +145,14 @@ func TestNewController(t *testing.T) {
 				t.Errorf("NewController() error = %v, wantErr %v", err, tt.wantErr)
 				return
 			}
+
+			// A function can only be compared to nil
+			if tt.want != nil && got != nil {
+				assert.NotNil(t, got.wrapTransport)
+				tt.want.wrapTransport = nil
+				got.wrapTransport = nil
+			}
+
 			if !reflect.DeepEqual(got, tt.want) {
 				t.Errorf("NewController() = %v, want %v", got, tt.want)
 			}
