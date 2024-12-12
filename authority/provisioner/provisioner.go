@@ -266,7 +266,7 @@ type Config struct {
 	HTTPClient *http.Client
 	// WrapTransport references the function that should wrap any [http.Transport] initialized
 	// down the Config's chain.
-	WrapTransport func(*http.Transport) http.RoundTripper
+	WrapTransport TransportWrapper
 }
 
 type provisioner struct {
