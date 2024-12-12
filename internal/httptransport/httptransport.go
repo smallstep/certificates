@@ -8,6 +8,17 @@ import (
 	"time"
 )
 
+// Wrapper wraps the set of functions mapping [http.Transport] references to [http.RoundTripper].
+type Wrapper func(*http.Transport) http.RoundTripper
+
+// NoopWrapper returns a [Wrapper] that simply casts its provided [http.Transport] to an
+// [http.RoundTripper].
+func NoopWrapper() Wrapper {
+	return func(t *http.Transport) http.RoundTripper {
+		return t
+	}
+}
+
 // New returns a reference to an [http.Transport] that's initialized just like the
 // [http.DefaultTransport] is by the standard library.
 func New() *http.Transport {
