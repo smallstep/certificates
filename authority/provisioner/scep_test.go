@@ -201,7 +201,7 @@ func Test_challengeValidationController_Validate(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			c := newChallengeValidationController(tt.fields.client, tt.fields.webhooks)
+			c := newChallengeValidationController(tt.fields.client, nil, tt.fields.webhooks)
 			ctx := context.Background()
 			got, err := c.Validate(ctx, dummyCSR, tt.args.provisionerName, tt.args.challenge, tt.args.transactionID)
 			if tt.expErr != nil {

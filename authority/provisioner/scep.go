@@ -18,6 +18,7 @@ import (
 	"go.step.sm/crypto/x509util"
 	"go.step.sm/linkedca"
 
+	"github.com/smallstep/certificates/internal/httptransport"
 	"github.com/smallstep/certificates/webhook"
 )
 
@@ -112,13 +113,14 @@ func (s *SCEP) DefaultTLSCertDuration() time.Duration {
 }
 
 type challengeValidationController struct {
-	client   *http.Client
-	webhooks []*Webhook
+	client        *http.Client
+	wrapTransport httptransport.Wrapper
+	webhooks      []*Webhook
 }
 
 // newChallengeValidationController creates a new challengeValidationController
 // that performs challenge validation through webhooks.
-func newChallengeValidationController(client *http.Client, webhooks []*Webhook) *challengeValidationController {
+func newChallengeValidationController(client *http.Client, tw httptransport.Wrapper, webhooks []*Webhook) *challengeValidationController {
 	scepHooks := []*Webhook{}
 	for _, wh := range webhooks {
 		if wh.Kind != linkedca.Webhook_SCEPCHALLENGE.String() {
@@ -130,8 +132,9 @@ func newChallengeValidationController(client *http.Client, webhooks []*Webhook) 
 		scepHooks = append(scepHooks, wh)
 	}
 	return &challengeValidationController{
-		client:   client,
-		webhooks: scepHooks,
+		client:        client,
+		wrapTransport: tw,
+		webhooks:      scepHooks,
 	}
 }
 
@@ -157,7 +160,7 @@ func (c *challengeValidationController) Validate(ctx context.Context, csr *x509.
 		req.ProvisionerName = provisionerName
 		req.SCEPChallenge = challenge
 		req.SCEPTransactionID = transactionID
-		resp, err := wh.DoWithContext(ctx, c.client, req, nil) // TODO(hs): support templated URL? Requires some refactoring
+		resp, err := wh.DoWithContext(ctx, c.client, c.wrapTransport, req, nil) // TODO(hs): support templated URL? Requires some refactoring
 		if err != nil {
 			return nil, fmt.Errorf("failed executing webhook request: %w", err)
 		}
@@ -176,13 +179,14 @@ func (c *challengeValidationController) Validate(ctx context.Context, csr *x509.
 }
 
 type notificationController struct {
-	client   *http.Client
-	webhooks []*Webhook
+	client        *http.Client
+	wrapTransport httptransport.Wrapper
+	webhooks      []*Webhook
 }
 
 // newNotificationController creates a new notificationController
 // that performs SCEP notifications through webhooks.
-func newNotificationController(client *http.Client, webhooks []*Webhook) *notificationController {
+func newNotificationController(client *http.Client, tw httptransport.Wrapper, webhooks []*Webhook) *notificationController {
 	scepHooks := []*Webhook{}
 	for _, wh := range webhooks {
 		if wh.Kind != linkedca.Webhook_NOTIFYING.String() {
@@ -194,8 +198,9 @@ func newNotificationController(client *http.Client, webhooks []*Webhook) *notifi
 		scepHooks = append(scepHooks, wh)
 	}
 	return &notificationController{
-		client:   client,
-		webhooks: scepHooks,
+		client:        client,
+		wrapTransport: tw,
+		webhooks:      scepHooks,
 	}
 }
 
@@ -207,7 +212,7 @@ func (c *notificationController) Success(ctx context.Context, csr *x509.Certific
 		}
 		req.X509Certificate.Raw = cert.Raw // adding the full certificate DER bytes
 		req.SCEPTransactionID = transactionID
-		if _, err = wh.DoWithContext(ctx, c.client, req, nil); err != nil {
+		if _, err = wh.DoWithContext(ctx, c.client, c.wrapTransport, req, nil); err != nil {
 			return fmt.Errorf("failed executing webhook request: %w: %w", ErrSCEPNotificationFailed, err)
 		}
 	}
@@ -224,7 +229,7 @@ func (c *notificationController) Failure(ctx context.Context, csr *x509.Certific
 		req.SCEPTransactionID = transactionID
 		req.SCEPErrorCode = errorCode
 		req.SCEPErrorDescription = errorDescription
-		if _, err = wh.DoWithContext(ctx, c.client, req, nil); err != nil {
+		if _, err = wh.DoWithContext(ctx, c.client, c.wrapTransport, req, nil); err != nil {
 			return fmt.Errorf("failed executing webhook request: %w: %w", ErrSCEPNotificationFailed, err)
 		}
 	}
@@ -267,12 +272,14 @@ func (s *SCEP) Init(config Config) (err error) {
 	// Prepare the SCEP challenge validator
 	s.challengeValidationController = newChallengeValidationController(
 		config.WebhookClient,
+		config.WrapTransport,
 		s.GetOptions().GetWebhooks(),
 	)
 
 	// Prepare the SCEP notification controller
 	s.notificationController = newNotificationController(
 		config.WebhookClient,
+		config.WrapTransport,
 		s.GetOptions().GetWebhooks(),
 	)
 

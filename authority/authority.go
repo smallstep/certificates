@@ -33,6 +33,7 @@ import (
 	"github.com/smallstep/certificates/cas"
 	casapi "github.com/smallstep/certificates/cas/apiv1"
 	"github.com/smallstep/certificates/db"
+	"github.com/smallstep/certificates/internal/httptransport"
 	"github.com/smallstep/certificates/scep"
 	"github.com/smallstep/certificates/templates"
 	"github.com/smallstep/nosql"
@@ -48,6 +49,7 @@ type Authority struct {
 	adminDB       admin.DB
 	templates     *templates.Templates
 	linkedCAToken string
+	wrapTransport httptransport.Wrapper
 	webhookClient *http.Client
 	httpClient    *http.Client
 
@@ -128,10 +130,11 @@ func New(cfg *config.Config, opts ...Option) (*Authority, error) {
 	}
 
 	var a = &Authority{
-		config:       cfg,
-		certificates: new(sync.Map),
-		validateSCEP: true,
-		meter:        noopMeter{},
+		config:        cfg,
+		certificates:  new(sync.Map),
+		validateSCEP:  true,
+		meter:         noopMeter{},
+		wrapTransport: httptransport.NoopWrapper(),
 	}
 
 	// Apply options.
@@ -158,9 +161,10 @@ func New(cfg *config.Config, opts ...Option) (*Authority, error) {
 // project without the limitations of the config.
 func NewEmbedded(opts ...Option) (*Authority, error) {
 	a := &Authority{
-		config:       &config.Config{},
-		certificates: new(sync.Map),
-		meter:        noopMeter{},
+		config:        &config.Config{},
+		certificates:  new(sync.Map),
+		meter:         noopMeter{},
+		wrapTransport: httptransport.NoopWrapper(),
 	}
 
 	// Apply options.
@@ -496,7 +500,7 @@ func (a *Authority) init() error {
 	clientRoots := make([]*x509.Certificate, 0, len(a.rootX509Certs)+len(a.federatedX509Certs))
 	clientRoots = append(clientRoots, a.rootX509Certs...)
 	clientRoots = append(clientRoots, a.federatedX509Certs...)
-	a.httpClient, err = newHTTPClient(clientRoots...)
+	a.httpClient, err = newHTTPClient(a.wrapTransport, clientRoots...)
 	if err != nil {
 		return err
 	}

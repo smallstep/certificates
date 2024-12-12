@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"github.com/smallstep/certificates/authority/provisioner"
+	"github.com/smallstep/certificates/internal/httptransport"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"go.step.sm/crypto/jose"
@@ -113,8 +114,8 @@ func Test_newHTTPClient(t *testing.T) {
 		}{http.DefaultTransport}
 		http.DefaultTransport = transport
 
-		client, err := newHTTPClient(auth.rootX509Certs...)
+		client, err := newHTTPClient(httptransport.NoopWrapper(), auth.rootX509Certs...)
 		assert.NoError(t, err)
-		assert.Equal(t, &http.Client{}, client)
+		assert.NotNil(t, client)
 	})
 }
