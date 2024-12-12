@@ -627,7 +627,7 @@ func TestWebhook_Do(t *testing.T) {
 			ctx, cancel := context.WithTimeout(ctx, time.Second*10)
 			defer cancel()
 
-			got, err := tc.webhook.DoWithContext(ctx, http.DefaultClient, reqBody, tc.dataArg)
+			got, err := tc.webhook.DoWithContext(ctx, http.DefaultClient, httptransport.NoopWrapper(), reqBody, tc.dataArg)
 			if tc.expectErr != nil {
 				assert.Equal(t, tc.expectErr.Error(), err.Error())
 				return
@@ -663,14 +663,14 @@ func TestWebhook_Do(t *testing.T) {
 		ctx, cancel := context.WithTimeout(context.Background(), time.Second*10)
 		defer cancel()
 
-		_, err = wh.DoWithContext(ctx, client, reqBody, nil)
+		_, err = wh.DoWithContext(ctx, client, httptransport.NoopWrapper(), reqBody, nil)
 		require.NoError(t, err)
 
 		ctx, cancel = context.WithTimeout(context.Background(), time.Second*10)
 		defer cancel()
 
 		wh.DisableTLSClientAuth = true
-		_, err = wh.DoWithContext(ctx, client, reqBody, nil)
+		_, err = wh.DoWithContext(ctx, client, httptransport.NoopWrapper(), reqBody, nil)
 		require.Error(t, err)
 	})
 }

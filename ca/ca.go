@@ -198,7 +198,9 @@ func (ca *CA) Init(cfg *config.Config) (*CA, error) {
 	}
 
 	webhookTransport := httptransport.New()
-	opts = append(opts, authority.WithWebhookClient(&http.Client{Transport: webhookTransport}))
+	opts = append(opts,
+		authority.WithWebhookClient(&http.Client{Transport: webhookTransport}),
+	)
 
 	auth, err := authority.New(cfg, opts...)
 	if err != nil {

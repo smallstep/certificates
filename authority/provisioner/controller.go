@@ -9,6 +9,7 @@ import (
 
 	"github.com/pkg/errors"
 	"github.com/smallstep/certificates/errs"
+	"github.com/smallstep/certificates/internal/httptransport"
 	"github.com/smallstep/certificates/webhook"
 	"go.step.sm/linkedca"
 	"golang.org/x/crypto/ssh"
@@ -27,6 +28,7 @@ type Controller struct {
 	webhookClient         *http.Client
 	webhooks              []*Webhook
 	httpClient            *http.Client
+	wrapTransport         httptransport.Wrapper
 }
 
 // NewController initializes a new provisioner controller.
@@ -50,6 +52,7 @@ func NewController(p Interface, claims *Claims, config Config, options *Options)
 		webhookClient:         config.WebhookClient,
 		webhooks:              options.GetWebhooks(),
 		httpClient:            config.HTTPClient,
+		wrapTransport:         config.WrapTransport,
 	}, nil
 }
 
@@ -89,16 +92,25 @@ func (c *Controller) AuthorizeSSHRenew(ctx context.Context, cert *ssh.Certificat
 }
 
 func (c *Controller) newWebhookController(templateData WebhookSetter, certType linkedca.Webhook_CertType, opts ...webhook.RequestBodyOption) *WebhookController {
+	wt := c.wrapTransport
+	if wt == nil {
+		wt = httptransport.NoopWrapper()
+	}
+
 	client := c.webhookClient
 	if client == nil {
-		client = http.DefaultClient
+		client = &http.Client{
+			Transport: wt(httptransport.New()),
+		}
 	}
+
 	return &WebhookController{
-		TemplateData: templateData,
-		client:       client,
-		webhooks:     c.webhooks,
-		certType:     certType,
-		options:      opts,
+		TemplateData:  templateData,
+		client:        client,
+		wrapTransport: wt,
+		webhooks:      c.webhooks,
+		certType:      certType,
+		options:       opts,
 	}
 }
 

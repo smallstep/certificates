@@ -264,6 +264,9 @@ type Config struct {
 	// HTTPClient is an HTTP client that trusts the system cert pool and the CA
 	// roots.
 	HTTPClient *http.Client
+	// WrapTransport references the function that should wrap any [http.Transport] initialized
+	// down the Config's chain.
+	WrapTransport func(*http.Transport) http.RoundTripper
 }
 
 type provisioner struct {
