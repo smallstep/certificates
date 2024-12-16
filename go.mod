@@ -39,7 +39,7 @@ require (
 	go.uber.org/mock v0.5.0
 	golang.org/x/crypto v0.30.0
 	golang.org/x/exp v0.0.0-20240318143956-a85f2c67cd81
-	golang.org/x/net v0.31.0
+	golang.org/x/net v0.32.0
 	google.golang.org/api v0.210.0
 	google.golang.org/grpc v1.68.1
 	google.golang.org/protobuf v1.35.2
