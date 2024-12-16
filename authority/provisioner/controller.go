@@ -41,6 +41,10 @@ func NewController(p Interface, claims *Claims, config Config, options *Options)
 	if err != nil {
 		return nil, err
 	}
+	wt := config.WrapTransport
+	if wt == nil {
+		wt = httptransport.NoopWrapper()
+	}
 	return &Controller{
 		Interface:             p,
 		Audiences:             &config.Audiences,
@@ -52,7 +56,7 @@ func NewController(p Interface, claims *Claims, config Config, options *Options)
 		webhookClient:         config.WebhookClient,
 		webhooks:              options.GetWebhooks(),
 		httpClient:            config.HTTPClient,
-		wrapTransport:         config.WrapTransport,
+		wrapTransport:         wt,
 	}, nil
 }
 
@@ -92,22 +96,17 @@ func (c *Controller) AuthorizeSSHRenew(ctx context.Context, cert *ssh.Certificat
 }
 
 func (c *Controller) newWebhookController(templateData WebhookSetter, certType linkedca.Webhook_CertType, opts ...webhook.RequestBodyOption) *WebhookController {
-	wt := c.wrapTransport
-	if wt == nil {
-		wt = httptransport.NoopWrapper()
-	}
-
 	client := c.webhookClient
 	if client == nil {
 		client = &http.Client{
-			Transport: wt(httptransport.New()),
+			Transport: c.wrapTransport(httptransport.New()),
 		}
 	}
 
 	return &WebhookController{
 		TemplateData:  templateData,
 		client:        client,
-		wrapTransport: wt,
+		wrapTransport: c.wrapTransport,
 		webhooks:      c.webhooks,
 		certType:      certType,
 		options:       opts,
