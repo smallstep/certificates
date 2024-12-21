@@ -67,6 +67,7 @@ type SSHCertificate struct {
 // AttestationData is data validated by acme device-attest-01 challenge
 type AttestationData struct {
 	PermanentIdentifier string `json:"permanentIdentifier"`
+	Payload             []byte `json:"payload,omitempty"`
 }
 
 // X5CCertificate is the authorization certificate sent to webhook servers for
