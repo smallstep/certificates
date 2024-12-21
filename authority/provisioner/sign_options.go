@@ -85,6 +85,7 @@ func (fn CertificateEnforcerFunc) Enforce(cert *x509.Certificate) error {
 // sign methods.
 type AttestationData struct {
 	PermanentIdentifier string
+	Payload             []byte
 }
 
 // defaultPublicKeyValidator validates the public key of a certificate request.
