@@ -40,7 +40,7 @@ require (
 	golang.org/x/crypto v0.31.0
 	golang.org/x/exp v0.0.0-20240318143956-a85f2c67cd81
 	golang.org/x/net v0.33.0
-	google.golang.org/api v0.212.0
+	google.golang.org/api v0.214.0
 	google.golang.org/grpc v1.69.0
 	google.golang.org/protobuf v1.36.0
 )
