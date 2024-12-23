@@ -30,7 +30,7 @@ require (
 	github.com/smallstep/cli-utils v0.10.0
 	github.com/smallstep/go-attestation v0.4.4-0.20240109183208-413678f90935
 	github.com/smallstep/nosql v0.7.0
-	github.com/smallstep/pkcs7 v0.0.0-20240911091500-b1cae6277023
+	github.com/smallstep/pkcs7 v0.1.1
 	github.com/smallstep/scep v0.0.0-20240926084937-8cf1ca453101
 	github.com/stretchr/testify v1.10.0
 	github.com/urfave/cli v1.22.16
