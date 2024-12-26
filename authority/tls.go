@@ -1029,7 +1029,6 @@ func (a *Authority) callEnrichingWebhooksX509(ctx context.Context, prov provisio
 	if attData != nil {
 		attested = &webhook.AttestationData{
 			PermanentIdentifier: attData.PermanentIdentifier,
-			Payload:             attData.Payload,
 		}
 	}
 

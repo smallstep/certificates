@@ -41,9 +41,8 @@ const (
 
 // Identifier encodes the type that an order pertains to.
 type Identifier struct {
-	Type    IdentifierType `json:"type"`
-	Value   string         `json:"value"`
-	Payload []byte         `json:"-"`
+	Type  IdentifierType `json:"type"`
+	Value string         `json:"value"`
 }
 
 // Order contains order metadata for the ACME protocol order type.
@@ -241,14 +240,10 @@ func (o *Order) Finalize(ctx context.Context, db DB, csr *x509.CertificateReques
 	var extraOptions []provisioner.SignOption
 
 	// TODO: support for multiple identifiers?
-	var (
-		permanentIdentifier string
-		attestationPayload  []byte
-	)
+	var permanentIdentifier string
 	for i := range o.Identifiers {
 		if o.Identifiers[i].Type == PermanentIdentifier {
 			permanentIdentifier = o.Identifiers[i].Value
-			attestationPayload = o.Identifiers[i].Payload
 			// the first (and only) Permanent Identifier that gets added to the certificate
 			// should be equal to the Subject Common Name if it's set. If not equal, the CSR
 			// is rejected, because the Common Name hasn't been challenged in that case. This
@@ -271,7 +266,6 @@ func (o *Order) Finalize(ctx context.Context, db DB, csr *x509.CertificateReques
 		})
 		extraOptions = append(extraOptions, provisioner.AttestationData{
 			PermanentIdentifier: permanentIdentifier,
-			Payload:             attestationPayload,
 		})
 	} else {
 		defaultTemplate = x509util.DefaultLeafTemplate

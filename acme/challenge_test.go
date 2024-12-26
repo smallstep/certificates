@@ -820,6 +820,7 @@ MCowBQYDK2VwAyEA5c+4NKZSNQcR1T8qN6SjwgdPZQ0Ge12Ylx/YeGAJ35k=
 						assert.Equal(t, StatusInvalid, updch.Status)
 						assert.Equal(t, ChallengeType("device-attest-01"), updch.Type)
 						assert.Equal(t, "12345678", updch.Value)
+						assert.Nil(t, updch.Payload)
 
 						err := NewError(ErrorRejectedIdentifierType, "payload contained error: an error")
 
@@ -871,6 +872,7 @@ MCowBQYDK2VwAyEA5c+4NKZSNQcR1T8qN6SjwgdPZQ0Ge12Ylx/YeGAJ35k=
 						assert.Equal(t, StatusValid, updch.Status)
 						assert.Equal(t, ChallengeType("device-attest-01"), updch.Type)
 						assert.Equal(t, "1234", updch.Value)
+						assert.Equal(t, payload, updch.Payload)
 
 						return nil
 					},
@@ -4004,6 +4006,7 @@ func Test_deviceAttest01Validate(t *testing.T) {
 							assert.Equal(t, StatusInvalid, updch.Status)
 							assert.Equal(t, ChallengeType("device-attest-01"), updch.Type)
 							assert.Equal(t, "12345678", updch.Value)
+							assert.Nil(t, updch.Payload)
 
 							err := NewError(ErrorRejectedIdentifierType, "payload contained error: an error")
 
@@ -4042,6 +4045,7 @@ func Test_deviceAttest01Validate(t *testing.T) {
 							assert.Equal(t, StatusInvalid, updch.Status)
 							assert.Equal(t, ChallengeType("device-attest-01"), updch.Type)
 							assert.Equal(t, "12345678", updch.Value)
+							assert.Nil(t, updch.Payload)
 
 							err := NewDetailedError(ErrorBadAttestationStatementType, "failed base64 decoding attObj %q", "?!")
 
@@ -4080,6 +4084,7 @@ func Test_deviceAttest01Validate(t *testing.T) {
 							assert.Equal(t, StatusInvalid, updch.Status)
 							assert.Equal(t, ChallengeType("device-attest-01"), updch.Type)
 							assert.Equal(t, "12345678", updch.Value)
+							assert.Nil(t, updch.Payload)
 
 							err := NewDetailedError(ErrorBadAttestationStatementType, "attObj must not be empty")
 
@@ -4118,6 +4123,7 @@ func Test_deviceAttest01Validate(t *testing.T) {
 							assert.Equal(t, StatusInvalid, updch.Status)
 							assert.Equal(t, ChallengeType("device-attest-01"), updch.Type)
 							assert.Equal(t, "12345678", updch.Value)
+							assert.Nil(t, updch.Payload)
 
 							err := NewDetailedError(ErrorBadAttestationStatementType, "attObj must not be empty")
 
@@ -4156,6 +4162,7 @@ func Test_deviceAttest01Validate(t *testing.T) {
 							assert.Equal(t, StatusInvalid, updch.Status)
 							assert.Equal(t, ChallengeType("device-attest-01"), updch.Type)
 							assert.Equal(t, "12345678", updch.Value)
+							assert.Nil(t, updch.Payload)
 
 							err := NewDetailedError(ErrorBadAttestationStatementType, "attObj is not well formed CBOR: unexpected EOF")
 
@@ -4196,6 +4203,7 @@ func Test_deviceAttest01Validate(t *testing.T) {
 							assert.Equal(t, StatusInvalid, updch.Status)
 							assert.Equal(t, ChallengeType("device-attest-01"), updch.Type)
 							assert.Equal(t, "12345678", updch.Value)
+							assert.Nil(t, updch.Payload)
 
 							err := NewDetailedError(ErrorBadAttestationStatementType, "unsupported attestation object format %q", "unsupported-format")
 
@@ -4241,6 +4249,7 @@ func Test_deviceAttest01Validate(t *testing.T) {
 							assert.Equal(t, StatusInvalid, updch.Status)
 							assert.Equal(t, ChallengeType("device-attest-01"), updch.Type)
 							assert.Equal(t, "12345678", updch.Value)
+							assert.Nil(t, updch.Payload)
 
 							err := NewError(ErrorBadAttestationStatementType, "attestation format %q is not enabled", "step")
 
@@ -4296,6 +4305,7 @@ func Test_deviceAttest01Validate(t *testing.T) {
 							assert.Equal(t, StatusInvalid, updch.Status)
 							assert.Equal(t, ChallengeType("device-attest-01"), updch.Type)
 							assert.Equal(t, "12345678", updch.Value)
+							assert.Nil(t, updch.Payload)
 
 							err := NewDetailedError(ErrorBadAttestationStatementType, "x5c not present")
 
@@ -4343,6 +4353,7 @@ func Test_deviceAttest01Validate(t *testing.T) {
 							assert.Equal(t, StatusInvalid, updch.Status)
 							assert.Equal(t, ChallengeType("device-attest-01"), updch.Type)
 							assert.Equal(t, "serial-number", updch.Value)
+							assert.Nil(t, updch.Payload)
 
 							err := NewDetailedError(ErrorBadAttestationStatementType, "challenge token does not match")
 
@@ -4389,6 +4400,7 @@ func Test_deviceAttest01Validate(t *testing.T) {
 							assert.Equal(t, StatusInvalid, updch.Status)
 							assert.Equal(t, ChallengeType("device-attest-01"), updch.Type)
 							assert.Equal(t, "non-matching-value", updch.Value)
+							assert.Nil(t, updch.Payload)
 
 							subproblem := NewSubproblemWithIdentifier(
 								ErrorRejectedIdentifierType,
@@ -4467,6 +4479,7 @@ func Test_deviceAttest01Validate(t *testing.T) {
 							assert.Equal(t, StatusInvalid, updch.Status)
 							assert.Equal(t, ChallengeType("device-attest-01"), updch.Type)
 							assert.Equal(t, "12345678", updch.Value)
+							assert.Nil(t, updch.Payload)
 
 							err := NewDetailedError(ErrorBadAttestationStatementType, "x5c not present")
 
@@ -4521,6 +4534,7 @@ func Test_deviceAttest01Validate(t *testing.T) {
 							assert.Equal(t, StatusInvalid, updch.Status)
 							assert.Equal(t, ChallengeType("device-attest-01"), updch.Type)
 							assert.Equal(t, "12345678", updch.Value)
+							assert.Nil(t, updch.Payload)
 
 							err := NewDetailedError(ErrorBadAttestationStatementType, "permanent identifier does not match").
 								AddSubproblems(NewSubproblemWithIdentifier(
@@ -4616,6 +4630,7 @@ func Test_deviceAttest01Validate(t *testing.T) {
 							assert.Equal(t, StatusInvalid, updch.Status)
 							assert.Equal(t, ChallengeType("device-attest-01"), updch.Type)
 							assert.Equal(t, "12345678", updch.Value)
+							assert.Nil(t, updch.Payload)
 
 							err := NewDetailedError(ErrorBadAttestationStatementType, `unsupported attestation object format "bogus-format"`)
 
@@ -4708,6 +4723,7 @@ func Test_deviceAttest01Validate(t *testing.T) {
 							assert.Equal(t, StatusValid, updch.Status)
 							assert.Equal(t, ChallengeType("device-attest-01"), updch.Type)
 							assert.Equal(t, "12345678", updch.Value)
+							assert.Equal(t, payload, updch.Payload)
 
 							return errors.New("force")
 						},
@@ -4754,6 +4770,7 @@ func Test_deviceAttest01Validate(t *testing.T) {
 							assert.Equal(t, StatusValid, updch.Status)
 							assert.Equal(t, ChallengeType("device-attest-01"), updch.Type)
 							assert.Equal(t, "12345678", updch.Value)
+							assert.Equal(t, payload, updch.Payload)
 
 							return nil
 						},
