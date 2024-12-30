@@ -89,6 +89,7 @@ type Challenge struct {
 	Target          string        `json:"target,omitempty"`
 	Error           *Error        `json:"error,omitempty"`
 	Payload         []byte        `json:"-"`
+	PayloadFormat   string        `json:"-"`
 }
 
 // ToLog enables response logging.
@@ -944,6 +945,7 @@ func deviceAttest01Validate(ctx context.Context, ch *Challenge, db DB, jwk *jose
 	ch.Error = nil
 	ch.ValidatedAt = clock.Now().Format(time.RFC3339)
 	ch.Payload = payload
+	ch.PayloadFormat = format
 
 	// Store the fingerprint in the authorization.
 	//
