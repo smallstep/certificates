@@ -11,10 +11,10 @@ import (
 	"testing"
 	"time"
 
+	"github.com/smallstep/linkedca"
 	"go.step.sm/crypto/jose"
 	"go.step.sm/crypto/pemutil"
 	"go.step.sm/crypto/randutil"
-	"go.step.sm/linkedca"
 
 	"github.com/smallstep/certificates/api/render"
 	"github.com/stretchr/testify/assert"

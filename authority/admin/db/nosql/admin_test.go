@@ -10,9 +10,9 @@ import (
 	"github.com/smallstep/assert"
 	"github.com/smallstep/certificates/authority/admin"
 	"github.com/smallstep/certificates/db"
+	"github.com/smallstep/linkedca"
 	"github.com/smallstep/nosql"
 	nosqldb "github.com/smallstep/nosql/database"
-	"go.step.sm/linkedca"
 	"google.golang.org/protobuf/types/known/timestamppb"
 )
 

@@ -7,7 +7,7 @@ import (
 	"github.com/pkg/errors"
 	"github.com/smallstep/certificates/authority/admin"
 	"github.com/smallstep/certificates/authority/provisioner"
-	"go.step.sm/linkedca"
+	"github.com/smallstep/linkedca"
 )
 
 // DefaultAdminLimit is the default limit for listing provisioners.

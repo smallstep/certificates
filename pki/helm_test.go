@@ -14,8 +14,8 @@ import (
 	"github.com/google/go-cmp/cmp"
 	"github.com/stretchr/testify/assert"
 
+	"github.com/smallstep/linkedca"
 	"go.step.sm/crypto/jose"
-	"go.step.sm/linkedca"
 
 	"github.com/smallstep/certificates/cas/apiv1"
 )

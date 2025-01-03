@@ -3,7 +3,7 @@ package policy
 import (
 	"fmt"
 
-	"go.step.sm/linkedca"
+	"github.com/smallstep/linkedca"
 
 	"github.com/smallstep/certificates/policy"
 )

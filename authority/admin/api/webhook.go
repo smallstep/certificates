@@ -10,8 +10,8 @@ import (
 	"github.com/smallstep/certificates/api/read"
 	"github.com/smallstep/certificates/api/render"
 	"github.com/smallstep/certificates/authority/admin"
+	"github.com/smallstep/linkedca"
 	"go.step.sm/crypto/randutil"
-	"go.step.sm/linkedca"
 )
 
 // WebhookAdminResponder is the interface responsible for writing webhook admin

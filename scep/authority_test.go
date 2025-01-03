@@ -13,6 +13,7 @@ import (
 
 	"github.com/smallstep/certificates/authority/config"
 	"github.com/smallstep/certificates/authority/provisioner"
+	"github.com/smallstep/linkedca"
 	"github.com/smallstep/pkcs7"
 	"github.com/smallstep/scep"
 	"github.com/stretchr/testify/assert"
@@ -21,7 +22,6 @@ import (
 	"go.step.sm/crypto/minica"
 	"go.step.sm/crypto/randutil"
 	"go.step.sm/crypto/x509util"
-	"go.step.sm/linkedca"
 )
 
 func generateContent(t *testing.T, size int) []byte {

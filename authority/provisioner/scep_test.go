@@ -17,13 +17,13 @@ import (
 	"testing"
 
 	"github.com/smallstep/certificates/webhook"
+	"github.com/smallstep/linkedca"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"go.step.sm/crypto/kms/softkms"
 	"go.step.sm/crypto/minica"
 	"go.step.sm/crypto/pemutil"
 	"go.step.sm/crypto/x509util"
-	"go.step.sm/linkedca"
 )
 
 func Test_challengeValidationController_Validate(t *testing.T) {

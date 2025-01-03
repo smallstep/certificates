@@ -15,11 +15,11 @@ import (
 	"github.com/pkg/errors"
 	nebula "github.com/slackhq/nebula/cert"
 
+	"github.com/smallstep/linkedca"
 	"go.step.sm/crypto/jose"
 	"go.step.sm/crypto/sshutil"
 	"go.step.sm/crypto/x25519"
 	"go.step.sm/crypto/x509util"
-	"go.step.sm/linkedca"
 	"golang.org/x/crypto/ssh"
 
 	"github.com/smallstep/certificates/errs"

@@ -5,7 +5,7 @@ import (
 
 	"github.com/google/go-cmp/cmp"
 
-	"go.step.sm/linkedca"
+	"github.com/smallstep/linkedca"
 )
 
 func TestPolicyToCertificates(t *testing.T) {
