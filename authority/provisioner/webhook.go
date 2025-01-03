@@ -16,7 +16,7 @@ import (
 
 	"github.com/pkg/errors"
 
-	"go.step.sm/linkedca"
+	"github.com/smallstep/linkedca"
 
 	"github.com/smallstep/certificates/internal/httptransport"
 	"github.com/smallstep/certificates/middleware/requestid"

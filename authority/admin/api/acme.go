@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"net/http"
 
-	"go.step.sm/linkedca"
+	"github.com/smallstep/linkedca"
 	"google.golang.org/protobuf/types/known/timestamppb"
 
 	"github.com/smallstep/certificates/acme"

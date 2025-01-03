@@ -23,12 +23,12 @@ import (
 	"github.com/smallstep/cli-utils/fileutil"
 	"github.com/smallstep/cli-utils/step"
 	"github.com/smallstep/cli-utils/ui"
+	"github.com/smallstep/linkedca"
 	"github.com/smallstep/nosql"
 	"go.step.sm/crypto/jose"
 	"go.step.sm/crypto/kms"
 	kmsapi "go.step.sm/crypto/kms/apiv1"
 	"go.step.sm/crypto/pemutil"
-	"go.step.sm/linkedca"
 
 	"github.com/smallstep/certificates/authority"
 	"github.com/smallstep/certificates/authority/admin"

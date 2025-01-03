@@ -20,9 +20,9 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"github.com/smallstep/linkedca"
 	"go.step.sm/crypto/pemutil"
 	"go.step.sm/crypto/x509util"
-	"go.step.sm/linkedca"
 
 	"github.com/smallstep/certificates/internal/httptransport"
 	"github.com/smallstep/certificates/middleware/requestid"

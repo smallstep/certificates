@@ -11,7 +11,7 @@ import (
 	"github.com/smallstep/certificates/errs"
 	"github.com/smallstep/certificates/internal/httptransport"
 	"github.com/smallstep/certificates/webhook"
-	"go.step.sm/linkedca"
+	"github.com/smallstep/linkedca"
 	"golang.org/x/crypto/ssh"
 )
 

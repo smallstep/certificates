@@ -11,7 +11,7 @@ import (
 
 	"github.com/pkg/errors"
 	"github.com/smallstep/certificates/acme/wire"
-	"go.step.sm/linkedca"
+	"github.com/smallstep/linkedca"
 )
 
 // ACMEChallenge represents the supported acme challenges.

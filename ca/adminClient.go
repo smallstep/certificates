@@ -17,9 +17,9 @@ import (
 
 	"github.com/smallstep/cli-utils/token"
 	"github.com/smallstep/cli-utils/token/provision"
+	"github.com/smallstep/linkedca"
 	"go.step.sm/crypto/jose"
 	"go.step.sm/crypto/randutil"
-	"go.step.sm/linkedca"
 
 	adminAPI "github.com/smallstep/certificates/authority/admin/api"
 	"github.com/smallstep/certificates/authority/provisioner"
