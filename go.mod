@@ -6,7 +6,7 @@ require (
 	cloud.google.com/go/longrunning v0.6.4
 	cloud.google.com/go/security v1.18.2
 	github.com/Masterminds/sprig/v3 v3.3.0
-	github.com/coreos/go-oidc/v3 v3.11.0
+	github.com/coreos/go-oidc/v3 v3.12.0
 	github.com/dgraph-io/badger v1.6.2
 	github.com/dgraph-io/badger/v2 v2.2007.4
 	github.com/fxamacker/cbor/v2 v2.7.0
