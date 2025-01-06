@@ -19,11 +19,11 @@ import (
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials"
 
+	"github.com/smallstep/linkedca"
 	"go.step.sm/crypto/jose"
 	"go.step.sm/crypto/keyutil"
 	"go.step.sm/crypto/tlsutil"
 	"go.step.sm/crypto/x509util"
-	"go.step.sm/linkedca"
 
 	"github.com/smallstep/certificates/authority/admin"
 	"github.com/smallstep/certificates/authority/provisioner"

@@ -358,6 +358,8 @@ github.com/smallstep/cli-utils v0.10.0 h1:CfXNvHtIN5pAzGvGP0NEUZoGFcj5epNEB6RSpS
 github.com/smallstep/cli-utils v0.10.0/go.mod h1:jIeNa5ctrVg89lU5TaQKYd6o1eFxi9mtZu1sXSxpEBg=
 github.com/smallstep/go-attestation v0.4.4-0.20240109183208-413678f90935 h1:kjYvkvS/Wdy0PVRDUAA0gGJIVSEZYhiAJtfwYgOYoGA=
 github.com/smallstep/go-attestation v0.4.4-0.20240109183208-413678f90935/go.mod h1:vNAduivU014fubg6ewygkAvQC0IQVXqdc8vaGl/0er4=
+github.com/smallstep/linkedca v0.23.0 h1:5W/7EudlK1HcCIdZM68dJlZ7orqCCCyv6bm2l/0JmLU=
+github.com/smallstep/linkedca v0.23.0/go.mod h1:7cyRM9soAYySg9ag65QwytcgGOM+4gOlkJ/YA58A9E8=
 github.com/smallstep/nosql v0.7.0 h1:YiWC9ZAHcrLCrayfaF+QJUv16I2bZ7KdLC3RpJcnAnE=
 github.com/smallstep/nosql v0.7.0/go.mod h1:H5VnKMCbeq9QA6SRY5iqPylfxLfYcLwvUff3onQ8+HU=
 github.com/smallstep/pkcs7 v0.0.0-20240911091500-b1cae6277023/go.mod h1:CM5KrX7rxWgwDdMj9yef/pJB2OPgy/56z4IEx2UIbpc=
@@ -421,8 +423,6 @@ go.opentelemetry.io/otel/trace v1.31.0 h1:ffjsj1aRouKewfr85U2aGagJ46+MvodynlQ1HY
 go.opentelemetry.io/otel/trace v1.31.0/go.mod h1:TXZkRk7SM2ZQLtR6eoAWQFIHPvzQ06FJAsO1tJg480A=
 go.step.sm/crypto v0.56.0 h1:KcFfV76cI9Xaw8bdSc9x55skyuSdcHcTdL37vvVZnvY=
 go.step.sm/crypto v0.56.0/go.mod h1:snWNloxY9s1W+HsFqcviq55nvzbqqX6LxVt0Vktv5mw=
-go.step.sm/linkedca v0.22.2 h1:zmFIyDC77gFHo6FLQJ8OIXYpLYDIsgDWaYqtYs6A9/Q=
-go.step.sm/linkedca v0.22.2/go.mod h1:ESY8r5VfhJA8ZVzI6hXIQcEX9LwaY3aoPnT+Hb9jpbw=
 go.uber.org/mock v0.5.0 h1:KAMbZvZPyBPWgD14IrIQ38QCyjwpvVVV6K/bHl1IwQU=
 go.uber.org/mock v0.5.0/go.mod h1:ge71pBPLYDk7QIi1LupWxdAykm7KIEFchiOqd6z7qMM=
 go.uber.org/multierr v1.11.0 h1:blXXJkSxSSfBVBlC76pxqeO+LN3aDfLQo+309xJstO0=
@@ -542,6 +542,8 @@ google.golang.org/genproto/googleapis/rpc v0.0.0-20241209162323-e6fa225c2576 h1:
 google.golang.org/genproto/googleapis/rpc v0.0.0-20241209162323-e6fa225c2576/go.mod h1:5uTbfoYQed2U9p3KIj2/Zzm02PYhndfdmML0qC3q3FU=
 google.golang.org/grpc v1.69.2 h1:U3S9QEtbXC0bYNvRtcoklF3xGtLViumSYxWykJS+7AU=
 google.golang.org/grpc v1.69.2/go.mod h1:vyjdE6jLBI76dgpDojsFGNaHlxdjXN9ghpnd2o7JGZ4=
+google.golang.org/grpc/cmd/protoc-gen-go-grpc v1.5.1 h1:F29+wU6Ee6qgu9TddPgooOdaqsxTMunOoj8KA5yuS5A=
+google.golang.org/grpc/cmd/protoc-gen-go-grpc v1.5.1/go.mod h1:5KF+wpkbTSbGcR9zteSqZV6fqFOWBl4Yde8En8MryZA=
 google.golang.org/protobuf v1.36.1 h1:yBPeRvTftaleIgM3PZ/WBIZ7XM/eEYAaEyCwvyjq/gk=
 google.golang.org/protobuf v1.36.1/go.mod h1:9fA7Ob0pmnwhb644+1+CVWFRbNajQ6iRojtC/QF5bRE=
 gopkg.in/check.v1 v0.0.0-20161208181325-20d25e280405/go.mod h1:Co6ibVJAznAaIkqp8huTwlJQCZ016jof/cbN4VW5Yz0=

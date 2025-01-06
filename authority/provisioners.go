@@ -13,8 +13,8 @@ import (
 
 	"github.com/smallstep/cli-utils/step"
 	"github.com/smallstep/cli-utils/ui"
+	"github.com/smallstep/linkedca"
 	"go.step.sm/crypto/jose"
-	"go.step.sm/linkedca"
 
 	"github.com/smallstep/certificates/authority/admin"
 	"github.com/smallstep/certificates/authority/config"

@@ -16,7 +16,7 @@ import (
 	"github.com/google/go-cmp/cmp/cmpopts"
 	"google.golang.org/protobuf/types/known/timestamppb"
 
-	"go.step.sm/linkedca"
+	"github.com/smallstep/linkedca"
 
 	"github.com/smallstep/assert"
 	"github.com/smallstep/certificates/authority/admin"

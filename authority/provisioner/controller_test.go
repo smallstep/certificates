@@ -12,10 +12,10 @@ import (
 	"github.com/smallstep/certificates/authority/policy"
 	"github.com/smallstep/certificates/internal/httptransport"
 	"github.com/smallstep/certificates/webhook"
+	"github.com/smallstep/linkedca"
 	"github.com/stretchr/testify/assert"
 	"go.step.sm/crypto/pemutil"
 	"go.step.sm/crypto/x509util"
-	"go.step.sm/linkedca"
 	"golang.org/x/crypto/ssh"
 )
 

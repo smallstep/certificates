@@ -17,7 +17,7 @@ import (
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/types/known/timestamppb"
 
-	"go.step.sm/linkedca"
+	"github.com/smallstep/linkedca"
 
 	"github.com/smallstep/assert"
 	"github.com/smallstep/certificates/acme"

@@ -9,7 +9,7 @@ import (
 	"github.com/go-jose/go-jose/v3"
 	"github.com/stretchr/testify/assert"
 
-	"go.step.sm/linkedca"
+	"github.com/smallstep/linkedca"
 
 	"github.com/smallstep/certificates/authority/admin"
 	"github.com/smallstep/certificates/authority/administrator"

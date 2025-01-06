@@ -10,7 +10,7 @@ import (
 	authconfig "github.com/smallstep/certificates/authority/config"
 	"github.com/smallstep/certificates/authority/provisioner"
 	"github.com/smallstep/certificates/templates"
-	"go.step.sm/linkedca"
+	"github.com/smallstep/linkedca"
 )
 
 type helmVariables struct {

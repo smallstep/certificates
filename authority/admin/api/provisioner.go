@@ -6,9 +6,9 @@ import (
 
 	"github.com/go-chi/chi/v5"
 
+	"github.com/smallstep/linkedca"
 	"go.step.sm/crypto/sshutil"
 	"go.step.sm/crypto/x509util"
-	"go.step.sm/linkedca"
 
 	"github.com/smallstep/certificates/api"
 	"github.com/smallstep/certificates/api/read"

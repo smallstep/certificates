@@ -15,7 +15,7 @@ import (
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/reflect/protoreflect"
 
-	"go.step.sm/linkedca"
+	"github.com/smallstep/linkedca"
 
 	"github.com/smallstep/certificates/errs"
 )

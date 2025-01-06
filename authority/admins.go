@@ -5,7 +5,7 @@ import (
 
 	"github.com/smallstep/certificates/authority/admin"
 	"github.com/smallstep/certificates/authority/provisioner"
-	"go.step.sm/linkedca"
+	"github.com/smallstep/linkedca"
 )
 
 // LoadAdminByID returns an *linkedca.Admin with the given ID.

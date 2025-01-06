@@ -17,11 +17,11 @@ import (
 	"github.com/pkg/errors"
 	"golang.org/x/crypto/ssh"
 
+	"github.com/smallstep/linkedca"
 	"go.step.sm/crypto/kms"
 	kmsapi "go.step.sm/crypto/kms/apiv1"
 	"go.step.sm/crypto/kms/sshagentkms"
 	"go.step.sm/crypto/pemutil"
-	"go.step.sm/linkedca"
 
 	"github.com/smallstep/certificates/authority/admin"
 	adminDBNosql "github.com/smallstep/certificates/authority/admin/db/nosql"
