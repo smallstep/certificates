@@ -50,6 +50,8 @@ func reservePort(t *testing.T) (host, port string) {
 }
 
 func Test_reflectRequestID(t *testing.T) {
+	ctx := context.Background()
+
 	dir := t.TempDir()
 	m, err := minica.New(minica.WithName("Step E2E"))
 	require.NoError(t, err)
@@ -133,8 +135,11 @@ func Test_reflectRequestID(t *testing.T) {
 		require.ErrorIs(t, err, http.ErrServerClosed)
 	}()
 
+	// require the CA server to be available within 10 seconds,
+	// failing the test if it doesn't.
+	requireCAServerToBeAvailable(t, net.JoinHostPort("localhost", port), 10*time.Second)
+
 	// require OK health response as the baseline
-	ctx := context.Background()
 	healthResponse, err := caClient.HealthWithContext(ctx)
 	require.NoError(t, err)
 	if assert.NotNil(t, healthResponse) {
@@ -262,8 +267,8 @@ func newAuthorizingServer(t *testing.T, mca *minica.CA) *httptest.Server {
 
 	srv := httptest.NewUnstartedServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if assert.Equal(t, "signRequestID", r.Header.Get("X-Request-Id")) {
-			json.NewEncoder(w).Encode(struct{ Allow bool }{Allow: true})
-			w.WriteHeader(http.StatusOK)
+			err := json.NewEncoder(w).Encode(struct{ Allow bool }{Allow: true})
+			require.NoError(t, err)
 			return
 		}
 
@@ -286,4 +291,31 @@ func newAuthorizingServer(t *testing.T, mca *minica.CA) *httptest.Server {
 	}
 
 	return srv
+}
+
+func requireCAServerToBeAvailable(t *testing.T, address string, timeout time.Duration) {
+	t.Helper()
+
+	ctx, cancel := context.WithTimeout(context.Background(), timeout)
+	defer cancel()
+
+	for !canConnect(ctx, address) {
+		select {
+		case <-ctx.Done():
+			require.FailNow(t, fmt.Sprintf("CA server failed to start at https://%s within %s", address, timeout.String()))
+		case <-time.After(100 * time.Millisecond):
+		}
+	}
+}
+
+func canConnect(ctx context.Context, address string) bool {
+	d := net.Dialer{Timeout: 5 * time.Second}
+	conn, err := d.DialContext(ctx, "tcp", address)
+	if err != nil {
+		return false
+	}
+
+	conn.Close()
+
+	return true
 }
