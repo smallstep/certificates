@@ -293,6 +293,9 @@ func newAuthorizingServer(t *testing.T, mca *minica.CA) *httptest.Server {
 	return srv
 }
 
+// requireCAServerToBeAvailable tries to connect to address to check a server
+// is available. It will retry the connection every ~100ms, until timeout occurs.
+// If no connection can be made, the test is failed.
 func requireCAServerToBeAvailable(t *testing.T, address string, timeout time.Duration) {
 	t.Helper()
 
@@ -309,7 +312,7 @@ func requireCAServerToBeAvailable(t *testing.T, address string, timeout time.Dur
 }
 
 func canConnect(ctx context.Context, address string) bool {
-	d := net.Dialer{Timeout: 5 * time.Second}
+	d := net.Dialer{}
 	conn, err := d.DialContext(ctx, "tcp", address)
 	if err != nil {
 		return false
