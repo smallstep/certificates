@@ -20,6 +20,7 @@ import (
 	"go.step.sm/crypto/sshutil"
 	"go.step.sm/crypto/x509util"
 
+	"github.com/smallstep/certificates/authority/provisioner/gcp"
 	"github.com/smallstep/certificates/errs"
 	"github.com/smallstep/certificates/webhook"
 )
@@ -71,6 +72,12 @@ func newGCPConfig() *gcpConfig {
 	}
 }
 
+// projectValidator is an interface to enable testing without using
+// gcp.OrganizationProjectValidator.
+type projectValidator interface {
+	ValidateProject(ctx context.Context, projectID string) error
+}
+
 // GCP is the provisioner that supports identity tokens created by the Google
 // Cloud Platform metadata API.
 //
@@ -93,6 +100,7 @@ type GCP struct {
 	Name                   string   `json:"name"`
 	ServiceAccounts        []string `json:"serviceAccounts"`
 	ProjectIDs             []string `json:"projectIDs"`
+	OrganizationID         string   `json:"organizationID"`
 	DisableCustomSANs      bool     `json:"disableCustomSANs"`
 	DisableTrustOnFirstUse bool     `json:"disableTrustOnFirstUse"`
 	DisableSSHCAUser       *bool    `json:"disableSSHCAUser,omitempty"`
@@ -103,6 +111,7 @@ type GCP struct {
 	config                 *gcpConfig
 	keyStore               *keyStore
 	ctl                    *Controller
+	projectValidator       projectValidator
 }
 
 // GetID returns the provisioner unique identifier. The name should uniquely
@@ -233,14 +242,22 @@ func (p *GCP) Init(config Config) (err error) {
 	}
 
 	config.Audiences = config.Audiences.WithFragment(p.GetIDForToken())
-	p.ctl, err = NewController(p, p.Claims, config, p.Options)
+
+	if p.ctl, err = NewController(p, p.Claims, config, p.Options); err != nil {
+		return
+	}
+
+	if p.projectValidator, err = gcp.NewOrganizationValidator(context.Background(), p.ProjectIDs, p.OrganizationID); err != nil {
+		return
+	}
+
 	return
 }
 
 // AuthorizeSign validates the given token and returns the sign options that
 // will be used on certificate creation.
 func (p *GCP) AuthorizeSign(ctx context.Context, token string) ([]SignOption, error) {
-	claims, err := p.authorizeToken(token)
+	claims, err := p.authorizeToken(ctx, token)
 	if err != nil {
 		return nil, errs.Wrap(http.StatusInternalServerError, err, "gcp.AuthorizeSign")
 	}
@@ -315,7 +332,7 @@ func (p *GCP) assertConfig() {
 // authorizeToken performs common jwt authorization actions and returns the
 // claims for case specific downstream parsing.
 // e.g. a Sign request will auth/validate different fields than a Revoke request.
-func (p *GCP) authorizeToken(token string) (*gcpPayload, error) {
+func (p *GCP) authorizeToken(ctx context.Context, token string) (*gcpPayload, error) {
 	jwt, err := jose.ParseSigned(token)
 	if err != nil {
 		return nil, errs.Wrap(http.StatusUnauthorized, err, "gcp.authorizeToken; error parsing gcp token")
@@ -368,17 +385,8 @@ func (p *GCP) authorizeToken(token string) (*gcpPayload, error) {
 	}
 
 	// validate projects
-	if len(p.ProjectIDs) > 0 {
-		var found bool
-		for _, pi := range p.ProjectIDs {
-			if pi == claims.Google.ComputeEngine.ProjectID {
-				found = true
-				break
-			}
-		}
-		if !found {
-			return nil, errs.Unauthorized("gcp.authorizeToken; invalid gcp token - invalid project id")
-		}
+	if err := p.projectValidator.ValidateProject(ctx, claims.Google.ComputeEngine.ProjectID); err != nil {
+		return nil, err
 	}
 
 	// validate instance age
@@ -414,7 +422,7 @@ func (p *GCP) AuthorizeSSHSign(ctx context.Context, token string) ([]SignOption,
 		return nil, err
 	}
 
-	claims, err := p.authorizeToken(token)
+	claims, err := p.authorizeToken(ctx, token)
 	if err != nil {
 		return nil, errs.Wrap(http.StatusInternalServerError, err, "gcp.AuthorizeSSHSign")
 	}
