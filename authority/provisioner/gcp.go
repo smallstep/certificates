@@ -233,6 +233,10 @@ func (p *GCP) Init(config Config) (err error) {
 		return errors.New("provisioner instanceAge cannot be negative")
 	}
 
+	if len(p.ProjectIDs) > 0 && p.OrganizationID != "" {
+		return errors.New("provisioner cannot have both `projectIDs` and `organizationID` set")
+	}
+
 	// Initialize config
 	p.assertConfig()
 

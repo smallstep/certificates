@@ -49,9 +49,7 @@ func NewOrganizationValidator(ctx context.Context, projectIDs []string, organiza
 }
 
 func (p *OrganizationValidator) ValidateProject(ctx context.Context, projectID string) error {
-	err := p.ProjectValidator.ValidateProject(ctx, projectID)
-
-	if p.OrganizationID == "" {
+	if err := p.ProjectValidator.ValidateProject(ctx, projectID); err != nil {
 		return err
 	}
 
