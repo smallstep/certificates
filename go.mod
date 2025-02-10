@@ -1,7 +1,6 @@
 module github.com/smallstep/certificates
 
-go 1.22.0
-toolchain go1.22.12
+go 1.22.12
 
 require (
 	cloud.google.com/go/longrunning v0.6.4
