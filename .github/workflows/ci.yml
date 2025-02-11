@@ -18,7 +18,7 @@ concurrency:
 
 jobs:
   ci:
-    uses: smallstep/workflows/.github/workflows/goCI.yml@main
+    uses: smallstep/workflows/.github/workflows/goCI.yml@b62a79e912bdd6a71cd11a72b55bbf82ddbbd94b
     with:
       only-latest-golang: false
       os-dependencies: 'libpcsclite-dev'
