@@ -309,7 +309,6 @@ func (o *Order) Finalize(ctx context.Context, db DB, csr *x509.CertificateReques
 		// Add subproblem for webhook errors, others can be added later.
 		var webhookErr *webhook.Error
 		if errors.As(err, &webhookErr) {
-			//nolint:govet // ignore non-constant format string
 			acmeError := NewDetailedError(ErrorUnauthorizedType, webhookErr.Error())
 			acmeError.AddSubproblems(Subproblem{
 				Type:   fmt.Sprintf("urn:smallstep:acme:error:%s", webhookErr.Code),

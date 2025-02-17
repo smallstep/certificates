@@ -9,10 +9,13 @@ import (
 	"time"
 
 	"github.com/pkg/errors"
-	"github.com/smallstep/certificates/authority/provisioner"
+	"golang.org/x/crypto/ssh"
+
 	"github.com/smallstep/nosql"
 	"github.com/smallstep/nosql/database"
-	"golang.org/x/crypto/ssh"
+
+	"github.com/smallstep/certificates/authority/provisioner"
+	"github.com/smallstep/certificates/internal/cast"
 )
 
 var (
@@ -465,7 +468,7 @@ func (db *DB) GetSSHHostPrincipals() ([]string, error) {
 		if err := json.Unmarshal(e.Value, &data); err != nil {
 			return nil, err
 		}
-		if time.Unix(int64(data.Expiry), 0).After(time.Now()) {
+		if time.Unix(cast.Int64(data.Expiry), 0).After(time.Now()) {
 			principals = append(principals, string(e.Key))
 		}
 	}
