@@ -15,6 +15,7 @@ import (
 	"go.step.sm/crypto/x509util"
 
 	"github.com/smallstep/certificates/errs"
+	"github.com/smallstep/certificates/internal/cast"
 	"github.com/smallstep/certificates/webhook"
 )
 
@@ -332,10 +333,10 @@ func (p *X5C) AuthorizeSSHSign(_ context.Context, token string) ([]SignOption, e
 	// Add modifiers from custom claims
 	t := now()
 	if !opts.ValidAfter.IsZero() {
-		signOptions = append(signOptions, sshCertValidAfterModifier(opts.ValidAfter.RelativeTime(t).Unix()))
+		signOptions = append(signOptions, sshCertValidAfterModifier(cast.Uint64(opts.ValidAfter.RelativeTime(t).Unix())))
 	}
 	if !opts.ValidBefore.IsZero() {
-		signOptions = append(signOptions, sshCertValidBeforeModifier(opts.ValidBefore.RelativeTime(t).Unix()))
+		signOptions = append(signOptions, sshCertValidBeforeModifier(cast.Uint64(opts.ValidBefore.RelativeTime(t).Unix())))
 	}
 
 	return append(signOptions,

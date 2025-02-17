@@ -19,6 +19,7 @@ import (
 	"github.com/smallstep/certificates/authority/provisioner"
 	"github.com/smallstep/certificates/db"
 	"github.com/smallstep/certificates/errs"
+	"github.com/smallstep/certificates/internal/cast"
 	"github.com/smallstep/certificates/templates"
 	"github.com/smallstep/certificates/webhook"
 )
@@ -356,7 +357,7 @@ func (a *Authority) renewSSH(ctx context.Context, oldCert *ssh.Certificate) (*ss
 	}
 
 	backdate := a.config.AuthorityConfig.Backdate.Duration
-	duration := time.Duration(oldCert.ValidBefore-oldCert.ValidAfter) * time.Second
+	duration := time.Duration(cast.Int64(oldCert.ValidBefore-oldCert.ValidAfter)) * time.Second
 	now := time.Now()
 	va := now.Add(-1 * backdate)
 	vb := now.Add(duration - backdate)
@@ -370,8 +371,8 @@ func (a *Authority) renewSSH(ctx context.Context, oldCert *ssh.Certificate) (*ss
 		ValidPrincipals: oldCert.ValidPrincipals,
 		Permissions:     oldCert.Permissions,
 		Reserved:        oldCert.Reserved,
-		ValidAfter:      uint64(va.Unix()),
-		ValidBefore:     uint64(vb.Unix()),
+		ValidAfter:      cast.Uint64(va.Unix()),
+		ValidBefore:     cast.Uint64(vb.Unix()),
 	}
 
 	// Get signer from authority keys
@@ -436,7 +437,7 @@ func (a *Authority) rekeySSH(ctx context.Context, oldCert *ssh.Certificate, pub 
 	}
 
 	backdate := a.config.AuthorityConfig.Backdate.Duration
-	duration := time.Duration(oldCert.ValidBefore-oldCert.ValidAfter) * time.Second
+	duration := time.Duration(cast.Int64(oldCert.ValidBefore-oldCert.ValidAfter)) * time.Second
 	now := time.Now()
 	va := now.Add(-1 * backdate)
 	vb := now.Add(duration - backdate)
@@ -450,8 +451,8 @@ func (a *Authority) rekeySSH(ctx context.Context, oldCert *ssh.Certificate, pub 
 		ValidPrincipals: oldCert.ValidPrincipals,
 		Permissions:     oldCert.Permissions,
 		Reserved:        oldCert.Reserved,
-		ValidAfter:      uint64(va.Unix()),
-		ValidBefore:     uint64(vb.Unix()),
+		ValidAfter:      cast.Uint64(va.Unix()),
+		ValidBefore:     cast.Uint64(vb.Unix()),
 	}
 
 	// Get signer from authority keys

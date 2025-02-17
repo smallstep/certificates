@@ -368,9 +368,7 @@ func TestTemplate_Output(t *testing.T) {
 }
 
 func TestOutput_Write(t *testing.T) {
-	dir, err := os.MkdirTemp("", "test-output-write")
-	assert.FatalError(t, err)
-	defer os.RemoveAll(dir)
+	dir := t.TempDir()
 
 	join := func(elem ...string) string {
 		elems := append([]string{dir}, elem...)

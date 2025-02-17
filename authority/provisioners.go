@@ -22,6 +22,7 @@ import (
 	"github.com/smallstep/certificates/authority/provisioner"
 	"github.com/smallstep/certificates/db"
 	"github.com/smallstep/certificates/errs"
+	"github.com/smallstep/certificates/internal/cast"
 )
 
 type raProvisioner interface {
@@ -1257,10 +1258,10 @@ func ProvisionerToLinkedca(p provisioner.Interface) (*linkedca.Provisioner, erro
 						ForceCn:                       p.ForceCN,
 						Challenge:                     p.ChallengePassword,
 						Capabilities:                  p.Capabilities,
-						MinimumPublicKeyLength:        int32(p.MinimumPublicKeyLength),
+						MinimumPublicKeyLength:        cast.Int32(p.MinimumPublicKeyLength),
 						IncludeRoot:                   p.IncludeRoot,
 						ExcludeIntermediate:           p.ExcludeIntermediate,
-						EncryptionAlgorithmIdentifier: int32(p.EncryptionAlgorithmIdentifier),
+						EncryptionAlgorithmIdentifier: cast.Int32(p.EncryptionAlgorithmIdentifier),
 						Decrypter: &linkedca.SCEPDecrypter{
 							Certificate: p.DecrypterCertificate,
 							Key:         p.DecrypterKeyPEM,

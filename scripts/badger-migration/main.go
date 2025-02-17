@@ -13,6 +13,7 @@ import (
 	badgerv1 "github.com/dgraph-io/badger"
 	badgerv2 "github.com/dgraph-io/badger/v2"
 
+	"github.com/smallstep/certificates/internal/cast"
 	"github.com/smallstep/nosql"
 )
 
@@ -306,9 +307,9 @@ func parseBadgerEncode(bk []byte) (value, rest []byte) {
 	var (
 		keyLen uint16
 		start  = uint16(2)
-		length = uint16(len(bk))
+		length = cast.Uint16(len(bk))
 	)
-	if uint16(len(bk)) < start {
+	if cast.Uint16(len(bk)) < start {
 		return nil, bk
 	}
 	// First 2 bytes stores the length of the value.
