@@ -215,7 +215,7 @@ func (a *Authority) signSSH(ctx context.Context, key ssh.PublicKey, opts provisi
 	for _, v := range keyValidators {
 		if err := v.Valid(key); err != nil {
 			return nil, nil, errs.ApplyOptions(
-				errs.ForbiddenErr(err, err.Error()), //nolint:govet // allow non-constant error messages
+				errs.ForbiddenErr(err, err.Error()),
 				errs.WithKeyVal("signOptions", signOpts),
 			)
 		}
@@ -232,7 +232,7 @@ func (a *Authority) signSSH(ctx context.Context, key ssh.PublicKey, opts provisi
 	// Call enriching webhooks
 	if err := a.callEnrichingWebhooksSSH(ctx, prov, webhookCtl, cr); err != nil {
 		return nil, prov, errs.ApplyOptions(
-			errs.ForbiddenErr(err, err.Error()), //nolint:govet // allow non-constant error messages
+			errs.ForbiddenErr(err, err.Error()),
 			errs.WithKeyVal("signOptions", signOpts),
 		)
 	}
@@ -244,7 +244,7 @@ func (a *Authority) signSSH(ctx context.Context, key ssh.PublicKey, opts provisi
 		switch {
 		case errors.As(err, &te):
 			return nil, prov, errs.ApplyOptions(
-				errs.BadRequestErr(err, err.Error()), //nolint:govet // allow non-constant error messages
+				errs.BadRequestErr(err, err.Error()),
 				errs.WithKeyVal("signOptions", signOpts),
 			)
 		case strings.HasPrefix(err.Error(), "error unmarshaling certificate"):
@@ -264,7 +264,7 @@ func (a *Authority) signSSH(ctx context.Context, key ssh.PublicKey, opts provisi
 	// Use SignSSHOptions to modify the certificate validity. It will be later
 	// checked or set if not defined.
 	if err := opts.ModifyValidity(certTpl); err != nil {
-		return nil, prov, errs.BadRequestErr(err, err.Error()) //nolint:govet // allow non-constant error messages
+		return nil, prov, errs.BadRequestErr(err, err.Error())
 	}
 
 	// Use provisioner modifiers.
