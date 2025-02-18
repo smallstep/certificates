@@ -14,6 +14,7 @@ import (
 	"go.step.sm/crypto/x509util"
 
 	"github.com/smallstep/certificates/errs"
+	"github.com/smallstep/certificates/internal/cast"
 )
 
 // jwtPayload extends jwt.Claims with step attributes.
@@ -249,7 +250,7 @@ func (p *JWK) AuthorizeSSHSign(_ context.Context, token string) ([]SignOption, e
 	// Use options in the token.
 	if opts.CertType != "" {
 		if certType, err = sshutil.CertTypeFromString(opts.CertType); err != nil {
-			return nil, errs.BadRequestErr(err, err.Error()) //nolint:govet // allow non-constant error messages
+			return nil, errs.BadRequestErr(err, err.Error())
 		}
 	}
 	if opts.KeyID != "" {
@@ -274,10 +275,10 @@ func (p *JWK) AuthorizeSSHSign(_ context.Context, token string) ([]SignOption, e
 	// Add modifiers from custom claims
 	t := now()
 	if !opts.ValidAfter.IsZero() {
-		signOptions = append(signOptions, sshCertValidAfterModifier(opts.ValidAfter.RelativeTime(t).Unix()))
+		signOptions = append(signOptions, sshCertValidAfterModifier(cast.Uint64(opts.ValidAfter.RelativeTime(t).Unix())))
 	}
 	if !opts.ValidBefore.IsZero() {
-		signOptions = append(signOptions, sshCertValidBeforeModifier(opts.ValidBefore.RelativeTime(t).Unix()))
+		signOptions = append(signOptions, sshCertValidBeforeModifier(cast.Uint64(opts.ValidBefore.RelativeTime(t).Unix())))
 	}
 
 	return append(signOptions,

@@ -8,9 +8,12 @@ import (
 	"reflect"
 	"time"
 
-	"github.com/smallstep/certificates/errs"
-	"go.step.sm/crypto/sshutil"
 	"golang.org/x/crypto/ssh"
+
+	"go.step.sm/crypto/sshutil"
+
+	"github.com/smallstep/certificates/errs"
+	"github.com/smallstep/certificates/internal/cast"
 )
 
 func validateSSHCertificate(cert *ssh.Certificate, opts *SignSSHOptions) error {
@@ -30,9 +33,9 @@ func validateSSHCertificate(cert *ssh.Certificate, opts *SignSSHOptions) error {
 	case opts.CertType == "host" && cert.CertType != ssh.HostCert:
 		return fmt.Errorf("certificate type is not valid, want %v, got %v", ssh.HostCert, cert.CertType)
 	case cert.ValidAfter != uint64(opts.ValidAfter.Unix()):
-		return fmt.Errorf("certificate valid after is not valid, want %v, got %v", opts.ValidAfter.Unix(), time.Unix(int64(cert.ValidAfter), 0))
+		return fmt.Errorf("certificate valid after is not valid, want %v, got %v", opts.ValidAfter.Unix(), time.Unix(cast.Int64(cert.ValidAfter), 0))
 	case cert.ValidBefore != uint64(opts.ValidBefore.Unix()):
-		return fmt.Errorf("certificate valid after is not valid, want %v, got %v", opts.ValidAfter.Unix(), time.Unix(int64(cert.ValidAfter), 0))
+		return fmt.Errorf("certificate valid after is not valid, want %v, got %v", opts.ValidAfter.Unix(), time.Unix(cast.Int64(cert.ValidAfter), 0))
 	case opts.CertType == "user" && len(cert.Extensions) != 5:
 		return fmt.Errorf("certificate extensions number is invalid, want 5, got %d", len(cert.Extensions))
 	case opts.CertType == "host" && len(cert.Extensions) != 0:
@@ -90,7 +93,7 @@ func signSSHCertificate(key crypto.PublicKey, opts SignSSHOptions, signOpts []Si
 		var templErr *sshutil.TemplateError
 		if errors.As(err, &templErr) {
 			return nil, errs.NewErr(http.StatusBadRequest, templErr,
-				errs.WithMessage(templErr.Error()), //nolint:govet // allow non-constant error messages
+				errs.WithMessage(templErr.Error()),
 				errs.WithKeyVal("signOptions", signOpts),
 			)
 		}

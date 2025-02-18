@@ -10,6 +10,7 @@ import (
 	"github.com/smallstep/certificates/api/render"
 	"github.com/smallstep/certificates/authority/provisioner"
 	"github.com/smallstep/certificates/errs"
+	"github.com/smallstep/certificates/internal/cast"
 )
 
 // SSHRekeyRequest is the request body of an SSH certificate request.
@@ -80,8 +81,8 @@ func SSHRekey(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Match identity cert with the SSH cert
-	notBefore := time.Unix(int64(oldCert.ValidAfter), 0)
-	notAfter := time.Unix(int64(oldCert.ValidBefore), 0)
+	notBefore := time.Unix(cast.Int64(oldCert.ValidAfter), 0)
+	notAfter := time.Unix(cast.Int64(oldCert.ValidBefore), 0)
 
 	identity, err := renewIdentityCertificate(r, notBefore, notAfter)
 	if err != nil {
