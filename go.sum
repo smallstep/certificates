@@ -235,8 +235,8 @@ github.com/hashicorp/vault/api v1.16.0 h1:nbEYGJiAPGzT9U4oWgaaB0g+Rj8E59QuHKyA5L
 github.com/hashicorp/vault/api v1.16.0/go.mod h1:KhuUhzOD8lDSk29AtzNjgAu2kxRA9jL9NAbkFlqvkBA=
 github.com/hashicorp/vault/api/auth/approle v0.9.0 h1:FdpspwGVWnGiWmAxd5L1Yd+T+fX2kYnyAIvI5oGdvNs=
 github.com/hashicorp/vault/api/auth/approle v0.9.0/go.mod h1:fvtJhBs3AYMs2fXk4U5+u+7unhUGuboiKzFpLPpIazw=
-github.com/hashicorp/vault/api/auth/aws v0.8.0 h1:6E14D7eHjV+Ytk8HmKLbTGS/LaXD9hP2FXe7IIKCrHc=
-github.com/hashicorp/vault/api/auth/aws v0.8.0/go.mod h1:SweK5366gCeO5krBk6Fpjz/MX2oa+iiIZz/Nu8/nMZw=
+github.com/hashicorp/vault/api/auth/aws v0.9.0 h1:XtV/fRhgf/MaPv5SLBgXf+Yn/QGjFYIlJkdcPktDlbc=
+github.com/hashicorp/vault/api/auth/aws v0.9.0/go.mod h1:DvUmnZg9T+HGYdkagNMCssdgbt9ODAyBjllY8PpaMvM=
 github.com/hashicorp/vault/api/auth/kubernetes v0.9.0 h1:xV3xXMtSV8tq5iefueAw3OOdhhXyjnyhrQkIFM5fh54=
 github.com/hashicorp/vault/api/auth/kubernetes v0.9.0/go.mod h1:3K6uEUKZLBQ3d+eXAa4Ubp4UocswU90zY4QP5Az3Vw8=
 github.com/huandu/xstrings v1.5.0 h1:2ag3IFq9ZDANvthTwTiqSSZLjDc+BedvHPAp5tJy2TI=
