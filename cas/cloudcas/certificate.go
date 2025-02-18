@@ -12,7 +12,10 @@ import (
 
 	pb "cloud.google.com/go/security/privateca/apiv1/privatecapb"
 	"github.com/pkg/errors"
+
 	kmsapi "go.step.sm/crypto/kms/apiv1"
+
+	"github.com/smallstep/certificates/internal/cast"
 )
 
 var (
@@ -250,7 +253,7 @@ func createX509Parameters(cert *x509.Certificate) *pb.X509Parameters {
 			maxPathLength = 0
 			caOptions.MaxIssuerPathLength = &maxPathLength
 		case cert.MaxPathLen > 0:
-			maxPathLength = int32(cert.MaxPathLen)
+			maxPathLength = cast.Int32(cert.MaxPathLen)
 			caOptions.MaxIssuerPathLength = &maxPathLength
 		}
 		caOptions.IsCa = &cert.IsCA
@@ -304,7 +307,7 @@ func isExtraExtension(oid asn1.ObjectIdentifier) bool {
 func createObjectID(oid asn1.ObjectIdentifier) *pb.ObjectId {
 	ret := make([]int32, len(oid))
 	for i, v := range oid {
-		ret[i] = int32(v)
+		ret[i] = cast.Int32(v)
 	}
 	return &pb.ObjectId{
 		ObjectIdPath: ret,

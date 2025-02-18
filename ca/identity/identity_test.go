@@ -187,10 +187,7 @@ func Test_fileExists(t *testing.T) {
 }
 
 func TestWriteDefaultIdentity(t *testing.T) {
-	tmpDir, err := os.MkdirTemp(os.TempDir(), "go-tests")
-	if err != nil {
-		t.Fatal(err)
-	}
+	tmpDir := t.TempDir()
 
 	oldConfigDir := configDir
 	oldIdentityDir := identityDir
@@ -372,10 +369,7 @@ func (r *renewer) Renew(http.RoundTripper) (*api.SignResponse, error) {
 }
 
 func TestIdentity_Renew(t *testing.T) {
-	tmpDir, err := os.MkdirTemp(os.TempDir(), "go-tests")
-	if err != nil {
-		t.Fatal(err)
-	}
+	tmpDir := t.TempDir()
 
 	oldIdentityDir := identityDir
 	identityDir = returnInput("testdata/identity")
