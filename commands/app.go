@@ -197,7 +197,7 @@ func appAction(ctx *cli.Context) error {
 			return errors.New(`'step-ca' requires the '--token' flag for linked deploy type.
 
 To get a linked authority token:
-  1. Log in or create a Certificate Manager account at ` + "\033[1mhttps://u.step.sm/linked\033[0m" + `
+  1. Contact us at ` + "\033[1mhttps://u.step.sm/cm\033[0m" + ` to create a new Certificate Manager account
   2. Add a new authority and select "Link a step-ca instance"
   3. Follow instructions in browser to start 'step-ca' using the '--token' flag
 `)

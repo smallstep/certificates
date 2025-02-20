@@ -749,7 +749,7 @@ func (p *PKI) askFeedback() {
 	if p.options.deploymentType == LinkedDeployment {
 		ui.Println()
 		ui.Println("\033[1mNEXT STEPS\033[0m")
-		ui.Println("  1. Log in or create a Certificate Manager account at \033[1mhttps://u.step.sm/linked\033[0m")
+		ui.Println("  1. Contact us at \033[1mhttps://u.step.sm/cm\033[0m to create a Certificate Manager account")
 		ui.Println("  2. Add a new authority and select \"Link a step-ca instance\"")
 		ui.Println("  3. Follow instructions in browser to start `step-ca` using the `--token` flag")
 		ui.Println()
