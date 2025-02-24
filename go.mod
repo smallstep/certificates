@@ -1,6 +1,6 @@
 module github.com/smallstep/certificates
 
-go 1.22.12
+go 1.23.6
 
 require (
 	cloud.google.com/go/longrunning v0.6.4
@@ -38,7 +38,7 @@ require (
 	github.com/urfave/cli v1.22.16
 	go.step.sm/crypto v0.58.0
 	go.uber.org/mock v0.5.0
-	golang.org/x/crypto v0.33.0
+	golang.org/x/crypto v0.34.0
 	golang.org/x/exp v0.0.0-20240318143956-a85f2c67cd81
 	golang.org/x/net v0.35.0
 	google.golang.org/api v0.221.0
