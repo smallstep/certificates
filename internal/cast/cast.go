@@ -68,11 +68,11 @@ func Int32[T signed](x T) int32 {
 	return i32
 }
 
-func SafeUint32(x int) (uint32, error) {
+func SafeUint32[T signed](x T) (uint32, error) {
 	return safecast.ToUint32(x)
 }
 
-func Uint32(x int) uint32 {
+func Uint32[T signed](x T) uint32 {
 	u32, err := SafeUint32(x)
 	if err != nil {
 		panic(err)
