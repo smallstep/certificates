@@ -77,7 +77,7 @@ func NewAdminClient(endpoint string, opts ...ClientOption) (*AdminClient, error)
 	}
 
 	return &AdminClient{
-		client:      newClient(tr),
+		client:      newClient(tr, o.timeout),
 		endpoint:    u,
 		retryFunc:   o.retryFunc,
 		opts:        opts,

@@ -22,6 +22,7 @@ import (
 	"path/filepath"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/pkg/errors"
 	"golang.org/x/net/http2"
@@ -53,10 +54,11 @@ type uaClient struct {
 	Client *http.Client
 }
 
-func newClient(transport http.RoundTripper) *uaClient {
+func newClient(transport http.RoundTripper, timeout time.Duration) *uaClient {
 	return &uaClient{
 		Client: &http.Client{
 			Transport: transport,
+			Timeout:   timeout,
 		},
 	}
 }
@@ -149,6 +151,7 @@ type ClientOption func(o *clientOptions) error
 
 type clientOptions struct {
 	transport            http.RoundTripper
+	timeout              time.Duration
 	rootSHA256           string
 	rootFilename         string
 	rootBundle           []byte
@@ -388,6 +391,16 @@ func WithRetryFunc(fn RetryFunc) ClientOption {
 	}
 }
 
+// WithTimeout defines the time limit for requests made by this client. The
+// timeout includes connection time, any redirects, and reading the response
+// body.
+func WithTimeout(d time.Duration) ClientOption {
+	return func(o *clientOptions) error {
+		o.timeout = d
+		return nil
+	}
+}
+
 func getTransportFromFile(filename string) (http.RoundTripper, error) {
 	data, err := os.ReadFile(filename)
 	if err != nil {
@@ -548,6 +561,7 @@ type Client struct {
 	client    *uaClient
 	endpoint  *url.URL
 	retryFunc RetryFunc
+	timeout   time.Duration
 	opts      []ClientOption
 }
 
@@ -568,9 +582,10 @@ func NewClient(endpoint string, opts ...ClientOption) (*Client, error) {
 	}
 
 	return &Client{
-		client:    newClient(tr),
+		client:    newClient(tr, o.timeout),
 		endpoint:  u,
 		retryFunc: o.retryFunc,
+		timeout:   o.timeout,
 		opts:      opts,
 	}, nil
 }
@@ -890,7 +905,7 @@ func (c *Client) RevokeWithContext(ctx context.Context, req *api.RevokeRequest, 
 	var uaClient *uaClient
 retry:
 	if tr != nil {
-		uaClient = newClient(tr)
+		uaClient = newClient(tr, c.timeout)
 	} else {
 		uaClient = c.client
 	}
