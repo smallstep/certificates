@@ -36,7 +36,7 @@ require (
 	github.com/smallstep/scep v0.0.0-20240926084937-8cf1ca453101
 	github.com/stretchr/testify v1.10.0
 	github.com/urfave/cli v1.22.16
-	go.step.sm/crypto v0.58.0
+	go.step.sm/crypto v0.59.0
 	go.uber.org/mock v0.5.0
 	golang.org/x/crypto v0.35.0
 	golang.org/x/exp v0.0.0-20240318143956-a85f2c67cd81
