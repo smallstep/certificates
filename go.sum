@@ -426,8 +426,8 @@ go.opentelemetry.io/otel/sdk/metric v1.32.0 h1:rZvFnvmvawYb0alrYkjraqJq0Z4ZUJAiy
 go.opentelemetry.io/otel/sdk/metric v1.32.0/go.mod h1:PWeZlq0zt9YkYAp3gjKZ0eicRYvOh1Gd+X99x6GHpCQ=
 go.opentelemetry.io/otel/trace v1.34.0 h1:+ouXS2V8Rd4hp4580a8q23bg0azF2nI8cqLYnC8mh/k=
 go.opentelemetry.io/otel/trace v1.34.0/go.mod h1:Svm7lSjQD7kG7KJ/MUHPVXSDGz2OX4h0M2jHBhmSfRE=
-go.step.sm/crypto v0.58.0 h1:PrrtM9fP8Y7A7193WnZDu2bqEZu7jc7M8+CCkDarMtw=
-go.step.sm/crypto v0.58.0/go.mod h1:yluOL5OqY7mXGGQ7JUmAv/6h8T8Ge3yXdlEESWHOqDQ=
+go.step.sm/crypto v0.59.0 h1:BDEbdyYJpp0yOSx7dmT+9git2/BXfkCsCzJKOj3v9RI=
+go.step.sm/crypto v0.59.0/go.mod h1:wz5S8Q0NI/x22TIWQxdGD+ioHa+ge2FbkcPmbXUzNao=
 go.uber.org/mock v0.5.0 h1:KAMbZvZPyBPWgD14IrIQ38QCyjwpvVVV6K/bHl1IwQU=
 go.uber.org/mock v0.5.0/go.mod h1:ge71pBPLYDk7QIi1LupWxdAykm7KIEFchiOqd6z7qMM=
 go.uber.org/multierr v1.11.0 h1:blXXJkSxSSfBVBlC76pxqeO+LN3aDfLQo+309xJstO0=
