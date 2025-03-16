@@ -197,7 +197,7 @@ release:
 
     ```
     cosign verify-blob \
-      --certificate step-ca_darwin_{{ .Version }}_amd64.tar.gz.sig.pem \
+      --certificate step-ca_darwin_{{ .Version }}_amd64.tar.gz.pem \
       --signature step-ca_darwin_{{ .Version }}_amd64.tar.gz.sig \
       --certificate-identity-regexp "https://github\.com/smallstep/workflows/.*" \
       --certificate-oidc-issuer https://token.actions.githubusercontent.com \
