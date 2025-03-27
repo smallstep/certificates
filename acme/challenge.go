@@ -22,6 +22,7 @@ import (
 	"net"
 	"net/url"
 	"reflect"
+	"slices"
 	"strconv"
 	"strings"
 	"time"
@@ -29,12 +30,12 @@ import (
 	"github.com/coreos/go-oidc/v3/oidc"
 	"github.com/fxamacker/cbor/v2"
 	"github.com/google/go-tpm/legacy/tpm2"
+
 	"github.com/smallstep/go-attestation/attest"
 	"go.step.sm/crypto/jose"
 	"go.step.sm/crypto/keyutil"
 	"go.step.sm/crypto/pemutil"
 	"go.step.sm/crypto/x509util"
-	"golang.org/x/exp/slices"
 
 	"github.com/smallstep/certificates/acme/wire"
 	"github.com/smallstep/certificates/authority/provisioner"
@@ -95,10 +96,28 @@ type Challenge struct {
 
 // ToLog enables response logging.
 func (ch *Challenge) ToLog() (interface{}, error) {
-	b, err := json.Marshal(ch)
+	type Record struct {
+		Type        ChallengeType `json:"type"`
+		Status      Status        `json:"status"`
+		Token       string        `json:"token"`
+		ValidatedAt string        `json:"validated,omitempty"`
+		URL         string        `json:"url"`
+		Target      string        `json:"target,omitempty"`
+		Error       errorRecord   `json:"error,omitempty"`
+	}
+	b, err := json.Marshal(Record{
+		Type:        ch.Type,
+		Status:      ch.Status,
+		Token:       ch.Token,
+		ValidatedAt: ch.ValidatedAt,
+		URL:         ch.URL,
+		Target:      ch.Target,
+		Error:       newErrorRecord(ch.Error),
+	})
 	if err != nil {
 		return nil, WrapErrorISE(err, "error marshaling challenge for logging")
 	}
+
 	return string(b), nil
 }
 
