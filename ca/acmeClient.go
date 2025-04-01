@@ -11,9 +11,11 @@ import (
 	"strings"
 
 	"github.com/pkg/errors"
+
+	"go.step.sm/crypto/jose"
+
 	"github.com/smallstep/certificates/acme"
 	acmeAPI "github.com/smallstep/certificates/acme/api"
-	"go.step.sm/crypto/jose"
 )
 
 // ACMEClient implements an HTTP client to an ACME API.
@@ -29,7 +31,7 @@ type ACMEClient struct {
 // NewACMEClient initializes a new ACMEClient.
 func NewACMEClient(endpoint string, contact []string, opts ...ClientOption) (*ACMEClient, error) {
 	// Retrieve transport from options.
-	o := new(clientOptions)
+	o := defaultClientOptions()
 	if err := o.apply(opts); err != nil {
 		return nil, err
 	}

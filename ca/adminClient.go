@@ -60,14 +60,23 @@ func (e *AdminClientError) Error() string {
 	return e.Message
 }
 
+// defaultClientOptions returns a new [clientOptions] with a
+// default timeout set.
+func defaultClientOptions() clientOptions {
+	return clientOptions{
+		timeout: 15 * time.Second,
+	}
+}
+
 // NewAdminClient creates a new AdminClient with the given endpoint and options.
 func NewAdminClient(endpoint string, opts ...ClientOption) (*AdminClient, error) {
 	u, err := parseEndpoint(endpoint)
 	if err != nil {
 		return nil, err
 	}
+
 	// Retrieve transport from options.
-	o := new(clientOptions)
+	o := defaultClientOptions()
 	if err := o.apply(opts); err != nil {
 		return nil, err
 	}
@@ -77,7 +86,7 @@ func NewAdminClient(endpoint string, opts ...ClientOption) (*AdminClient, error)
 	}
 
 	return &AdminClient{
-		client:      newClient(tr),
+		client:      newClient(tr, o.timeout),
 		endpoint:    u,
 		retryFunc:   o.retryFunc,
 		opts:        opts,
@@ -124,7 +133,7 @@ func (c *AdminClient) generateAdminToken(aud *url.URL) (string, error) {
 func (c *AdminClient) retryOnError(r *http.Response) bool {
 	if c.retryFunc != nil {
 		if c.retryFunc(r.StatusCode) {
-			o := new(clientOptions)
+			o := defaultClientOptions()
 			if err := o.apply(c.opts); err != nil {
 				return false
 			}
