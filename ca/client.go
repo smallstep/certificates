@@ -571,8 +571,9 @@ func NewClient(endpoint string, opts ...ClientOption) (*Client, error) {
 	if err != nil {
 		return nil, err
 	}
+
 	// Retrieve transport from options.
-	o := new(clientOptions)
+	o := defaultClientOptions()
 	if err := o.apply(opts); err != nil {
 		return nil, err
 	}
@@ -593,7 +594,7 @@ func NewClient(endpoint string, opts ...ClientOption) (*Client, error) {
 func (c *Client) retryOnError(r *http.Response) bool {
 	if c.retryFunc != nil {
 		if c.retryFunc(r.StatusCode) {
-			o := new(clientOptions)
+			o := defaultClientOptions()
 			if err := o.apply(c.opts); err != nil {
 				return false
 			}

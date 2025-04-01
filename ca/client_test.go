@@ -1038,11 +1038,11 @@ func TestClient_WithTimeout(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			c, err := NewClient(srv.URL, tt.options...)
 			require.NoError(t, err)
+			assert.NotZero(t, c.timeout)
 			_, err = c.Health()
 			tt.assertion(t, err)
 		})
 	}
-
 }
 
 func Test_enforceRequestID(t *testing.T) {
