@@ -1019,7 +1019,7 @@ func TestClient_GetCaURL(t *testing.T) {
 
 func TestClient_WithTimeout(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		time.Sleep(100 * time.Millisecond)
+		time.Sleep(200 * time.Millisecond)
 		render.JSONStatus(w, r, api.HealthResponse{Status: "ok"}, 200)
 	}))
 	defer srv.Close()
@@ -1030,8 +1030,8 @@ func TestClient_WithTimeout(t *testing.T) {
 		assertion assert.ErrorAssertionFunc
 	}{
 		{"ok", []ClientOption{WithTransport(http.DefaultTransport)}, assert.NoError},
-		{"ok with timeout", []ClientOption{WithTransport(http.DefaultTransport), WithTimeout(time.Second)}, assert.NoError},
-		{"fail with timeout", []ClientOption{WithTransport(http.DefaultTransport), WithTimeout(100 * time.Millisecond)}, assert.Error},
+		{"ok with timeout", []ClientOption{WithTransport(http.DefaultTransport), WithTimeout(5 * time.Second)}, assert.NoError},
+		{"fail with timeout", []ClientOption{WithTransport(http.DefaultTransport), WithTimeout(10 * time.Millisecond)}, assert.Error},
 	}
 
 	for _, tt := range tests {
