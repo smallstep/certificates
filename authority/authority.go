@@ -711,8 +711,9 @@ func (a *Authority) init() error {
 	case a.requiresSCEP() && a.GetSCEP() == nil:
 		if a.scepOptions == nil {
 			options := &scep.Options{
-				Roots:         a.rootX509Certs,
-				Intermediates: a.intermediateX509Certs,
+				Roots:          a.rootX509Certs,
+				Intermediates:  a.intermediateX509Certs,
+				SkipValidation: a.config.SkipSCEPValidation,
 			}
 
 			// intermediate certificates can be empty in RA mode
