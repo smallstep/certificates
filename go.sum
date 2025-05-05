@@ -8,8 +8,8 @@ cloud.google.com/go/compute/metadata v0.6.0 h1:A6hENjEsCDtC1k8byVsgwvVcioamEHvZ4
 cloud.google.com/go/compute/metadata v0.6.0/go.mod h1:FjyFAW1MW0C203CEOMDTu3Dk1FlqW3Rga40jzHL4hfg=
 cloud.google.com/go/iam v1.5.0 h1:QlLcVMhbLGOjRcGe6VTGGTyQib8dRLK2B/kYNV0+2xs=
 cloud.google.com/go/iam v1.5.0/go.mod h1:U+DOtKQltF/LxPEtcDLoobcsZMilSRwR7mgNL7knOpo=
-cloud.google.com/go/kms v1.21.1 h1:r1Auo+jlfJSf8B7mUnVw5K0fI7jWyoUy65bV53VjKyk=
-cloud.google.com/go/kms v1.21.1/go.mod h1:s0wCyByc9LjTdCjG88toVs70U9W+cc6RKFc8zAqX7nE=
+cloud.google.com/go/kms v1.21.2 h1:c/PRUSMNQ8zXrc1sdAUnsenWWaNXN+PzTXfXOcSFdoE=
+cloud.google.com/go/kms v1.21.2/go.mod h1:8wkMtHV/9Z8mLXEXr1GK7xPSBdi6knuLXIhqjuWcI6w=
 cloud.google.com/go/longrunning v0.6.7 h1:IGtfDWHhQCgCjwQjV9iiLnUta9LBCo8R9QmAFsS/PrE=
 cloud.google.com/go/longrunning v0.6.7/go.mod h1:EAFV3IZAKmM56TyiE6VAP3VoTzhZzySwI/YI1s/nRsY=
 cloud.google.com/go/security v1.18.5 h1:6hqzvuwC8za9jyCTxygmEHnp4vZ8hfhwKVArxSCAVCo=
@@ -420,8 +420,8 @@ go.opentelemetry.io/otel/sdk/metric v1.35.0 h1:1RriWBmCKgkeHEhM7a2uMjMUfP7MsOF5J
 go.opentelemetry.io/otel/sdk/metric v1.35.0/go.mod h1:is6XYCUMpcKi+ZsOvfluY5YstFnhW0BidkR+gL+qN+w=
 go.opentelemetry.io/otel/trace v1.35.0 h1:dPpEfJu1sDIqruz7BHFG3c7528f6ddfSWfFDVt/xgMs=
 go.opentelemetry.io/otel/trace v1.35.0/go.mod h1:WUk7DtFp1Aw2MkvqGdwiXYDZZNvA/1J8o6xRXLrIkyc=
-go.step.sm/crypto v0.61.0 h1:rW7He7LCzhOFn9JIf/XzgTjt4Djpf1KhdXHfbXUVFpY=
-go.step.sm/crypto v0.61.0/go.mod h1:rYubsWIX9j9xzi/aXXr2eFSzoTN3sklTAxJYucBqZaY=
+go.step.sm/crypto v0.63.0 h1:U1QGELQqJ85oDfeNFE2V52cow1rvy0m3MekG3wFmyXY=
+go.step.sm/crypto v0.63.0/go.mod h1:aj3LETmCZeSil1DMq3BlbhDBcN86+mmKrHZtXWyc0L4=
 go.uber.org/mock v0.5.2 h1:LbtPTcP8A5k9WPXj54PPPbjcI4Y6lhyOZXn+VS7wNko=
 go.uber.org/mock v0.5.2/go.mod h1:wLlUxC2vVTPTaE3UD51E0BGOAElKrILxhVSDYQLld5o=
 go.uber.org/multierr v1.11.0 h1:blXXJkSxSSfBVBlC76pxqeO+LN3aDfLQo+309xJstO0=
