@@ -27,9 +27,14 @@ function init_if_possible () {
 
 function generate_password () {
     set +o pipefail
-    < /dev/urandom tr -dc A-Za-z0-9 | head -c40
+    < /dev/urandom tr -dc A-Za-z0-9 | head -c256
     echo
     set -o pipefail
+}
+
+function set_password_files () {
+    ln -sf "${DOCKER_STEPCA_INIT_PASSWORD_FILE}" "${STEPPATH}/password"
+    ln -sf "${DOCKER_STEPCA_INIT_PASSWORD_FILE}" "${STEPPATH}/provisioner_password"
 }
 
 # Initialize a CA if not already initialized
@@ -47,8 +52,7 @@ function step_ca_init () {
         --address "${DOCKER_STEPCA_INIT_ADDRESS}"
     )
     if [ -n "${DOCKER_STEPCA_INIT_PASSWORD_FILE}" ]; then
-        cat < "${DOCKER_STEPCA_INIT_PASSWORD_FILE}" > "${STEPPATH}/password"
-        cat < "${DOCKER_STEPCA_INIT_PASSWORD_FILE}" > "${STEPPATH}/provisioner_password"
+	set_password_files
     elif [ -n "${DOCKER_STEPCA_INIT_PASSWORD}" ]; then
         echo "${DOCKER_STEPCA_INIT_PASSWORD}" > "${STEPPATH}/password"
         echo "${DOCKER_STEPCA_INIT_PASSWORD}" > "${STEPPATH}/provisioner_password"
@@ -84,6 +88,10 @@ fi
 
 if [ ! -f "${STEPPATH}/config/ca.json" ]; then
     init_if_possible
+fi
+
+if [ -n "${DOCKER_STEPCA_PASSWORD_FILE}" ]; then
+    set_password_files
 fi
 
 exec "${@}"
