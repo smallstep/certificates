@@ -129,7 +129,7 @@ func validateEABJWS(ctx context.Context, jws *jose.JSONWebSignature) (string, *a
 	keyID := header.KeyID
 	nonce := header.Nonce
 
-	if !(algorithm == jose.HS256 || algorithm == jose.HS384 || algorithm == jose.HS512) {
+	if algorithm != jose.HS256 && algorithm != jose.HS384 && algorithm != jose.HS512 {
 		return "", acme.NewError(acme.ErrorMalformedType, "'alg' field set to invalid algorithm '%s'", algorithm)
 	}
 

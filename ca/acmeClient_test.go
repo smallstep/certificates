@@ -112,11 +112,11 @@ func TestNewACMEClient(t *testing.T) {
 			i := 0
 			srv.Config.Handler = http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 				assert.Equals(t, "step-http-client/1.0", r.Header.Get("User-Agent")) // check default User-Agent header
-				switch {
-				case i == 0:
+				switch i {
+				case 0:
 					render.JSONStatus(w, r, tc.r1, tc.rc1)
 					i++
-				case i == 1:
+				case 1:
 					w.Header().Set("Replay-Nonce", "abc123")
 					render.JSONStatus(w, r, []byte{}, 200)
 					i++

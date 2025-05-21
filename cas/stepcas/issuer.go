@@ -91,8 +91,8 @@ func validateX5CIssuer(iss *apiv1.CertificateIssuer) error {
 // not given, then it will download it from the CA. If the password is not set
 // it will be prompted.
 func validateJWKIssuer(iss *apiv1.CertificateIssuer) error {
-	switch {
-	case iss.Provisioner == "":
+	switch iss.Provisioner {
+	case "":
 		return errors.New("stepCAS `certificateIssuer.provisioner` cannot be empty")
 	default:
 		return nil
