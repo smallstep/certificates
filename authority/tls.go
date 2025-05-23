@@ -197,7 +197,7 @@ func (a *Authority) signX509(ctx context.Context, csr *x509.CertificateRequest, 
 
 	if err := a.callEnrichingWebhooksX509(ctx, prov, webhookCtl, attData, csr); err != nil {
 		return nil, prov, errs.ApplyOptions(
-			errs.ForbiddenErr(err, err.Error()), //nolint:govet // allow non-constant error messages
+			errs.ForbiddenErr(err, err.Error()),
 			errs.WithKeyVal("csr", csr),
 			errs.WithKeyVal("signOptions", signOpts),
 		)
@@ -209,7 +209,7 @@ func (a *Authority) signX509(ctx context.Context, csr *x509.CertificateRequest, 
 		switch {
 		case errors.As(err, &te):
 			return nil, prov, errs.ApplyOptions(
-				errs.BadRequestErr(err, err.Error()), //nolint:govet // allow non-constant error messages
+				errs.BadRequestErr(err, err.Error()),
 				errs.WithKeyVal("csr", csr),
 				errs.WithKeyVal("signOptions", signOpts),
 			)
@@ -610,7 +610,7 @@ func (a *Authority) Revoke(ctx context.Context, revokeOpts *RevokeOptions) error
 	}
 
 	// If not mTLS nor ACME, then get the TokenID of the token.
-	if !(revokeOpts.MTLS || revokeOpts.ACME) {
+	if !revokeOpts.MTLS && !revokeOpts.ACME {
 		token, err := jose.ParseSigned(revokeOpts.OTT)
 		if err != nil {
 			return errs.Wrap(http.StatusUnauthorized, err, "authority.Revoke; error parsing token", opts...)

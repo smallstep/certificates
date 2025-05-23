@@ -45,7 +45,7 @@ jobs:
           echo "DOCKER_TAGS_HSM=${{ env.DOCKER_TAGS_HSM }},${{ env.DOCKER_IMAGE }}:hsm" >> "${GITHUB_ENV}"
       - name: Create Release
         id: create_release
-        uses: softprops/action-gh-release@c062e08bd532815e2082a85e87e3ef29c3e6d191 # v2.0.8
+        uses: softprops/action-gh-release@da05d552573ad5aba039eaac05058a918a7bf631 # v2.2.2
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
@@ -59,7 +59,11 @@ jobs:
     permissions:
       id-token: write
       contents: write
+      packages: write
     uses: smallstep/workflows/.github/workflows/goreleaser.yml@main
+    with:
+      enable-packages-upload: true
+      is-prerelease: ${{ needs.create_release.outputs.is_prerelease == 'true' }}
     secrets: inherit
 
   build_upload_docker:

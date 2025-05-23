@@ -10,11 +10,12 @@ import (
 	"time"
 
 	"github.com/smallstep/certificates/authority/policy"
+	"github.com/smallstep/certificates/internal/httptransport"
 	"github.com/smallstep/certificates/webhook"
+	"github.com/smallstep/linkedca"
 	"github.com/stretchr/testify/assert"
 	"go.step.sm/crypto/pemutil"
 	"go.step.sm/crypto/x509util"
-	"go.step.sm/linkedca"
 	"golang.org/x/crypto/ssh"
 )
 
@@ -79,14 +80,16 @@ func TestNewController(t *testing.T) {
 		wantErr bool
 	}{
 		{"ok", args{&JWK{}, nil, Config{
-			Claims:     globalProvisionerClaims,
-			Audiences:  testAudiences,
-			HTTPClient: &http.Client{},
+			Claims:        globalProvisionerClaims,
+			Audiences:     testAudiences,
+			HTTPClient:    &http.Client{},
+			WrapTransport: httptransport.NoopWrapper(),
 		}, nil}, &Controller{
-			Interface:  &JWK{},
-			Audiences:  &testAudiences,
-			Claimer:    mustClaimer(t, nil, globalProvisionerClaims),
-			httpClient: &http.Client{},
+			Interface:     &JWK{},
+			Audiences:     &testAudiences,
+			Claimer:       mustClaimer(t, nil, globalProvisionerClaims),
+			httpClient:    &http.Client{},
+			wrapTransport: httptransport.NoopWrapper(),
 		}, false},
 		{"ok with claims", args{&JWK{}, &Claims{
 			DisableRenewal: &defaultDisableRenewal,
@@ -99,6 +102,7 @@ func TestNewController(t *testing.T) {
 			Claimer: mustClaimer(t, &Claims{
 				DisableRenewal: &defaultDisableRenewal,
 			}, globalProvisionerClaims),
+			wrapTransport: httptransport.NoopWrapper(),
 		}, false},
 		{"ok with claims and options", args{&JWK{}, &Claims{
 			DisableRenewal: &defaultDisableRenewal,
@@ -111,7 +115,8 @@ func TestNewController(t *testing.T) {
 			Claimer: mustClaimer(t, &Claims{
 				DisableRenewal: &defaultDisableRenewal,
 			}, globalProvisionerClaims),
-			policy: mustNewPolicyEngine(t, options),
+			policy:        mustNewPolicyEngine(t, options),
+			wrapTransport: httptransport.NoopWrapper(),
 		}, false},
 		{"fail claimer", args{&JWK{}, &Claims{
 			MinTLSDur: mustDuration(t, "24h"),
@@ -140,6 +145,14 @@ func TestNewController(t *testing.T) {
 				t.Errorf("NewController() error = %v, wantErr %v", err, tt.wantErr)
 				return
 			}
+
+			// A function can only be compared to nil
+			if tt.want != nil && got != nil {
+				assert.NotNil(t, got.wrapTransport)
+				tt.want.wrapTransport = nil
+				got.wrapTransport = nil
+			}
+
 			if !reflect.DeepEqual(got, tt.want) {
 				t.Errorf("NewController() = %v, want %v", got, tt.want)
 			}
@@ -512,11 +525,18 @@ func Test_newWebhookController(t *testing.T) {
 			options:      opts,
 		}},
 	}
+
 	for _, tt := range tests {
-		c := &Controller{}
-		got := c.newWebhookController(tt.args.templateData, tt.args.certType, tt.args.opts...)
-		if !reflect.DeepEqual(got, tt.want) {
-			t.Errorf("newWebhookController() = %v, want %v", got, tt.want)
+		c := Controller{
+			webhookClient: new(http.Client),
+			wrapTransport: httptransport.NoopWrapper(),
 		}
+		got := c.newWebhookController(tt.args.templateData, tt.args.certType, tt.args.opts...)
+
+		assert.Equal(t, tt.args.templateData, got.TemplateData)
+		assert.Same(t, c.webhookClient, got.client)
+		assert.Equal(t, c.webhooks, got.webhooks)
+		assert.Equal(t, tt.args.opts, got.options)
+		assert.Equal(t, tt.args.certType, got.certType)
 	}
 }

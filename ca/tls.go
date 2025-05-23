@@ -62,7 +62,7 @@ func init() {
 		}
 		mTLSDialContext = func() func(ctx context.Context, network, address string) (net.Conn, error) {
 			d := &tls.Dialer{
-				NetDialer: getDefaultDialer(),
+				NetDialer: createDefaultDialer(),
 				Config: &tls.Config{
 					MinVersion:           tls.VersionTLS12,
 					RootCAs:              pool,
@@ -132,8 +132,7 @@ func (c *Client) getClientTLSConfig(ctx context.Context, sign *api.SignResponse,
 	}
 
 	tr := getDefaultTransport(tlsConfig)
-	tr.DialTLS = c.buildDialTLS(tlsCtx)
-	// tr.DialTLSContext = c.buildDialTLSContext(tlsCtx)
+	tr.DialTLSContext = c.buildDialTLSContext(tlsCtx)
 	renewer.RenewCertificate = getRenewFunc(tlsCtx, c, tr, pk) //nolint:contextcheck // deeply nested context
 
 	// Update client transport
@@ -179,8 +178,7 @@ func (c *Client) GetServerTLSConfig(ctx context.Context, sign *api.SignResponse,
 
 	// Update renew function with transport
 	tr := getDefaultTransport(tlsConfig)
-	tr.DialTLS = c.buildDialTLS(tlsCtx)
-	// tr.DialTLSContext = c.buildDialTLSContext(tlsCtx)
+	tr.DialTLSContext = c.buildDialTLSContext(tlsCtx)
 	renewer.RenewCertificate = getRenewFunc(tlsCtx, c, tr, pk) //nolint:contextcheck // deeply nested context
 
 	// Update client transport
@@ -212,17 +210,10 @@ func (c *Client) buildGetConfigForClient(ctx *TLSOptionCtx) func(*tls.ClientHell
 	}
 }
 
-// buildDialTLS returns an implementation of DialTLS callback in http.Transport.
-func (c *Client) buildDialTLS(ctx *TLSOptionCtx) func(network, addr string) (net.Conn, error) {
-	return func(network, addr string) (net.Conn, error) {
-		return tls.DialWithDialer(getDefaultDialer(), network, addr, ctx.mutableConfig.TLSConfig())
-	}
-}
-
-//nolint:unused // buildDialTLSContext returns an implementation of DialTLSContext callback in http.Transport.
+// buildDialTLSContext returns an implementation of DialTLSContext callback in http.Transport.
 func (c *Client) buildDialTLSContext(tlsCtx *TLSOptionCtx) func(ctx context.Context, network, addr string) (net.Conn, error) {
 	return func(ctx context.Context, network, addr string) (net.Conn, error) {
-		d := getDefaultDialer()
+		d := createDefaultDialer()
 		// TLS dialers do not support context, but we can use the context
 		// deadline if it is set.
 		if t, ok := ctx.Deadline(); ok {
@@ -300,8 +291,8 @@ func getDefaultTLSConfig(sign *api.SignResponse) *tls.Config {
 	}
 }
 
-// getDefaultDialer returns a new dialer with the default configuration.
-func getDefaultDialer() *net.Dialer {
+// createDefaultDialer returns a new dialer with the default configuration.
+func createDefaultDialer() *net.Dialer {
 	// With the KeepAlive parameter set to 0, it will be use Golang's default.
 	return &net.Dialer{
 		Timeout:   30 * time.Second,
@@ -325,7 +316,7 @@ func getDefaultTransport(tlsConfig *tls.Config) *http.Transport {
 		// context if it is available, required and expected to work.
 		dialContext = nil
 	case mTLSDialContext == nil:
-		d := getDefaultDialer()
+		d := createDefaultDialer()
 		dialContext = d.DialContext
 	default:
 		dialContext = mTLSDialContext()

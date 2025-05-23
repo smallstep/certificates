@@ -39,6 +39,7 @@ import (
 	"github.com/smallstep/certificates/acme/wire"
 	"github.com/smallstep/certificates/authority/provisioner"
 	wireprovisioner "github.com/smallstep/certificates/authority/provisioner/wire"
+	"github.com/smallstep/certificates/internal/cast"
 )
 
 type ChallengeType string
@@ -88,6 +89,8 @@ type Challenge struct {
 	URL             string        `json:"url"`
 	Target          string        `json:"target,omitempty"`
 	Error           *Error        `json:"error,omitempty"`
+	Payload         []byte        `json:"-"`
+	PayloadFormat   string        `json:"-"`
 }
 
 // ToLog enables response logging.
@@ -227,7 +230,7 @@ func tlsAlert(err error) uint8 {
 	if errors.As(err, &opErr) {
 		v := reflect.ValueOf(opErr.Err)
 		if v.Kind() == reflect.Uint8 {
-			return uint8(v.Uint())
+			return uint8(v.Uint()) //nolint:gosec // handled by checking its type
 		}
 	}
 	return 0
@@ -942,6 +945,8 @@ func deviceAttest01Validate(ctx context.Context, ch *Challenge, db DB, jwk *jose
 	ch.Status = StatusValid
 	ch.Error = nil
 	ch.ValidatedAt = clock.Now().Format(time.RFC3339)
+	ch.Payload = payload
+	ch.PayloadFormat = format
 
 	// Store the fingerprint in the authorization.
 	//
@@ -974,9 +979,9 @@ type tpmAttestationData struct {
 type coseAlgorithmIdentifier int32
 
 const (
-	coseAlgES256 coseAlgorithmIdentifier = -7
-	coseAlgRS256 coseAlgorithmIdentifier = -257
-	coseAlgRS1   coseAlgorithmIdentifier = -65535 // deprecated, but (still) often used in TPMs
+	coseAlgES256 = coseAlgorithmIdentifier(-7)
+	coseAlgRS256 = coseAlgorithmIdentifier(-257)
+	coseAlgRS1   = coseAlgorithmIdentifier(-65535) // deprecated, but (still) often used in TPMs
 )
 
 func doTPMAttestationFormat(_ context.Context, prov Provisioner, ch *Challenge, jwk *jose.JSONWebKey, att *attestationObject) (*tpmAttestationData, error) {
@@ -1101,8 +1106,13 @@ func doTPMAttestationFormat(_ context.Context, prov Provisioner, ch *Challenge, 
 		return nil, NewDetailedError(ErrorBadAttestationStatementType, "invalid alg in attestation statement")
 	}
 
+	algI32, err := cast.SafeInt32(alg)
+	if err != nil {
+		return nil, WrapDetailedError(ErrorBadAttestationStatementType, err, "invalid alg %d in attestation statement", alg)
+	}
+
 	var hash crypto.Hash
-	switch coseAlgorithmIdentifier(alg) {
+	switch coseAlgorithmIdentifier(algI32) {
 	case coseAlgRS256, coseAlgES256:
 		hash = crypto.SHA256
 	case coseAlgRS1:

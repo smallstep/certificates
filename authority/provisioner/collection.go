@@ -12,8 +12,10 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/smallstep/certificates/authority/admin"
 	"go.step.sm/crypto/jose"
+
+	"github.com/smallstep/certificates/authority/admin"
+	"github.com/smallstep/certificates/internal/cast"
 )
 
 // DefaultProvisionersLimit is the default limit for listing provisioners.
@@ -210,7 +212,7 @@ func (c *Collection) Store(p Interface) error {
 	// 0x00000000, 0x00000001, 0x00000002, ...
 	bi := make([]byte, 4)
 	sum := provisionerSum(p)
-	binary.BigEndian.PutUint32(bi, uint32(c.sorted.Len()))
+	binary.BigEndian.PutUint32(bi, cast.Uint32(c.sorted.Len()))
 	sum[0], sum[1], sum[2], sum[3] = bi[0], bi[1], bi[2], bi[3]
 	c.sorted = append(c.sorted, uidProvisioner{
 		provisioner: p,

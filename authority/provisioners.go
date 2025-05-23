@@ -11,10 +11,10 @@ import (
 
 	"github.com/pkg/errors"
 
-	"go.step.sm/cli-utils/step"
-	"go.step.sm/cli-utils/ui"
+	"github.com/smallstep/cli-utils/step"
+	"github.com/smallstep/cli-utils/ui"
+	"github.com/smallstep/linkedca"
 	"go.step.sm/crypto/jose"
-	"go.step.sm/linkedca"
 
 	"github.com/smallstep/certificates/authority/admin"
 	"github.com/smallstep/certificates/authority/config"
@@ -22,6 +22,7 @@ import (
 	"github.com/smallstep/certificates/authority/provisioner"
 	"github.com/smallstep/certificates/db"
 	"github.com/smallstep/certificates/errs"
+	"github.com/smallstep/certificates/internal/cast"
 )
 
 type raProvisioner interface {
@@ -202,6 +203,7 @@ func (a *Authority) generateProvisionerConfig(ctx context.Context) (provisioner.
 		AuthorizeSSHRenewFunc: a.authorizeSSHRenewFunc,
 		WebhookClient:         a.webhookClient,
 		HTTPClient:            a.httpClient,
+		WrapTransport:         a.wrapTransport,
 		SCEPKeyManager:        a.scepKeyManager,
 	}, nil
 }
@@ -955,6 +957,8 @@ func ProvisionerToCertificates(p *linkedca.Provisioner) (provisioner.Interface, 
 			ProjectIDs:             cfg.ProjectIds,
 			DisableCustomSANs:      cfg.DisableCustomSans,
 			DisableTrustOnFirstUse: cfg.DisableTrustOnFirstUse,
+			DisableSSHCAUser:       cfg.DisableSshCaUser,
+			DisableSSHCAHost:       cfg.DisableSshCaHost,
 			InstanceAge:            instanceAge,
 			Claims:                 claims,
 			Options:                options,
@@ -1095,6 +1099,8 @@ func ProvisionerToLinkedca(p provisioner.Interface) (*linkedca.Provisioner, erro
 						ProjectIds:             p.ProjectIDs,
 						DisableCustomSans:      p.DisableCustomSANs,
 						DisableTrustOnFirstUse: p.DisableTrustOnFirstUse,
+						DisableSshCaUser:       p.DisableSSHCAUser,
+						DisableSshCaHost:       p.DisableSSHCAHost,
 						InstanceAge:            p.InstanceAge.String(),
 					},
 				},
@@ -1252,10 +1258,10 @@ func ProvisionerToLinkedca(p provisioner.Interface) (*linkedca.Provisioner, erro
 						ForceCn:                       p.ForceCN,
 						Challenge:                     p.ChallengePassword,
 						Capabilities:                  p.Capabilities,
-						MinimumPublicKeyLength:        int32(p.MinimumPublicKeyLength),
+						MinimumPublicKeyLength:        cast.Int32(p.MinimumPublicKeyLength),
 						IncludeRoot:                   p.IncludeRoot,
 						ExcludeIntermediate:           p.ExcludeIntermediate,
-						EncryptionAlgorithmIdentifier: int32(p.EncryptionAlgorithmIdentifier),
+						EncryptionAlgorithmIdentifier: cast.Int32(p.EncryptionAlgorithmIdentifier),
 						Decrypter: &linkedca.SCEPDecrypter{
 							Certificate: p.DecrypterCertificate,
 							Key:         p.DecrypterKeyPEM,

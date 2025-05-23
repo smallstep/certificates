@@ -5,7 +5,7 @@ import (
 	"errors"
 	"fmt"
 
-	"go.step.sm/linkedca"
+	"github.com/smallstep/linkedca"
 
 	"github.com/smallstep/certificates/authority/admin"
 	authPolicy "github.com/smallstep/certificates/authority/policy"

@@ -20,7 +20,7 @@ type Provisioner interface {
 	GetDecrypter() (*x509.Certificate, crypto.Decrypter)
 	GetSigner() (*x509.Certificate, crypto.Signer)
 	GetContentEncryptionAlgorithm() int
-	ValidateChallenge(ctx context.Context, csr *x509.CertificateRequest, challenge, transactionID string) error
+	ValidateChallenge(ctx context.Context, csr *x509.CertificateRequest, challenge, transactionID string) ([]provisioner.SignCSROption, error)
 	NotifySuccess(ctx context.Context, csr *x509.CertificateRequest, cert *x509.Certificate, transactionID string) error
 	NotifyFailure(ctx context.Context, csr *x509.CertificateRequest, transactionID string, errorCode int, errorDescription string) error
 }

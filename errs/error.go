@@ -62,6 +62,11 @@ type ErrorResponse struct {
 	Message string `json:"message"`
 }
 
+// Unwrap implements the Unwrap interface and returns the original error.
+func (e *Error) Unwrap() error {
+	return e.Err
+}
+
 // Cause implements the errors.Causer interface and returns the original error.
 func (e *Error) Cause() error {
 	return e.Err

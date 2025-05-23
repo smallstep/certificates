@@ -5,7 +5,7 @@ import (
 	"errors"
 	"net/http"
 
-	"go.step.sm/linkedca"
+	"github.com/smallstep/linkedca"
 
 	"github.com/smallstep/certificates/acme"
 	"github.com/smallstep/certificates/api/read"

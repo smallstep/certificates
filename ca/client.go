@@ -22,23 +22,26 @@ import (
 	"path/filepath"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/pkg/errors"
+	"golang.org/x/net/http2"
+	"google.golang.org/protobuf/encoding/protojson"
+	"google.golang.org/protobuf/proto"
+
+	"github.com/smallstep/cli-utils/step"
+	"go.step.sm/crypto/jose"
+	"go.step.sm/crypto/keyutil"
+	"go.step.sm/crypto/pemutil"
+	"go.step.sm/crypto/randutil"
+	"go.step.sm/crypto/x509util"
+
 	"github.com/smallstep/certificates/api"
 	"github.com/smallstep/certificates/authority"
 	"github.com/smallstep/certificates/authority/provisioner"
 	"github.com/smallstep/certificates/ca/client"
 	"github.com/smallstep/certificates/ca/identity"
 	"github.com/smallstep/certificates/errs"
-	"go.step.sm/cli-utils/step"
-	"go.step.sm/crypto/jose"
-	"go.step.sm/crypto/keyutil"
-	"go.step.sm/crypto/pemutil"
-	"go.step.sm/crypto/randutil"
-	"go.step.sm/crypto/x509util"
-	"golang.org/x/net/http2"
-	"google.golang.org/protobuf/encoding/protojson"
-	"google.golang.org/protobuf/proto"
 )
 
 // DisableIdentity is a global variable to disable the identity.
@@ -51,10 +54,11 @@ type uaClient struct {
 	Client *http.Client
 }
 
-func newClient(transport http.RoundTripper) *uaClient {
+func newClient(transport http.RoundTripper, timeout time.Duration) *uaClient {
 	return &uaClient{
 		Client: &http.Client{
 			Transport: transport,
+			Timeout:   timeout,
 		},
 	}
 }
@@ -147,6 +151,7 @@ type ClientOption func(o *clientOptions) error
 
 type clientOptions struct {
 	transport            http.RoundTripper
+	timeout              time.Duration
 	rootSHA256           string
 	rootFilename         string
 	rootBundle           []byte
@@ -386,6 +391,16 @@ func WithRetryFunc(fn RetryFunc) ClientOption {
 	}
 }
 
+// WithTimeout defines the time limit for requests made by this client. The
+// timeout includes connection time, any redirects, and reading the response
+// body.
+func WithTimeout(d time.Duration) ClientOption {
+	return func(o *clientOptions) error {
+		o.timeout = d
+		return nil
+	}
+}
+
 func getTransportFromFile(filename string) (http.RoundTripper, error) {
 	data, err := os.ReadFile(filename)
 	if err != nil {
@@ -546,6 +561,7 @@ type Client struct {
 	client    *uaClient
 	endpoint  *url.URL
 	retryFunc RetryFunc
+	timeout   time.Duration
 	opts      []ClientOption
 }
 
@@ -555,8 +571,9 @@ func NewClient(endpoint string, opts ...ClientOption) (*Client, error) {
 	if err != nil {
 		return nil, err
 	}
+
 	// Retrieve transport from options.
-	o := new(clientOptions)
+	o := defaultClientOptions()
 	if err := o.apply(opts); err != nil {
 		return nil, err
 	}
@@ -566,9 +583,10 @@ func NewClient(endpoint string, opts ...ClientOption) (*Client, error) {
 	}
 
 	return &Client{
-		client:    newClient(tr),
+		client:    newClient(tr, o.timeout),
 		endpoint:  u,
 		retryFunc: o.retryFunc,
+		timeout:   o.timeout,
 		opts:      opts,
 	}, nil
 }
@@ -576,7 +594,7 @@ func NewClient(endpoint string, opts ...ClientOption) (*Client, error) {
 func (c *Client) retryOnError(r *http.Response) bool {
 	if c.retryFunc != nil {
 		if c.retryFunc(r.StatusCode) {
-			o := new(clientOptions)
+			o := defaultClientOptions()
 			if err := o.apply(c.opts); err != nil {
 				return false
 			}
@@ -888,7 +906,7 @@ func (c *Client) RevokeWithContext(ctx context.Context, req *api.RevokeRequest, 
 	var uaClient *uaClient
 retry:
 	if tr != nil {
-		uaClient = newClient(tr)
+		uaClient = newClient(tr, c.timeout)
 	} else {
 		uaClient = c.client
 	}

@@ -31,9 +31,9 @@ func main() {
 				name = r.TLS.PeerCertificates[0].Subject.CommonName
 				issuer = r.TLS.PeerCertificates[len(r.TLS.PeerCertificates)-1].Issuer.CommonName
 			}
-
-			w.Write([]byte(fmt.Sprintf("Hello %s (cert issued by '%s') at %s", name, issuer, time.Now().UTC())))
+			fmt.Fprintf(w, "Hello %s (cert issued by '%s') at %s", name, issuer, time.Now().UTC())
 		}),
+		ReadHeaderTimeout: 30 * time.Second,
 	}, ca.AddFederationToClientCAs(), ListTrustedRoots())
 	if err != nil {
 		panic(err)

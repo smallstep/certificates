@@ -15,10 +15,13 @@ import (
 	"time"
 
 	"github.com/pkg/errors"
+
+	"github.com/smallstep/linkedca"
+
+	"github.com/smallstep/certificates/internal/httptransport"
 	"github.com/smallstep/certificates/middleware/requestid"
 	"github.com/smallstep/certificates/templates"
 	"github.com/smallstep/certificates/webhook"
-	"go.step.sm/linkedca"
 )
 
 var ErrWebhookDenied = errors.New("webhook server did not allow request")
@@ -28,11 +31,12 @@ type WebhookSetter interface {
 }
 
 type WebhookController struct {
-	client       *http.Client
-	webhooks     []*Webhook
-	certType     linkedca.Webhook_CertType
-	options      []webhook.RequestBodyOption
-	TemplateData WebhookSetter
+	client        *http.Client
+	wrapTransport httptransport.Wrapper
+	webhooks      []*Webhook
+	certType      linkedca.Webhook_CertType
+	options       []webhook.RequestBodyOption
+	TemplateData  WebhookSetter
 }
 
 // Enrich fetches data from remote servers and adds returned data to the
@@ -60,11 +64,14 @@ func (wc *WebhookController) Enrich(ctx context.Context, req *webhook.RequestBod
 		whCtx, cancel := context.WithTimeout(ctx, time.Second*10)
 		defer cancel() //nolint:gocritic // every request canceled with its own timeout
 
-		resp, err := wh.DoWithContext(whCtx, wc.client, req, wc.TemplateData)
+		resp, err := wh.DoWithContext(whCtx, wc.client, wc.wrapTransport, req, wc.TemplateData)
 		if err != nil {
 			return err
 		}
 		if !resp.Allow {
+			if resp.Error != nil {
+				return resp.Error
+			}
 			return ErrWebhookDenied
 		}
 		wc.TemplateData.SetWebhook(wh.Name, resp.Data)
@@ -96,11 +103,14 @@ func (wc *WebhookController) Authorize(ctx context.Context, req *webhook.Request
 		whCtx, cancel := context.WithTimeout(ctx, time.Second*10)
 		defer cancel() //nolint:gocritic // every request canceled with its own timeout
 
-		resp, err := wh.DoWithContext(whCtx, wc.client, req, wc.TemplateData)
+		resp, err := wh.DoWithContext(whCtx, wc.client, wc.wrapTransport, req, wc.TemplateData)
 		if err != nil {
 			return err
 		}
 		if !resp.Allow {
+			if resp.Error != nil {
+				return resp.Error
+			}
 			return ErrWebhookDenied
 		}
 	}
@@ -132,7 +142,11 @@ type Webhook struct {
 	} `json:"-"`
 }
 
-func (w *Webhook) DoWithContext(ctx context.Context, client *http.Client, reqBody *webhook.RequestBody, data any) (*webhook.ResponseBody, error) {
+// TransportWrapper wraps the set of functions mapping [http.Transport] references to
+// [http.RoundTripper].
+type TransportWrapper = httptransport.Wrapper
+
+func (w *Webhook) DoWithContext(ctx context.Context, client *http.Client, tw TransportWrapper, reqBody *webhook.RequestBody, data any) (*webhook.ResponseBody, error) {
 	tmpl, err := template.New("url").Funcs(templates.StepFuncMap()).Parse(w.URL)
 	if err != nil {
 		return nil, err
@@ -194,15 +208,18 @@ retry:
 	if w.DisableTLSClientAuth {
 		transport, ok := client.Transport.(*http.Transport)
 		if !ok {
-			return nil, errors.New("client transport is not a *http.Transport")
+			transport = httptransport.New()
+		} else {
+			transport = transport.Clone()
 		}
-		transport = transport.Clone()
-		tlsConfig := transport.TLSClientConfig.Clone()
-		tlsConfig.GetClientCertificate = nil
-		tlsConfig.Certificates = nil
-		transport.TLSClientConfig = tlsConfig
+
+		if transport.TLSClientConfig != nil {
+			transport.TLSClientConfig.GetClientCertificate = nil
+			transport.TLSClientConfig.Certificates = nil
+		}
+
 		client = &http.Client{
-			Transport: transport,
+			Transport: tw(transport),
 		}
 	}
 	resp, err := client.Do(req)

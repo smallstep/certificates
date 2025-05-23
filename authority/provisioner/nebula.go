@@ -14,15 +14,16 @@ import (
 
 	"github.com/pkg/errors"
 	nebula "github.com/slackhq/nebula/cert"
+	"golang.org/x/crypto/ssh"
 
+	"github.com/smallstep/linkedca"
 	"go.step.sm/crypto/jose"
 	"go.step.sm/crypto/sshutil"
 	"go.step.sm/crypto/x25519"
 	"go.step.sm/crypto/x509util"
-	"go.step.sm/linkedca"
-	"golang.org/x/crypto/ssh"
 
 	"github.com/smallstep/certificates/errs"
+	"github.com/smallstep/certificates/internal/cast"
 )
 
 const (
@@ -62,9 +63,13 @@ func (p *Nebula) Init(config Config) (err error) {
 		return errors.New("provisioner root(s) cannot be empty")
 	}
 
-	p.caPool, err = nebula.NewCAPoolFromBytes(p.Roots)
+	var certErrors []error
+	p.caPool, certErrors, err = nebula.NewCAPoolFromBytes(p.Roots)
 	if err != nil {
-		return errs.InternalServer("failed to create ca pool: %v", err)
+		return errs.InternalServer("failed to create CA pool: %v", err)
+	}
+	if len(certErrors) > 0 {
+		return errs.InternalServer("failed to create CA pool: %v", certErrors)
 	}
 
 	config.Audiences = config.Audiences.WithFragment(p.GetIDForToken())
@@ -233,10 +238,10 @@ func (p *Nebula) AuthorizeSSHSign(_ context.Context, token string) ([]SignOption
 		// Add modifiers from custom claims
 		t := now()
 		if !opts.ValidAfter.IsZero() {
-			signOptions = append(signOptions, sshCertValidAfterModifier(opts.ValidAfter.RelativeTime(t).Unix()))
+			signOptions = append(signOptions, sshCertValidAfterModifier(cast.Uint64(opts.ValidAfter.RelativeTime(t).Unix())))
 		}
 		if !opts.ValidBefore.IsZero() {
-			signOptions = append(signOptions, sshCertValidBeforeModifier(opts.ValidBefore.RelativeTime(t).Unix()))
+			signOptions = append(signOptions, sshCertValidBeforeModifier(cast.Uint64(opts.ValidBefore.RelativeTime(t).Unix())))
 		}
 	}
 

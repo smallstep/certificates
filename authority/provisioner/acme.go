@@ -11,13 +11,13 @@ import (
 
 	"github.com/pkg/errors"
 	"github.com/smallstep/certificates/acme/wire"
-	"go.step.sm/linkedca"
+	"github.com/smallstep/linkedca"
 )
 
 // ACMEChallenge represents the supported acme challenges.
 type ACMEChallenge string
 
-//nolint:stylecheck,revive // better names
+//nolint:staticcheck,revive // better names
 const (
 	// HTTP_01 is the http-01 ACME challenge.
 	HTTP_01 ACMEChallenge = "http-01"

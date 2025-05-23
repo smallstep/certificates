@@ -14,10 +14,10 @@ import (
 
 	"github.com/pkg/errors"
 
+	"github.com/smallstep/linkedca"
 	"go.step.sm/crypto/jose"
 	"go.step.sm/crypto/sshutil"
 	"go.step.sm/crypto/x509util"
-	"go.step.sm/linkedca"
 
 	"github.com/smallstep/certificates/errs"
 	"github.com/smallstep/certificates/webhook"
@@ -379,7 +379,7 @@ func (p *Azure) AuthorizeSign(ctx context.Context, token string) ([]SignOption, 
 		// name will work only inside the virtual network
 		so = append(so,
 			commonNameValidator(name),
-			dnsNamesValidator([]string{name}),
+			dnsNamesSubsetValidator([]string{name}),
 			ipAddressesValidator(nil),
 			emailAddressesValidator(nil),
 			newURIsValidator(ctx, nil),

@@ -9,6 +9,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net"
+	"net/url"
 	"reflect"
 	"testing"
 	"time"
@@ -18,6 +19,8 @@ import (
 	"github.com/smallstep/assert"
 	"github.com/smallstep/certificates/authority"
 	"github.com/smallstep/certificates/authority/provisioner"
+	"github.com/smallstep/certificates/errs"
+	"github.com/smallstep/certificates/webhook"
 	"go.step.sm/crypto/keyutil"
 	"go.step.sm/crypto/x509util"
 )
@@ -590,6 +593,55 @@ func TestOrder_Finalize(t *testing.T) {
 				err: NewErrorISE("error signing certificate for order oID: force"),
 			}
 		},
+		"fail/webhook-error": func(t *testing.T) test {
+			now := clock.Now()
+			o := &Order{
+				ID:               "oID",
+				AccountID:        "accID",
+				Status:           StatusReady,
+				ExpiresAt:        now.Add(5 * time.Minute),
+				AuthorizationIDs: []string{"a", "b"},
+				Identifiers: []Identifier{
+					{Type: "dns", Value: "foo.internal"},
+					{Type: "dns", Value: "bar.internal"},
+				},
+			}
+			csr := &x509.CertificateRequest{
+				Subject: pkix.Name{
+					CommonName: "foo.internal",
+				},
+				DNSNames: []string{"bar.internal"},
+			}
+
+			return test{
+				o:   o,
+				csr: csr,
+				prov: &MockProvisioner{
+					MauthorizeSign: func(ctx context.Context, token string) ([]provisioner.SignOption, error) {
+						assert.Equals(t, token, "")
+						return nil, nil
+					},
+					MgetOptions: func() *provisioner.Options {
+						return nil
+					},
+				},
+				ca: &mockSignAuth{
+					signWithContext: func(_ context.Context, _csr *x509.CertificateRequest, signOpts provisioner.SignOptions, extraOpts ...provisioner.SignOption) ([]*x509.Certificate, error) {
+						assert.Equals(t, _csr, csr)
+						return nil, errs.ForbiddenErr(&webhook.Error{Code: "theCode", Message: "The message"}, "forbidden error")
+					},
+				},
+				db: &MockDB{
+					MockGetAuthorization: func(ctx context.Context, id string) (*Authorization, error) {
+						return &Authorization{ID: id, Status: StatusValid}, nil
+					},
+				},
+				err: NewDetailedError(ErrorUnauthorizedType, "The message (theCode)").AddSubproblems(Subproblem{
+					Type:   "urn:smallstep:acme:error:theCode",
+					Detail: "The message",
+				}),
+			}
+		},
 		"fail/error-db.CreateCertificate": func(t *testing.T) test {
 			now := clock.Now()
 			o := &Order{
@@ -1006,6 +1058,667 @@ func TestOrder_Finalize(t *testing.T) {
 				},
 			}
 		},
+		"fail/csr-wire-id-csr-uri-missing": func(t *testing.T) test {
+			now := clock.Now()
+			o := &Order{
+				ID:               "oID",
+				AccountID:        "accID",
+				Status:           StatusReady,
+				ExpiresAt:        now.Add(5 * time.Minute),
+				AuthorizationIDs: []string{"a", "b"},
+				Identifiers: []Identifier{
+					{Type: "wireapp-device", Value: "{\"name\": \"device\", \"domain\": \"wire.com\", \"client-id\": \"wireapp://CzbfFjDOQrenCbDxVmgnFw!594930e9d50bb175@wire.com\", \"handle\": \"wireapp://%40alice_wire@wire.com\"}"},
+				},
+			}
+
+			signer := mustSigner("EC", "P-256", 0)
+			_, err := keyutil.Fingerprint(signer.Public())
+			if err != nil {
+				t.Fatal(err)
+			}
+			csr := &x509.CertificateRequest{
+				Subject: pkix.Name{
+					Names: []pkix.AttributeTypeAndValue{
+						{Type: asn1.ObjectIdentifier{2, 16, 840, 1, 113730, 3, 1, 241}, Value: "device"},
+					},
+					Organization: []string{"wire.com"},
+				},
+				PublicKey: signer.Public(),
+				ExtraExtensions: []pkix.Extension{
+					{
+						Id:    asn1.ObjectIdentifier{2, 16, 840, 1, 113730, 3, 1, 241},
+						Value: []byte("a-wireapp-user"),
+					},
+				},
+			}
+
+			leaf := &x509.Certificate{
+				Subject:   pkix.Name{CommonName: "a-wireapp-user"},
+				PublicKey: signer.Public(),
+				ExtraExtensions: []pkix.Extension{
+					{
+						Id:    asn1.ObjectIdentifier{2, 16, 840, 1, 113730, 3, 1, 241},
+						Value: []byte("a-wireapp-user"),
+					},
+				},
+			}
+			inter := &x509.Certificate{Subject: pkix.Name{CommonName: "inter"}}
+			root := &x509.Certificate{Subject: pkix.Name{CommonName: "root"}}
+
+			return test{
+				o:   o,
+				csr: csr,
+				prov: &MockProvisioner{
+					MauthorizeSign: func(ctx context.Context, token string) ([]provisioner.SignOption, error) {
+						assert.Equals(t, token, "")
+						return nil, nil
+					},
+					MgetOptions: func() *provisioner.Options {
+						return nil
+					},
+				},
+				ca: &mockSignAuth{
+					signWithContext: func(_ context.Context, _csr *x509.CertificateRequest, signOpts provisioner.SignOptions, extraOpts ...provisioner.SignOption) ([]*x509.Certificate, error) {
+						assert.Equals(t, _csr, csr)
+						return []*x509.Certificate{leaf, inter, root}, nil
+					},
+				},
+				db: &MockWireDB{
+					MockDB: MockDB{
+						MockGetAuthorization: func(ctx context.Context, id string) (*Authorization, error) {
+							return &Authorization{ID: id, Status: StatusValid}, nil
+						},
+					},
+					MockGetDpopToken: func(ctx context.Context, orderID string) (map[string]interface{}, error) {
+						assert.Equals(t, orderID, o.ID)
+						dpopMap := map[string]interface{}{
+							"dpop": "a-dpop-token",
+						}
+						return dpopMap, nil
+					},
+					MockGetOidcToken: func(ctx context.Context, orderID string) (map[string]interface{}, error) {
+						assert.Equals(t, orderID, o.ID)
+						oidcMap := map[string]interface{}{
+							"oidc": "a-oidc-token",
+						}
+						return oidcMap, nil
+					},
+				},
+				err: NewError(ErrorBadCSRType, "CSR URIs do not match identifiers exactly: CSR URIs = [], Order URIs = [wireapp://CzbfFjDOQrenCbDxVmgnFw%%21594930e9d50bb175@wire.com]"),
+			}
+		},
+		"fail/csr-wire-id-csr-uri-mismatch": func(t *testing.T) test {
+			now := clock.Now()
+			o := &Order{
+				ID:               "oID",
+				AccountID:        "accID",
+				Status:           StatusReady,
+				ExpiresAt:        now.Add(5 * time.Minute),
+				AuthorizationIDs: []string{"a", "b"},
+				Identifiers: []Identifier{
+					{Type: "wireapp-device", Value: "{\"name\": \"device\", \"domain\": \"wire.com\", \"client-id\": \"wireapp://CzbfFjDOQrenCbDxVmgnFw!594930e9d50bb175@wire.com\", \"handle\": \"wireapp://%40alice_wire@wire.com\"}"},
+				},
+			}
+
+			signer := mustSigner("EC", "P-256", 0)
+			_, err := keyutil.Fingerprint(signer.Public())
+			if err != nil {
+				t.Fatal(err)
+			}
+			wireURL, _ := url.Parse("someurl.com")
+			csr := &x509.CertificateRequest{
+				Subject: pkix.Name{
+					Names: []pkix.AttributeTypeAndValue{
+						{Type: asn1.ObjectIdentifier{2, 16, 840, 1, 113730, 3, 1, 241}, Value: "device"},
+					},
+					Organization: []string{"wire.com"},
+				},
+				URIs: []*url.URL{
+					wireURL,
+				},
+				PublicKey: signer.Public(),
+				ExtraExtensions: []pkix.Extension{
+					{
+						Id:    asn1.ObjectIdentifier{2, 16, 840, 1, 113730, 3, 1, 241},
+						Value: []byte("a-wireapp-user"),
+					},
+				},
+			}
+
+			leaf := &x509.Certificate{
+				Subject:   pkix.Name{CommonName: "a-wireapp-user"},
+				PublicKey: signer.Public(),
+				ExtraExtensions: []pkix.Extension{
+					{
+						Id:    asn1.ObjectIdentifier{2, 16, 840, 1, 113730, 3, 1, 241},
+						Value: []byte("a-wireapp-user"),
+					},
+				},
+			}
+			inter := &x509.Certificate{Subject: pkix.Name{CommonName: "inter"}}
+			root := &x509.Certificate{Subject: pkix.Name{CommonName: "root"}}
+
+			return test{
+				o:   o,
+				csr: csr,
+				prov: &MockProvisioner{
+					MauthorizeSign: func(ctx context.Context, token string) ([]provisioner.SignOption, error) {
+						assert.Equals(t, token, "")
+						return nil, nil
+					},
+					MgetOptions: func() *provisioner.Options {
+						return nil
+					},
+				},
+				ca: &mockSignAuth{
+					signWithContext: func(_ context.Context, _csr *x509.CertificateRequest, signOpts provisioner.SignOptions, extraOpts ...provisioner.SignOption) ([]*x509.Certificate, error) {
+						assert.Equals(t, _csr, csr)
+						return []*x509.Certificate{leaf, inter, root}, nil
+					},
+				},
+				db: &MockWireDB{
+					MockDB: MockDB{
+						MockGetAuthorization: func(ctx context.Context, id string) (*Authorization, error) {
+							return &Authorization{ID: id, Status: StatusValid}, nil
+						},
+					},
+					MockGetDpopToken: func(ctx context.Context, orderID string) (map[string]interface{}, error) {
+						assert.Equals(t, orderID, o.ID)
+						dpopMap := map[string]interface{}{
+							"dpop": "a-dpop-token",
+						}
+						return dpopMap, nil
+					},
+					MockGetOidcToken: func(ctx context.Context, orderID string) (map[string]interface{}, error) {
+						assert.Equals(t, orderID, o.ID)
+						oidcMap := map[string]interface{}{
+							"oidc": "a-oidc-token",
+						}
+						return oidcMap, nil
+					},
+				},
+				err: NewError(ErrorBadCSRType, "CSR URIs do not match identifiers exactly: CSR URIs = [someurl.com], Order URIs = [wireapp://CzbfFjDOQrenCbDxVmgnFw%%21594930e9d50bb175@wire.com]"),
+			}
+		},
+		"fail/other-than-wire-ids-present": func(t *testing.T) test {
+			now := clock.Now()
+			o := &Order{
+				ID:               "oID",
+				AccountID:        "accID",
+				Status:           StatusReady,
+				ExpiresAt:        now.Add(5 * time.Minute),
+				AuthorizationIDs: []string{"a", "b"},
+				Identifiers: []Identifier{
+					{Type: "wireapp-device", Value: "{\"name\": \"device\", \"domain\": \"wire.com\", \"client-id\": \"wireapp://CzbfFjDOQrenCbDxVmgnFw!594930e9d50bb175@wire.com\", \"handle\": \"wireapp://%40alice_wire@wire.com\"}"},
+					{Type: "permanent-identifier", Value: "a-permanent-identifier"},
+				},
+			}
+
+			signer := mustSigner("EC", "P-256", 0)
+			_, err := keyutil.Fingerprint(signer.Public())
+			if err != nil {
+				t.Fatal(err)
+			}
+			wireURL, _ := url.Parse("wireapp://CzbfFjDOQrenCbDxVmgnFw!594930e9d50bb175@wire.com")
+			csr := &x509.CertificateRequest{
+				Subject: pkix.Name{
+					Names: []pkix.AttributeTypeAndValue{
+						{Type: asn1.ObjectIdentifier{2, 16, 840, 1, 113730, 3, 1, 241}, Value: "device"},
+					},
+					Organization: []string{"wire.com"},
+				},
+				URIs: []*url.URL{
+					wireURL,
+				},
+				PublicKey: signer.Public(),
+				ExtraExtensions: []pkix.Extension{
+					{
+						Id:    asn1.ObjectIdentifier{2, 16, 840, 1, 113730, 3, 1, 241},
+						Value: []byte("a-wireapp-user"),
+					},
+				},
+			}
+
+			leaf := &x509.Certificate{
+				Subject:   pkix.Name{CommonName: "a-wireapp-user"},
+				PublicKey: signer.Public(),
+				ExtraExtensions: []pkix.Extension{
+					{
+						Id:    asn1.ObjectIdentifier{2, 16, 840, 1, 113730, 3, 1, 241},
+						Value: []byte("a-wireapp-user"),
+					},
+				},
+			}
+			inter := &x509.Certificate{Subject: pkix.Name{CommonName: "inter"}}
+			root := &x509.Certificate{Subject: pkix.Name{CommonName: "root"}}
+
+			return test{
+				o:   o,
+				csr: csr,
+				prov: &MockProvisioner{
+					MauthorizeSign: func(ctx context.Context, token string) ([]provisioner.SignOption, error) {
+						assert.Equals(t, token, "")
+						return nil, nil
+					},
+					MgetOptions: func() *provisioner.Options {
+						return nil
+					},
+				},
+				ca: &mockSignAuth{
+					signWithContext: func(_ context.Context, _csr *x509.CertificateRequest, signOpts provisioner.SignOptions, extraOpts ...provisioner.SignOption) ([]*x509.Certificate, error) {
+						assert.Equals(t, _csr, csr)
+						return []*x509.Certificate{leaf, inter, root}, nil
+					},
+				},
+				db: &MockWireDB{
+					MockDB: MockDB{
+						MockGetAuthorization: func(ctx context.Context, id string) (*Authorization, error) {
+							return &Authorization{ID: id, Status: StatusValid}, nil
+						},
+					},
+				},
+				err: NewError(ErrorServerInternalType, "order must have exactly one WireUser and WireDevice identifier"),
+			}
+		},
+		"fail/wire-id-org-missing": func(t *testing.T) test {
+			now := clock.Now()
+			o := &Order{
+				ID:               "oID",
+				AccountID:        "accID",
+				Status:           StatusReady,
+				ExpiresAt:        now.Add(5 * time.Minute),
+				AuthorizationIDs: []string{"a", "b"},
+				Identifiers: []Identifier{
+					{Type: "wireapp-user", Value: "{\"name\": \"Alice Smith\", \"domain\": \"wire.com\", \"handle\": \"wireapp://%40alice_wire@wire.com\"}"},
+				},
+			}
+
+			signer := mustSigner("EC", "P-256", 0)
+			_, err := keyutil.Fingerprint(signer.Public())
+			if err != nil {
+				t.Fatal(err)
+			}
+			wireURL, _ := url.Parse("wireapp://%40alice_wire@wire.com")
+			csr := &x509.CertificateRequest{
+				Subject: pkix.Name{
+					Names: []pkix.AttributeTypeAndValue{
+						{Type: asn1.ObjectIdentifier{2, 16, 840, 1, 113730, 3, 1, 241}, Value: "Alice Smith"},
+					},
+				},
+				URIs: []*url.URL{
+					wireURL,
+				},
+				PublicKey: signer.Public(),
+			}
+
+			leaf := &x509.Certificate{
+				Subject:   pkix.Name{CommonName: "a-wireapp-user"},
+				PublicKey: signer.Public(),
+				ExtraExtensions: []pkix.Extension{
+					{
+						Id:    asn1.ObjectIdentifier{2, 16, 840, 1, 113730, 3, 1, 241},
+						Value: []byte("a-wireapp-user"),
+					},
+				},
+			}
+			inter := &x509.Certificate{Subject: pkix.Name{CommonName: "inter"}}
+			root := &x509.Certificate{Subject: pkix.Name{CommonName: "root"}}
+
+			return test{
+				o:   o,
+				csr: csr,
+				prov: &MockProvisioner{
+					MauthorizeSign: func(ctx context.Context, token string) ([]provisioner.SignOption, error) {
+						assert.Equals(t, token, "")
+						return nil, nil
+					},
+					MgetOptions: func() *provisioner.Options {
+						return nil
+					},
+				},
+				ca: &mockSignAuth{
+					signWithContext: func(_ context.Context, _csr *x509.CertificateRequest, signOpts provisioner.SignOptions, extraOpts ...provisioner.SignOption) ([]*x509.Certificate, error) {
+						assert.Equals(t, _csr, csr)
+						return []*x509.Certificate{leaf, inter, root}, nil
+					},
+				},
+				db: &MockWireDB{
+					MockDB: MockDB{
+						MockGetAuthorization: func(ctx context.Context, id string) (*Authorization, error) {
+							return &Authorization{ID: id, Status: StatusValid}, nil
+						},
+					},
+				},
+				err: NewError(ErrorServerInternalType, "expected Organization [wire.com], found []"),
+			}
+		},
+		"fail/wire-id-display-name-missing": func(t *testing.T) test {
+			now := clock.Now()
+			o := &Order{
+				ID:               "oID",
+				AccountID:        "accID",
+				Status:           StatusReady,
+				ExpiresAt:        now.Add(5 * time.Minute),
+				AuthorizationIDs: []string{"a", "b"},
+				Identifiers: []Identifier{
+					{Type: "wireapp-user", Value: "{\"name\": \"Alice Smith\", \"domain\": \"wire.com\", \"handle\": \"wireapp://%40alice_wire@wire.com\"}"},
+				},
+			}
+
+			signer := mustSigner("EC", "P-256", 0)
+			_, err := keyutil.Fingerprint(signer.Public())
+			if err != nil {
+				t.Fatal(err)
+			}
+			wireURL, _ := url.Parse("wireapp://%40alice_wire@wire.com")
+			csr := &x509.CertificateRequest{
+				Subject: pkix.Name{
+					Organization: []string{"wire.com"},
+				},
+				URIs: []*url.URL{
+					wireURL,
+				},
+				PublicKey: signer.Public(),
+			}
+
+			leaf := &x509.Certificate{
+				Subject:   pkix.Name{CommonName: "a-wireapp-user"},
+				PublicKey: signer.Public(),
+				ExtraExtensions: []pkix.Extension{
+					{
+						Id:    asn1.ObjectIdentifier{2, 16, 840, 1, 113730, 3, 1, 241},
+						Value: []byte("a-wireapp-user"),
+					},
+				},
+			}
+			inter := &x509.Certificate{Subject: pkix.Name{CommonName: "inter"}}
+			root := &x509.Certificate{Subject: pkix.Name{CommonName: "root"}}
+
+			return test{
+				o:   o,
+				csr: csr,
+				prov: &MockProvisioner{
+					MauthorizeSign: func(ctx context.Context, token string) ([]provisioner.SignOption, error) {
+						assert.Equals(t, token, "")
+						return nil, nil
+					},
+					MgetOptions: func() *provisioner.Options {
+						return nil
+					},
+				},
+				ca: &mockSignAuth{
+					signWithContext: func(_ context.Context, _csr *x509.CertificateRequest, signOpts provisioner.SignOptions, extraOpts ...provisioner.SignOption) ([]*x509.Certificate, error) {
+						assert.Equals(t, _csr, csr)
+						return []*x509.Certificate{leaf, inter, root}, nil
+					},
+				},
+				db: &MockWireDB{
+					MockDB: MockDB{
+						MockGetAuthorization: func(ctx context.Context, id string) (*Authorization, error) {
+							return &Authorization{ID: id, Status: StatusValid}, nil
+						},
+					},
+				},
+				err: NewError(ErrorServerInternalType, "CSR must contain the display name in '2.16.840.1.113730.3.1.241' OID"),
+			}
+		},
+		"fail/wire-id-display-name-mismatch": func(t *testing.T) test {
+			now := clock.Now()
+			o := &Order{
+				ID:               "oID",
+				AccountID:        "accID",
+				Status:           StatusReady,
+				ExpiresAt:        now.Add(5 * time.Minute),
+				AuthorizationIDs: []string{"a", "b"},
+				Identifiers: []Identifier{
+					{Type: "wireapp-user", Value: "{\"name\": \"Alice Smith\", \"domain\": \"wire.com\", \"handle\": \"wireapp://%40alice_wire@wire.com\"}"},
+				},
+			}
+
+			signer := mustSigner("EC", "P-256", 0)
+			_, err := keyutil.Fingerprint(signer.Public())
+			if err != nil {
+				t.Fatal(err)
+			}
+			wireURL, _ := url.Parse("wireapp://%40alice_wire@wire.com")
+			csr := &x509.CertificateRequest{
+				Subject: pkix.Name{
+					Names: []pkix.AttributeTypeAndValue{
+						{Type: asn1.ObjectIdentifier{2, 16, 840, 1, 113730, 3, 1, 241}, Value: "Someone else"},
+					},
+					Organization: []string{"wire.com"},
+				},
+				URIs: []*url.URL{
+					wireURL,
+				},
+				PublicKey: signer.Public(),
+			}
+
+			leaf := &x509.Certificate{
+				Subject:   pkix.Name{CommonName: "a-wireapp-user"},
+				PublicKey: signer.Public(),
+				ExtraExtensions: []pkix.Extension{
+					{
+						Id:    asn1.ObjectIdentifier{2, 16, 840, 1, 113730, 3, 1, 241},
+						Value: []byte("a-wireapp-user"),
+					},
+				},
+			}
+			inter := &x509.Certificate{Subject: pkix.Name{CommonName: "inter"}}
+			root := &x509.Certificate{Subject: pkix.Name{CommonName: "root"}}
+
+			return test{
+				o:   o,
+				csr: csr,
+				prov: &MockProvisioner{
+					MauthorizeSign: func(ctx context.Context, token string) ([]provisioner.SignOption, error) {
+						assert.Equals(t, token, "")
+						return nil, nil
+					},
+					MgetOptions: func() *provisioner.Options {
+						return nil
+					},
+				},
+				ca: &mockSignAuth{
+					signWithContext: func(_ context.Context, _csr *x509.CertificateRequest, signOpts provisioner.SignOptions, extraOpts ...provisioner.SignOption) ([]*x509.Certificate, error) {
+						assert.Equals(t, _csr, csr)
+						return []*x509.Certificate{leaf, inter, root}, nil
+					},
+				},
+				db: &MockWireDB{
+					MockDB: MockDB{
+						MockGetAuthorization: func(ctx context.Context, id string) (*Authorization, error) {
+							return &Authorization{ID: id, Status: StatusValid}, nil
+						},
+					},
+				},
+				err: NewError(ErrorServerInternalType, "expected displayName Alice Smith, found Someone else"),
+			}
+		},
+		"ok/wire-id-user": func(t *testing.T) test {
+			now := clock.Now()
+			o := &Order{
+				ID:               "oID",
+				AccountID:        "accID",
+				Status:           StatusReady,
+				ExpiresAt:        now.Add(5 * time.Minute),
+				AuthorizationIDs: []string{"a", "b"},
+				Identifiers: []Identifier{
+					{Type: "wireapp-user", Value: "{\"name\": \"Alice Smith\", \"domain\": \"wire.com\", \"handle\": \"wireapp://%40alice_wire@wire.com\"}"},
+				},
+			}
+
+			signer := mustSigner("EC", "P-256", 0)
+			_, err := keyutil.Fingerprint(signer.Public())
+			if err != nil {
+				t.Fatal(err)
+			}
+			wireURL, _ := url.Parse("wireapp://%40alice_wire@wire.com")
+			csr := &x509.CertificateRequest{
+				Subject: pkix.Name{
+					Names: []pkix.AttributeTypeAndValue{
+						{Type: asn1.ObjectIdentifier{2, 16, 840, 1, 113730, 3, 1, 241}, Value: "Alice Smith"},
+					},
+					Organization: []string{"wire.com"},
+				},
+				URIs: []*url.URL{
+					wireURL,
+				},
+				PublicKey: signer.Public(),
+				ExtraExtensions: []pkix.Extension{
+					{
+						Id:    asn1.ObjectIdentifier{2, 16, 840, 1, 113730, 3, 1, 241},
+						Value: []byte("a-wireapp-user"),
+					},
+				},
+			}
+
+			leaf := &x509.Certificate{
+				Subject:   pkix.Name{CommonName: "a-wireapp-user"},
+				PublicKey: signer.Public(),
+				ExtraExtensions: []pkix.Extension{
+					{
+						Id:    asn1.ObjectIdentifier{2, 16, 840, 1, 113730, 3, 1, 241},
+						Value: []byte("a-wireapp-user"),
+					},
+				},
+			}
+			inter := &x509.Certificate{Subject: pkix.Name{CommonName: "inter"}}
+			root := &x509.Certificate{Subject: pkix.Name{CommonName: "root"}}
+
+			return test{
+				o:   o,
+				csr: csr,
+				prov: &MockProvisioner{
+					MauthorizeSign: func(ctx context.Context, token string) ([]provisioner.SignOption, error) {
+						assert.Equals(t, token, "")
+						return nil, nil
+					},
+					MgetOptions: func() *provisioner.Options {
+						return nil
+					},
+				},
+				ca: &mockSignAuth{
+					signWithContext: func(_ context.Context, _csr *x509.CertificateRequest, signOpts provisioner.SignOptions, extraOpts ...provisioner.SignOption) ([]*x509.Certificate, error) {
+						assert.Equals(t, _csr, csr)
+						return []*x509.Certificate{leaf, inter, root}, nil
+					},
+				},
+				db: &MockWireDB{
+					MockDB: MockDB{
+						MockGetAuthorization: func(ctx context.Context, id string) (*Authorization, error) {
+							return &Authorization{ID: id, Status: StatusValid}, nil
+						},
+					},
+					MockGetDpopToken: func(ctx context.Context, orderID string) (map[string]interface{}, error) {
+						assert.Equals(t, orderID, o.ID)
+						dpopMap := map[string]interface{}{
+							"dpop": "a-dpop-token",
+						}
+						return dpopMap, nil
+					},
+					MockGetOidcToken: func(ctx context.Context, orderID string) (map[string]interface{}, error) {
+						assert.Equals(t, orderID, o.ID)
+						oidcMap := map[string]interface{}{
+							"oidc": "a-oidc-token",
+						}
+						return oidcMap, nil
+					},
+				},
+			}
+		},
+		"ok/wire-id-device": func(t *testing.T) test {
+			now := clock.Now()
+			o := &Order{
+				ID:               "oID",
+				AccountID:        "accID",
+				Status:           StatusReady,
+				ExpiresAt:        now.Add(5 * time.Minute),
+				AuthorizationIDs: []string{"a", "b"},
+				Identifiers: []Identifier{
+					{Type: "wireapp-device", Value: "{\"name\": \"device\", \"domain\": \"wire.com\", \"client-id\": \"wireapp://CzbfFjDOQrenCbDxVmgnFw!594930e9d50bb175@wire.com\", \"handle\": \"wireapp://%40alice_wire@wire.com\"}"},
+				},
+			}
+
+			signer := mustSigner("EC", "P-256", 0)
+			_, err := keyutil.Fingerprint(signer.Public())
+			if err != nil {
+				t.Fatal(err)
+			}
+			wireURL, _ := url.Parse("wireapp://CzbfFjDOQrenCbDxVmgnFw!594930e9d50bb175@wire.com")
+			csr := &x509.CertificateRequest{
+				Subject: pkix.Name{
+					Names: []pkix.AttributeTypeAndValue{
+						{Type: asn1.ObjectIdentifier{2, 16, 840, 1, 113730, 3, 1, 241}, Value: "device"},
+					},
+					Organization: []string{"wire.com"},
+				},
+				URIs: []*url.URL{
+					wireURL,
+				},
+				PublicKey: signer.Public(),
+				ExtraExtensions: []pkix.Extension{
+					{
+						Id:    asn1.ObjectIdentifier{2, 16, 840, 1, 113730, 3, 1, 241},
+						Value: []byte("a-wireapp-user"),
+					},
+				},
+			}
+
+			leaf := &x509.Certificate{
+				Subject:   pkix.Name{CommonName: "a-wireapp-user"},
+				PublicKey: signer.Public(),
+				ExtraExtensions: []pkix.Extension{
+					{
+						Id:    asn1.ObjectIdentifier{2, 16, 840, 1, 113730, 3, 1, 241},
+						Value: []byte("a-wireapp-user"),
+					},
+				},
+			}
+			inter := &x509.Certificate{Subject: pkix.Name{CommonName: "inter"}}
+			root := &x509.Certificate{Subject: pkix.Name{CommonName: "root"}}
+
+			return test{
+				o:   o,
+				csr: csr,
+				prov: &MockProvisioner{
+					MauthorizeSign: func(ctx context.Context, token string) ([]provisioner.SignOption, error) {
+						assert.Equals(t, token, "")
+						return nil, nil
+					},
+					MgetOptions: func() *provisioner.Options {
+						return nil
+					},
+				},
+				ca: &mockSignAuth{
+					signWithContext: func(_ context.Context, _csr *x509.CertificateRequest, signOpts provisioner.SignOptions, extraOpts ...provisioner.SignOption) ([]*x509.Certificate, error) {
+						assert.Equals(t, _csr, csr)
+						return []*x509.Certificate{leaf, inter, root}, nil
+					},
+				},
+				db: &MockWireDB{
+					MockDB: MockDB{
+						MockGetAuthorization: func(ctx context.Context, id string) (*Authorization, error) {
+							return &Authorization{ID: id, Status: StatusValid}, nil
+						},
+					},
+					MockGetDpopToken: func(ctx context.Context, orderID string) (map[string]interface{}, error) {
+						assert.Equals(t, orderID, o.ID)
+						dpopMap := map[string]interface{}{
+							"dpop": "a-dpop-token",
+						}
+						return dpopMap, nil
+					},
+					MockGetOidcToken: func(ctx context.Context, orderID string) (map[string]interface{}, error) {
+						assert.Equals(t, orderID, o.ID)
+						oidcMap := map[string]interface{}{
+							"oidc": "a-oidc-token",
+						}
+						return oidcMap, nil
+					},
+				},
+			}
+		},
 		"ok/new-cert-dns": func(t *testing.T) test {
 			now := clock.Now()
 			o := &Order{
@@ -1217,6 +1930,7 @@ func TestOrder_Finalize(t *testing.T) {
 						assert.Equals(t, k.Status, tc.err.Status)
 						assert.Equals(t, k.Err.Error(), tc.err.Err.Error())
 						assert.Equals(t, k.Detail, tc.err.Detail)
+						assert.Equals(t, k.Subproblems, tc.err.Subproblems)
 					} else {
 						assert.FatalError(t, errors.New("unexpected error type"))
 					}

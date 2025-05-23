@@ -9,8 +9,9 @@ import (
 
 	"github.com/Masterminds/sprig/v3"
 	"github.com/pkg/errors"
-	"go.step.sm/cli-utils/fileutil"
-	"go.step.sm/cli-utils/step"
+
+	"github.com/smallstep/cli-utils/fileutil"
+	"github.com/smallstep/cli-utils/step"
 )
 
 // TemplateType defines how a template will be written in disk.

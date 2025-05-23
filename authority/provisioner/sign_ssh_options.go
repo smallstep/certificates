@@ -10,10 +10,13 @@ import (
 	"time"
 
 	"github.com/pkg/errors"
+	"golang.org/x/crypto/ssh"
+
+	"go.step.sm/crypto/keyutil"
+
 	"github.com/smallstep/certificates/authority/policy"
 	"github.com/smallstep/certificates/errs"
-	"go.step.sm/crypto/keyutil"
-	"golang.org/x/crypto/ssh"
+	"github.com/smallstep/certificates/internal/cast"
 )
 
 const (
@@ -103,10 +106,10 @@ func (o SignSSHOptions) Modify(cert *ssh.Certificate, _ SignSSHOptions) error {
 func (o SignSSHOptions) ModifyValidity(cert *ssh.Certificate) error {
 	t := now()
 	if !o.ValidAfter.IsZero() {
-		cert.ValidAfter = uint64(o.ValidAfter.RelativeTime(t).Unix())
+		cert.ValidAfter = cast.Uint64(o.ValidAfter.RelativeTime(t).Unix())
 	}
 	if !o.ValidBefore.IsZero() {
-		cert.ValidBefore = uint64(o.ValidBefore.RelativeTime(t).Unix())
+		cert.ValidBefore = cast.Uint64(o.ValidBefore.RelativeTime(t).Unix())
 	}
 	if cert.ValidAfter > 0 && cert.ValidBefore > 0 && cert.ValidAfter > cert.ValidBefore {
 		return errs.BadRequest("ssh certificate validAfter cannot be greater than validBefore")
@@ -167,11 +170,11 @@ func (m *sshDefaultDuration) Modify(cert *ssh.Certificate, o SignSSHOptions) err
 
 	var backdate uint64
 	if cert.ValidAfter == 0 {
-		backdate = uint64(o.Backdate / time.Second)
-		cert.ValidAfter = uint64(now().Truncate(time.Second).Unix())
+		backdate = cast.Uint64(o.Backdate / time.Second)
+		cert.ValidAfter = cast.Uint64(now().Truncate(time.Second).Unix())
 	}
 	if cert.ValidBefore == 0 {
-		cert.ValidBefore = cert.ValidAfter + uint64(d/time.Second)
+		cert.ValidBefore = cert.ValidAfter + cast.Uint64(d/time.Second)
 	}
 	// Apply backdate safely
 	if cert.ValidAfter > backdate {
@@ -206,11 +209,11 @@ func (m *sshLimitDuration) Modify(cert *ssh.Certificate, o SignSSHOptions) error
 
 	var backdate uint64
 	if cert.ValidAfter == 0 {
-		backdate = uint64(o.Backdate / time.Second)
-		cert.ValidAfter = uint64(now().Truncate(time.Second).Unix())
+		backdate = cast.Uint64(o.Backdate / time.Second)
+		cert.ValidAfter = cast.Uint64(now().Truncate(time.Second).Unix())
 	}
 
-	certValidAfter := time.Unix(int64(cert.ValidAfter), 0)
+	certValidAfter := time.Unix(cast.Int64(cert.ValidAfter), 0)
 	if certValidAfter.After(m.NotAfter) {
 		return errs.Forbidden("provisioning credential expiration (%s) is before requested certificate validAfter (%s)",
 			m.NotAfter, certValidAfter)
@@ -221,9 +224,9 @@ func (m *sshLimitDuration) Modify(cert *ssh.Certificate, o SignSSHOptions) error
 		if m.NotAfter.Before(certValidBefore) {
 			certValidBefore = m.NotAfter
 		}
-		cert.ValidBefore = uint64(certValidBefore.Unix())
+		cert.ValidBefore = cast.Uint64(certValidBefore.Unix())
 	} else {
-		certValidBefore := time.Unix(int64(cert.ValidBefore), 0)
+		certValidBefore := time.Unix(cast.Int64(cert.ValidBefore), 0)
 		if m.NotAfter.Before(certValidBefore) {
 			return errs.Forbidden("provisioning credential expiration (%s) is before requested certificate validBefore (%s)",
 				m.NotAfter, certValidBefore)
@@ -277,7 +280,7 @@ func (v *sshCertValidityValidator) Valid(cert *ssh.Certificate, opts SignSSHOpti
 	switch {
 	case cert.ValidAfter == 0:
 		return errs.BadRequest("ssh certificate validAfter cannot be 0")
-	case cert.ValidBefore < uint64(now().Unix()):
+	case cert.ValidBefore < cast.Uint64(now().Unix()):
 		return errs.BadRequest("ssh certificate validBefore cannot be in the past")
 	case cert.ValidBefore < cert.ValidAfter:
 		return errs.BadRequest("ssh certificate validBefore cannot be before validAfter")
@@ -299,7 +302,7 @@ func (v *sshCertValidityValidator) Valid(cert *ssh.Certificate, opts SignSSHOpti
 
 	// To not take into account the backdate, time.Now() will be used to
 	// calculate the duration if ValidAfter is in the past.
-	dur := time.Duration(cert.ValidBefore-cert.ValidAfter) * time.Second
+	dur := time.Duration(cast.Int64(cert.ValidBefore-cert.ValidAfter)) * time.Second
 
 	switch {
 	case dur < minDur:
@@ -332,7 +335,7 @@ func (v *sshCertDefaultValidator) Valid(cert *ssh.Certificate, _ SignSSHOptions)
 		return errs.Forbidden("ssh certificate key id cannot be empty")
 	case cert.ValidAfter == 0:
 		return errs.Forbidden("ssh certificate validAfter cannot be 0")
-	case cert.ValidBefore < uint64(now().Unix()):
+	case cert.ValidBefore < cast.Uint64(now().Unix()):
 		return errs.Forbidden("ssh certificate validBefore cannot be in the past")
 	case cert.ValidBefore < cert.ValidAfter:
 		return errs.Forbidden("ssh certificate validBefore cannot be before validAfter")
@@ -462,7 +465,7 @@ func sshParseString(in []byte) (out, rest []byte, ok bool) {
 	}
 	length := binary.BigEndian.Uint32(in)
 	in = in[4:]
-	if uint32(len(in)) < length {
+	if cast.Uint32(len(in)) < length {
 		return
 	}
 	out = in[:length]

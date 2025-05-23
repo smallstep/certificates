@@ -25,6 +25,87 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
 
 ---
 
+## [0.28.3] - 2025-03-17
+
+- dependabot updates
+
+
+## [0.28.2] - 2025-02-20
+
+### Added
+
+- Added support for imported keys on YubiKey (smallstep/certificates#2113)
+- Enable storing ACME attestation payload (smallstep/certificates#2114)
+- Add ACME attestation format field to ACME challenge (smallstep/certificates#2124)
+
+### Changed
+
+- Added internal httptransport package to replace cloning of http.DefaultTransport (smallstep/certificates#2098, smallstep/certificates#2103, smallstep/certificates#2104)
+  - For example, replacing http.DefaultTransport clone in provisioner webhook business logic.
+
+
+## [0.28.1] - 2024-11-19
+
+### Added
+
+- Support for using template data from SCEPCHALLENGE webhooks (smallstep/certificates#2065)
+- New field to Webhook response that allows for propagation of human readable errors to the client (smallstep/certificates#2066, smallstep/certificates#2069)
+- CICD for pushing DEB and RPM packages to packages.smallstep.com on releases (smallstep/certificates#2076)
+- PKCS11 utilities in HSM container image (smallstep/certificates#2077)
+
+### Changed
+
+- Artifact names for RPM and DEB packages in conformance with standards (smallstep/certificates#2076)
+
+
+## [0.28.0] - 2024-10-29
+
+### Added
+
+- Add options to GCP IID provisioner to enable or disable signing of SSH user and host certificates (smallstep/certificates#2045)
+
+### Changed
+
+- For IID provisioners with disableCustomSANs set to true, validate that the
+  requested DNS names are a subset of the allowed DNS names (based on the IID token),
+  rather than requiring an exact match to the entire list of allowed DNS names. (smallstep/certificates#2044)
+
+
+## [0.27.5] - 2024-10-17
+
+### Added
+
+- Option to log real IP (x-forwarded-for) in logging middleware (smallstep/certificates#2002)
+
+### Fixed
+
+- Pulled in updates to smallstep/pkcs7 to fix failing Windows SCEP enrollment certificates (smallstep/certificates#1994)
+
+
+## [0.27.4] - 2024-09-13
+
+### Fixed
+
+- Release worfklow
+
+## [0.27.3] - 2024-09-13
+
+### Added
+
+- AWS auth method for Vault RA mode (smallstep/certificates#1976)
+- API endpoints for retrieving Intermediate certificates (smallstep/certificates#1962)
+- Enable use of OIDC provisioner with private identity providers and a certificate from step-ca (smallstep/certificates#1940)
+- Support for verifying `cnf` and `x5rt#S256` claim when provided in token (smallstep/certificates#1660)
+- Add Wire integration to ACME provisioner (smallstep/certificates#1666)
+
+### Changed
+
+- Clarified SSH certificate policy errors (smallstep/certificates#1951)
+
+### Fixed
+
+- Nebula ECDSA P-256 support (smallstep/certificates#1662)
+
 ## [0.27.2] - 2024-07-18
 
 ### Added
@@ -86,7 +167,7 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
 
 ## [0.26.0] - 2024-03-28
 
-### Added 
+### Added
 
 - [TPM KMS](https://github.com/smallstep/crypto/tree/master/kms/tpmkms) support for CA keys (smallstep/certificates#1772)
 - Propagation of HTTP request identifier using X-Request-Id header (smallstep/certificates#1743, smallstep/certificates#1542)
@@ -96,7 +177,7 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
 - AWS `ca-west-1` identity document root certificate (smallstep/certificates#1715)
 - [COSE RS1](https://www.rfc-editor.org/rfc/rfc8812.html#section-2) as a supported algorithm with ACME `device-attest-01` challenge (smallstep/certificates#1663)
 
-### Changed 
+### Changed
 
 - In an RA setup, let the CA decide the RA certificate lifetime (smallstep/certificates#1764)
 - Use Debian Bookworm in Docker containers (smallstep/certificates#1615)
@@ -146,9 +227,9 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
 - Added AWS public certificates for me-central-1 and ap-southeast-3
   (smallstep/certificates#1404)
 - Added namespace field to VaultCAS JSON config (smallstep/certificates#1424)
-- Added AWS public certificates for me-central-1 and ap-southeast-3 
+- Added AWS public certificates for me-central-1 and ap-southeast-3
   (smallstep/certificates#1404)
-- Added unversioned filenames to Github release assets 
+- Added unversioned filenames to Github release assets
   (smallstep/certificates#1435)
 - Send X5C leaf certificate to webhooks (smallstep/certificates#1485)
 - Added support for disableSmallstepExtensions claim (smallstep/certificates#1484)
@@ -156,7 +237,7 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
 - Added Winget release automation (smallstep/certificates#1519)
 - Added CSR to SCEPCHALLENGE webhook request body (smallstep/certificates#1523)
 - Added SCEP issuance notification webhook (smallstep/certificates#1544)
-- Added ability to disable color in the log text formatter 
+- Added ability to disable color in the log text formatter
   (smallstep/certificates(#1559)
 
 ### Changed
@@ -184,7 +265,7 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
   (smallstep/certificates#1476, smallstep/crypto#288)
 - Fixed adding certificate templates with ASN.1 functions
   (smallstep/certificates#1500, smallstep/crypto#302)
-- Fixed a problem when the ca.json is truncated if the encoding of the 
+- Fixed a problem when the ca.json is truncated if the encoding of the
   configuration fails (e.g., new provisioner with bad template data)
   (smallstep/cli#994, smallstep/certificates#1501)
 - Fixed provisionerOptionsToLinkedCA missing template and templateData

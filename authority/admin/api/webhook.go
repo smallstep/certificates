@@ -10,8 +10,8 @@ import (
 	"github.com/smallstep/certificates/api/read"
 	"github.com/smallstep/certificates/api/render"
 	"github.com/smallstep/certificates/authority/admin"
+	"github.com/smallstep/linkedca"
 	"go.step.sm/crypto/randutil"
-	"go.step.sm/linkedca"
 )
 
 // WebhookAdminResponder is the interface responsible for writing webhook admin
@@ -202,7 +202,7 @@ func (war *webhookAdminResponder) UpdateProvisionerWebhook(w http.ResponseWriter
 	}
 	if !found {
 		msg := fmt.Sprintf("provisioner %q has no webhook with the name %q", prov.Name, newWebhook.Name)
-		err := admin.NewError(admin.ErrorNotFoundType, msg) //nolint:govet // allow non-constant error messages
+		err := admin.NewError(admin.ErrorNotFoundType, msg)
 		render.Error(w, r, err)
 		return
 	}

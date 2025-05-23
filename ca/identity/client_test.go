@@ -10,6 +10,8 @@ import (
 	"reflect"
 	"sort"
 	"testing"
+
+	"github.com/smallstep/certificates/internal/httptransport"
 )
 
 func returnInput(val string) func() string {
@@ -129,7 +131,7 @@ func TestLoadClient(t *testing.T) {
 	pool := x509.NewCertPool()
 	pool.AppendCertsFromPEM(b)
 
-	tr := http.DefaultTransport.(*http.Transport).Clone()
+	tr := httptransport.New()
 	tr.TLSClientConfig = &tls.Config{
 		Certificates: []tls.Certificate{crt},
 		RootCAs:      pool,

@@ -10,6 +10,7 @@ import (
 	"os"
 
 	"github.com/pkg/errors"
+	"github.com/smallstep/certificates/internal/httptransport"
 )
 
 // Client wraps http.Client with a transport using the step root and identity.
@@ -60,7 +61,7 @@ func LoadClient() (*Client, error) {
 	}
 
 	// Prepare transport with information in defaults.json and identity.json
-	tr := http.DefaultTransport.(*http.Transport).Clone()
+	tr := httptransport.New()
 	tr.TLSClientConfig = &tls.Config{
 		MinVersion:           tls.VersionTLS12,
 		GetClientCertificate: identity.GetClientCertificateFunc(),

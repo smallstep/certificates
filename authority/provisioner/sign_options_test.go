@@ -186,6 +186,39 @@ func Test_dnsNamesValidator_Valid(t *testing.T) {
 	}
 }
 
+func Test_dnsNamesSubsetValidator_Valid(t *testing.T) {
+	type args struct {
+		req *x509.CertificateRequest
+	}
+	tests := []struct {
+		name    string
+		v       dnsNamesSubsetValidator
+		args    args
+		wantErr bool
+	}{
+		{"ok0", []string{}, args{&x509.CertificateRequest{DNSNames: []string{}}}, false},
+		{"ok1", []string{"foo.bar.zar"}, args{&x509.CertificateRequest{DNSNames: []string{"foo.bar.zar"}}}, false},
+		{"ok2", []string{"foo.bar.zar", "bar.zar"}, args{&x509.CertificateRequest{DNSNames: []string{"foo.bar.zar", "bar.zar"}}}, false},
+		{"ok3", []string{"foo.bar.zar", "bar.zar"}, args{&x509.CertificateRequest{DNSNames: []string{"bar.zar", "foo.bar.zar"}}}, false},
+		{"ok4", []string{"foo.bar.zar", "bar.zar"}, args{&x509.CertificateRequest{}}, false},
+		{"ok5", []string{"foo.bar.zar", "bar.zar"}, args{&x509.CertificateRequest{DNSNames: []string{"bar.zar"}}}, false},
+		{"ok6", []string{"foo", "bar", "baz", "zar", "zap"}, args{&x509.CertificateRequest{DNSNames: []string{"zap", "baz", "foo"}}}, false},
+		{"fail1", []string{"foo.bar.zar"}, args{&x509.CertificateRequest{DNSNames: []string{"bar.zar"}}}, true},
+		{"fail2", []string{"foo.bar.zar"}, args{&x509.CertificateRequest{DNSNames: []string{"bar.zar", "foo.bar.zar"}}}, true},
+		{"fail3", []string{"foo.bar.zar", "bar.zar"}, args{&x509.CertificateRequest{DNSNames: []string{"foo.bar.zar", "zar.bar"}}}, true},
+		{"fail4", []string{"foo", "bar", "baz", "zar", "zap"}, args{&x509.CertificateRequest{DNSNames: []string{"zap", "baz", "foO"}}}, true},
+		{"fail5", []string{"foo", "bar", "baz", "zar", "zap"}, args{&x509.CertificateRequest{DNSNames: []string{"zap", "baz", "fax", "foo"}}}, true},
+		{"fail6", []string{}, args{&x509.CertificateRequest{DNSNames: []string{"zap", "baz", "fax", "foo"}}}, true},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if err := tt.v.Valid(tt.args.req); (err != nil) != tt.wantErr {
+				t.Errorf("dnsNamesSubsetValidator.Valid() error = %v, wantErr %v", err, tt.wantErr)
+			}
+		})
+	}
+}
+
 func Test_ipAddressesValidator_Valid(t *testing.T) {
 	ip1 := net.IPv4(10, 3, 2, 1)
 	ip2 := net.IPv4(10, 3, 2, 2)

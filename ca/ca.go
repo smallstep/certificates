@@ -18,6 +18,11 @@ import (
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
 	"github.com/pkg/errors"
+
+	"github.com/smallstep/cli-utils/step"
+	"github.com/smallstep/nosql"
+	"go.step.sm/crypto/x509util"
+
 	"github.com/smallstep/certificates/acme"
 	acmeAPI "github.com/smallstep/certificates/acme/api"
 	acmeNoSQL "github.com/smallstep/certificates/acme/db/nosql"
@@ -28,6 +33,7 @@ import (
 	"github.com/smallstep/certificates/authority/config"
 	"github.com/smallstep/certificates/cas/apiv1"
 	"github.com/smallstep/certificates/db"
+	"github.com/smallstep/certificates/internal/httptransport"
 	"github.com/smallstep/certificates/internal/metrix"
 	"github.com/smallstep/certificates/logging"
 	"github.com/smallstep/certificates/middleware/requestid"
@@ -35,9 +41,6 @@ import (
 	"github.com/smallstep/certificates/scep"
 	scepAPI "github.com/smallstep/certificates/scep/api"
 	"github.com/smallstep/certificates/server"
-	"github.com/smallstep/nosql"
-	"go.step.sm/cli-utils/step"
-	"go.step.sm/crypto/x509util"
 )
 
 type options struct {
@@ -194,8 +197,10 @@ func (ca *CA) Init(cfg *config.Config) (*CA, error) {
 		opts = append(opts, authority.WithMeter(meter))
 	}
 
-	webhookTransport := http.DefaultTransport.(*http.Transport).Clone()
-	opts = append(opts, authority.WithWebhookClient(&http.Client{Transport: webhookTransport}))
+	webhookTransport := httptransport.New()
+	opts = append(opts,
+		authority.WithWebhookClient(&http.Client{Transport: webhookTransport}),
+	)
 
 	auth, err := authority.New(cfg, opts...)
 	if err != nil {

@@ -15,10 +15,10 @@ import (
 
 	"github.com/pkg/errors"
 
+	"github.com/smallstep/linkedca"
 	"go.step.sm/crypto/jose"
 	"go.step.sm/crypto/sshutil"
 	"go.step.sm/crypto/x509util"
-	"go.step.sm/linkedca"
 
 	"github.com/smallstep/certificates/errs"
 	"github.com/smallstep/certificates/webhook"
@@ -265,7 +265,7 @@ func (p *GCP) AuthorizeSign(ctx context.Context, token string) ([]SignOption, er
 			commonNameSliceValidator([]string{
 				ce.InstanceName, ce.InstanceID, dnsName1, dnsName2,
 			}),
-			dnsNamesValidator([]string{
+			dnsNamesSubsetValidator([]string{
 				dnsName1, dnsName2,
 			}),
 			ipAddressesValidator(nil),

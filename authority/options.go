@@ -18,6 +18,7 @@ import (
 	"github.com/smallstep/certificates/cas"
 	casapi "github.com/smallstep/certificates/cas/apiv1"
 	"github.com/smallstep/certificates/db"
+	"github.com/smallstep/certificates/internal/httptransport"
 	"github.com/smallstep/certificates/scep"
 )
 
@@ -99,6 +100,22 @@ func WithQuietInit() Option {
 func WithWebhookClient(c *http.Client) Option {
 	return func(a *Authority) error {
 		a.webhookClient = c
+		return nil
+	}
+}
+
+// Wrapper wraps the set of functions mapping [http.Transport] references to [http.RoundTripper].
+type TransportWrapper = httptransport.Wrapper
+
+// WithTransportWrapper sets the transport wrapper of the authority to the provided one or, in case
+// that one is nil, to a noop one.
+func WithTransportWrapper(tw httptransport.Wrapper) Option {
+	if tw == nil {
+		tw = httptransport.NoopWrapper()
+	}
+
+	return func(a *Authority) error {
+		a.wrapTransport = tw
 		return nil
 	}
 }

@@ -4,7 +4,7 @@ import (
 	"bytes"
 	"context"
 	"crypto"
-	"crypto/dsa" // support legacy algorithms
+	"crypto/dsa" //nolint:staticcheck // support legacy algorithms
 	"crypto/ecdsa"
 	"crypto/ed25519"
 	"crypto/rsa"
@@ -31,6 +31,7 @@ import (
 	"github.com/smallstep/certificates/authority/config"
 	"github.com/smallstep/certificates/authority/provisioner"
 	"github.com/smallstep/certificates/errs"
+	"github.com/smallstep/certificates/internal/cast"
 	"github.com/smallstep/certificates/logging"
 )
 
@@ -595,8 +596,8 @@ func LogSSHCertificate(w http.ResponseWriter, cert *ssh.Certificate) {
 		m := map[string]interface{}{
 			"serial":           cert.Serial,
 			"principals":       cert.ValidPrincipals,
-			"valid-from":       time.Unix(int64(cert.ValidAfter), 0).Format(time.RFC3339),
-			"valid-to":         time.Unix(int64(cert.ValidBefore), 0).Format(time.RFC3339),
+			"valid-from":       time.Unix(cast.Int64(cert.ValidAfter), 0).Format(time.RFC3339),
+			"valid-to":         time.Unix(cast.Int64(cert.ValidBefore), 0).Format(time.RFC3339),
 			"certificate":      certificate,
 			"certificate-type": certificateType,
 		}

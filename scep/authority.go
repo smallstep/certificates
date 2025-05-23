@@ -241,7 +241,7 @@ func (a *Authority) DecryptPKIEnvelope(ctx context.Context, msg *PKIMessage) err
 
 // SignCSR creates an x509.Certificate based on a CSR template and Cert Authority credentials
 // returns a new PKIMessage with CertRep data
-func (a *Authority) SignCSR(ctx context.Context, csr *x509.CertificateRequest, msg *PKIMessage) (*PKIMessage, error) {
+func (a *Authority) SignCSR(ctx context.Context, csr *x509.CertificateRequest, msg *PKIMessage, signCSROpts ...provisioner.SignCSROption) (*PKIMessage, error) {
 	// TODO: intermediate storage of the request? In SCEP it's possible to request a csr/certificate
 	// to be signed, which can be performed asynchronously / out-of-band. In that case a client can
 	// poll for the status. It seems to be similar as what can happen in ACME, so might want to model
@@ -283,6 +283,13 @@ func (a *Authority) SignCSR(ctx context.Context, csr *x509.CertificateRequest, m
 		SerialNumber:       csr.Subject.SerialNumber,
 		CommonName:         csr.Subject.CommonName,
 	})
+
+	// Apply CSR options. Currently only one option is defined.
+	for _, o := range signCSROpts {
+		if m, ok := o.(provisioner.TemplateDataModifier); ok {
+			m.Modify(data)
+		}
+	}
 
 	// Get authorizations from the SCEP provisioner.
 	ctx = provisioner.NewContextWithMethod(ctx, provisioner.SignMethod)
@@ -506,7 +513,7 @@ func (a *Authority) GetCACaps(ctx context.Context) []string {
 	return caps
 }
 
-func (a *Authority) ValidateChallenge(ctx context.Context, csr *x509.CertificateRequest, challenge, transactionID string) error {
+func (a *Authority) ValidateChallenge(ctx context.Context, csr *x509.CertificateRequest, challenge, transactionID string) ([]provisioner.SignCSROption, error) {
 	p := provisionerFromContext(ctx)
 	return p.ValidateChallenge(ctx, csr, challenge, transactionID)
 }
