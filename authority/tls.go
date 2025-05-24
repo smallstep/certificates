@@ -610,7 +610,7 @@ func (a *Authority) Revoke(ctx context.Context, revokeOpts *RevokeOptions) error
 	}
 
 	// If not mTLS nor ACME, then get the TokenID of the token.
-	if !(revokeOpts.MTLS || revokeOpts.ACME) {
+	if !revokeOpts.MTLS && !revokeOpts.ACME {
 		token, err := jose.ParseSigned(revokeOpts.OTT)
 		if err != nil {
 			return errs.Wrap(http.StatusUnauthorized, err, "authority.Revoke; error parsing token", opts...)

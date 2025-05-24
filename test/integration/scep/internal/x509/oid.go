@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style
 // license that can be found in the LICENSE file.
 
-//nolint:stylecheck,revive,gocritic // code copied from crypto/x509
+//nolint:staticcheck,revive,gocritic // code copied from crypto/x509
 package legacyx509
 
 import (

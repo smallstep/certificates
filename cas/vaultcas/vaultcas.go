@@ -212,12 +212,12 @@ func (v *VaultCAS) RevokeCertificate(req *apiv1.RevokeCertificateRequest) (*apiv
 func (v *VaultCAS) createCertificate(cr *x509.CertificateRequest, lifetime time.Duration) (*x509.Certificate, []*x509.Certificate, error) {
 	var vaultPKIRole string
 
-	switch {
-	case cr.PublicKeyAlgorithm == x509.RSA:
+	switch cr.PublicKeyAlgorithm {
+	case x509.RSA:
 		vaultPKIRole = v.config.PKIRoleRSA
-	case cr.PublicKeyAlgorithm == x509.ECDSA:
+	case x509.ECDSA:
 		vaultPKIRole = v.config.PKIRoleEC
-	case cr.PublicKeyAlgorithm == x509.Ed25519:
+	case x509.Ed25519:
 		vaultPKIRole = v.config.PKIRoleEd25519
 	default:
 		return nil, nil, fmt.Errorf("unsupported public key algorithm %v", cr.PublicKeyAlgorithm)

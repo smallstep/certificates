@@ -19,15 +19,15 @@ func testCAHelper(t *testing.T) (*url.URL, *vault.Client) {
 	t.Helper()
 
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		switch {
-		case r.RequestURI == "/v1/auth/kubernetes/login":
+		switch r.RequestURI {
+		case "/v1/auth/kubernetes/login":
 			w.WriteHeader(http.StatusOK)
 			fmt.Fprintf(w, `{
 				  "auth": {
 					"client_token": "hvs.0000"
 				  }
 				}`)
-		case r.RequestURI == "/v1/auth/custom-kubernetes/login":
+		case "/v1/auth/custom-kubernetes/login":
 			w.WriteHeader(http.StatusOK)
 			fmt.Fprintf(w, `{
 				  "auth": {
