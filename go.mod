@@ -29,17 +29,17 @@ require (
 	github.com/slackhq/nebula v1.9.5
 	github.com/smallstep/assert v0.0.0-20200723003110-82e2b9b3b262
 	github.com/smallstep/cli-utils v0.12.1
-	github.com/smallstep/go-attestation v0.4.4-0.20240109183208-413678f90935
+	github.com/smallstep/go-attestation v0.4.4-0.20241119153605-2306d5b464ca
 	github.com/smallstep/linkedca v0.23.0
 	github.com/smallstep/nosql v0.7.0
 	github.com/smallstep/pkcs7 v0.2.1
 	github.com/smallstep/scep v0.0.0-20240926084937-8cf1ca453101
 	github.com/stretchr/testify v1.10.0
 	github.com/urfave/cli v1.22.16
-	go.step.sm/crypto v0.64.0
+	go.step.sm/crypto v0.66.0
 	go.uber.org/mock v0.5.2
 	golang.org/x/crypto v0.38.0
-	golang.org/x/exp v0.0.0-20250305212735-054e65f0b394
+	golang.org/x/exp v0.0.0-20250408133849-7e4ce0ab07d0
 	golang.org/x/net v0.40.0
 	google.golang.org/api v0.234.0
 	google.golang.org/grpc v1.72.2
@@ -52,12 +52,12 @@ require (
 	cloud.google.com/go/auth/oauth2adapt v0.2.8 // indirect
 	cloud.google.com/go/compute/metadata v0.7.0 // indirect
 	cloud.google.com/go/iam v1.5.2 // indirect
-	cloud.google.com/go/kms v1.21.2 // indirect
+	cloud.google.com/go/kms v1.22.0 // indirect
 	dario.cat/mergo v1.0.1 // indirect
 	filippo.io/edwards25519 v1.1.0 // indirect
 	github.com/AndreasBriese/bbloom v0.0.0-20190825152654-46b345b51c96 // indirect
 	github.com/Azure/azure-sdk-for-go/sdk/azcore v1.18.0 // indirect
-	github.com/Azure/azure-sdk-for-go/sdk/azidentity v1.9.0 // indirect
+	github.com/Azure/azure-sdk-for-go/sdk/azidentity v1.10.0 // indirect
 	github.com/Azure/azure-sdk-for-go/sdk/internal v1.11.1 // indirect
 	github.com/Azure/azure-sdk-for-go/sdk/keyvault/azkeys v0.10.0 // indirect
 	github.com/Azure/azure-sdk-for-go/sdk/keyvault/internal v0.7.1 // indirect
@@ -164,7 +164,7 @@ require (
 	golang.org/x/sys v0.33.0 // indirect
 	golang.org/x/text v0.25.0 // indirect
 	golang.org/x/time v0.11.0 // indirect
-	golang.org/x/tools v0.31.0 // indirect
+	golang.org/x/tools v0.33.0 // indirect
 	google.golang.org/genproto v0.0.0-20250505200425-f936aa4a68b2 // indirect
 	google.golang.org/genproto/googleapis/api v0.0.0-20250505200425-f936aa4a68b2 // indirect
 	google.golang.org/genproto/googleapis/rpc v0.0.0-20250512202823-5a2f75b736a9 // indirect
