@@ -118,7 +118,7 @@ func (a *Authority) Sign(csr *x509.CertificateRequest, signOpts provisioner.Sign
 // request, taking the provided context.Context.
 func (a *Authority) SignWithContext(ctx context.Context, csr *x509.CertificateRequest, signOpts provisioner.SignOptions, extraOpts ...provisioner.SignOption) ([]*x509.Certificate, error) {
 	chain, prov, err := a.signX509(ctx, csr, signOpts, extraOpts...)
-	a.meter.X509Signed(prov, err)
+	a.meter.X509Signed(chain, prov, err)
 	return chain, err
 }
 
@@ -372,9 +372,9 @@ func (a *Authority) Rekey(oldCert *x509.Certificate, pk crypto.PublicKey) ([]*x5
 func (a *Authority) RenewContext(ctx context.Context, oldCert *x509.Certificate, pk crypto.PublicKey) ([]*x509.Certificate, error) {
 	chain, prov, err := a.renewContext(ctx, oldCert, pk)
 	if pk == nil {
-		a.meter.X509Renewed(prov, err)
+		a.meter.X509Renewed(chain, prov, err)
 	} else {
-		a.meter.X509Rekeyed(prov, err)
+		a.meter.X509Rekeyed(chain, prov, err)
 	}
 	return chain, err
 }

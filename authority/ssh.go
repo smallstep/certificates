@@ -149,7 +149,7 @@ func (a *Authority) GetSSHBastion(ctx context.Context, user, hostname string) (*
 // SignSSH creates a signed SSH certificate with the given public key and options.
 func (a *Authority) SignSSH(ctx context.Context, key ssh.PublicKey, opts provisioner.SignSSHOptions, signOpts ...provisioner.SignOption) (*ssh.Certificate, error) {
 	cert, prov, err := a.signSSH(ctx, key, opts, signOpts...)
-	a.meter.SSHSigned(prov, err)
+	a.meter.SSHSigned(cert, prov, err)
 	return cert, err
 }
 
@@ -337,7 +337,7 @@ func (a *Authority) isAllowedToSignSSHCertificate(cert *ssh.Certificate) error {
 // RenewSSH creates a signed SSH certificate using the old SSH certificate as a template.
 func (a *Authority) RenewSSH(ctx context.Context, oldCert *ssh.Certificate) (*ssh.Certificate, error) {
 	cert, prov, err := a.renewSSH(ctx, oldCert)
-	a.meter.SSHRenewed(prov, err)
+	a.meter.SSHRenewed(cert, prov, err)
 	return cert, err
 }
 
@@ -408,7 +408,7 @@ func (a *Authority) renewSSH(ctx context.Context, oldCert *ssh.Certificate) (*ss
 // RekeySSH creates a signed SSH certificate using the old SSH certificate as a template.
 func (a *Authority) RekeySSH(ctx context.Context, oldCert *ssh.Certificate, pub ssh.PublicKey, signOpts ...provisioner.SignOption) (*ssh.Certificate, error) {
 	cert, prov, err := a.rekeySSH(ctx, oldCert, pub, signOpts...)
-	a.meter.SSHRekeyed(prov, err)
+	a.meter.SSHRekeyed(cert, prov, err)
 	return cert, err
 }
 
