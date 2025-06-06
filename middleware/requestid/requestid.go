@@ -5,8 +5,6 @@ import (
 	"context"
 	"net/http"
 
-	"github.com/rs/xid"
-
 	"go.step.sm/crypto/randutil"
 )
 
@@ -67,14 +65,7 @@ func (h *Handler) Middleware(next http.Handler) http.Handler {
 // newRequestID generates a new random UUIDv4 request ID. If UUIDv4
 // generation fails, it'll fallback to generating a random ID using
 // github.com/rs/xid.
-func newRequestID() string {
-	requestID, err := randutil.UUIDv4()
-	if err != nil {
-		requestID = xid.New().String()
-	}
-
-	return requestID
-}
+func newRequestID() string { return randutil.UUIDv4() }
 
 type contextKey struct{}
 

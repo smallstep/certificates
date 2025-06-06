@@ -123,17 +123,13 @@ func encryptJSONWebKey(jwk *jose.JSONWebKey) (*jose.JSONWebEncryption, error) {
 	if err != nil {
 		return nil, err
 	}
-	salt, err := randutil.Salt(jose.PBKDF2SaltSize)
-	if err != nil {
-		return nil, err
-	}
 	opts := new(jose.EncrypterOptions)
 	opts.WithContentType(jose.ContentType("jwk+json"))
 	recipient := jose.Recipient{
 		Algorithm:  jose.PBES2_HS256_A128KW,
 		Key:        []byte("password"),
 		PBES2Count: jose.PBKDF2Iterations,
-		PBES2Salt:  salt,
+		PBES2Salt:  randutil.Salt(jose.PBKDF2SaltSize),
 	}
 	encrypter, err := jose.NewEncrypter(jose.DefaultEncAlgorithm, recipient, opts)
 	if err != nil {
@@ -159,10 +155,6 @@ func decryptJSONWebKey(key string) (*jose.JSONWebKey, error) {
 }
 
 func generateJWK() (*JWK, error) {
-	name, err := randutil.Alphanumeric(10)
-	if err != nil {
-		return nil, err
-	}
 	jwk, err := generateJSONWebKey()
 	if err != nil {
 		return nil, err
@@ -178,7 +170,7 @@ func generateJWK() (*JWK, error) {
 	}
 
 	p := &JWK{
-		Name:         name,
+		Name:         randutil.Alphanumeric(10),
 		Type:         "JWK",
 		Key:          &public,
 		EncryptedKey: encrypted,
@@ -226,10 +218,6 @@ func generateK8sSA(inputPubKey interface{}) (*K8sSA, error) {
 }
 
 func generateSSHPOP() (*SSHPOP, error) {
-	name, err := randutil.Alphanumeric(10)
-	if err != nil {
-		return nil, err
-	}
 	userB, err := os.ReadFile("./testdata/certs/ssh_user_ca_key.pub")
 	if err != nil {
 		return nil, err
@@ -248,7 +236,7 @@ func generateSSHPOP() (*SSHPOP, error) {
 	}
 
 	p := &SSHPOP{
-		Name:   name,
+		Name:   randutil.Alphanumeric(10),
 		Type:   "SSHPOP",
 		Claims: &globalProvisionerClaims,
 		sshPubKeys: &SSHKeys{
@@ -277,10 +265,6 @@ M46l92gdOozT
 -----END CERTIFICATE-----`)
 	}
 
-	name, err := randutil.Alphanumeric(10)
-	if err != nil {
-		return nil, err
-	}
 	rootPool := x509.NewCertPool()
 
 	var (
@@ -299,12 +283,13 @@ M46l92gdOozT
 		rootPool.AddCert(cert)
 	}
 	p := &X5C{
-		Name:     name,
+		Name:     randutil.Alphanumeric(10),
 		Type:     "X5C",
 		Roots:    root,
 		Claims:   &globalProvisionerClaims,
 		rootPool: rootPool,
 	}
+	var err error
 	p.ctl, err = NewController(p, p.Claims, Config{
 		Audiences: testAudiences,
 	}, nil)
@@ -312,30 +297,18 @@ M46l92gdOozT
 }
 
 func generateOIDC() (*OIDC, error) {
-	name, err := randutil.Alphanumeric(10)
-	if err != nil {
-		return nil, err
-	}
-	clientID, err := randutil.Alphanumeric(10)
-	if err != nil {
-		return nil, err
-	}
-	issuer, err := randutil.Alphanumeric(10)
-	if err != nil {
-		return nil, err
-	}
 	jwk, err := generateJSONWebKey()
 	if err != nil {
 		return nil, err
 	}
 	p := &OIDC{
-		Name:                  name,
+		Name:                  randutil.Alphanumeric(10),
 		Type:                  "OIDC",
-		ClientID:              clientID,
+		ClientID:              randutil.Alphanumeric(10),
 		ConfigurationEndpoint: "https://example.com/.well-known/openid-configuration",
 		Claims:                &globalProvisionerClaims,
 		configuration: openIDConfiguration{
-			Issuer:    issuer,
+			Issuer:    randutil.Alphanumeric(10),
 			JWKSetURI: "https://example.com/.well-known/jwks",
 		},
 		keyStore: &keyStore{
@@ -350,14 +323,7 @@ func generateOIDC() (*OIDC, error) {
 }
 
 func generateGCP() (*GCP, error) {
-	name, err := randutil.Alphanumeric(10)
-	if err != nil {
-		return nil, err
-	}
-	serviceAccount, err := randutil.Alphanumeric(10)
-	if err != nil {
-		return nil, err
-	}
+	name := randutil.Alphanumeric(10)
 	jwk, err := generateJSONWebKey()
 	if err != nil {
 		return nil, err
@@ -365,7 +331,7 @@ func generateGCP() (*GCP, error) {
 	p := &GCP{
 		Type:             "GCP",
 		Name:             name,
-		ServiceAccounts:  []string{serviceAccount},
+		ServiceAccounts:  []string{randutil.Alphanumeric(10)},
 		Claims:           &globalProvisionerClaims,
 		DisableSSHCAHost: &DefaultDisableSSHCAHost,
 		DisableSSHCAUser: &DefaultDisableSSHCAUser,
@@ -382,14 +348,7 @@ func generateGCP() (*GCP, error) {
 }
 
 func generateAWS() (*AWS, error) {
-	name, err := randutil.Alphanumeric(10)
-	if err != nil {
-		return nil, err
-	}
-	accountID, err := randutil.Alphanumeric(10)
-	if err != nil {
-		return nil, err
-	}
+	name := randutil.Alphanumeric(10)
 	block, _ := pem.Decode([]byte(awsTestCertificate))
 	if block == nil || block.Type != "CERTIFICATE" {
 		return nil, errors.New("error decoding AWS certificate")
@@ -401,7 +360,7 @@ func generateAWS() (*AWS, error) {
 	p := &AWS{
 		Type:         "AWS",
 		Name:         name,
-		Accounts:     []string{accountID},
+		Accounts:     []string{randutil.Alphanumeric(10)},
 		Claims:       &globalProvisionerClaims,
 		IMDSVersions: []string{"v2", "v1"},
 		config: &awsConfig{
@@ -490,14 +449,7 @@ func generateAWSWithServer() (*AWS, *httptest.Server, error) {
 }
 
 func generateAWSV1Only() (*AWS, error) {
-	name, err := randutil.Alphanumeric(10)
-	if err != nil {
-		return nil, err
-	}
-	accountID, err := randutil.Alphanumeric(10)
-	if err != nil {
-		return nil, err
-	}
+	name := randutil.Alphanumeric(10)
 	block, _ := pem.Decode([]byte(awsTestCertificate))
 	if block == nil || block.Type != "CERTIFICATE" {
 		return nil, errors.New("error decoding AWS certificate")
@@ -509,7 +461,7 @@ func generateAWSV1Only() (*AWS, error) {
 	p := &AWS{
 		Type:         "AWS",
 		Name:         name,
-		Accounts:     []string{accountID},
+		Accounts:     []string{randutil.Alphanumeric(10)},
 		Claims:       &globalProvisionerClaims,
 		IMDSVersions: []string{"v1"},
 		config: &awsConfig{
@@ -583,21 +535,14 @@ func generateAWSWithServerV1Only() (*AWS, *httptest.Server, error) {
 }
 
 func generateAzure() (*Azure, error) {
-	name, err := randutil.Alphanumeric(10)
-	if err != nil {
-		return nil, err
-	}
-	tenantID, err := randutil.Alphanumeric(10)
-	if err != nil {
-		return nil, err
-	}
+	tenantID := randutil.Alphanumeric(10)
 	jwk, err := generateJSONWebKey()
 	if err != nil {
 		return nil, err
 	}
 	p := &Azure{
 		Type:     "Azure",
-		Name:     name,
+		Name:     randutil.Alphanumeric(10),
 		TenantID: tenantID,
 		Audience: azureDefaultAudience,
 		Claims:   &globalProvisionerClaims,
@@ -742,18 +687,13 @@ func generateToken(sub, iss, aud, email string, sans []string, iat time.Time, jw
 		return "", err
 	}
 
-	id, err := randutil.ASCII(64)
-	if err != nil {
-		return "", err
-	}
-
 	claims := struct {
 		jose.Claims
 		Email string   `json:"email"`
 		SANS  []string `json:"sans"`
 	}{
 		Claims: jose.Claims{
-			ID:        id,
+			ID:        randutil.ASCII(64),
 			Subject:   sub,
 			Issuer:    iss,
 			IssuedAt:  jose.NewNumericDate(iat),
@@ -781,13 +721,9 @@ func generateCustomToken(sub, iss, aud string, jwk *jose.JSONWebKey, extraHeader
 		return "", err
 	}
 
-	id, err := randutil.ASCII(64)
-	if err != nil {
-		return "", err
-	}
 	iat := time.Now()
 	claims := jose.Claims{
-		ID:        id,
+		ID:        randutil.ASCII(64),
 		Subject:   sub,
 		Issuer:    iss,
 		IssuedAt:  jose.NewNumericDate(iat),
@@ -814,18 +750,13 @@ func generateOIDCToken(sub, iss, aud, email, preferredUsername string, iat time.
 		return "", err
 	}
 
-	id, err := randutil.ASCII(64)
-	if err != nil {
-		return "", err
-	}
-
 	claims := struct {
 		jose.Claims
 		Email             string `json:"email"`
 		PreferredUsername string `json:"preferred_username,omitempty"`
 	}{
 		Claims: jose.Claims{
-			ID:        id,
+			ID:        randutil.ASCII(64),
 			Subject:   sub,
 			Issuer:    iss,
 			IssuedAt:  jose.NewNumericDate(iat),
@@ -914,17 +845,12 @@ func generateSSHToken(sub, iss, aud string, iat time.Time, sshOpts *SignSSHOptio
 		return "", err
 	}
 
-	id, err := randutil.ASCII(64)
-	if err != nil {
-		return "", err
-	}
-
 	claims := struct {
 		jose.Claims
 		Step *stepPayload `json:"step,omitempty"`
 	}{
 		Claims: jose.Claims{
-			ID:        id,
+			ID:        randutil.ASCII(64),
 			Subject:   sub,
 			Issuer:    iss,
 			IssuedAt:  jose.NewNumericDate(iat),

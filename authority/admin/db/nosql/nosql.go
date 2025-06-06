@@ -70,13 +70,7 @@ func (db *DB) save(_ context.Context, id string, nu, old interface{}, typ string
 	}
 }
 
-func randID() (val string, err error) {
-	val, err = randutil.UUIDv4()
-	if err != nil {
-		return "", errors.Wrap(err, "error generating random alphanumeric ID")
-	}
-	return val, nil
-}
+func randID() string { return randutil.UUIDv4() }
 
 // Clock that returns time in UTC rounded to seconds.
 type Clock struct{}

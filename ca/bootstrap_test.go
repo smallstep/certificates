@@ -120,10 +120,6 @@ func generateBootstrapToken(ca, subject, sha string) string {
 	if err != nil {
 		panic(err)
 	}
-	id, err := randutil.ASCII(64)
-	if err != nil {
-		panic(err)
-	}
 	cl := struct {
 		SHA string `json:"sha"`
 		jose.Claims
@@ -131,7 +127,7 @@ func generateBootstrapToken(ca, subject, sha string) string {
 	}{
 		SHA: sha,
 		Claims: jose.Claims{
-			ID:        id,
+			ID:        randutil.ASCII(64),
 			Subject:   subject,
 			Issuer:    "mariano",
 			NotBefore: jose.NewNumericDate(now),

@@ -24,11 +24,10 @@ require (
 	github.com/newrelic/go-agent/v3 v3.39.0
 	github.com/pkg/errors v0.9.1
 	github.com/prometheus/client_golang v1.22.0
-	github.com/rs/xid v1.6.0
 	github.com/sirupsen/logrus v1.9.3
 	github.com/slackhq/nebula v1.9.5
 	github.com/smallstep/assert v0.0.0-20200723003110-82e2b9b3b262
-	github.com/smallstep/cli-utils v0.12.1
+	github.com/smallstep/cli-utils v0.12.2-0.20250606021536-dd7f6cfa209e
 	github.com/smallstep/go-attestation v0.4.4-0.20241119153605-2306d5b464ca
 	github.com/smallstep/linkedca v0.23.0
 	github.com/smallstep/nosql v0.7.0
@@ -36,7 +35,7 @@ require (
 	github.com/smallstep/scep v0.0.0-20240926084937-8cf1ca453101
 	github.com/stretchr/testify v1.10.0
 	github.com/urfave/cli v1.22.16
-	go.step.sm/crypto v0.66.0
+	go.step.sm/crypto v0.66.1-0.20250605121706-9fa5daed8f0d
 	go.uber.org/mock v0.5.2
 	golang.org/x/crypto v0.38.0
 	golang.org/x/exp v0.0.0-20250408133849-7e4ce0ab07d0

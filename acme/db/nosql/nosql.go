@@ -86,12 +86,8 @@ func (db *DB) save(_ context.Context, id string, nu, old interface{}, typ string
 
 var idLen = 32
 
-func randID() (val string, err error) {
-	val, err = randutil.Alphanumeric(idLen)
-	if err != nil {
-		return "", errors.Wrap(err, "error generating random alphanumeric ID")
-	}
-	return val, nil
+func randID() string {
+	return randutil.Alphanumeric(idLen)
 }
 
 // Clock that returns time in UTC rounded to seconds.

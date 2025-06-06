@@ -175,8 +175,6 @@ ZEp7knvU2psWRw==
 			}
 		},
 		"fail commonname-claim": func(t *testing.T) *signTest {
-			jti, err := randutil.ASCII(32)
-			assert.FatalError(t, err)
 			cl := struct {
 				jose.Claims
 				SANS []string `json:"sans"`
@@ -187,7 +185,7 @@ ZEp7knvU2psWRw==
 					NotBefore: jose.NewNumericDate(now),
 					Expiry:    jose.NewNumericDate(now.Add(time.Minute)),
 					Audience:  validAud,
-					ID:        jti,
+					ID:        randutil.ASCII(32),
 				},
 				SANS: []string{"invalid"},
 			}
@@ -208,8 +206,6 @@ ZEp7knvU2psWRw==
 			}
 		},
 		"ok": func(t *testing.T) *signTest {
-			jti, err := randutil.ASCII(32)
-			assert.FatalError(t, err)
 			cl := struct {
 				jose.Claims
 				SANS []string `json:"sans"`
@@ -220,7 +216,7 @@ ZEp7knvU2psWRw==
 					NotBefore: jose.NewNumericDate(now),
 					Expiry:    jose.NewNumericDate(now.Add(time.Minute)),
 					Audience:  validAud,
-					ID:        jti,
+					ID:        randutil.ASCII(32),
 				},
 				SANS: []string{"test.smallstep.com"},
 			}
@@ -242,8 +238,6 @@ ZEp7knvU2psWRw==
 			}
 		},
 		"ok-backwards-compat-missing-subject-SAN": func(t *testing.T) *signTest {
-			jti, err := randutil.ASCII(32)
-			assert.FatalError(t, err)
 			cl := struct {
 				jose.Claims
 				SANS []string `json:"sans"`
@@ -254,7 +248,7 @@ ZEp7knvU2psWRw==
 					NotBefore: jose.NewNumericDate(now),
 					Expiry:    jose.NewNumericDate(now.Add(time.Minute)),
 					Audience:  validAud,
-					ID:        jti,
+					ID:        randutil.ASCII(32),
 				},
 			}
 			raw, err := jose.Signed(sig).Claims(cl).CompactSerialize()

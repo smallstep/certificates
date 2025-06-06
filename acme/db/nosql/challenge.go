@@ -48,11 +48,7 @@ func (db *DB) getDBChallenge(_ context.Context, id string) (*dbChallenge, error)
 // CreateChallenge creates a new ACME challenge data structure in the database.
 // Implements acme.DB.CreateChallenge interface.
 func (db *DB) CreateChallenge(ctx context.Context, ch *acme.Challenge) error {
-	var err error
-	ch.ID, err = randID()
-	if err != nil {
-		return errors.Wrap(err, "error generating random id for ACME challenge")
-	}
+	ch.ID = randID()
 
 	dbch := &dbChallenge{
 		ID:        ch.ID,
