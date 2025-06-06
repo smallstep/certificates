@@ -2,10 +2,12 @@ package authority
 
 import (
 	"crypto"
+	"crypto/x509"
 	"io"
 
 	"go.step.sm/crypto/kms"
 	kmsapi "go.step.sm/crypto/kms/apiv1"
+	"golang.org/x/crypto/ssh"
 
 	"github.com/smallstep/certificates/authority/provisioner"
 )
@@ -13,13 +15,13 @@ import (
 // Meter wraps the set of defined callbacks for metrics gatherers.
 type Meter interface {
 	// X509Signed is called whenever an X509 certificate is signed.
-	X509Signed(provisioner.Interface, error)
+	X509Signed([]*x509.Certificate, provisioner.Interface, error)
 
 	// X509Renewed is called whenever an X509 certificate is renewed.
-	X509Renewed(provisioner.Interface, error)
+	X509Renewed([]*x509.Certificate, provisioner.Interface, error)
 
 	// X509Rekeyed is called whenever an X509 certificate is rekeyed.
-	X509Rekeyed(provisioner.Interface, error)
+	X509Rekeyed([]*x509.Certificate, provisioner.Interface, error)
 
 	// X509WebhookAuthorized is called whenever an X509 authoring webhook is called.
 	X509WebhookAuthorized(provisioner.Interface, error)
@@ -28,13 +30,13 @@ type Meter interface {
 	X509WebhookEnriched(provisioner.Interface, error)
 
 	// SSHSigned is called whenever an SSH certificate is signed.
-	SSHSigned(provisioner.Interface, error)
+	SSHSigned(*ssh.Certificate, provisioner.Interface, error)
 
 	// SSHRenewed is called whenever an SSH certificate is renewed.
-	SSHRenewed(provisioner.Interface, error)
+	SSHRenewed(*ssh.Certificate, provisioner.Interface, error)
 
 	// SSHRekeyed is called whenever an SSH certificate is rekeyed.
-	SSHRekeyed(provisioner.Interface, error)
+	SSHRekeyed(*ssh.Certificate, provisioner.Interface, error)
 
 	// SSHWebhookAuthorized is called whenever an SSH authoring webhook is called.
 	SSHWebhookAuthorized(provisioner.Interface, error)
@@ -49,17 +51,17 @@ type Meter interface {
 // noopMeter implements a noop [Meter].
 type noopMeter struct{}
 
-func (noopMeter) SSHRekeyed(provisioner.Interface, error)            {}
-func (noopMeter) SSHRenewed(provisioner.Interface, error)            {}
-func (noopMeter) SSHSigned(provisioner.Interface, error)             {}
-func (noopMeter) SSHWebhookAuthorized(provisioner.Interface, error)  {}
-func (noopMeter) SSHWebhookEnriched(provisioner.Interface, error)    {}
-func (noopMeter) X509Rekeyed(provisioner.Interface, error)           {}
-func (noopMeter) X509Renewed(provisioner.Interface, error)           {}
-func (noopMeter) X509Signed(provisioner.Interface, error)            {}
-func (noopMeter) X509WebhookAuthorized(provisioner.Interface, error) {}
-func (noopMeter) X509WebhookEnriched(provisioner.Interface, error)   {}
-func (noopMeter) KMSSigned(error)                                    {}
+func (noopMeter) SSHRekeyed(*ssh.Certificate, provisioner.Interface, error)     {}
+func (noopMeter) SSHRenewed(*ssh.Certificate, provisioner.Interface, error)     {}
+func (noopMeter) SSHSigned(*ssh.Certificate, provisioner.Interface, error)      {}
+func (noopMeter) SSHWebhookAuthorized(provisioner.Interface, error)             {}
+func (noopMeter) SSHWebhookEnriched(provisioner.Interface, error)               {}
+func (noopMeter) X509Rekeyed([]*x509.Certificate, provisioner.Interface, error) {}
+func (noopMeter) X509Renewed([]*x509.Certificate, provisioner.Interface, error) {}
+func (noopMeter) X509Signed([]*x509.Certificate, provisioner.Interface, error)  {}
+func (noopMeter) X509WebhookAuthorized(provisioner.Interface, error)            {}
+func (noopMeter) X509WebhookEnriched(provisioner.Interface, error)              {}
+func (noopMeter) KMSSigned(error)                                               {}
 
 type instrumentedKeyManager struct {
 	kms.KeyManager
