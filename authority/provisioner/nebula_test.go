@@ -254,15 +254,12 @@ func mustNebulaToken(t *testing.T, sub, iss, aud string, iat time.Time, sans []s
 	sig, err := jose.NewSigner(jose.SigningKey{Algorithm: algorithm, Key: key}, so)
 	require.NoError(t, err)
 
-	id, err := randutil.ASCII(64)
-	require.NoError(t, err)
-
 	claims := struct {
 		jose.Claims
 		SANS []string `json:"sans"`
 	}{
 		Claims: jose.Claims{
-			ID:        id,
+			ID:        randutil.ASCII(64),
 			Subject:   sub,
 			Issuer:    iss,
 			IssuedAt:  jose.NewNumericDate(iat),
@@ -290,15 +287,12 @@ func mustNebulaSSHToken(t *testing.T, sub, iss, aud string, iat time.Time, opts 
 	sig, err := jose.NewSigner(jose.SigningKey{Algorithm: algorithm, Key: key}, so)
 	require.NoError(t, err)
 
-	id, err := randutil.ASCII(64)
-	require.NoError(t, err)
-
 	claims := struct {
 		jose.Claims
 		Step *stepPayload `json:"step,omitempty"`
 	}{
 		Claims: jose.Claims{
-			ID:        id,
+			ID:        randutil.ASCII(64),
 			Subject:   sub,
 			Issuer:    iss,
 			IssuedAt:  jose.NewNumericDate(iat),

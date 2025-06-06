@@ -321,11 +321,7 @@ func newAuthorization(ctx context.Context, az *acme.Authorization) error {
 
 	chTypes := challengeTypes(az)
 
-	var err error
-	az.Token, err = randutil.Alphanumeric(32)
-	if err != nil {
-		return acme.WrapErrorISE(err, "error generating random alphanumeric ID")
-	}
+	az.Token = randutil.Alphanumeric(32)
 
 	db := acme.MustDatabaseFromContext(ctx)
 	prov := acme.MustProvisionerFromContext(ctx)
@@ -378,7 +374,7 @@ func newAuthorization(ctx context.Context, az *acme.Authorization) error {
 		}
 		az.Challenges = append(az.Challenges, ch)
 	}
-	if err = db.CreateAuthorization(ctx, az); err != nil {
+	if err := db.CreateAuthorization(ctx, az); err != nil {
 		return acme.WrapErrorISE(err, "error creating authorization")
 	}
 	return nil

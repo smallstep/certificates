@@ -160,11 +160,7 @@ func (db *DB) GetProvisioners(_ context.Context) ([]*linkedca.Provisioner, error
 
 // CreateProvisioner stores a new provisioner to the database.
 func (db *DB) CreateProvisioner(ctx context.Context, prov *linkedca.Provisioner) error {
-	var err error
-	prov.Id, err = randID()
-	if err != nil {
-		return admin.WrapErrorISE(err, "error generating random id for provisioner")
-	}
+	prov.Id = randID()
 
 	details, err := json.Marshal(prov.Details.GetData())
 	if err != nil {

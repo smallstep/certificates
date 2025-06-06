@@ -21,12 +21,7 @@ type dbNonce struct {
 // CreateNonce creates, stores, and returns an ACME replay-nonce.
 // Implements the acme.DB interface.
 func (db *DB) CreateNonce(ctx context.Context) (acme.Nonce, error) {
-	_id, err := randID()
-	if err != nil {
-		return "", err
-	}
-
-	id := base64.RawURLEncoding.EncodeToString([]byte(_id))
+	id := base64.RawURLEncoding.EncodeToString([]byte(randID()))
 	n := &dbNonce{
 		ID:        id,
 		CreatedAt: clock.Now(),

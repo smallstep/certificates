@@ -86,11 +86,7 @@ func (db *DB) GetAccountByKeyID(ctx context.Context, kid string) (*acme.Account,
 
 // CreateAccount imlements the AcmeDB.CreateAccount interface.
 func (db *DB) CreateAccount(ctx context.Context, acc *acme.Account) error {
-	var err error
-	acc.ID, err = randID()
-	if err != nil {
-		return err
-	}
+	acc.ID = randID()
 
 	dba := &dbAccount{
 		ID:              acc.ID,

@@ -113,10 +113,7 @@ func onboardAction(ctx *cli.Context) error {
 		return errors.Wrap(err, "error unmarshaling response")
 	}
 
-	password, err := randutil.ASCII(32)
-	if err != nil {
-		return err
-	}
+	password := randutil.ASCII(32)
 	cfg.password = []byte(password)
 
 	ui.Println("Initializing step-ca with the following configuration:")

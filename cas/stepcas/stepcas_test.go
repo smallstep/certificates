@@ -281,10 +281,7 @@ func TestMain(m *testing.M) {
 	}
 
 	// Password used to encrypt the key.
-	testPassword, err = randutil.Hex(32)
-	if err != nil {
-		panic(err)
-	}
+	testPassword = randutil.Hex(32)
 
 	// Encrypted JWK key used when the key is downloaded from the CA.
 	jwe, err := jose.EncryptJWK(&jose.JSONWebKey{Key: testX5CKey}, []byte(testPassword))

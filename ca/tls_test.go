@@ -36,15 +36,12 @@ func generateOTT(t *testing.T, subject string) string {
 	sig, err := jose.NewSigner(jose.SigningKey{Algorithm: jose.ES256, Key: jwk.Key}, opts)
 	require.NoError(t, err)
 
-	id, err := randutil.ASCII(64)
-	require.NoError(t, err)
-
 	cl := struct {
 		jose.Claims
 		SANS []string `json:"sans"`
 	}{
 		Claims: jose.Claims{
-			ID:        id,
+			ID:        randutil.ASCII(64),
 			Subject:   subject,
 			Issuer:    "mariano",
 			NotBefore: jose.NewNumericDate(now),

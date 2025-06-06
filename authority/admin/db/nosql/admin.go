@@ -130,11 +130,7 @@ func (db *DB) GetAdmins(context.Context) ([]*linkedca.Admin, error) {
 
 // CreateAdmin stores a new admin to the database.
 func (db *DB) CreateAdmin(ctx context.Context, adm *linkedca.Admin) error {
-	var err error
-	adm.Id, err = randID()
-	if err != nil {
-		return admin.WrapErrorISE(err, "error generating random id for admin")
-	}
+	adm.Id = randID()
 	adm.AuthorityId = db.authorityID
 
 	dba := &dbAdmin{

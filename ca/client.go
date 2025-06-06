@@ -111,14 +111,7 @@ const requestIDHeader = "X-Request-Id"
 
 // newRequestID generates a new random UUIDv4 request ID. If it fails,
 // the request ID will be the empty string.
-func newRequestID() string {
-	requestID, err := randutil.UUIDv4()
-	if err != nil {
-		return ""
-	}
-
-	return requestID
-}
+func newRequestID() string { return randutil.UUIDv4() }
 
 // enforceRequestID checks if the X-Request-Id HTTP header is filled. If it's
 // empty, the context is searched for a request ID. If that's also empty, a new

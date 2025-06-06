@@ -78,11 +78,7 @@ func (db *DB) GetAuthorization(ctx context.Context, id string) (*acme.Authorizat
 // CreateAuthorization creates an entry in the database for the Authorization.
 // Implements the acme.DB.CreateAuthorization interface.
 func (db *DB) CreateAuthorization(ctx context.Context, az *acme.Authorization) error {
-	var err error
-	az.ID, err = randID()
-	if err != nil {
-		return err
-	}
+	az.ID = randID()
 
 	chIDs := make([]string, len(az.Challenges))
 	for i, ch := range az.Challenges {

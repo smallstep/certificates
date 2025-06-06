@@ -155,7 +155,7 @@ func Test_reflectRequestID(t *testing.T) {
 		assert.NotEmpty(t, firstErr.RequestID)
 
 		// TODO: include the below error in the JSON? It's currently only output to the CA logs. Also see https://github.com/smallstep/certificates/pull/759
-		//assert.Equal(t, "/root/invalid was not found: certificate with fingerprint invalid was not found", apiErr.Msg)
+		// assert.Equal(t, "/root/invalid was not found: certificate with fingerprint invalid was not found", apiErr.Msg)
 	}
 	assert.Nil(t, rootResponse)
 
@@ -230,15 +230,12 @@ func generateOTT(t *testing.T, jwk *jose.JSONWebKey, subject string) string {
 	signer, err := jose.NewSigner(jose.SigningKey{Key: jwk.Key}, opts)
 	require.NoError(t, err)
 
-	id, err := randutil.ASCII(64)
-	require.NoError(t, err)
-
 	cl := struct {
 		jose.Claims
 		SANS []string `json:"sans"`
 	}{
 		Claims: jose.Claims{
-			ID:        id,
+			ID:        randutil.ASCII(64),
 			Subject:   subject,
 			Issuer:    "jwk",
 			NotBefore: jose.NewNumericDate(now),

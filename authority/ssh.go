@@ -574,11 +574,6 @@ func (a *Authority) SignSSHAddUser(ctx context.Context, key ssh.PublicKey, subje
 		return nil, err
 	}
 
-	nonce, err := randutil.ASCII(32)
-	if err != nil {
-		return nil, errs.Wrap(http.StatusInternalServerError, err, "signSSHAddUser")
-	}
-
 	var serial uint64
 	if err := binary.Read(rand.Reader, binary.BigEndian, &serial); err != nil {
 		return nil, errs.Wrap(http.StatusInternalServerError, err, "signSSHAddUser: error reading random number")
@@ -595,7 +590,7 @@ func (a *Authority) SignSSHAddUser(ctx context.Context, key ssh.PublicKey, subje
 	addUserPrincipal := a.getAddUserPrincipal()
 
 	cert := &ssh.Certificate{
-		Nonce:           []byte(nonce),
+		Nonce:           []byte(randutil.ASCII(32)),
 		Key:             key,
 		Serial:          serial,
 		CertType:        ssh.UserCert,

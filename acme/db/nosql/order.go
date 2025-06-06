@@ -75,11 +75,7 @@ func (db *DB) GetOrder(ctx context.Context, id string) (*acme.Order, error) {
 
 // CreateOrder creates ACME Order resources and saves them to the DB.
 func (db *DB) CreateOrder(ctx context.Context, o *acme.Order) error {
-	var err error
-	o.ID, err = randID()
-	if err != nil {
-		return err
-	}
+	o.ID = randID()
 
 	now := clock.Now()
 	dbo := &dbOrder{
@@ -98,11 +94,8 @@ func (db *DB) CreateOrder(ctx context.Context, o *acme.Order) error {
 		return err
 	}
 
-	_, err = db.updateAddOrderIDs(ctx, o.AccountID, false, o.ID)
-	if err != nil {
-		return err
-	}
-	return nil
+	_, err := db.updateAddOrderIDs(ctx, o.AccountID, false, o.ID)
+	return err
 }
 
 // UpdateOrder saves an updated ACME Order to the database.

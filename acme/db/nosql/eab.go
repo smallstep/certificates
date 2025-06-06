@@ -2,10 +2,11 @@ package nosql
 
 import (
 	"context"
-	"crypto/rand"
 	"encoding/json"
 	"sync"
 	"time"
+
+	"go.step.sm/crypto/randutil"
 
 	"github.com/pkg/errors"
 
@@ -57,22 +58,12 @@ func (db *DB) CreateExternalAccountKey(ctx context.Context, provisionerID, refer
 	externalAccountKeyMutex.Lock()
 	defer externalAccountKeyMutex.Unlock()
 
-	keyID, err := randID()
-	if err != nil {
-		return nil, err
-	}
-
-	random := make([]byte, 32)
-	_, err = rand.Read(random)
-	if err != nil {
-		return nil, err
-	}
-
+	keyID := randID()
 	dbeak := &dbExternalAccountKey{
 		ID:            keyID,
 		ProvisionerID: provisionerID,
 		Reference:     reference,
-		HmacKey:       random,
+		HmacKey:       randutil.Bytes(32),
 		CreatedAt:     clock.Now(),
 	}
 

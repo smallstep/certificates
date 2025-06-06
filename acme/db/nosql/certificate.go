@@ -28,11 +28,7 @@ type dbSerial struct {
 
 // CreateCertificate creates and stores an ACME certificate type.
 func (db *DB) CreateCertificate(ctx context.Context, cert *acme.Certificate) error {
-	var err error
-	cert.ID, err = randID()
-	if err != nil {
-		return err
-	}
+	cert.ID = randID()
 
 	leaf := pem.EncodeToMemory(&pem.Block{
 		Type:  "CERTIFICATE",
@@ -54,8 +50,7 @@ func (db *DB) CreateCertificate(ctx context.Context, cert *acme.Certificate) err
 		Intermediates: intermediates,
 		CreatedAt:     time.Now().UTC(),
 	}
-	err = db.save(ctx, cert.ID, dbch, nil, "certificate", certTable)
-	if err != nil {
+	if err := db.save(ctx, cert.ID, dbch, nil, "certificate", certTable); err != nil {
 		return err
 	}
 

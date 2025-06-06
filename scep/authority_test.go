@@ -24,13 +24,6 @@ import (
 	"go.step.sm/crypto/x509util"
 )
 
-func generateContent(t *testing.T, size int) []byte {
-	t.Helper()
-	b, err := randutil.Bytes(size)
-	require.NoError(t, err)
-	return b
-}
-
 func generateRecipients(t *testing.T) []*x509.Certificate {
 	ca, err := minica.New()
 	require.NoError(t, err)
@@ -59,12 +52,12 @@ func TestAuthority_encrypt(t *testing.T) {
 		args    args
 		wantErr bool
 	}{
-		{"alg-0", args{generateContent(t, 32), recipients, pkcs7.EncryptionAlgorithmDESCBC}, false},
-		{"alg-1", args{generateContent(t, 32), recipients, pkcs7.EncryptionAlgorithmAES128CBC}, false},
-		{"alg-2", args{generateContent(t, 32), recipients, pkcs7.EncryptionAlgorithmAES256CBC}, false},
-		{"alg-3", args{generateContent(t, 32), recipients, pkcs7.EncryptionAlgorithmAES128GCM}, false},
-		{"alg-4", args{generateContent(t, 32), recipients, pkcs7.EncryptionAlgorithmAES256GCM}, false},
-		{"alg-unknown", args{generateContent(t, 32), recipients, 42}, true},
+		{"alg-0", args{randutil.Bytes(32), recipients, pkcs7.EncryptionAlgorithmDESCBC}, false},
+		{"alg-1", args{randutil.Bytes(32), recipients, pkcs7.EncryptionAlgorithmAES128CBC}, false},
+		{"alg-2", args{randutil.Bytes(32), recipients, pkcs7.EncryptionAlgorithmAES256CBC}, false},
+		{"alg-3", args{randutil.Bytes(32), recipients, pkcs7.EncryptionAlgorithmAES128GCM}, false},
+		{"alg-4", args{randutil.Bytes(32), recipients, pkcs7.EncryptionAlgorithmAES256GCM}, false},
+		{"alg-unknown", args{randutil.Bytes(32), recipients, 42}, true},
 	}
 	for _, tt := range tests {
 		tc := tt

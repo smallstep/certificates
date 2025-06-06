@@ -82,11 +82,7 @@ func (i *x5cIssuer) createToken(aud, sub string, sans []string, info *raInfo) (s
 		return "", err
 	}
 
-	id, err := randutil.Hex(64) // 256 bits
-	if err != nil {
-		return "", err
-	}
-
+	id := randutil.Hex(64) // 256 bits
 	claims := defaultClaims(i.issuer, sub, aud, id)
 	builder := jose.Signed(signer).Claims(claims)
 	if len(sans) > 0 {

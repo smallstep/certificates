@@ -90,12 +90,7 @@ func (war *webhookAdminResponder) CreateProvisionerWebhook(w http.ResponseWriter
 		return
 	}
 
-	id, err := randutil.UUIDv4()
-	if err != nil {
-		render.Error(w, r, admin.WrapErrorISE(err, "error generating webhook id"))
-		return
-	}
-	newWebhook.Id = id
+	newWebhook.Id = randutil.UUIDv4()
 
 	// verify the name is unique
 	for _, wh := range prov.Webhooks {
@@ -106,12 +101,7 @@ func (war *webhookAdminResponder) CreateProvisionerWebhook(w http.ResponseWriter
 		}
 	}
 
-	secret, err := randutil.Bytes(64)
-	if err != nil {
-		render.Error(w, r, admin.WrapErrorISE(err, "error generating webhook secret"))
-		return
-	}
-	newWebhook.Secret = base64.StdEncoding.EncodeToString(secret)
+	newWebhook.Secret = base64.StdEncoding.EncodeToString(randutil.Bytes(64))
 
 	prov.Webhooks = append(prov.Webhooks, newWebhook)
 
