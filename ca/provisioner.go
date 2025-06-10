@@ -92,10 +92,7 @@ func (p *Provisioner) Token(subject string, sans ...string) (string, error) {
 	}
 
 	// A random jwt id will be used to identify duplicated tokens
-	jwtID, err := randutil.Hex(64) // 256 bits
-	if err != nil {
-		return "", err
-	}
+	jwtID := randutil.Hex(64) // 256 bits
 
 	notBefore := time.Now()
 	notAfter := notBefore.Add(tokenLifetime)
@@ -122,15 +119,10 @@ func (p *Provisioner) Token(subject string, sans ...string) (string, error) {
 
 // SSHToken generates a SSH token.
 func (p *Provisioner) SSHToken(certType, keyID string, principals []string) (string, error) {
-	jwtID, err := randutil.Hex(64)
-	if err != nil {
-		return "", err
-	}
-
 	notBefore := time.Now()
 	notAfter := notBefore.Add(tokenLifetime)
 	tokOptions := []token.Options{
-		token.WithJWTID(jwtID),
+		token.WithJWTID(randutil.Hex(64)),
 		token.WithKid(p.kid),
 		token.WithIssuer(p.name),
 		token.WithAudience(p.sshAudience),

@@ -75,10 +75,7 @@ func (i *jwkIssuer) Lifetime(d time.Duration) time.Duration {
 }
 
 func (i *jwkIssuer) createToken(aud, sub string, sans []string, info *raInfo) (string, error) {
-	id, err := randutil.Hex(64) // 256 bits
-	if err != nil {
-		return "", err
-	}
+	id := randutil.Hex(64) // 256 bits
 
 	claims := defaultClaims(i.issuer, sub, aud, id)
 	builder := jose.Signed(i.signer).Claims(claims)

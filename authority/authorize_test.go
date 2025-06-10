@@ -66,17 +66,12 @@ func generateToken(sub, iss, aud string, sans []string, iat time.Time, jwk *jose
 		return "", err
 	}
 
-	id, err := randutil.ASCII(64)
-	if err != nil {
-		return "", err
-	}
-
 	claims := struct {
 		jose.Claims
 		SANS []string `json:"sans"`
 	}{
 		Claims: jose.Claims{
-			ID:        id,
+			ID:        randutil.ASCII(64),
 			Subject:   sub,
 			Issuer:    iss,
 			IssuedAt:  jose.NewNumericDate(iat),
@@ -103,14 +98,9 @@ func generateCustomToken(sub, iss, aud string, jwk *jose.JSONWebKey, extraHeader
 		return "", err
 	}
 
-	id, err := randutil.ASCII(64)
-	if err != nil {
-		return "", err
-	}
-
 	iat := time.Now()
 	claims := jose.Claims{
-		ID:        id,
+		ID:        randutil.ASCII(64),
 		Subject:   sub,
 		Issuer:    iss,
 		IssuedAt:  jose.NewNumericDate(iat),
@@ -967,17 +957,12 @@ func generateSSHToken(sub, iss, aud string, iat time.Time, sshOpts *provisioner.
 		return "", err
 	}
 
-	id, err := randutil.ASCII(64)
-	if err != nil {
-		return "", err
-	}
-
 	claims := struct {
 		jose.Claims
 		Step *stepPayload `json:"step,omitempty"`
 	}{
 		Claims: jose.Claims{
-			ID:        id,
+			ID:        randutil.ASCII(64),
 			Subject:   sub,
 			Issuer:    iss,
 			IssuedAt:  jose.NewNumericDate(iat),

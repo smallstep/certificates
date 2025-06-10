@@ -100,10 +100,7 @@ func NewAdminClient(endpoint string, opts ...ClientOption) (*AdminClient, error)
 
 func (c *AdminClient) generateAdminToken(aud *url.URL) (string, error) {
 	// A random jwt id will be used to identify duplicated tokens
-	jwtID, err := randutil.Hex(64) // 256 bits
-	if err != nil {
-		return "", err
-	}
+	jwtID := randutil.Hex(64) // 256 bits
 
 	// Drop any query string parameter from the token audience
 	aud = &url.URL{

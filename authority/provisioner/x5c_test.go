@@ -713,12 +713,10 @@ func TestX5C_AuthorizeSSHSign(t *testing.T) {
 			p, err := generateX5C(nil)
 			require.NoError(t, err)
 
-			id, err := randutil.ASCII(64)
-			require.NoError(t, err)
 			now := time.Now()
 			claims := &x5cPayload{
 				Claims: jose.Claims{
-					ID:        id,
+					ID:        randutil.ASCII(64),
 					Subject:   "foo",
 					Issuer:    p.GetName(),
 					IssuedAt:  jose.NewNumericDate(now),
@@ -741,12 +739,10 @@ func TestX5C_AuthorizeSSHSign(t *testing.T) {
 			p, err := generateX5C(nil)
 			require.NoError(t, err)
 
-			id, err := randutil.ASCII(64)
-			require.NoError(t, err)
 			now := time.Now()
 			claims := &x5cPayload{
 				Claims: jose.Claims{
-					ID:        id,
+					ID:        randutil.ASCII(64),
 					Subject:   "foo",
 					Issuer:    p.GetName(),
 					IssuedAt:  jose.NewNumericDate(now),
@@ -775,12 +771,10 @@ func TestX5C_AuthorizeSSHSign(t *testing.T) {
 			p, err := generateX5C(nil)
 			require.NoError(t, err)
 
-			id, err := randutil.ASCII(64)
-			require.NoError(t, err)
 			now := time.Now()
 			claims := &x5cPayload{
 				Claims: jose.Claims{
-					ID:        id,
+					ID:        randutil.ASCII(64),
 					Subject:   "foo",
 					Issuer:    p.GetName(),
 					IssuedAt:  jose.NewNumericDate(now),
@@ -803,12 +797,10 @@ func TestX5C_AuthorizeSSHSign(t *testing.T) {
 			p, err := generateX5C(nil)
 			require.NoError(t, err)
 
-			id, err := randutil.ASCII(64)
-			require.NoError(t, err)
 			now := time.Now()
 			claims := &x5cPayload{
 				Claims: jose.Claims{
-					ID:        id,
+					ID:        randutil.ASCII(64),
 					Subject:   "foo",
 					Issuer:    p.GetName(),
 					IssuedAt:  jose.NewNumericDate(now),
