@@ -41,6 +41,10 @@ type SCEP struct {
 	// GetCACerts response
 	ExcludeIntermediate bool `json:"excludeIntermediate,omitempty"`
 
+	// ReturnEntireCertChain makes the provisioner return the full certificate chain
+	// provided by the CA rather than just the leaf certificate
+	ReturnEntireCertChain bool `json:"returnEntireCertChain,omitempty"`
+
 	// MinimumPublicKeyLength is the minimum length for public keys in CSRs
 	MinimumPublicKeyLength int `json:"minimumPublicKeyLength,omitempty"`
 
@@ -445,6 +449,13 @@ func (s *SCEP) ShouldIncludeRootInChain() bool {
 // don't pick the right recipient.
 func (s *SCEP) ShouldIncludeIntermediateInChain() bool {
 	return !s.ExcludeIntermediate
+}
+
+// ShouldReturnEntireCertChain indicates if the
+// CA should return the entire chain of certificates in the SCEP
+// PKIOperation response rather than just the leaf certificate.
+func (s *SCEP) ShouldReturnEntireCertChain() bool {
+	return s.ReturnEntireCertChain
 }
 
 // GetContentEncryptionAlgorithm returns the numeric identifier

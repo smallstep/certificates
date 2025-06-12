@@ -363,10 +363,16 @@ func (a *Authority) SignCSR(ctx context.Context, csr *x509.CertificateRequest, m
 		return nil, err
 	}
 
-	// add the certificate into the signed data type
-	// this cert must be added before the signedData because the recipient will expect it
-	// as the first certificate in the array
-	signedData.AddCertificate(cert)
+	// add the certificate chain into the signed data type if specified
+	// otherwise just return the leaf cert. the ordering of the added signed data is important
+	// because the recipient will expect the leaf as the first certificate
+	if p.ShouldReturnEntireCertChain() {
+		for _, c := range certChain {
+			signedData.AddCertificate(c)
+		}
+	} else {
+		signedData.AddCertificate(cert)
+	}
 
 	signerCert, signer, err := a.selectSigner(ctx)
 	if err != nil {
