@@ -375,7 +375,7 @@ func (v sshDefaultPublicKeyValidator) Valid(cert *ssh.Certificate, _ SignSSHOpti
 				8*keyutil.MinRSAKeyBytes, keyutil.MinRSAKeyBytes)
 		}
 		return nil
-	case ssh.KeyAlgoDSA:
+	case ssh.InsecureKeyAlgoDSA: //nolint:staticcheck // only using the constant for lookup; no dependent logic
 		return errs.BadRequest("ssh certificate key algorithm (DSA) is not supported")
 	default:
 		return nil
