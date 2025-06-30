@@ -16,6 +16,7 @@ import (
 	"encoding/base64"
 	"encoding/hex"
 	"encoding/json"
+	"encoding/pem"
 	"errors"
 	"fmt"
 	"io"
@@ -36,6 +37,7 @@ import (
 	"go.step.sm/crypto/x509util"
 	"golang.org/x/exp/slices"
 
+	"github.com/mbreban/attestation"
 	"github.com/smallstep/certificates/acme/wire"
 	"github.com/smallstep/certificates/authority/provisioner"
 	wireprovisioner "github.com/smallstep/certificates/authority/provisioner/wire"
@@ -834,7 +836,7 @@ func deviceAttest01Validate(ctx context.Context, ch *Challenge, db DB, jwk *jose
 	format := att.Format
 	prov := MustProvisionerFromContext(ctx)
 	if !prov.IsAttestationFormatEnabled(ctx, provisioner.ACMEAttestationFormat(format)) {
-		if format != "apple" && format != "step" && format != "tpm" {
+		if format != "apple" && format != "step" && format != "tpm" && format != "android-key" {
 			return storeError(ctx, db, ch, true, NewDetailedError(ErrorBadAttestationStatementType, "unsupported attestation object format %q", format))
 		}
 
@@ -843,6 +845,36 @@ func deviceAttest01Validate(ctx context.Context, ch *Challenge, db DB, jwk *jose
 	}
 
 	switch format {
+	case "android-key":
+		data, err := doAndroidKeyAttestionFormat(ctx, prov, ch, jwk, &att)
+		if err != nil {
+			var acmeError *Error
+			if errors.As(err, &acmeError) {
+				if acmeError.Status == 500 {
+					return acmeError
+				}
+				return storeError(ctx, db, ch, true, acmeError)
+			}
+			return WrapErrorISE(err, "error validating attestation")
+		}
+
+		// 1. attestationSecurityLevel > 0
+		if data.Attestation.AttestationSecurityLevel < 1 {
+			return storeError(ctx, db, ch, true, NewDetailedError(ErrorBadAttestationStatementType, "Security Level does not match"))
+		}
+
+		// 2. hardwareEnforced
+		if ch.Value != string(data.Attestation.TeeEnforced.AttestationIdSerial) {
+			subproblem := NewSubproblemWithIdentifier(
+				ErrorRejectedIdentifierType,
+				Identifier{Type: "permanent-identifier", Value: ch.Value},
+				"challenge identifier %q doesn't match any of the attested hardware identifiers %q", ch.Value, []string{string(data.Attestation.TeeEnforced.AttestationIdSerial)},
+			)
+			return storeError(ctx, db, ch, true, NewDetailedError(ErrorBadAttestationStatementType, "permanent identifier does not match").AddSubproblems(subproblem))
+		}
+
+		// Update attestation key fingerprint to compare against the CSR
+		az.Fingerprint = data.Fingerprint
 	case "apple":
 		data, err := doAppleAttestationFormat(ctx, prov, ch, &att)
 		if err != nil {
@@ -1362,6 +1394,195 @@ func doAppleAttestationFormat(_ context.Context, prov Provisioner, _ *Challenge,
 		case ext.Id.Equal(oidAppleNonce):
 			data.Nonce = ext.Value
 		}
+	}
+
+	return data, nil
+}
+
+// Android Root CA
+// https://developer.android.com/privacy-and-security/security-key-attestation#root_certificate
+const AndroidRootCAPubKey = `-----BEGIN PUBLIC KEY-----
+MIICIjANBgkqhkiG9w0BAQEFAAOCAg8AMIICCgKCAgEAr7bHgiuxpwHsK7Qui8xU
+FmOr75gvMsd/dTEDDJdSSxtf6An7xyqpRR90PL2abxM1dEqlXnf2tqw1Ne4Xwl5j
+lRfdnJLmN0pTy/4lj4/7tv0Sk3iiKkypnEUtR6WfMgH0QZfKHM1+di+y9TFRtv6y
+//0rb+T+W8a9nsNL/ggjnar86461qO0rOs2cXjp3kOG1FEJ5MVmFmBGtnrKpa73X
+pXyTqRxB/M0n1n/W9nGqC4FSYa04T6N5RIZGBN2z2MT5IKGbFlbC8UrW0DxW7AYI
+mQQcHtGl/m00QLVWutHQoVJYnFPlXTcHYvASLu+RhhsbDmxMgJJ0mcDpvsC4PjvB
++TxywElgS70vE0XmLD+OJtvsBslHZvPBKCOdT0MS+tgSOIfga+z1Z1g7+DVagf7q
+uvmag8jfPioyKvxnK/EgsTUVi2ghzq8wm27ud/mIM7AY2qEORR8Go3TVB4HzWQgp
+Zrt3i5MIlCaY504LzSRiigHCzAPlHws+W0rB5N+er5/2pJKnfBSDiCiFAVtCLOZ7
+gLiMm0jhO2B6tUXHI/+MRPjy02i59lINMRRev56GKtcd9qO/0kUJWdZTdA2XoS82
+ixPvZtXQpUpuL12ab+9EaDK8Z4RHJYYfCT3Q5vNAXaiWQ+8PTWm2QgBR/bkwSWc+
+NpUFgNPN9PvQi8WEg5UmAGMCAwEAAQ==
+-----END PUBLIC KEY-----`
+
+// Attestion oid for Android, encoded as an integer.
+// https://source.android.com/docs/security/features/keystore/attestation#id-attestation
+var oidAndroidAttestation = asn1.ObjectIdentifier{1, 3, 6, 1, 4, 1, 11129, 2, 1, 17}
+
+type androidKeyAttestationData struct {
+	Certificate *x509.Certificate
+	Fingerprint string
+	Attestation *attestation.KeyDescription
+}
+
+func findAndroidAttestationCert(intermediates []*x509.Certificate) (*x509.Certificate, error) {
+	for _, cert := range intermediates {
+		for _, ext := range cert.Extensions {
+			if ext.Id.Equal(oidAndroidAttestation) {
+				return cert, nil
+			}
+		}
+	}
+	return nil, errors.New("no attestation certificate with OID 1.3.6.1.4.1.11129.2.1.17 found in the cert chain")
+}
+
+// https://developer.android.com/privacy-and-security/security-key-attestation
+// 3. Verify that the root public certificate is trustworthy and that each certificate signs the next certificate in the chain.
+// 4. Check each certificate's revocation status to ensure that none of the certificates have been revoked.
+// 5. Optionally, inspect the provisioning information certificate extension that is only present in newer certificate chains.
+//    Obtain a reference to the CBOR parser library that is most appropriate for your toolset. Find the nearest certificate to the root that contains the provisioning information certificate extension. Use the parser to extract the provisioning information certificate extension data from that certificate.
+//    See the section about the provisioning information extension for more details.
+// 6. Find the nearest certificate to the root that contains the key attestation certificate extension. If the provisioning information certificate extension was present, the key attestation certificate extension must be in the immediately subsequent certificate. Use the parser to extract the key attestation certificate extension data from that certificate.
+// 7. Check the extension data that you've retrieved in the previous steps for consistency and compare with the set of values that you expect the hardware-backed key to contain.
+
+func doAndroidKeyAttestionFormat(_ context.Context, prov Provisioner, ch *Challenge, jwk *jose.JSONWebKey, att *attestationObject) (*androidKeyAttestationData, error) {
+	// Extract x5c and verify certificate
+	acme := prov.(*provisioner.ACME)
+	certs := []*x509.Certificate{}
+	x5c, ok := att.AttStatement["x5c"].([]any)
+	if !ok {
+		return nil, NewDetailedError(ErrorBadAttestationStatementType, "x5c not present")
+	}
+	if len(x5c) == 0 {
+		return nil, NewDetailedError(ErrorRejectedIdentifierType, "x5c is empty")
+	}
+	der, ok := x5c[0].([]byte)
+	if !ok {
+		return nil, NewDetailedError(ErrorBadAttestationStatementType, "x5c[0] is not a DER []byte")
+	}
+	leaf, err := x509.ParseCertificate(der)
+	if err != nil {
+		return nil, WrapDetailedError(ErrorBadAttestationStatementType, err, "failed to parse leaf certificate")
+	}
+	certs = append(certs, leaf)
+
+	// Parse intermediates and root
+	intermediates := x509.NewCertPool()
+	var root *x509.Certificate
+	for i, v := range x5c[1:] {
+		der, ok := v.([]byte)
+		if !ok {
+			return nil, NewDetailedError(ErrorBadAttestationStatementType, "x5c element is not a DER []byte")
+		}
+		cert, err := x509.ParseCertificate(der)
+		if err != nil {
+			return nil, WrapDetailedError(ErrorBadAttestationStatementType, err, "failed to parse intermediate/root certificate")
+		}
+		// Verify CRL
+		if acme.IsRootRevoked(cert.SerialNumber.String()) {
+			return nil, NewDetailedError(ErrorBadAttestationStatementType, "x5c element contain a revoked certificate")
+		}
+		if i == len(x5c)-2 {
+			// Last cert = root
+			certs = append(certs, cert)
+			root = cert
+		} else {
+			certs = append(certs, cert)
+			intermediates.AddCert(cert)
+		}
+	}
+
+	if root == nil {
+		return nil, NewDetailedError(ErrorBadAttestationStatementType, "missing root certificate in x5c chain")
+	}
+
+	block, _ := pem.Decode([]byte(AndroidRootCAPubKey))
+	trustedPubKey, err := x509.ParsePKIXPublicKey(block.Bytes)
+	switch root.PublicKey.(type) {
+	case *rsa.PublicKey:
+		if !root.PublicKey.(*rsa.PublicKey).Equal(trustedPubKey) {
+			return nil, NewDetailedError(ErrorBadAttestationStatementType, "Root certificate not signed by Android")
+		}
+	default:
+		return nil, NewDetailedError(ErrorBadAttestationStatementType, "Invalid root certificate signature algorithm")
+	}
+
+	// Validate the full chain including root as trust anchor
+	roots := x509.NewCertPool()
+	roots.AddCert(root)
+
+	if _, err := leaf.Verify(x509.VerifyOptions{
+		Intermediates: intermediates,
+		Roots:         roots,
+		CurrentTime:   time.Now().Add(2 * time.Second).Truncate(time.Second),
+		KeyUsages:     []x509.ExtKeyUsage{x509.ExtKeyUsageCodeSigning},
+	}); err != nil {
+		return nil, WrapDetailedError(ErrorBadAttestationStatementType, err, "x5c chain verification failed")
+	}
+
+	// Get signature
+	sig, ok := att.AttStatement["sig"].([]byte)
+	if !ok {
+		return nil, NewDetailedError(ErrorBadAttestationStatementType, "sig not present")
+	}
+
+	keyAuth, err := KeyAuthorization(ch.Token, jwk)
+	if err != nil {
+		return nil, err
+	}
+
+	// Parse attestation data:
+	// find the attestation certificate
+	attCert, err := findAndroidAttestationCert(certs)
+	if err != nil {
+		return nil, WrapDetailedError(ErrorBadAttestationStatementType, err, "")
+	}
+
+	switch pub := attCert.PublicKey.(type) {
+	case *ecdsa.PublicKey:
+		if pub.Curve != elliptic.P256() {
+			return nil, WrapDetailedError(ErrorBadAttestationStatementType, err, "unsupported elliptic curve %s", pub.Curve)
+		}
+		sum := sha256.Sum256([]byte(keyAuth))
+		if !ecdsa.VerifyASN1(pub, sum[:], sig) {
+			return nil, NewDetailedError(ErrorBadAttestationStatementType, "failed to validate signature")
+		}
+	case *rsa.PublicKey:
+		sum := sha256.Sum256([]byte(keyAuth))
+		if err := rsa.VerifyPKCS1v15(pub, crypto.SHA256, sum[:], sig); err != nil {
+			return nil, NewDetailedError(ErrorBadAttestationStatementType, "failed to validate signature")
+		}
+	case ed25519.PublicKey:
+		if !ed25519.Verify(pub, []byte(keyAuth), sig) {
+			return nil, NewDetailedError(ErrorBadAttestationStatementType, "failed to validate signature")
+		}
+	default:
+		return nil, NewDetailedError(ErrorBadAttestationStatementType, "unsupported public key type %T", pub)
+	}
+
+	data := &androidKeyAttestationData{
+		Certificate: attCert,
+	}
+	if data.Fingerprint, err = keyutil.Fingerprint(attCert.PublicKey); err != nil {
+		return nil, WrapErrorISE(err, "error calculating key fingerprint")
+	}
+
+	for _, ext := range attCert.Extensions {
+		if !ext.Id.Equal(oidAndroidAttestation) {
+			continue
+		}
+		keyDesc, err := attestation.ParseExtension(ext.Value)
+		if err != nil {
+			return nil, WrapError(ErrorBadAttestationStatementType, err, "error parsing attestation")
+		}
+		data.Attestation = keyDesc
+		break
+	}
+
+	// validate challenge
+	if string(data.Attestation.AttestationChallenge) != keyAuth {
+		return nil, NewDetailedError(ErrorBadAttestationStatementType, "Challenge mismatach: "+string(data.Attestation.AttestationChallenge))
 	}
 
 	return data, nil
