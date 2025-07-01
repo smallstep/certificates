@@ -1,0 +1,80 @@
+package poolhttp
+
+import (
+	"net/http"
+	"sync"
+
+	"github.com/smallstep/certificates/internal/httptransport"
+)
+
+// Transporter is the implemented by custom HTTP clients with a method that
+// returns an [*http.Transport].
+type Transporter interface {
+	Transport() *http.Transport
+}
+
+// Client returns an HTTP client that uses a [sync.Pool] to create new HTTP
+// client. It implements the [provisioner.HTTPClient] and [Transporter]
+// interfaces. This is the HTTP client used by the provisioners.
+type Client struct {
+	pool sync.Pool
+}
+
+// New creates a new poolhttp [Client], the [sync.Pool] will initialize a new
+// [*http.Client] with the given function.
+func New(fn func() *http.Client) *Client {
+	return &Client{
+		pool: sync.Pool{
+			New: func() any { return fn() },
+		},
+	}
+}
+
+// SetNew replaces the inner pool with a new [sync.Pool] with the given New
+// function. This method should not be used concurrently with other methods.
+func (c *Client) SetNew(fn func() *http.Client) {
+	c.pool = sync.Pool{
+		New: func() any { return fn() },
+	}
+}
+
+// Get issues a GET to the specified URL. If the response is one of the
+// following redirect codes, Get follows the redirect after calling the
+// [Client.CheckRedirect] function:
+func (c *Client) Get(u string) (resp *http.Response, err error) {
+	if hc, ok := c.pool.Get().(*http.Client); ok && hc != nil {
+		resp, err = hc.Get(u)
+		c.pool.Put(hc)
+	} else {
+		resp, err = http.DefaultClient.Get(u)
+	}
+
+	return
+}
+
+// Do sends an HTTP request and returns an HTTP response, following policy (such
+// as redirects, cookies, auth) as configured on the client.
+func (c *Client) Do(req *http.Request) (resp *http.Response, err error) {
+	if hc, ok := c.pool.Get().(*http.Client); ok && hc != nil {
+		resp, err = hc.Do(req)
+		c.pool.Put(hc)
+	} else {
+		resp, err = http.DefaultClient.Do(req)
+	}
+
+	return
+}
+
+// Transport() returns a clone of the http.Client Transport or returns the
+// default transport.
+func (c *Client) Transport() *http.Transport {
+	if hc, ok := c.pool.Get().(*http.Client); ok && hc != nil {
+		tr, ok := hc.Transport.(*http.Transport)
+		c.pool.Put(hc)
+		if ok {
+			return tr.Clone()
+		}
+	}
+
+	return httptransport.New()
+}

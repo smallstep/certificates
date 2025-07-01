@@ -18,6 +18,7 @@ import (
 
 	"github.com/smallstep/linkedca"
 
+	"github.com/smallstep/certificates/authority/poolhttp"
 	"github.com/smallstep/certificates/internal/httptransport"
 	"github.com/smallstep/certificates/middleware/requestid"
 	"github.com/smallstep/certificates/templates"
@@ -31,7 +32,7 @@ type WebhookSetter interface {
 }
 
 type WebhookController struct {
-	client        *http.Client
+	client        HTTPClient
 	wrapTransport httptransport.Wrapper
 	webhooks      []*Webhook
 	certType      linkedca.Webhook_CertType
@@ -146,7 +147,7 @@ type Webhook struct {
 // [http.RoundTripper].
 type TransportWrapper = httptransport.Wrapper
 
-func (w *Webhook) DoWithContext(ctx context.Context, client *http.Client, tw TransportWrapper, reqBody *webhook.RequestBody, data any) (*webhook.ResponseBody, error) {
+func (w *Webhook) DoWithContext(ctx context.Context, client HTTPClient, tw TransportWrapper, reqBody *webhook.RequestBody, data any) (*webhook.ResponseBody, error) {
 	tmpl, err := template.New("url").Funcs(templates.StepFuncMap()).Parse(w.URL)
 	if err != nil {
 		return nil, err
@@ -206,11 +207,11 @@ retry:
 	}
 
 	if w.DisableTLSClientAuth {
-		transport, ok := client.Transport.(*http.Transport)
-		if !ok {
-			transport = httptransport.New()
+		var transport *http.Transport
+		if ct, ok := client.(poolhttp.Transporter); ok {
+			transport = ct.Transport()
 		} else {
-			transport = transport.Clone()
+			transport = httptransport.New()
 		}
 
 		if transport.TLSClientConfig != nil {

@@ -8,6 +8,7 @@ import (
 	"crypto/x509"
 	"encoding/hex"
 	"encoding/pem"
+	"fmt"
 	"net"
 	"os"
 	"path/filepath"
@@ -24,6 +25,16 @@ import (
 	"go.step.sm/crypto/minica"
 	"go.step.sm/crypto/pemutil"
 )
+
+func TestMain(m *testing.M) {
+	if err := initializeSystemCertPool(); err != nil {
+		fmt.Fprintln(os.Stderr, "failed to initialize system cert pool:", err)
+		fmt.Fprintln(os.Stderr, "See https://pkg.go.dev/github.com/tjfoc/gmsm/x509#SystemCertPool\n", err)
+		os.Exit(2)
+	}
+
+	os.Exit(m.Run())
+}
 
 func testAuthority(t *testing.T, opts ...Option) *Authority {
 	maxjwk, err := jose.ReadKey("testdata/secrets/max_pub.jwk")
