@@ -98,6 +98,8 @@ func TestClient_SetNew(t *testing.T) {
 }
 
 func TestClient_parallel(t *testing.T) {
+	t.Parallel()
+
 	srv := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		fmt.Fprintln(w, "Hello World")
 	}))
