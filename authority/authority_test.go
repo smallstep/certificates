@@ -74,8 +74,8 @@ func testAuthority(t *testing.T, opts ...Option) *Authority {
 			Type: "JWK",
 			Key:  clijwk,
 			Claims: &provisioner.Claims{
-				MinTLSDur: &provisioner.Duration{Duration: 5 * time.Minute},
-				MaxTLSDur: &provisioner.Duration{Duration: time.Minute},
+				MinTLSDur: &provisioner.Duration{Duration: time.Minute},
+				MaxTLSDur: &provisioner.Duration{Duration: 25 * time.Hour}, // Make it > DefaultTLSDur
 			},
 		},
 	}
@@ -92,6 +92,11 @@ func testAuthority(t *testing.T, opts ...Option) *Authority {
 		Password: "pass",
 		AuthorityConfig: &AuthConfig{
 			Provisioners: p,
+			Claims: &provisioner.Claims{
+				MinTLSDur:     &provisioner.Duration{Duration: 5 * time.Minute},
+				MaxTLSDur:     &provisioner.Duration{Duration: 24 * time.Hour},
+				DefaultTLSDur: &provisioner.Duration{Duration: 24 * time.Hour},
+			},
 		},
 	}
 	a, err := New(c, opts...)
