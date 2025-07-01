@@ -258,16 +258,6 @@ type Config struct {
 	// GetIdentityFunc is a function that returns an identity that will be
 	// used by the provisioner to populate certificate attributes.
 	GetIdentityFunc GetIdentityFunc
-	/*
-		// GetHttpClientFunc is a function that returns an HTTP client that trusts
-		// the system cert pool and the CA roots.
-		GetHttpClientFunc func() *http.Client
-		// GetWebhookClientFunc ris a function that returns the HTTP client used
-		// when performing webhook requests, this is an HTTP client that trusts the
-		// system cert pool, the CA roots and uses the CA certificate as a client
-		// certificate.
-		GetWebhookClientFunc func() *http.Client
-	*/
 	// AuthorizeRenewFunc is a function that returns nil if a given X.509
 	// certificate can be renewed.
 	AuthorizeRenewFunc AuthorizeRenewFunc
