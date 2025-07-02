@@ -7,14 +7,14 @@ import (
 	"github.com/smallstep/certificates/internal/httptransport"
 )
 
-// Transporter is the implemented by custom HTTP clients with a method that
+// Transporter is implemented by custom HTTP clients with a method that
 // returns an [*http.Transport].
 type Transporter interface {
 	Transport() *http.Transport
 }
 
-// Client returns an HTTP client that uses a [sync.Pool] to create new HTTP
-// client. It implements the [provisioner.HTTPClient] and [Transporter]
+// Client is an HTTP client that uses a [sync.Pool] to create new and reuse HTTP
+// clients. It implements the [provisioner.HTTPClient] and [Transporter]
 // interfaces. This is the HTTP client used by the provisioners.
 type Client struct {
 	pool sync.Pool
@@ -38,7 +38,7 @@ func (c *Client) SetNew(fn func() *http.Client) {
 	}
 }
 
-// Get issues a GET to the specified URL. If the response is one of the
+// Get issues a GET request to the specified URL. If the response is one of the
 // following redirect codes, Get follows the redirect after calling the
 // [Client.CheckRedirect] function:
 func (c *Client) Get(u string) (resp *http.Response, err error) {

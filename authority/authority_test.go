@@ -28,8 +28,8 @@ import (
 
 func TestMain(m *testing.M) {
 	if err := initializeSystemCertPool(); err != nil {
-		fmt.Fprintln(os.Stderr, "failed to initialize system cert pool:", err)
-		fmt.Fprintln(os.Stderr, "See https://pkg.go.dev/github.com/tjfoc/gmsm/x509#SystemCertPool\n", err)
+		fmt.Fprintf(os.Stderr, "failed to initialize system cert pool: %v\n", err)
+		fmt.Fprintln(os.Stderr, "See https://pkg.go.dev/crypto/x509#SystemCertPool")
 		os.Exit(2)
 	}
 
