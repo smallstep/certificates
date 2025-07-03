@@ -114,8 +114,7 @@ func Test_newHTTPClient(t *testing.T) {
 		}{http.DefaultTransport}
 		http.DefaultTransport = transport
 
-		client, err := newHTTPClient(httptransport.NoopWrapper(), auth.rootX509Certs...)
-		assert.NoError(t, err)
+		client := newHTTPClient(httptransport.NoopWrapper(), auth.rootX509Certs...)
 		assert.NotNil(t, client)
 	})
 }

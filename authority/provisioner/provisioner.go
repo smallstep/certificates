@@ -34,6 +34,13 @@ type Interface interface {
 	AuthorizeSSHRekey(ctx context.Context, token string) (*ssh.Certificate, []SignOption, error)
 }
 
+// HTTPClient is the interface implemented by the HTTP clients used by the
+// provisioners.
+type HTTPClient interface {
+	Get(string) (*http.Response, error)
+	Do(*http.Request) (*http.Response, error)
+}
+
 // Uninitialized represents a disabled provisioner. Uninitialized provisioners
 // are created when the Init methods fails.
 type Uninitialized struct {
@@ -258,12 +265,12 @@ type Config struct {
 	// certificate can be renewed.
 	AuthorizeSSHRenewFunc AuthorizeSSHRenewFunc
 	// WebhookClient is an HTTP client used when performing webhook requests.
-	WebhookClient *http.Client
+	WebhookClient HTTPClient
 	// SCEPKeyManager, if defined, is the interface used by SCEP provisioners.
 	SCEPKeyManager SCEPKeyManager
 	// HTTPClient is an HTTP client that trusts the system cert pool and the CA
 	// roots.
-	HTTPClient *http.Client
+	HTTPClient HTTPClient
 	// WrapTransport references the function that should wrap any [http.Transport] initialized
 	// down the Config's chain.
 	WrapTransport TransportWrapper

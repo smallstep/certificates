@@ -28,9 +28,9 @@ type Controller struct {
 	AuthorizeRenewFunc    AuthorizeRenewFunc
 	AuthorizeSSHRenewFunc AuthorizeSSHRenewFunc
 	policy                *policyEngine
-	webhookClient         *http.Client
+	httpClient            HTTPClient
+	webhookClient         HTTPClient
 	webhooks              []*Webhook
-	httpClient            *http.Client
 	wrapTransport         httptransport.Wrapper
 }
 
@@ -48,6 +48,7 @@ func NewController(p Interface, claims *Claims, config Config, options *Options)
 	if wt == nil {
 		wt = httptransport.NoopWrapper()
 	}
+
 	return &Controller{
 		Interface:             p,
 		Audiences:             &config.Audiences,
@@ -65,7 +66,7 @@ func NewController(p Interface, claims *Claims, config Config, options *Options)
 
 // GetHTTPClient returns the configured HTTP client or the default one if none
 // is configured.
-func (c *Controller) GetHTTPClient() *http.Client {
+func (c *Controller) GetHTTPClient() HTTPClient {
 	if c.httpClient != nil {
 		return c.httpClient
 	}

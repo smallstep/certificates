@@ -5,7 +5,6 @@ import (
 	"crypto"
 	"crypto/x509"
 	"encoding/pem"
-	"net/http"
 
 	"github.com/pkg/errors"
 	"golang.org/x/crypto/ssh"
@@ -97,7 +96,7 @@ func WithQuietInit() Option {
 }
 
 // WithWebhookClient sets the http.Client to be used for outbound requests.
-func WithWebhookClient(c *http.Client) Option {
+func WithWebhookClient(c provisioner.HTTPClient) Option {
 	return func(a *Authority) error {
 		a.webhookClient = c
 		return nil
