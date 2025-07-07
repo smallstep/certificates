@@ -8,8 +8,8 @@ import (
 	"crypto/sha256"
 	"crypto/x509"
 	"encoding/hex"
+	"fmt"
 	"log"
-	"net/http"
 	"strings"
 	"sync"
 	"time"
@@ -50,8 +50,8 @@ type Authority struct {
 	templates     *templates.Templates
 	linkedCAToken string
 	wrapTransport httptransport.Wrapper
-	webhookClient *http.Client
-	httpClient    *http.Client
+	webhookClient provisioner.HTTPClient
+	httpClient    provisioner.HTTPClient
 
 	// X509 CA
 	password              []byte
@@ -147,6 +147,11 @@ func New(cfg *config.Config, opts ...Option) (*Authority, error) {
 		a.keyManager = newInstrumentedKeyManager(a.keyManager, a.meter)
 	}
 
+	// Initialize system cert pool
+	if err := initializeSystemCertPool(); err != nil {
+		return nil, fmt.Errorf("failed to initialize the system cert pool: %w", err)
+	}
+
 	if !a.skipInit {
 		// Initialize authority from options or configuration.
 		if err := a.init(); err != nil {
@@ -175,6 +180,11 @@ func NewEmbedded(opts ...Option) (*Authority, error) {
 	}
 	if a.keyManager != nil {
 		a.keyManager = newInstrumentedKeyManager(a.keyManager, a.meter)
+	}
+
+	// Initialize system cert pool
+	if err := initializeSystemCertPool(); err != nil {
+		return nil, fmt.Errorf("failed to initialize the system cert pool: %w", err)
 	}
 
 	// Validate required options
@@ -500,7 +510,7 @@ func (a *Authority) init() error {
 	clientRoots := make([]*x509.Certificate, 0, len(a.rootX509Certs)+len(a.federatedX509Certs))
 	clientRoots = append(clientRoots, a.rootX509Certs...)
 	clientRoots = append(clientRoots, a.federatedX509Certs...)
-	a.httpClient, err = newHTTPClient(a.wrapTransport, clientRoots...)
+	a.httpClient = newHTTPClient(a.wrapTransport, clientRoots...)
 	if err != nil {
 		return err
 	}

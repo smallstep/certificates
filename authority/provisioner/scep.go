@@ -8,7 +8,6 @@ import (
 	"crypto/x509"
 	"encoding/pem"
 	"fmt"
-	"net/http"
 	"time"
 
 	"github.com/pkg/errors"
@@ -113,14 +112,14 @@ func (s *SCEP) DefaultTLSCertDuration() time.Duration {
 }
 
 type challengeValidationController struct {
-	client        *http.Client
+	client        HTTPClient
 	wrapTransport httptransport.Wrapper
 	webhooks      []*Webhook
 }
 
 // newChallengeValidationController creates a new challengeValidationController
 // that performs challenge validation through webhooks.
-func newChallengeValidationController(client *http.Client, tw httptransport.Wrapper, webhooks []*Webhook) *challengeValidationController {
+func newChallengeValidationController(client HTTPClient, tw httptransport.Wrapper, webhooks []*Webhook) *challengeValidationController {
 	scepHooks := []*Webhook{}
 	for _, wh := range webhooks {
 		if wh.Kind != linkedca.Webhook_SCEPCHALLENGE.String() {
@@ -179,14 +178,14 @@ func (c *challengeValidationController) Validate(ctx context.Context, csr *x509.
 }
 
 type notificationController struct {
-	client        *http.Client
+	client        HTTPClient
 	wrapTransport httptransport.Wrapper
 	webhooks      []*Webhook
 }
 
 // newNotificationController creates a new notificationController
 // that performs SCEP notifications through webhooks.
-func newNotificationController(client *http.Client, tw httptransport.Wrapper, webhooks []*Webhook) *notificationController {
+func newNotificationController(client HTTPClient, tw httptransport.Wrapper, webhooks []*Webhook) *notificationController {
 	scepHooks := []*Webhook{}
 	for _, wh := range webhooks {
 		if wh.Kind != linkedca.Webhook_NOTIFYING.String() {
