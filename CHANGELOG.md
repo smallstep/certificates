@@ -25,16 +25,40 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
 
 ---
 
-## [unreleased] - aaaa-bb-cc
+## [0.28.5] - unreleased
+
+### Added
+
+### Changed
+
+### Deprecated
+
+### Removed
+
+### Fixed
+
+### Security
+
+
+## [0.28.4] - unreleased
 
 ### Added
 
 - Add support for using key usage, extended key usage, and basic constraints
   from certificate requests in certificate templates (smallstep/crypto#767)
+- Allow to specify audience when generating JWK provisioner tokens (smallstep/certificates#2326)
+- Add SSH certificate type to exposed metrics (smallstep/certificates#2290)
+
+### Changed
+
+- Introduce poolhttp package for improved memory performance of Authority
+  httpClients (smallstep/certificates#2325)
+
 
 ## [0.28.3] - 2025-03-17
 
 - dependabot updates
+
 
 ## [0.28.2] - 2025-02-20
 
