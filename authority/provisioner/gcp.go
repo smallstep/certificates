@@ -251,10 +251,7 @@ func (p *GCP) Init(config Config) (err error) {
 		return
 	}
 
-	if p.projectValidator, err = gcp.NewOrganizationValidator(context.Background(), p.ProjectIDs, p.OrganizationID); err != nil {
-		return
-	}
-
+	p.projectValidator = gcp.NewOrganizationValidator(p.ProjectIDs, p.OrganizationID)
 	return
 }
 
