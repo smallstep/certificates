@@ -3,9 +3,14 @@ package provisioner
 import (
 	"context"
 	"crypto/x509"
+	"encoding/json"
 	"encoding/pem"
 	"fmt"
+	"io"
+	"log"
 	"net"
+	"net/http"
+	"slices"
 	"strings"
 	"time"
 
@@ -54,6 +59,9 @@ type ACMEAttestationFormat string
 
 const (
 	// APPLE is the format used to enable device-attest-01 on Apple devices.
+	ANDROID ACMEAttestationFormat = "android-key"
+
+	// APPLE is the format used to enable device-attest-01 on Apple devices.
 	APPLE ACMEAttestationFormat = "apple"
 
 	// STEP is the format used to enable device-attest-01 on devices that
@@ -74,7 +82,7 @@ func (f ACMEAttestationFormat) String() string {
 // Validate returns an error if the attestation format is not a valid one.
 func (f ACMEAttestationFormat) Validate() error {
 	switch ACMEAttestationFormat(f.String()) {
-	case APPLE, STEP, TPM:
+	case APPLE, STEP, TPM, ANDROID:
 		return nil
 	default:
 		return fmt.Errorf("acme attestation format %q is not supported", f)
@@ -120,6 +128,8 @@ type ACME struct {
 	AttestationRoots    []byte   `json:"attestationRoots,omitempty"`
 	Claims              *Claims  `json:"claims,omitempty"`
 	Options             *Options `json:"options,omitempty"`
+	RootCRLs            []string `json:"rootCRLs,omitempty"`
+	androidCRLTimeout   time.Time
 	attestationRootPool *x509.CertPool
 	ctl                 *Controller
 }
@@ -216,8 +226,48 @@ func (p *ACME) Init(config Config) (err error) {
 		return fmt.Errorf("failed initializing Wire options: %w", err)
 	}
 
+	if slices.Contains(p.AttestationFormats, "android-key") && len(p.RootCRLs) == 0 {
+		p.initializeAndroidCRL()
+	}
+
 	p.ctl, err = NewController(p, p.Claims, config, p.Options)
 	return
+}
+
+const ANDROID_ATTESTATION_STATUS_URL = "https://android.googleapis.com/attestation/status"
+
+// fetch CRL https://android.googleapis.com/attestation/status and build a list of serial number
+func (p *ACME) initializeAndroidCRL() error {
+	log.Printf("Updating Android CRL list for %s ACME provisioner", p.Name)
+	var CRLResponse struct {
+		Entries map[string]struct {
+			Status string `json:"status"`
+			Reason string `json:"reason"`
+		} `json:"entries"`
+	}
+	res, err := http.Get(ANDROID_ATTESTATION_STATUS_URL)
+	if err != nil {
+		return fmt.Errorf("client: error making Android CRL request: %s\n", err)
+	}
+	defer res.Body.Close()
+
+	if res.StatusCode != http.StatusOK {
+		bodyBytes, _ := io.ReadAll(res.Body)
+		return fmt.Errorf("unexpected Android CRL response %d: %s", res.StatusCode, string(bodyBytes))
+	}
+
+	if err := json.NewDecoder(res.Body).Decode(&CRLResponse); err != nil {
+		return fmt.Errorf("error decoding Android CRL JSON: %w", err)
+	}
+
+	// Extract keys into a slice
+	keys := make([]string, 0, len(CRLResponse.Entries))
+	for k := range CRLResponse.Entries {
+		keys = append(keys, k)
+	}
+	p.RootCRLs = keys
+	p.androidCRLTimeout = time.Now().Add(24 * time.Hour)
+	return nil
 }
 
 // initializeWireOptions initializes the options for the ACME Wire
@@ -371,7 +421,7 @@ func (p *ACME) IsChallengeEnabled(_ context.Context, challenge ACMEChallenge) bo
 // AttestationFormat provisioner property should have at least one element.
 func (p *ACME) IsAttestationFormatEnabled(_ context.Context, format ACMEAttestationFormat) bool {
 	enabledFormats := []ACMEAttestationFormat{
-		APPLE, STEP, TPM,
+		APPLE, STEP, TPM, ANDROID,
 	}
 	if len(p.AttestationFormats) > 0 {
 		enabledFormats = p.AttestationFormats
@@ -391,4 +441,13 @@ func (p *ACME) IsAttestationFormatEnabled(_ context.Context, format ACMEAttestat
 // interface function instead to authorize?
 func (p *ACME) GetAttestationRoots() (*x509.CertPool, bool) {
 	return p.attestationRootPool, p.attestationRootPool != nil
+}
+
+// IsRootRevoked return a true if the serialNumber is part of the list
+// It will also be in charge of updating the list periodically if no CRL list is provided at configuration.
+func (p *ACME) IsRootRevoked(serialNumber string) bool {
+	if slices.Contains(p.AttestationFormats, "android-key") && !p.androidCRLTimeout.IsZero() && time.Now().After(p.androidCRLTimeout) {
+		p.initializeAndroidCRL()
+	}
+	return len(p.RootCRLs) > 0 && slices.Contains(p.RootCRLs, serialNumber)
 }
