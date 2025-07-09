@@ -4,9 +4,9 @@ import (
 	"context"
 	"net/http"
 
-	"github.com/smallstep/certificates/errs"
-
 	"google.golang.org/api/cloudresourcemanager/v1"
+
+	"github.com/smallstep/certificates/errs"
 )
 
 type ProjectValidator struct {
@@ -29,23 +29,14 @@ func (p *ProjectValidator) ValidateProject(_ context.Context, projectID string) 
 
 type OrganizationValidator struct {
 	*ProjectValidator
-
-	OrganizationID  string
-	projectsService *cloudresourcemanager.ProjectsService
+	OrganizationID string
 }
 
-func NewOrganizationValidator(ctx context.Context, projectIDs []string, organizationID string) (*OrganizationValidator, error) {
-	crm, err := cloudresourcemanager.NewService(ctx)
-
-	if err != nil {
-		return nil, err
-	}
-
+func NewOrganizationValidator(projectIDs []string, organizationID string) *OrganizationValidator {
 	return &OrganizationValidator{
 		&ProjectValidator{projectIDs},
 		organizationID,
-		crm.Projects,
-	}, nil
+	}
 }
 
 func (p *OrganizationValidator) ValidateProject(ctx context.Context, projectID string) error {
@@ -53,7 +44,16 @@ func (p *OrganizationValidator) ValidateProject(ctx context.Context, projectID s
 		return err
 	}
 
-	ancestry, err := p.projectsService.
+	if p.OrganizationID == "" {
+		return nil
+	}
+
+	crm, err := cloudresourcemanager.NewService(ctx)
+	if err != nil {
+		return err
+	}
+
+	ancestry, err := crm.Projects.
 		GetAncestry(projectID, &cloudresourcemanager.GetAncestryRequest{}).
 		Context(ctx).
 		Do()
