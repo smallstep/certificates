@@ -21,6 +21,7 @@ import (
 
 	"github.com/smallstep/assert"
 	"github.com/smallstep/certificates/api/render"
+	"github.com/smallstep/certificates/authority/provisioner/gcp"
 )
 
 func TestGCP_Getters(t *testing.T) {
@@ -292,7 +293,7 @@ func TestGCP_authorizeToken(t *testing.T) {
 		"fail/invalid-projectID": func(t *testing.T) test {
 			p, err := generateGCP()
 			assert.FatalError(t, err)
-			p.ProjectIDs = []string{"foo", "bar"}
+			p.projectValidator = &gcp.ProjectValidator{ProjectIDs: []string{"foo", "bar"}}
 			tok, err := generateGCPToken(p.ServiceAccounts[0],
 				"https://accounts.google.com", p.GetID(),
 				"instance-id", "instance-name", "project-id", "zone",
@@ -398,7 +399,7 @@ func TestGCP_authorizeToken(t *testing.T) {
 	for name, tt := range tests {
 		t.Run(name, func(t *testing.T) {
 			tc := tt(t)
-			if claims, err := tc.p.authorizeToken(tc.token); err != nil {
+			if claims, err := tc.p.authorizeToken(context.Background(), tc.token); err != nil {
 				if assert.NotNil(t, tc.err) {
 					var sc render.StatusCodedError
 					assert.Fatal(t, errors.As(err, &sc), "error does not implement StatusCodedError interface")
@@ -430,7 +431,7 @@ func TestGCP_AuthorizeSign(t *testing.T) {
 
 	p3, err := generateGCP()
 	assert.FatalError(t, err)
-	p3.ProjectIDs = []string{"other-project-id"}
+	p3.projectValidator = &gcp.ProjectValidator{ProjectIDs: []string{"other-project-id"}}
 	p3.ServiceAccounts = []string{"foo@developer.gserviceaccount.com"}
 	p3.InstanceAge = Duration{1 * time.Minute}
 
