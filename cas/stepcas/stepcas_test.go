@@ -130,13 +130,13 @@ func testCAHelper(t *testing.T) (*url.URL, *ca.Client) {
 		_ = json.NewDecoder(r.Body).Decode(v)
 	}
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		switch {
-		case r.RequestURI == "/root/"+testRootFingerprint:
+		switch r.RequestURI {
+		case "/root/" + testRootFingerprint:
 			w.WriteHeader(http.StatusOK)
 			writeJSON(w, api.RootResponse{
 				RootPEM: api.NewCertificate(testRootCrt),
 			})
-		case r.RequestURI == "/sign":
+		case "/sign":
 			var msg api.SignRequest
 			parseJSON(r, &msg)
 			if msg.CsrPEM.DNSNames[0] == "fail.doe.org" {
@@ -148,7 +148,7 @@ func testCAHelper(t *testing.T) (*url.URL, *ca.Client) {
 			writeJSON(w, api.SignResponse{
 				CertChainPEM: []api.Certificate{api.NewCertificate(testCrt), api.NewCertificate(testIssCrt)},
 			})
-		case r.RequestURI == "/renew":
+		case "/renew":
 			if r.Header.Get("Authorization") == "Bearer fail" {
 				w.WriteHeader(http.StatusBadRequest)
 				fmt.Fprintf(w, `{"error":"fail","message":"fail"}`)
@@ -158,7 +158,7 @@ func testCAHelper(t *testing.T) (*url.URL, *ca.Client) {
 			writeJSON(w, api.SignResponse{
 				CertChainPEM: []api.Certificate{api.NewCertificate(testCrt), api.NewCertificate(testIssCrt)},
 			})
-		case r.RequestURI == "/revoke":
+		case "/revoke":
 			var msg api.RevokeRequest
 			parseJSON(r, &msg)
 			if msg.Serial == "fail" {
@@ -170,7 +170,7 @@ func testCAHelper(t *testing.T) (*url.URL, *ca.Client) {
 			writeJSON(w, api.RevokeResponse{
 				Status: "ok",
 			})
-		case r.RequestURI == "/provisioners":
+		case "/provisioners":
 			w.WriteHeader(http.StatusOK)
 			writeJSON(w, api.ProvisionersResponse{
 				NextCursor: "cursor",
@@ -188,7 +188,7 @@ func testCAHelper(t *testing.T) (*url.URL, *ca.Client) {
 					},
 				},
 			})
-		case r.RequestURI == "/provisioners?cursor=cursor":
+		case "/provisioners?cursor=cursor":
 			w.WriteHeader(http.StatusOK)
 			writeJSON(w, api.ProvisionersResponse{})
 		default:

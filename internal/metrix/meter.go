@@ -2,11 +2,13 @@
 package metrix
 
 import (
+	"crypto/x509"
 	"net/http"
 	"strconv"
 	"time"
 
 	"github.com/smallstep/certificates/authority/provisioner"
+	"golang.org/x/crypto/ssh"
 
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
@@ -15,6 +17,8 @@ import (
 // New initializes and returns a new [Meter].
 func New() (m *Meter) {
 	initializedAt := time.Now()
+	defaultLabels := []string{"provisioner", "success"}
+	sshSignLabels := []string{"provisioner", "success", "type"}
 
 	m = &Meter{
 		uptime: prometheus.NewGaugeFunc(
@@ -27,8 +31,8 @@ func New() (m *Meter) {
 				return float64(time.Since(initializedAt) / time.Second)
 			},
 		),
-		ssh:  newProvisionerInstruments("ssh"),
-		x509: newProvisionerInstruments("x509"),
+		ssh:  newProvisionerInstruments("ssh", sshSignLabels, defaultLabels),
+		x509: newProvisionerInstruments("x509", defaultLabels, defaultLabels),
 		kms: &kms{
 			signed: prometheus.NewCounter(prometheus.CounterOpts(opts("kms", "signed", "Number of KMS-backed signatures"))),
 			errors: prometheus.NewCounter(prometheus.CounterOpts(opts("kms", "errors", "Number of KMS-related errors"))),
@@ -77,18 +81,18 @@ type Meter struct {
 }
 
 // SSHRekeyed implements [authority.Meter] for [Meter].
-func (m *Meter) SSHRekeyed(p provisioner.Interface, err error) {
-	incrProvisionerCounter(m.ssh.rekeyed, p, err)
+func (m *Meter) SSHRekeyed(cert *ssh.Certificate, p provisioner.Interface, err error) {
+	incrProvisionerCounter(m.ssh.rekeyed, p, err, sshCertValues(cert)...)
 }
 
 // SSHRenewed implements [authority.Meter] for [Meter].
-func (m *Meter) SSHRenewed(p provisioner.Interface, err error) {
-	incrProvisionerCounter(m.ssh.renewed, p, err)
+func (m *Meter) SSHRenewed(cert *ssh.Certificate, p provisioner.Interface, err error) {
+	incrProvisionerCounter(m.ssh.renewed, p, err, sshCertValues(cert)...)
 }
 
 // SSHSigned implements [authority.Meter] for [Meter].
-func (m *Meter) SSHSigned(p provisioner.Interface, err error) {
-	incrProvisionerCounter(m.ssh.signed, p, err)
+func (m *Meter) SSHSigned(cert *ssh.Certificate, p provisioner.Interface, err error) {
+	incrProvisionerCounter(m.ssh.signed, p, err, sshCertValues(cert)...)
 }
 
 // SSHWebhookAuthorized implements [authority.Meter] for [Meter].
@@ -102,17 +106,17 @@ func (m *Meter) SSHWebhookEnriched(p provisioner.Interface, err error) {
 }
 
 // X509Rekeyed implements [authority.Meter] for [Meter].
-func (m *Meter) X509Rekeyed(p provisioner.Interface, err error) {
+func (m *Meter) X509Rekeyed(_ []*x509.Certificate, p provisioner.Interface, err error) {
 	incrProvisionerCounter(m.x509.rekeyed, p, err)
 }
 
 // X509Renewed implements [authority.Meter] for [Meter].
-func (m *Meter) X509Renewed(p provisioner.Interface, err error) {
+func (m *Meter) X509Renewed(_ []*x509.Certificate, p provisioner.Interface, err error) {
 	incrProvisionerCounter(m.x509.renewed, p, err)
 }
 
 // X509Signed implements [authority.Meter] for [Meter].
-func (m *Meter) X509Signed(p provisioner.Interface, err error) {
+func (m *Meter) X509Signed(_ []*x509.Certificate, p provisioner.Interface, err error) {
 	incrProvisionerCounter(m.x509.signed, p, err)
 }
 
@@ -126,13 +130,27 @@ func (m *Meter) X509WebhookEnriched(p provisioner.Interface, err error) {
 	incrProvisionerCounter(m.x509.webhookEnriched, p, err)
 }
 
-func incrProvisionerCounter(cv *prometheus.CounterVec, p provisioner.Interface, err error) {
+func sshCertValues(cert *ssh.Certificate) []string {
+	switch cert.CertType {
+	case ssh.UserCert:
+		return []string{"user"}
+	case ssh.HostCert:
+		return []string{"host"}
+	default:
+		return []string{"unknown"}
+	}
+}
+
+func incrProvisionerCounter(cv *prometheus.CounterVec, p provisioner.Interface, err error, extraValues ...string) {
 	var name string
 	if p != nil {
 		name = p.GetName()
 	}
 
-	cv.WithLabelValues(name, strconv.FormatBool(err == nil)).Inc()
+	values := append([]string{
+		name, strconv.FormatBool(err == nil),
+	}, extraValues...)
+	cv.WithLabelValues(values...).Inc()
 }
 
 // KMSSigned implements [authority.Meter] for [Meter].
@@ -154,28 +172,13 @@ type provisionerInstruments struct {
 	webhookEnriched   *prometheus.CounterVec
 }
 
-func newProvisionerInstruments(subsystem string) *provisionerInstruments {
+func newProvisionerInstruments(subsystem string, signLabels, webhookLabels []string) *provisionerInstruments {
 	return &provisionerInstruments{
-		rekeyed: newCounterVec(subsystem, "rekeyed_total", "Number of certificates rekeyed",
-			"provisioner",
-			"success",
-		),
-		renewed: newCounterVec(subsystem, "renewed_total", "Number of certificates renewed",
-			"provisioner",
-			"success",
-		),
-		signed: newCounterVec(subsystem, "signed_total", "Number of certificates signed",
-			"provisioner",
-			"success",
-		),
-		webhookAuthorized: newCounterVec(subsystem, "webhook_authorized_total", "Number of authorizing webhooks called",
-			"provisioner",
-			"success",
-		),
-		webhookEnriched: newCounterVec(subsystem, "webhook_enriched_total", "Number of enriching webhooks called",
-			"provisioner",
-			"success",
-		),
+		rekeyed:           newCounterVec(subsystem, "rekeyed_total", "Number of certificates rekeyed", signLabels...),
+		renewed:           newCounterVec(subsystem, "renewed_total", "Number of certificates renewed", signLabels...),
+		signed:            newCounterVec(subsystem, "signed_total", "Number of certificates signed", signLabels...),
+		webhookAuthorized: newCounterVec(subsystem, "webhook_authorized_total", "Number of authorizing webhooks called", webhookLabels...),
+		webhookEnriched:   newCounterVec(subsystem, "webhook_enriched_total", "Number of enriching webhooks called", webhookLabels...),
 	}
 }
 

@@ -14,15 +14,16 @@ import (
 
 	"github.com/pkg/errors"
 	nebula "github.com/slackhq/nebula/cert"
+	"golang.org/x/crypto/ssh"
 
 	"github.com/smallstep/linkedca"
 	"go.step.sm/crypto/jose"
 	"go.step.sm/crypto/sshutil"
 	"go.step.sm/crypto/x25519"
 	"go.step.sm/crypto/x509util"
-	"golang.org/x/crypto/ssh"
 
 	"github.com/smallstep/certificates/errs"
+	"github.com/smallstep/certificates/internal/cast"
 )
 
 const (
@@ -237,10 +238,10 @@ func (p *Nebula) AuthorizeSSHSign(_ context.Context, token string) ([]SignOption
 		// Add modifiers from custom claims
 		t := now()
 		if !opts.ValidAfter.IsZero() {
-			signOptions = append(signOptions, sshCertValidAfterModifier(opts.ValidAfter.RelativeTime(t).Unix()))
+			signOptions = append(signOptions, sshCertValidAfterModifier(cast.Uint64(opts.ValidAfter.RelativeTime(t).Unix())))
 		}
 		if !opts.ValidBefore.IsZero() {
-			signOptions = append(signOptions, sshCertValidBeforeModifier(opts.ValidBefore.RelativeTime(t).Unix()))
+			signOptions = append(signOptions, sshCertValidBeforeModifier(cast.Uint64(opts.ValidBefore.RelativeTime(t).Unix())))
 		}
 	}
 

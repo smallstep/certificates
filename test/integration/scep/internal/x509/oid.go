@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style
 // license that can be found in the LICENSE file.
 
-//nolint:stylecheck,revive,gocritic // code copied from crypto/x509
+//nolint:staticcheck,revive,gocritic // code copied from crypto/x509
 package legacyx509
 
 import (
@@ -14,6 +14,8 @@ import (
 	"math/bits"
 	"strconv"
 	"strings"
+
+	"github.com/smallstep/certificates/internal/cast"
 )
 
 var (
@@ -80,7 +82,7 @@ func base128IntLength(n uint64) int {
 
 func appendBase128Int(dst []byte, n uint64) []byte {
 	for i := base128IntLength(n) - 1; i >= 0; i-- {
-		o := byte(n >> uint(i*7))
+		o := byte(n >> cast.Uint(i*7))
 		o &= 0x7f
 		if i != 0 {
 			o |= 0x80

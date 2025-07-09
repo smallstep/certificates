@@ -25,6 +25,55 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
 
 ---
 
+## [0.28.5] - unreleased
+
+### Added
+
+### Changed
+
+### Deprecated
+
+### Removed
+
+### Fixed
+
+### Security
+
+
+## [0.28.4] - unreleased
+
+### Added
+
+- Add support for using key usage, extended key usage, and basic constraints
+  from certificate requests in certificate templates (smallstep/crypto#767)
+- Allow to specify audience when generating JWK provisioner tokens (smallstep/certificates#2326)
+- Add SSH certificate type to exposed metrics (smallstep/certificates#2290)
+
+### Changed
+
+- Introduce poolhttp package for improved memory performance of Authority
+  httpClients (smallstep/certificates#2325)
+
+
+## [0.28.3] - 2025-03-17
+
+- dependabot updates
+
+
+## [0.28.2] - 2025-02-20
+
+### Added
+
+- Added support for imported keys on YubiKey (smallstep/certificates#2113)
+- Enable storing ACME attestation payload (smallstep/certificates#2114)
+- Add ACME attestation format field to ACME challenge (smallstep/certificates#2124)
+
+### Changed
+
+- Added internal httptransport package to replace cloning of http.DefaultTransport (smallstep/certificates#2098, smallstep/certificates#2103, smallstep/certificates#2104)
+  - For example, replacing http.DefaultTransport clone in provisioner webhook business logic.
+
+
 ## [0.28.1] - 2024-11-19
 
 ### Added
@@ -47,8 +96,8 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
 
 ### Changed
 
-- For IID provisioners with disableCustomSANs set to true, validate that the 
-  requested DNS names are a subset of the allowed DNS names (based on the IID token), 
+- For IID provisioners with disableCustomSANs set to true, validate that the
+  requested DNS names are a subset of the allowed DNS names (based on the IID token),
   rather than requiring an exact match to the entire list of allowed DNS names. (smallstep/certificates#2044)
 
 
@@ -148,7 +197,7 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
 
 ## [0.26.0] - 2024-03-28
 
-### Added 
+### Added
 
 - [TPM KMS](https://github.com/smallstep/crypto/tree/master/kms/tpmkms) support for CA keys (smallstep/certificates#1772)
 - Propagation of HTTP request identifier using X-Request-Id header (smallstep/certificates#1743, smallstep/certificates#1542)
@@ -158,7 +207,7 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
 - AWS `ca-west-1` identity document root certificate (smallstep/certificates#1715)
 - [COSE RS1](https://www.rfc-editor.org/rfc/rfc8812.html#section-2) as a supported algorithm with ACME `device-attest-01` challenge (smallstep/certificates#1663)
 
-### Changed 
+### Changed
 
 - In an RA setup, let the CA decide the RA certificate lifetime (smallstep/certificates#1764)
 - Use Debian Bookworm in Docker containers (smallstep/certificates#1615)
@@ -208,9 +257,9 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
 - Added AWS public certificates for me-central-1 and ap-southeast-3
   (smallstep/certificates#1404)
 - Added namespace field to VaultCAS JSON config (smallstep/certificates#1424)
-- Added AWS public certificates for me-central-1 and ap-southeast-3 
+- Added AWS public certificates for me-central-1 and ap-southeast-3
   (smallstep/certificates#1404)
-- Added unversioned filenames to Github release assets 
+- Added unversioned filenames to Github release assets
   (smallstep/certificates#1435)
 - Send X5C leaf certificate to webhooks (smallstep/certificates#1485)
 - Added support for disableSmallstepExtensions claim (smallstep/certificates#1484)
@@ -218,7 +267,7 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
 - Added Winget release automation (smallstep/certificates#1519)
 - Added CSR to SCEPCHALLENGE webhook request body (smallstep/certificates#1523)
 - Added SCEP issuance notification webhook (smallstep/certificates#1544)
-- Added ability to disable color in the log text formatter 
+- Added ability to disable color in the log text formatter
   (smallstep/certificates(#1559)
 
 ### Changed
@@ -246,7 +295,7 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
   (smallstep/certificates#1476, smallstep/crypto#288)
 - Fixed adding certificate templates with ASN.1 functions
   (smallstep/certificates#1500, smallstep/crypto#302)
-- Fixed a problem when the ca.json is truncated if the encoding of the 
+- Fixed a problem when the ca.json is truncated if the encoding of the
   configuration fails (e.g., new provisioner with bad template data)
   (smallstep/cli#994, smallstep/certificates#1501)
 - Fixed provisionerOptionsToLinkedCA missing template and templateData

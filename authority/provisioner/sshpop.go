@@ -13,6 +13,7 @@ import (
 	"go.step.sm/crypto/jose"
 
 	"github.com/smallstep/certificates/errs"
+	"github.com/smallstep/certificates/internal/cast"
 )
 
 // sshPOPPayload extends jwt.Claims with step attributes.
@@ -118,10 +119,10 @@ func (p *SSHPOP) authorizeToken(token string, audiences []string, checkValidity 
 	// Controller.AuthorizeSSHRenew will validate this on the renewal flow.
 	if checkValidity {
 		unixNow := time.Now().Unix()
-		if after := int64(sshCert.ValidAfter); after < 0 || unixNow < int64(sshCert.ValidAfter) {
+		if after := cast.Int64(sshCert.ValidAfter); after < 0 || unixNow < cast.Int64(sshCert.ValidAfter) {
 			return nil, errs.Unauthorized("sshpop.authorizeToken; sshpop certificate validAfter is in the future")
 		}
-		if before := int64(sshCert.ValidBefore); sshCert.ValidBefore != uint64(ssh.CertTimeInfinity) && (unixNow >= before || before < 0) {
+		if before := cast.Int64(sshCert.ValidBefore); sshCert.ValidBefore != uint64(ssh.CertTimeInfinity) && (unixNow >= before || before < 0) {
 			return nil, errs.Unauthorized("sshpop.authorizeToken; sshpop certificate validBefore is in the past")
 		}
 	}

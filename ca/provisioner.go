@@ -80,9 +80,34 @@ func (p *Provisioner) Kid() string {
 	return p.kid
 }
 
+// Fingerprint root certificate fingerprint.
+func (p *Provisioner) Fingerprint() string {
+	return p.fingerprint
+}
+
+// Audience returns the audience for tokens used with X.509 certificates.
+func (p *Provisioner) Audience() string {
+	return p.audience
+}
+
+// SSHAudience returns audience used with SSH certificates.
+func (p *Provisioner) SSHAudience() string {
+	return p.sshAudience
+}
+
 // SetFingerprint overwrites the default fingerprint used.
 func (p *Provisioner) SetFingerprint(sum string) {
 	p.fingerprint = sum
+}
+
+// SetAudience overwrites the default audience used with X.509 certificates.
+func (p *Provisioner) SetAudience(s string) {
+	p.audience = s
+}
+
+// SetSSHAudience overwrites the default audience used with SSH certificates.
+func (p *Provisioner) SetSSHAudience(s string) {
+	p.sshAudience = s
 }
 
 // Token generates a bootstrap token for a subject.

@@ -1045,10 +1045,12 @@ func generateAzureToken(sub, iss, aud, tenantID, subscriptionID, resourceGroup, 
 	if err != nil {
 		return "", err
 	}
+
 	var xmsMirID string
-	if resourceType == "vm" {
+	switch resourceType {
+	case "vm":
 		xmsMirID = fmt.Sprintf("/subscriptions/%s/resourceGroups/%s/providers/Microsoft.Compute/virtualMachines/%s", subscriptionID, resourceGroup, resourceName)
-	} else if resourceType == "uai" {
+	case "uai":
 		xmsMirID = fmt.Sprintf("/subscriptions/%s/resourceGroups/%s/providers/Microsoft.ManagedIdentity/userAssignedIdentities/%s", subscriptionID, resourceGroup, resourceName)
 	}
 

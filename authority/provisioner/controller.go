@@ -8,11 +8,14 @@ import (
 	"time"
 
 	"github.com/pkg/errors"
+	"golang.org/x/crypto/ssh"
+
+	"github.com/smallstep/linkedca"
+
 	"github.com/smallstep/certificates/errs"
+	"github.com/smallstep/certificates/internal/cast"
 	"github.com/smallstep/certificates/internal/httptransport"
 	"github.com/smallstep/certificates/webhook"
-	"github.com/smallstep/linkedca"
-	"golang.org/x/crypto/ssh"
 )
 
 // Controller wraps a provisioner with other attributes useful in callback
@@ -25,9 +28,9 @@ type Controller struct {
 	AuthorizeRenewFunc    AuthorizeRenewFunc
 	AuthorizeSSHRenewFunc AuthorizeSSHRenewFunc
 	policy                *policyEngine
-	webhookClient         *http.Client
+	httpClient            HTTPClient
+	webhookClient         HTTPClient
 	webhooks              []*Webhook
-	httpClient            *http.Client
 	wrapTransport         httptransport.Wrapper
 }
 
@@ -45,6 +48,7 @@ func NewController(p Interface, claims *Claims, config Config, options *Options)
 	if wt == nil {
 		wt = httptransport.NoopWrapper()
 	}
+
 	return &Controller{
 		Interface:             p,
 		Audiences:             &config.Audiences,
@@ -62,7 +66,7 @@ func NewController(p Interface, claims *Claims, config Config, options *Options)
 
 // GetHTTPClient returns the configured HTTP client or the default one if none
 // is configured.
-func (c *Controller) GetHTTPClient() *http.Client {
+func (c *Controller) GetHTTPClient() HTTPClient {
 	if c.httpClient != nil {
 		return c.httpClient
 	}
@@ -189,10 +193,10 @@ func DefaultAuthorizeSSHRenew(_ context.Context, p *Controller, cert *ssh.Certif
 	}
 
 	unixNow := time.Now().Unix()
-	if after := int64(cert.ValidAfter); after < 0 || unixNow < int64(cert.ValidAfter) {
+	if after := cast.Int64(cert.ValidAfter); after < 0 || unixNow < cast.Int64(cert.ValidAfter) {
 		return errs.Unauthorized("certificate is not yet valid")
 	}
-	if before := int64(cert.ValidBefore); cert.ValidBefore != uint64(ssh.CertTimeInfinity) && (unixNow >= before || before < 0) && !p.Claimer.AllowRenewalAfterExpiry() {
+	if before := cast.Int64(cert.ValidBefore); cert.ValidBefore != uint64(ssh.CertTimeInfinity) && (unixNow >= before || before < 0) && !p.Claimer.AllowRenewalAfterExpiry() {
 		return errs.Unauthorized("certificate has expired")
 	}
 

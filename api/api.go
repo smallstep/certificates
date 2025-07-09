@@ -4,7 +4,7 @@ import (
 	"bytes"
 	"context"
 	"crypto"
-	"crypto/dsa" // support legacy algorithms
+	"crypto/dsa" //nolint:staticcheck // support legacy algorithms
 	"crypto/ecdsa"
 	"crypto/ed25519"
 	"crypto/rsa"
@@ -31,6 +31,7 @@ import (
 	"github.com/smallstep/certificates/authority/config"
 	"github.com/smallstep/certificates/authority/provisioner"
 	"github.com/smallstep/certificates/errs"
+	"github.com/smallstep/certificates/internal/cast"
 	"github.com/smallstep/certificates/logging"
 )
 
@@ -551,6 +552,7 @@ func LogCertificate(w http.ResponseWriter, cert *x509.Certificate) {
 			"serial":      cert.SerialNumber.String(),
 			"subject":     cert.Subject.CommonName,
 			"issuer":      cert.Issuer.CommonName,
+			"sans":        fmtSans(cert),
 			"valid-from":  cert.NotBefore.Format(time.RFC3339),
 			"valid-to":    cert.NotAfter.Format(time.RFC3339),
 			"public-key":  fmtPublicKey(cert),
@@ -595,8 +597,8 @@ func LogSSHCertificate(w http.ResponseWriter, cert *ssh.Certificate) {
 		m := map[string]interface{}{
 			"serial":           cert.Serial,
 			"principals":       cert.ValidPrincipals,
-			"valid-from":       time.Unix(int64(cert.ValidAfter), 0).Format(time.RFC3339),
-			"valid-to":         time.Unix(int64(cert.ValidBefore), 0).Format(time.RFC3339),
+			"valid-from":       time.Unix(cast.Int64(cert.ValidAfter), 0).Format(time.RFC3339),
+			"valid-to":         time.Unix(cast.Int64(cert.ValidBefore), 0).Format(time.RFC3339),
 			"certificate":      certificate,
 			"certificate-type": certificateType,
 		}
@@ -622,6 +624,31 @@ func ParseCursor(r *http.Request) (cursor string, limit int, err error) {
 		}
 	}
 	return
+}
+
+func fmtSans(cert *x509.Certificate) map[string][]string {
+	sans := make(map[string][]string)
+	if len(cert.DNSNames) > 0 {
+		sans["dns"] = cert.DNSNames
+	}
+	if len(cert.EmailAddresses) > 0 {
+		sans["email"] = cert.EmailAddresses
+	}
+	if size := len(cert.IPAddresses); size > 0 {
+		ips := make([]string, size)
+		for i, ip := range cert.IPAddresses {
+			ips[i] = ip.String()
+		}
+		sans["ip"] = ips
+	}
+	if size := len(cert.URIs); size > 0 {
+		uris := make([]string, size)
+		for i, u := range cert.URIs {
+			uris[i] = u.String()
+		}
+		sans["uri"] = uris
+	}
+	return sans
 }
 
 func fmtPublicKey(cert *x509.Certificate) string {

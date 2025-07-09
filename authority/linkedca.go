@@ -28,6 +28,7 @@ import (
 	"github.com/smallstep/certificates/authority/admin"
 	"github.com/smallstep/certificates/authority/provisioner"
 	"github.com/smallstep/certificates/db"
+	"github.com/smallstep/certificates/internal/cast"
 )
 
 const uuidPattern = "^[a-fA-F0-9]{8}-[a-fA-F0-9]{4}-[a-fA-F0-9]{4}-[a-fA-F0-9]{4}-[a-fA-F0-9]{12}$"
@@ -336,7 +337,7 @@ func (c *linkedCaClient) Revoke(crt *x509.Certificate, rci *db.RevokedCertificat
 		Serial:         rci.Serial,
 		PemCertificate: serializeCertificate(crt),
 		Reason:         rci.Reason,
-		ReasonCode:     linkedca.RevocationReasonCode(rci.ReasonCode),
+		ReasonCode:     linkedca.RevocationReasonCode(cast.Int32(rci.ReasonCode)),
 		Passive:        true,
 	})
 
@@ -350,7 +351,7 @@ func (c *linkedCaClient) RevokeSSH(cert *ssh.Certificate, rci *db.RevokedCertifi
 		Serial:      rci.Serial,
 		Certificate: serializeSSHCertificate(cert),
 		Reason:      rci.Reason,
-		ReasonCode:  linkedca.RevocationReasonCode(rci.ReasonCode),
+		ReasonCode:  linkedca.RevocationReasonCode(cast.Int32(rci.ReasonCode)),
 		Passive:     true,
 	})
 
@@ -403,7 +404,7 @@ func createProvisionerIdentity(p provisioner.Interface) *linkedca.ProvisionerIde
 	}
 	return &linkedca.ProvisionerIdentity{
 		Id:   p.GetID(),
-		Type: linkedca.Provisioner_Type(p.GetType()),
+		Type: linkedca.Provisioner_Type(cast.Int32(int(p.GetType()))),
 		Name: p.GetName(),
 	}
 }

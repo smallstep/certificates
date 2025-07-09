@@ -170,10 +170,10 @@ release:
     #### Linux
 
     - 📦 [step-ca_linux_{{ .Version }}_amd64.tar.gz](https://dl.smallstep.com/gh-release/certificates/gh-release-header/{{ .Tag }}/step-ca_linux_{{ .Version }}_amd64.tar.gz)
-    - 📦 [step-ca_{{ replace .Version "-" "." }}-{{ .Var.packageRelease }}_amd64.deb](https://dl.smallstep.com/gh-release/cli/gh-release-header/{{ .Tag }}/step-ca_{{ replace .Version "-" "." }}-{{ .Var.packageRelease }}_amd64.deb)
-    - 📦 [step-ca-{{ replace .Version "-" "." }}-{{ .Var.packageRelease }}.x86_64.rpm](https://dl.smallstep.com/gh-release/cli/gh-release-header/{{ .Tag }}/step-ca-{{ replace .Version "-" "." }}-{{ .Var.packageRelease }}.x86_64.rpm)
-    - 📦 [step-ca_{{ replace .Version "-" "." }}-{{ .Var.packageRelease }}_arm64.deb](https://dl.smallstep.com/gh-release/cli/gh-release-header/{{ .Tag }}/step-ca_{{ replace .Version "-" "." }}-{{ .Var.packageRelease }}_arm64.deb)
-    - 📦 [step-ca-{{ replace .Version "-" "." }}-{{ .Var.packageRelease }}.aarch64.rpm](https://dl.smallstep.com/gh-release/cli/gh-release-header/{{ .Tag }}/step-ca-{{ replace .Version "-" "." }}-{{ .Var.packageRelease }}.aarch64.rpm)
+    - 📦 [step-ca_{{ replace .Version "-" "." }}-{{ .Var.packageRelease }}_amd64.deb](https://dl.smallstep.com/gh-release/certificates/gh-release-header/{{ .Tag }}/step-ca_{{ replace .Version "-" "." }}-{{ .Var.packageRelease }}_amd64.deb)
+    - 📦 [step-ca-{{ replace .Version "-" "." }}-{{ .Var.packageRelease }}.x86_64.rpm](https://dl.smallstep.com/gh-release/certificates/gh-release-header/{{ .Tag }}/step-ca-{{ replace .Version "-" "." }}-{{ .Var.packageRelease }}.x86_64.rpm)
+    - 📦 [step-ca_{{ replace .Version "-" "." }}-{{ .Var.packageRelease }}_arm64.deb](https://dl.smallstep.com/gh-release/certificates/gh-release-header/{{ .Tag }}/step-ca_{{ replace .Version "-" "." }}-{{ .Var.packageRelease }}_arm64.deb)
+    - 📦 [step-ca-{{ replace .Version "-" "." }}-{{ .Var.packageRelease }}.aarch64.rpm](https://dl.smallstep.com/gh-release/certificates/gh-release-header/{{ .Tag }}/step-ca-{{ replace .Version "-" "." }}-{{ .Var.packageRelease }}.aarch64.rpm)
 
     #### OSX Darwin
 
@@ -197,7 +197,7 @@ release:
 
     ```
     cosign verify-blob \
-      --certificate step-ca_darwin_{{ .Version }}_amd64.tar.gz.sig.pem \
+      --certificate step-ca_darwin_{{ .Version }}_amd64.tar.gz.pem \
       --signature step-ca_darwin_{{ .Version }}_amd64.tar.gz.sig \
       --certificate-identity-regexp "https://github\.com/smallstep/workflows/.*" \
       --certificate-oidc-issuer https://token.actions.githubusercontent.com \

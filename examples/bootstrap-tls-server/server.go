@@ -29,8 +29,9 @@ func main() {
 			if r.TLS != nil && len(r.TLS.PeerCertificates) > 0 {
 				name = r.TLS.PeerCertificates[0].Subject.CommonName
 			}
-			w.Write([]byte(fmt.Sprintf("Hello %s at %s!!!", name, time.Now().UTC())))
+			fmt.Fprintf(w, "Hello %s at %s!!!", name, time.Now().UTC())
 		}),
+		ReadHeaderTimeout: 30 * time.Second,
 	}, ca.VerifyClientCertIfGiven())
 	if err != nil {
 		panic(err)

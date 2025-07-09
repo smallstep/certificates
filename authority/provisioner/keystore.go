@@ -3,7 +3,6 @@ package provisioner
 import (
 	"encoding/json"
 	"math/rand"
-	"net/http"
 	"regexp"
 	"strconv"
 	"sync"
@@ -22,33 +21,26 @@ var maxAgeRegex = regexp.MustCompile(`max-age=(\d+)`)
 
 type keyStore struct {
 	sync.RWMutex
-	client *http.Client
+	client HTTPClient
 	uri    string
 	keySet jose.JSONWebKeySet
-	timer  *time.Timer
 	expiry time.Time
 	jitter time.Duration
 }
 
-func newKeyStore(client *http.Client, uri string) (*keyStore, error) {
+func newKeyStore(client HTTPClient, uri string) (*keyStore, error) {
 	keys, age, err := getKeysFromJWKsURI(client, uri)
 	if err != nil {
 		return nil, err
 	}
-	ks := &keyStore{
+	jitter := getCacheJitter(age)
+	return &keyStore{
 		client: client,
 		uri:    uri,
 		keySet: keys,
-		expiry: getExpirationTime(age),
-		jitter: getCacheJitter(age),
-	}
-	next := ks.nextReloadDuration(age)
-	ks.timer = time.AfterFunc(next, ks.reload)
-	return ks, nil
-}
-
-func (ks *keyStore) Close() {
-	ks.timer.Stop()
+		expiry: getExpirationTime(age, jitter),
+		jitter: jitter,
+	}, nil
 }
 
 func (ks *keyStore) Get(kid string) (keys []jose.JSONWebKey) {
@@ -65,34 +57,16 @@ func (ks *keyStore) Get(kid string) (keys []jose.JSONWebKey) {
 }
 
 func (ks *keyStore) reload() {
-	var next time.Duration
-	keys, age, err := getKeysFromJWKsURI(ks.client, ks.uri)
-	if err != nil {
-		next = ks.nextReloadDuration(ks.jitter / 2)
-	} else {
+	if keys, age, err := getKeysFromJWKsURI(ks.client, ks.uri); err == nil {
 		ks.Lock()
 		ks.keySet = keys
-		ks.expiry = getExpirationTime(age)
 		ks.jitter = getCacheJitter(age)
-		next = ks.nextReloadDuration(age)
+		ks.expiry = getExpirationTime(age, ks.jitter)
 		ks.Unlock()
 	}
-
-	ks.Lock()
-	ks.timer.Reset(next)
-	ks.Unlock()
 }
 
-// nextReloadDuration would return the duration for the next rotation. If age is
-// 0 it will randomly rotate between 0-12 hours, but every time we call to Get
-// it will automatically rotate.
-func (ks *keyStore) nextReloadDuration(age time.Duration) time.Duration {
-	n := rand.Int63n(int64(ks.jitter)) //nolint:gosec // not used for cryptographic security
-	age -= time.Duration(n)
-	return abs(age)
-}
-
-func getKeysFromJWKsURI(client *http.Client, uri string) (jose.JSONWebKeySet, time.Duration, error) {
+func getKeysFromJWKsURI(client HTTPClient, uri string) (jose.JSONWebKeySet, time.Duration, error) {
 	var keys jose.JSONWebKeySet
 	resp, err := client.Get(uri)
 	if err != nil {
@@ -136,8 +110,12 @@ func getCacheJitter(age time.Duration) time.Duration {
 	}
 }
 
-func getExpirationTime(age time.Duration) time.Time {
-	return time.Now().Truncate(time.Second).Add(age)
+func getExpirationTime(age, jitter time.Duration) time.Time {
+	if age > 0 {
+		n := rand.Int63n(int64(jitter)) //nolint:gosec // not used for cryptographic security
+		age -= time.Duration(n)
+	}
+	return time.Now().Truncate(time.Second).Add(abs(age))
 }
 
 // abs returns the absolute value of n.

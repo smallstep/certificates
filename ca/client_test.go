@@ -1017,6 +1017,34 @@ func TestClient_GetCaURL(t *testing.T) {
 	}
 }
 
+func TestClient_WithTimeout(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		time.Sleep(200 * time.Millisecond)
+		render.JSONStatus(w, r, api.HealthResponse{Status: "ok"}, 200)
+	}))
+	defer srv.Close()
+
+	tests := []struct {
+		name      string
+		options   []ClientOption
+		assertion assert.ErrorAssertionFunc
+	}{
+		{"ok", []ClientOption{WithTransport(http.DefaultTransport)}, assert.NoError},
+		{"ok with timeout", []ClientOption{WithTransport(http.DefaultTransport), WithTimeout(5 * time.Second)}, assert.NoError},
+		{"fail with timeout", []ClientOption{WithTransport(http.DefaultTransport), WithTimeout(10 * time.Millisecond)}, assert.Error},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			c, err := NewClient(srv.URL, tt.options...)
+			require.NoError(t, err)
+			assert.NotZero(t, c.timeout)
+			_, err = c.Health()
+			tt.assertion(t, err)
+		})
+	}
+}
+
 func Test_enforceRequestID(t *testing.T) {
 	set := httptest.NewRequest(http.MethodGet, "https://example.com", http.NoBody)
 	set.Header.Set("X-Request-Id", "already-set")
