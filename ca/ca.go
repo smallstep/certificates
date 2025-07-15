@@ -5,6 +5,7 @@ import (
 	"context"
 	"crypto/tls"
 	"crypto/x509"
+	"errors"
 	"fmt"
 	"log"
 	"net"
@@ -17,7 +18,6 @@ import (
 
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
-	"github.com/pkg/errors"
 
 	"github.com/smallstep/cli-utils/step"
 	"github.com/smallstep/nosql"
@@ -264,7 +264,7 @@ func (ca *CA) Init(cfg *config.Config) (*CA, error) {
 	if cfg.DB != nil {
 		acmeDB, err = acmeNoSQL.New(auth.GetDatabase().(nosql.DB))
 		if err != nil {
-			return nil, errors.Wrap(err, "error configuring ACME DB interface")
+			return nil, fmt.Errorf("error configuring ACME DB interface: %w", err)
 		}
 		acmeLinker = acme.NewLinker(dns, "acme")
 		mux.Route("/acme", func(r chi.Router) {
@@ -418,9 +418,6 @@ func buildContext(a *authority.Authority, scepAuthority *scep.Authority, acmeDB 
 
 // Run starts the CA calling to the server ListenAndServe method.
 func (ca *CA) Run() error {
-	var wg sync.WaitGroup
-	errs := make(chan error, 1)
-
 	if !ca.opts.quiet {
 		authorityInfo := ca.auth.GetInfo()
 		log.Printf("Starting %s", step.Version())
@@ -450,6 +447,11 @@ func (ca *CA) Run() error {
 		}
 	}
 
+	var (
+		wg  sync.WaitGroup
+		err error
+	)
+
 	wg.Add(1)
 	go func() {
 		defer wg.Done()
@@ -460,7 +462,7 @@ func (ca *CA) Run() error {
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
-			errs <- ca.insecureSrv.ListenAndServe()
+			err = errors.Join(err, ca.insecureSrv.ListenAndServe())
 		}()
 	}
 
@@ -468,25 +470,22 @@ func (ca *CA) Run() error {
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
-			errs <- ca.metricsSrv.ListenAndServe()
+			err = errors.Join(err, ca.metricsSrv.ListenAndServe())
 		}()
 	}
 
 	wg.Add(1)
 	go func() {
 		defer wg.Done()
-		errs <- ca.srv.ListenAndServe()
+		err = errors.Join(err, ca.srv.ListenAndServe())
 	}()
-
-	// wait till error occurs; ensures the servers keep listening
-	err := <-errs
 
 	// if the error is not the usual HTTP server closed error, it is
 	// highly likely that an error occurred when starting one of the
 	// CA servers, possibly because of a port already being in use or
 	// some part of the configuration not being correct. This case is
 	// handled by stopping the CA in its entirety.
-	if !errors.Is(err, http.ErrServerClosed) {
+	if err != nil && !errors.Is(err, http.ErrServerClosed) {
 		log.Println("shutting down due to startup error ...")
 		if stopErr := ca.Stop(); stopErr != nil {
 			err = fmt.Errorf("failed stopping CA after error occurred: %w: %w", err, stopErr)
@@ -510,17 +509,26 @@ func (ca *CA) Stop() error {
 	if err := ca.auth.Shutdown(); err != nil {
 		log.Printf("error stopping ca.Authority: %+v\n", err)
 	}
+
 	var insecureShutdownErr error
 	if ca.insecureSrv != nil {
 		insecureShutdownErr = ca.insecureSrv.Shutdown()
 	}
 
-	secureErr := ca.srv.Shutdown()
-
-	if insecureShutdownErr != nil {
-		return insecureShutdownErr
+	var metricsShutdownErr error
+	if ca.metricsSrv != nil {
+		metricsShutdownErr = ca.metricsSrv.Shutdown()
 	}
-	return secureErr
+
+	secureErr := ca.srv.Shutdown()
+	switch {
+	case insecureShutdownErr != nil:
+		return insecureShutdownErr
+	case metricsShutdownErr != nil:
+		return metricsShutdownErr
+	default:
+		return secureErr
+	}
 }
 
 // Reload reloads the configuration of the CA and calls to the server Reload
@@ -528,7 +536,7 @@ func (ca *CA) Stop() error {
 func (ca *CA) Reload() error {
 	cfg, err := config.LoadConfiguration(ca.opts.configFile)
 	if err != nil {
-		return errors.Wrap(err, "error reloading ca configuration")
+		return fmt.Errorf("error reloading ca configuration: %w", err)
 	}
 
 	logContinue := func(reason string) {
@@ -555,26 +563,26 @@ func (ca *CA) Reload() error {
 	)
 	if err != nil {
 		logContinue("Reload failed because the CA with new configuration could not be initialized.")
-		return errors.Wrap(err, "error reloading ca")
+		return fmt.Errorf("error reloading ca: %w", err)
 	}
 
 	if ca.insecureSrv != nil {
 		if err = ca.insecureSrv.Reload(newCA.insecureSrv); err != nil {
 			logContinue("Reload failed because insecure server could not be replaced.")
-			return errors.Wrap(err, "error reloading insecure server")
+			return fmt.Errorf("error reloading insecure server: %w", err)
 		}
 	}
 
 	if ca.metricsSrv != nil {
 		if err = ca.metricsSrv.Reload(newCA.metricsSrv); err != nil {
 			logContinue("Reload failed because metrics server could not be replaced.")
-			return errors.Wrap(err, "error reloading metrics server")
+			return fmt.Errorf("error reloading metrics server: %w", err)
 		}
 	}
 
 	if err = ca.srv.Reload(newCA.srv); err != nil {
 		logContinue("Reload failed because server could not be replaced.")
-		return errors.Wrap(err, "error reloading server")
+		return fmt.Errorf("error reloading server: %w", err)
 	}
 
 	// 1. Stop previous renewer
