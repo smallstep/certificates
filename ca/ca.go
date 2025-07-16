@@ -13,11 +13,11 @@ import (
 	"net/url"
 	"reflect"
 	"strings"
-	"sync"
 	"time"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
+	"golang.org/x/sync/errgroup"
 
 	"github.com/smallstep/cli-utils/step"
 	"github.com/smallstep/nosql"
@@ -447,45 +447,36 @@ func (ca *CA) Run() error {
 		}
 	}
 
-	var (
-		wg  sync.WaitGroup
-		err error
-	)
-
-	wg.Add(1)
-	go func() {
-		defer wg.Done()
+	eg := new(errgroup.Group)
+	eg.Go(func() error {
 		ca.runCompactJob()
-	}()
+		return nil
+	})
 
 	if ca.insecureSrv != nil {
-		wg.Add(1)
-		go func() {
-			defer wg.Done()
-			err = errors.Join(err, ca.insecureSrv.ListenAndServe())
-		}()
+		eg.Go(func() error {
+			return ca.insecureSrv.ListenAndServe()
+		})
 	}
 
 	if ca.metricsSrv != nil {
-		wg.Add(1)
-		go func() {
-			defer wg.Done()
-			err = errors.Join(err, ca.metricsSrv.ListenAndServe())
-		}()
+		eg.Go(func() error {
+			return ca.metricsSrv.ListenAndServe()
+		})
 	}
 
-	wg.Add(1)
-	go func() {
-		defer wg.Done()
-		err = errors.Join(err, ca.srv.ListenAndServe())
-	}()
+	eg.Go(func() error {
+		return ca.srv.ListenAndServe()
+	})
+
+	err := eg.Wait()
 
 	// if the error is not the usual HTTP server closed error, it is
 	// highly likely that an error occurred when starting one of the
 	// CA servers, possibly because of a port already being in use or
 	// some part of the configuration not being correct. This case is
 	// handled by stopping the CA in its entirety.
-	if err != nil && !errors.Is(err, http.ErrServerClosed) {
+	if !errors.Is(err, http.ErrServerClosed) {
 		log.Println("shutting down due to startup error ...")
 		if stopErr := ca.Stop(); stopErr != nil {
 			err = fmt.Errorf("failed stopping CA after error occurred: %w: %w", err, stopErr)
@@ -493,8 +484,6 @@ func (ca *CA) Run() error {
 			err = fmt.Errorf("stopped CA after error occurred: %w", err)
 		}
 	}
-
-	wg.Wait()
 
 	return err
 }
