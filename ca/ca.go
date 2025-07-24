@@ -499,25 +499,28 @@ func (ca *CA) Stop() error {
 		log.Printf("error stopping ca.Authority: %+v\n", err)
 	}
 
-	var insecureShutdownErr error
+	// Concurrently shutdown services
+	var eg errgroup.Group
 	if ca.insecureSrv != nil {
-		insecureShutdownErr = ca.insecureSrv.Shutdown()
+		eg.Go(func() error {
+			return ca.insecureSrv.Shutdown()
+		})
 	}
 
-	var metricsShutdownErr error
 	if ca.metricsSrv != nil {
-		metricsShutdownErr = ca.metricsSrv.Shutdown()
+		eg.Go(func() error {
+			return ca.metricsSrv.Shutdown()
+		})
 	}
 
-	secureErr := ca.srv.Shutdown()
-	switch {
-	case insecureShutdownErr != nil:
-		return insecureShutdownErr
-	case metricsShutdownErr != nil:
-		return metricsShutdownErr
-	default:
-		return secureErr
+	if ca.srv != nil {
+		eg.Go(func() error {
+			return ca.srv.Shutdown()
+		})
 	}
+
+	// Return first error
+	return eg.Wait()
 }
 
 // Reload reloads the configuration of the CA and calls to the server Reload
