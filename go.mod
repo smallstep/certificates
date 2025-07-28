@@ -26,7 +26,7 @@ require (
 	github.com/prometheus/client_golang v1.22.0
 	github.com/rs/xid v1.6.0
 	github.com/sirupsen/logrus v1.9.3
-	github.com/slackhq/nebula v1.9.5
+	github.com/slackhq/nebula v1.9.6
 	github.com/smallstep/assert v0.0.0-20200723003110-82e2b9b3b262
 	github.com/smallstep/cli-utils v0.12.1
 	github.com/smallstep/go-attestation v0.4.4-0.20241119153605-2306d5b464ca
