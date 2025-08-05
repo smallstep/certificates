@@ -2207,7 +2207,7 @@ MCowBQYDK2VwAyEA5c+4NKZSNQcR1T8qN6SjwgdPZQ0Ge12Ylx/YeGAJ35k=
 			},
 			Config: &wireprovisioner.Config{
 				ClientID:            "wireapp",
-				SignatureAlgorithms: []string{"ES256"},
+				SignatureAlgorithms: []string{"RS256"},
 				Now: func() time.Time {
 					return time.Date(2024, 1, 12, 18, 32, 41, 0, time.UTC) // (Token Expiry: 2024-01-12 21:32:42 +0100 CET)
 				},
