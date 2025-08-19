@@ -74,6 +74,7 @@ type Provisioner interface {
 	IsChallengeEnabled(ctx context.Context, challenge provisioner.ACMEChallenge) bool
 	IsAttestationFormatEnabled(ctx context.Context, format provisioner.ACMEAttestationFormat) bool
 	GetAttestationRoots() (*x509.CertPool, bool)
+	GetAttestationIntermediates() (*x509.CertPool, bool)
 	GetID() string
 	GetName() string
 	DefaultTLSCertDuration() time.Duration
@@ -108,18 +109,19 @@ func MustProvisionerFromContext(ctx context.Context) Provisioner {
 
 // MockProvisioner for testing
 type MockProvisioner struct {
-	Mret1                     interface{}
-	Merr                      error
-	MgetID                    func() string
-	MgetName                  func() string
-	MauthorizeOrderIdentifier func(ctx context.Context, identifier provisioner.ACMEIdentifier) error
-	MauthorizeSign            func(ctx context.Context, ott string) ([]provisioner.SignOption, error)
-	MauthorizeRevoke          func(ctx context.Context, token string) error
-	MisChallengeEnabled       func(ctx context.Context, challenge provisioner.ACMEChallenge) bool
-	MisAttFormatEnabled       func(ctx context.Context, format provisioner.ACMEAttestationFormat) bool
-	MgetAttestationRoots      func() (*x509.CertPool, bool)
-	MdefaultTLSCertDuration   func() time.Duration
-	MgetOptions               func() *provisioner.Options
+	Mret1                        interface{}
+	Merr                         error
+	MgetID                       func() string
+	MgetName                     func() string
+	MauthorizeOrderIdentifier    func(ctx context.Context, identifier provisioner.ACMEIdentifier) error
+	MauthorizeSign               func(ctx context.Context, ott string) ([]provisioner.SignOption, error)
+	MauthorizeRevoke             func(ctx context.Context, token string) error
+	MisChallengeEnabled          func(ctx context.Context, challenge provisioner.ACMEChallenge) bool
+	MisAttFormatEnabled          func(ctx context.Context, format provisioner.ACMEAttestationFormat) bool
+	MgetAttestationRoots         func() (*x509.CertPool, bool)
+	MgetAttestationIntermediates func() (*x509.CertPool, bool)
+	MdefaultTLSCertDuration      func() time.Duration
+	MgetOptions                  func() *provisioner.Options
 }
 
 // GetName mock
@@ -173,6 +175,13 @@ func (m *MockProvisioner) IsAttestationFormatEnabled(ctx context.Context, format
 func (m *MockProvisioner) GetAttestationRoots() (*x509.CertPool, bool) {
 	if m.MgetAttestationRoots != nil {
 		return m.MgetAttestationRoots()
+	}
+	return m.Mret1.(*x509.CertPool), m.Mret1 != nil
+}
+
+func (m *MockProvisioner) GetAttestationIntermediates() (*x509.CertPool, bool) {
+	if m.MgetAttestationIntermediates != nil {
+		return m.MgetAttestationIntermediates()
 	}
 	return m.Mret1.(*x509.CertPool), m.Mret1 != nil
 }

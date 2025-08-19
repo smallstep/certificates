@@ -117,11 +117,17 @@ type ACME struct {
 	// AttestationRoots contains a bundle of root certificates in PEM format
 	// that will be used to verify the attestation certificates. If provided,
 	// this bundle will be used even for well-known CAs like Apple and Yubico.
-	AttestationRoots    []byte   `json:"attestationRoots,omitempty"`
-	Claims              *Claims  `json:"claims,omitempty"`
-	Options             *Options `json:"options,omitempty"`
-	attestationRootPool *x509.CertPool
-	ctl                 *Controller
+	AttestationRoots []byte `json:"attestationRoots,omitempty"`
+	// AttestationIntermediates contains a bundle of intermediates certificates
+	// in PEM format that will be used to verify the attestation certificates.
+	// If provided, this bundle will be used even for well-known intermediate
+	// CAs from Yubico.
+	AttestationIntermediates     []byte   `json:"attestationIntermediates,omitempty"`
+	Claims                       *Claims  `json:"claims,omitempty"`
+	Options                      *Options `json:"options,omitempty"`
+	attestationRootPool          *x509.CertPool
+	attestationIntermediatesPool *x509.CertPool
+	ctl                          *Controller
 }
 
 // GetID returns the provisioner unique identifier.
@@ -191,25 +197,27 @@ func (p *ACME) Init(config Config) (err error) {
 
 	// Parse attestation roots.
 	// The pool will be nil if there are no roots.
-	if rest := p.AttestationRoots; len(rest) > 0 {
-		var block *pem.Block
-		var hasCert bool
-		p.attestationRootPool = x509.NewCertPool()
-		for rest != nil {
-			block, rest = pem.Decode(rest)
-			if block == nil {
-				break
-			}
-			cert, err := x509.ParseCertificate(block.Bytes)
-			if err != nil {
-				return errors.New("error parsing attestationRoots: malformed certificate")
-			}
-			p.attestationRootPool.AddCert(cert)
-			hasCert = true
+	if len(p.AttestationRoots) > 0 {
+		pool, hasCert, err := createX509CertPool(p.AttestationRoots)
+		if err != nil {
+			return errors.New("error parsing attestationRoots: malformed certificate")
 		}
 		if !hasCert {
 			return errors.New("error parsing attestationRoots: no certificates found")
 		}
+		p.attestationRootPool = pool
+	}
+	// Parse attestation intermediates.
+	// The pool will be nil if there are no roots.
+	if len(p.AttestationIntermediates) > 0 {
+		pool, hasCert, err := createX509CertPool(p.AttestationIntermediates)
+		if err != nil {
+			return errors.New("error parsing attestationIntermediates: malformed certificate")
+		}
+		if !hasCert {
+			return errors.New("error parsing attestationIntermediates: no certificates found")
+		}
+		p.attestationIntermediatesPool = pool
 	}
 
 	if err := p.initializeWireOptions(); err != nil {
@@ -391,4 +399,37 @@ func (p *ACME) IsAttestationFormatEnabled(_ context.Context, format ACMEAttestat
 // interface function instead to authorize?
 func (p *ACME) GetAttestationRoots() (*x509.CertPool, bool) {
 	return p.attestationRootPool, p.attestationRootPool != nil
+}
+
+// GetAttestationIntermediates returns certificate pool with the configured
+// attestation intermediates and reports if the pool contains at least one
+// certificate.
+//
+// TODO(hs): we may not want to expose the intermediate pool like this; call
+// into an interface function instead to authorize?
+func (p *ACME) GetAttestationIntermediates() (*x509.CertPool, bool) {
+	return p.attestationIntermediatesPool, p.attestationIntermediatesPool != nil
+}
+
+func createX509CertPool(b []byte) (*x509.CertPool, bool, error) {
+	var (
+		block   *pem.Block
+		hasCert bool
+		pool    = x509.NewCertPool()
+	)
+
+	for b != nil {
+		block, b = pem.Decode(b)
+		if block == nil {
+			break
+		}
+		cert, err := x509.ParseCertificate(block.Bytes)
+		if err != nil {
+			return nil, false, err
+		}
+		pool.AddCert(cert)
+		hasCert = true
+	}
+
+	return pool, hasCert, nil
 }

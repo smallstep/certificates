@@ -50,12 +50,13 @@ func (*fakeProvisioner) IsChallengeEnabled(context.Context, provisioner.ACMEChal
 func (*fakeProvisioner) IsAttestationFormatEnabled(context.Context, provisioner.ACMEAttestationFormat) bool {
 	return true
 }
-func (*fakeProvisioner) GetAttestationRoots() (*x509.CertPool, bool)   { return nil, false }
-func (*fakeProvisioner) AuthorizeRevoke(context.Context, string) error { return nil }
-func (*fakeProvisioner) GetID() string                                 { return "" }
-func (*fakeProvisioner) GetName() string                               { return "" }
-func (*fakeProvisioner) DefaultTLSCertDuration() time.Duration         { return 0 }
-func (*fakeProvisioner) GetOptions() *provisioner.Options              { return nil }
+func (*fakeProvisioner) GetAttestationRoots() (*x509.CertPool, bool)         { return nil, false }
+func (*fakeProvisioner) GetAttestationIntermediates() (*x509.CertPool, bool) { return nil, false }
+func (*fakeProvisioner) AuthorizeRevoke(context.Context, string) error       { return nil }
+func (*fakeProvisioner) GetID() string                                       { return "" }
+func (*fakeProvisioner) GetName() string                                     { return "" }
+func (*fakeProvisioner) DefaultTLSCertDuration() time.Duration               { return 0 }
+func (*fakeProvisioner) GetOptions() *provisioner.Options                    { return nil }
 
 func newProv() acme.Provisioner {
 	// Initialize provisioners
