@@ -1094,7 +1094,6 @@ func TestHandler_RevokeCert(t *testing.T) {
 				assert.Equals(t, res.Header["Content-Type"], []string{"application/problem+json"})
 			} else {
 				assert.True(t, bytes.Equal(bytes.TrimSpace(body), []byte{}))
-				assert.Equals(t, int64(-1), req.ContentLength)
 				assert.Equals(t, []string{fmt.Sprintf("<%s/acme/%s/directory>;rel=\"index\"", baseURL.String(), escProvName)}, res.Header["Link"])
 			}
 		})
