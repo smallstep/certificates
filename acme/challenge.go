@@ -1426,7 +1426,7 @@ func doStepAttestationFormat(_ context.Context, prov Provisioner, ch *Challenge,
 	// Use configured or default attestation roots if none is configured.
 	roots, ok := prov.GetAttestationRoots()
 	if !ok {
-		pinRoot, err := pemutil.ParseCertificate([]byte(yubicoPIVRootCA))
+		pivRoot, err := pemutil.ParseCertificate([]byte(yubicoPIVRootCA))
 		if err != nil {
 			return nil, WrapErrorISE(err, "error parsing root ca")
 		}
@@ -1435,7 +1435,7 @@ func doStepAttestationFormat(_ context.Context, prov Provisioner, ch *Challenge,
 			return nil, WrapErrorISE(err, "error parsing root ca")
 		}
 		roots = x509.NewCertPool()
-		roots.AddCert(pinRoot)
+		roots.AddCert(pivRoot)
 		roots.AddCert(attRoot)
 	}
 
