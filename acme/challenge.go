@@ -1581,7 +1581,7 @@ func doAndroidKeyAttestionFormat(_ context.Context, prov Provisioner, ch *Challe
 	}
 
 	// validate challenge
-	if string(data.Attestation.AttestationChallenge) != keyAuth {
+	if subtle.ConstantTimeCompare([]byte(keyAuth), data.Attestation.AttestationChallenge) != 1 {
 		return nil, NewDetailedError(ErrorBadAttestationStatementType, fmt.Sprintf("challenge mismatch; expected %q, got %q", keyAuth, string(data.Attestation.AttestationChallenge)))
 	}
 
