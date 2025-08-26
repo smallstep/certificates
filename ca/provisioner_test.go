@@ -7,6 +7,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
 	"go.step.sm/crypto/jose"
@@ -40,6 +41,14 @@ func getTestProvisioner(t *testing.T, caURL string) *Provisioner {
 		jwk:           jwk,
 		tokenLifetime: 5 * time.Minute,
 	}
+}
+
+func mustParseSigned(t *testing.T, tok string, key, dest any) {
+	t.Helper()
+
+	jwt, err := jose.ParseSigned(tok)
+	require.NoError(t, err)
+	require.NoError(t, jwt.Claims(key, dest))
 }
 
 func TestNewProvisioner(t *testing.T) {
@@ -102,6 +111,39 @@ func TestProvisioner_Getters(t *testing.T) {
 	if got := p.Kid(); got != p.kid {
 		t.Errorf("Provisioner.Kid() = %v, want %v", got, p.kid)
 	}
+	if got := p.Fingerprint(); got != p.fingerprint {
+		t.Errorf("Provisioner.Fingerprint() = %v, want %v", got, p.kid)
+	}
+	if got := p.Audience(); got != p.audience {
+		t.Errorf("Provisioner.Audience() = %v, want %v", got, p.kid)
+	}
+	if got := p.SSHAudience(); got != p.sshAudience {
+		t.Errorf("Provisioner.SSHAudience() = %v, want %v", got, p.kid)
+	}
+}
+
+func TestProvisioner_Setters(t *testing.T) {
+	p := getTestProvisioner(t, "https://127.0.0.1:9000")
+	u, err := url.Parse(p.GetCaURL())
+	require.NoError(t, err)
+
+	p.SetFingerprint("71498a347624fe99e1baff52d57d04a75be9c695c67bd6b0a08903e809f7497d")
+	p.SetAudience(u.ResolveReference(&url.URL{Path: "/1.0/revoke"}).String())
+	p.SetSSHAudience(u.ResolveReference(&url.URL{Path: "/1.0/ssh/revoke"}).String())
+
+	tok, err := p.Token("test@example.com")
+	require.NoError(t, err)
+	claims := make(map[string]any)
+	mustParseSigned(t, tok, p.jwk.Public(), &claims)
+	assert.Equal(t, "71498a347624fe99e1baff52d57d04a75be9c695c67bd6b0a08903e809f7497d", claims["sha"])
+	assert.Equal(t, "https://127.0.0.1:9000/1.0/revoke", claims["aud"])
+
+	tok, err = p.SSHToken("user", "test@example.com", []string{"test"})
+	require.NoError(t, err)
+	claims = make(map[string]any)
+	mustParseSigned(t, tok, p.jwk.Public(), &claims)
+	assert.Equal(t, "71498a347624fe99e1baff52d57d04a75be9c695c67bd6b0a08903e809f7497d", claims["sha"])
+	assert.Equal(t, "https://127.0.0.1:9000/1.0/ssh/revoke", claims["aud"])
 }
 
 func TestProvisioner_Token(t *testing.T) {

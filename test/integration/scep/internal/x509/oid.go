@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style
 // license that can be found in the LICENSE file.
 
-//nolint:staticcheck,revive,gocritic // code copied from crypto/x509
+//nolint:staticcheck,gocritic // code copied from crypto/x509
 package legacyx509
 
 import (
@@ -18,9 +18,7 @@ import (
 	"github.com/smallstep/certificates/internal/cast"
 )
 
-var (
-	errInvalidOID = errors.New("invalid oid")
-)
+var errInvalidOID = errors.New("invalid oid")
 
 // An OID represents an ASN.1 OBJECT IDENTIFIER.
 type OID struct {

@@ -485,7 +485,7 @@ func (o *OIDC) AuthorizeSSHRevoke(_ context.Context, token string) error {
 	return errs.Unauthorized("oidc.AuthorizeSSHRevoke; cannot revoke with non-admin oidc token")
 }
 
-func getAndDecode(client *http.Client, uri string, v interface{}) error {
+func getAndDecode(client HTTPClient, uri string, v interface{}) error {
 	resp, err := client.Get(uri)
 	if err != nil {
 		return errors.Wrapf(err, "failed to connect to %s", uri)

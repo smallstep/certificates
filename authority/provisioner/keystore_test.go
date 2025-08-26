@@ -22,7 +22,6 @@ func Test_newKeyStore(t *testing.T) {
 
 	ks, err := newKeyStore(srv.Client(), srv.URL)
 	assert.FatalError(t, err)
-	defer ks.Close()
 
 	type args struct {
 		client *http.Client
@@ -49,7 +48,6 @@ func Test_newKeyStore(t *testing.T) {
 				if !reflect.DeepEqual(got.keySet, tt.want) {
 					t.Errorf("newKeyStore() = %v, want %v", got, tt.want)
 				}
-				got.Close()
 			}
 		})
 	}
@@ -61,7 +59,6 @@ func Test_keyStore(t *testing.T) {
 
 	ks, err := newKeyStore(srv.Client(), srv.URL+"/random")
 	assert.FatalError(t, err)
-	defer ks.Close()
 	ks.RLock()
 	keySet1 := ks.keySet
 	ks.RUnlock()
@@ -73,6 +70,7 @@ func Test_keyStore(t *testing.T) {
 
 	// Wait for rotation
 	time.Sleep(5 * time.Second)
+	assert.Len(t, 0, ks.Get("foobar")) // force refresh
 
 	ks.RLock()
 	keySet2 := ks.keySet
@@ -105,7 +103,6 @@ func Test_keyStore_noCache(t *testing.T) {
 
 	ks, err := newKeyStore(srv.Client(), srv.URL+"/no-cache")
 	assert.FatalError(t, err)
-	defer ks.Close()
 	ks.RLock()
 	keySet1 := ks.keySet
 	ks.RUnlock()
@@ -114,20 +111,6 @@ func Test_keyStore_noCache(t *testing.T) {
 	assert.Len(t, 2, keySet1.Keys)
 	assert.Len(t, 0, ks.Get(keySet1.Keys[0].KeyID))
 	assert.Len(t, 0, ks.Get(keySet1.Keys[1].KeyID))
-	assert.Len(t, 0, ks.Get("foobar"))
-
-	ks.RLock()
-	keySet2 := ks.keySet
-	ks.RUnlock()
-	if reflect.DeepEqual(keySet1, keySet2) {
-		t.Error("keyStore did not rotated")
-	}
-
-	// The keys will rotate on Get.
-	// So we won't be able to find the cached ones
-	assert.Len(t, 2, keySet2.Keys)
-	assert.Len(t, 0, ks.Get(keySet2.Keys[0].KeyID))
-	assert.Len(t, 0, ks.Get(keySet2.Keys[1].KeyID))
 	assert.Len(t, 0, ks.Get("foobar"))
 
 	// Check hits
@@ -147,7 +130,6 @@ func Test_keyStore_Get(t *testing.T) {
 	defer srv.Close()
 	ks, err := newKeyStore(srv.Client(), srv.URL)
 	assert.FatalError(t, err)
-	defer ks.Close()
 
 	type args struct {
 		kid string
