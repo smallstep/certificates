@@ -1359,7 +1359,7 @@ func attestationFormatsToCertificates(formats []linkedca.ACMEProvisioner_Attesta
 	for _, f := range formats {
 		switch f {
 		case 4:
-			ret = append(ret, provisioner.ANDROID)
+			ret = append(ret, provisioner.ANDROIDKEY)
 		case linkedca.ACMEProvisioner_APPLE:
 			ret = append(ret, provisioner.APPLE)
 		case linkedca.ACMEProvisioner_STEP:
@@ -1377,7 +1377,7 @@ func attestationFormatsToLinkedca(formats []provisioner.ACMEAttestationFormat) [
 	ret := make([]linkedca.ACMEProvisioner_AttestationFormatType, 0, len(formats))
 	for _, f := range formats {
 		switch provisioner.ACMEAttestationFormat(f.String()) {
-		case provisioner.ANDROID:
+		case provisioner.ANDROIDKEY:
 			ret = append(ret, 4)
 		case provisioner.APPLE:
 			ret = append(ret, linkedca.ACMEProvisioner_APPLE)

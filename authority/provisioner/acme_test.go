@@ -51,7 +51,7 @@ func TestACMEAttestationFormat_Validate(t *testing.T) {
 		f       ACMEAttestationFormat
 		wantErr bool
 	}{
-		{"android", ANDROID, false},
+		{"android", ANDROIDKEY, false},
 		{"apple", APPLE, false},
 		{"step", STEP, false},
 		{"tpm", TPM, false},
@@ -199,7 +199,7 @@ MCowBQYDK2VwAyEA5c+4NKZSNQcR1T8qN6SjwgdPZQ0Ge12Ylx/YeGAJ35k=
 					Name:               "foo",
 					Type:               "ACME",
 					Challenges:         []ACMEChallenge{DNS_01, DEVICE_ATTEST_01},
-					AttestationFormats: []ACMEAttestationFormat{APPLE, STEP, ANDROID},
+					AttestationFormats: []ACMEAttestationFormat{APPLE, STEP, ANDROIDKEY},
 					AttestationRoots:   bytes.Join([][]byte{appleCA, yubicoCA}, []byte("\n")),
 				},
 			}
@@ -427,7 +427,7 @@ func TestACME_IsAttestationFormatEnabled(t *testing.T) {
 		args   args
 		want   bool
 	}{
-		{"ok", fields{[]ACMEAttestationFormat{APPLE, STEP, TPM, ANDROID}}, args{ctx, TPM}, true},
+		{"ok", fields{[]ACMEAttestationFormat{APPLE, STEP, TPM, ANDROIDKEY}}, args{ctx, TPM}, true},
 		{"ok empty apple", fields{nil}, args{ctx, APPLE}, true},
 		{"ok empty step", fields{nil}, args{ctx, STEP}, true},
 		{"ok empty tpm", fields{[]ACMEAttestationFormat{}}, args{ctx, "tpm"}, true},
@@ -436,7 +436,7 @@ func TestACME_IsAttestationFormatEnabled(t *testing.T) {
 		{"fail apple", fields{[]ACMEAttestationFormat{STEP, TPM}}, args{ctx, APPLE}, false},
 		{"fail step", fields{[]ACMEAttestationFormat{APPLE, TPM}}, args{ctx, STEP}, false},
 		{"fail step", fields{[]ACMEAttestationFormat{APPLE, STEP}}, args{ctx, TPM}, false},
-		{"fail android", fields{[]ACMEAttestationFormat{APPLE, STEP}}, args{ctx, ANDROID}, false},
+		{"fail android", fields{[]ACMEAttestationFormat{APPLE, STEP}}, args{ctx, ANDROIDKEY}, false},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
