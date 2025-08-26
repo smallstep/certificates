@@ -236,8 +236,8 @@ func (p *ACME) Init(config Config) (err error) {
 
 const ANDROID_ATTESTATION_STATUS_URL = "https://android.googleapis.com/attestation/status"
 
-// fetch CRL https://android.googleapis.com/attestation/status and build a list of serial number
-func (p *ACME) initializeAndroidCRL() error {
+// fetch CRL https://android.googleapis.com/attestation/status and build a list of revoked serial numbers
+func (p *ACME) fetchAndroidCRL() error {
 	log.Printf("Updating Android CRL list for %s ACME provisioner", p.Name)
 	var CRLResponse struct {
 		Entries map[string]struct {
@@ -256,13 +256,13 @@ func (p *ACME) initializeAndroidCRL() error {
 		return fmt.Errorf("unexpected Android CRL response %d: %s", res.StatusCode, string(bodyBytes))
 	}
 
-	if err := json.NewDecoder(res.Body).Decode(&CRLResponse); err != nil {
+	if err := json.NewDecoder(res.Body).Decode(&crlResponse); err != nil {
 		return fmt.Errorf("error decoding Android CRL JSON: %w", err)
 	}
 
 	// Extract keys into a slice
-	keys := make([]string, 0, len(CRLResponse.Entries))
-	for k := range CRLResponse.Entries {
+	keys := make([]string, 0, len(crlResponse.Entries))
+	for k := range crlResponse.Entries {
 		keys = append(keys, k)
 	}
 	p.RootCRLs = keys

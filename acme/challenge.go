@@ -860,7 +860,7 @@ func deviceAttest01Validate(ctx context.Context, ch *Challenge, db DB, jwk *jose
 
 		// 1. attestationSecurityLevel > 0
 		if data.Attestation.AttestationSecurityLevel < 1 {
-			return storeError(ctx, db, ch, true, NewDetailedError(ErrorBadAttestationStatementType, "Security Level does not match"))
+			return storeError(ctx, db, ch, true, NewDetailedError(ErrorBadAttestationStatementType, "security level does not match"))
 		}
 
 		// 2. hardwareEnforced
@@ -1416,7 +1416,7 @@ ixPvZtXQpUpuL12ab+9EaDK8Z4RHJYYfCT3Q5vNAXaiWQ+8PTWm2QgBR/bkwSWc+
 NpUFgNPN9PvQi8WEg5UmAGMCAwEAAQ==
 -----END PUBLIC KEY-----`
 
-// Attestion oid for Android, encoded as an integer.
+// OID for the Android attestation extension
 // https://source.android.com/docs/security/features/keystore/attestation#id-attestation
 var oidAndroidAttestation = asn1.ObjectIdentifier{1, 3, 6, 1, 4, 1, 11129, 2, 1, 17}
 
@@ -1426,8 +1426,8 @@ type androidKeyAttestationData struct {
 	Attestation *attestation.KeyDescription
 }
 
-func findAndroidAttestationCert(intermediates []*x509.Certificate) (*x509.Certificate, error) {
-	for _, cert := range intermediates {
+func findAndroidAttestationCert(certs []*x509.Certificate) (*x509.Certificate, error) {
+	for _, cert := range certs {
 		for _, ext := range cert.Extensions {
 			if ext.Id.Equal(oidAndroidAttestation) {
 				return cert, nil
@@ -1459,11 +1459,11 @@ func doAndroidKeyAttestionFormat(_ context.Context, prov Provisioner, ch *Challe
 	}
 	der, ok := x5c[0].([]byte)
 	if !ok {
-		return nil, NewDetailedError(ErrorBadAttestationStatementType, "x5c[0] is not a DER []byte")
+		return nil, NewDetailedError(ErrorBadAttestationStatementType, "x5c is malformed")
 	}
 	leaf, err := x509.ParseCertificate(der)
 	if err != nil {
-		return nil, WrapDetailedError(ErrorBadAttestationStatementType, err, "failed to parse leaf certificate")
+		return nil, WrapDetailedError(ErrorBadAttestationStatementType, err, "failed parsing leaf certificate")
 	}
 	certs = append(certs, leaf)
 
@@ -1473,11 +1473,11 @@ func doAndroidKeyAttestionFormat(_ context.Context, prov Provisioner, ch *Challe
 	for i, v := range x5c[1:] {
 		der, ok := v.([]byte)
 		if !ok {
-			return nil, NewDetailedError(ErrorBadAttestationStatementType, "x5c element is not a DER []byte")
+			return nil, NewDetailedError(ErrorBadAttestationStatementType, "x5c is malformed")
 		}
 		cert, err := x509.ParseCertificate(der)
 		if err != nil {
-			return nil, WrapDetailedError(ErrorBadAttestationStatementType, err, "failed to parse intermediate/root certificate")
+			return nil, WrapDetailedError(ErrorBadAttestationStatementType, err, "failed parsing certificate in chain")
 		}
 		// Verify CRL
 		if acme.IsRootRevoked(cert.SerialNumber.String()) {
@@ -1502,10 +1502,10 @@ func doAndroidKeyAttestionFormat(_ context.Context, prov Provisioner, ch *Challe
 	switch root.PublicKey.(type) {
 	case *rsa.PublicKey:
 		if !root.PublicKey.(*rsa.PublicKey).Equal(trustedPubKey) {
-			return nil, NewDetailedError(ErrorBadAttestationStatementType, "Root certificate not signed by Android")
+			return nil, NewDetailedError(ErrorBadAttestationStatementType, "root certificate not signed by Google")
 		}
 	default:
-		return nil, NewDetailedError(ErrorBadAttestationStatementType, "Invalid root certificate signature algorithm")
+		return nil, NewDetailedError(ErrorBadAttestationStatementType, "invalid root certificate key type")
 	}
 
 	// Validate the full chain including root as trust anchor
@@ -1582,7 +1582,7 @@ func doAndroidKeyAttestionFormat(_ context.Context, prov Provisioner, ch *Challe
 
 	// validate challenge
 	if string(data.Attestation.AttestationChallenge) != keyAuth {
-		return nil, NewDetailedError(ErrorBadAttestationStatementType, "Challenge mismatach: "+string(data.Attestation.AttestationChallenge))
+		return nil, NewDetailedError(ErrorBadAttestationStatementType, fmt.Sprintf("challenge mismatch; expected %q, got %q", keyAuth, string(data.Attestation.AttestationChallenge))
 	}
 
 	return data, nil

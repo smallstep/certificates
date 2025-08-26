@@ -190,7 +190,7 @@ func mustAttestAndroid(t *testing.T, keyAuthorization string) ([]byte, *x509.Cer
 	}{
 		AttObj: base64.RawURLEncoding.EncodeToString(attObj),
 	})
-	fatalError(t, err)
+	require.NoError(t, err)
 
 	return payload, leaf, ca.Root, rootAndroid
 }
