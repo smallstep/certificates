@@ -227,26 +227,26 @@ func (p *ACME) Init(config Config) (err error) {
 		return fmt.Errorf("failed initializing Wire options: %w", err)
 	}
 
-	if slices.Contains(p.AttestationFormats, "android-key") && len(p.RootCRLs) == 0 {
-		p.initializeAndroidCRL()
+	if slices.Contains(p.AttestationFormats, ANDROIDKEY) && len(p.RootCRLs) == 0 {
+		p.fetchAndroidCRL()
 	}
 
 	p.ctl, err = NewController(p, p.Claims, config, p.Options)
 	return
 }
 
-const ANDROID_ATTESTATION_STATUS_URL = "https://android.googleapis.com/attestation/status"
+const androidAttestationStatusURL = "https://android.googleapis.com/attestation/status"
 
 // fetch CRL https://android.googleapis.com/attestation/status and build a list of revoked serial numbers
 func (p *ACME) fetchAndroidCRL() error {
 	log.Printf("Updating Android CRL list for %s ACME provisioner", p.Name)
-	var CRLResponse struct {
+	var crlResponse struct {
 		Entries map[string]struct {
 			Status string `json:"status"`
 			Reason string `json:"reason"`
 		} `json:"entries"`
 	}
-	res, err := http.Get(ANDROID_ATTESTATION_STATUS_URL)
+	res, err := p.ctl.httpClient.Get(androidAttestationStatusURL)
 	if err != nil {
 		return fmt.Errorf("client: error making Android CRL request: %s\n", err)
 	}
@@ -444,12 +444,12 @@ func (p *ACME) GetAttestationRoots() (*x509.CertPool, bool) {
 	return p.attestationRootPool, p.attestationRootPool != nil
 }
 
-// IsRootRevoked returns true if the provided serialNumber is in the list of revoked 
+// IsRootRevoked returns true if the provided serialNumber is in the list of revoked
 // certificate serial number.
 // It will also be in charge of updating the list periodically if no CRL list is provided at configuration.
 func (p *ACME) IsRootRevoked(serialNumber string) bool {
 	if slices.Contains(p.AttestationFormats, "android-key") && !p.androidCRLTimeout.IsZero() && time.Now().After(p.androidCRLTimeout) {
-		p.initializeAndroidCRL()
+		p.fetchAndroidCRL()
 	}
 	return len(p.RootCRLs) > 0 && slices.Contains(p.RootCRLs, serialNumber)
 }

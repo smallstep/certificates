@@ -1515,7 +1515,7 @@ func doAndroidKeyAttestionFormat(_ context.Context, prov Provisioner, ch *Challe
 	if _, err := leaf.Verify(x509.VerifyOptions{
 		Intermediates: intermediates,
 		Roots:         roots,
-		CurrentTime:   time.Now().Add(2 * time.Second).Truncate(time.Second),
+		CurrentTime:   time.Now(),
 		KeyUsages:     []x509.ExtKeyUsage{x509.ExtKeyUsageCodeSigning},
 	}); err != nil {
 		return nil, WrapDetailedError(ErrorBadAttestationStatementType, err, "x5c chain verification failed")
@@ -1582,7 +1582,7 @@ func doAndroidKeyAttestionFormat(_ context.Context, prov Provisioner, ch *Challe
 
 	// validate challenge
 	if string(data.Attestation.AttestationChallenge) != keyAuth {
-		return nil, NewDetailedError(ErrorBadAttestationStatementType, fmt.Sprintf("challenge mismatch; expected %q, got %q", keyAuth, string(data.Attestation.AttestationChallenge))
+		return nil, NewDetailedError(ErrorBadAttestationStatementType, fmt.Sprintf("challenge mismatch; expected %q, got %q", keyAuth, string(data.Attestation.AttestationChallenge)))
 	}
 
 	return data, nil
