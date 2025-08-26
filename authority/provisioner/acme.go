@@ -444,7 +444,8 @@ func (p *ACME) GetAttestationRoots() (*x509.CertPool, bool) {
 	return p.attestationRootPool, p.attestationRootPool != nil
 }
 
-// IsRootRevoked return a true if the serialNumber is part of the list
+// IsRootRevoked returns true if the provided serialNumber is in the list of revoked 
+// certificate serial number.
 // It will also be in charge of updating the list periodically if no CRL list is provided at configuration.
 func (p *ACME) IsRootRevoked(serialNumber string) bool {
 	if slices.Contains(p.AttestationFormats, "android-key") && !p.androidCRLTimeout.IsZero() && time.Now().After(p.androidCRLTimeout) {
