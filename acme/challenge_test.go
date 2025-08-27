@@ -150,19 +150,14 @@ func mustAttestAndroid(t *testing.T, keyAuthorization string) ([]byte, *x509.Cer
 		},
 	}
 	attestByte, err := attestation.CreateKeyDescription(&atts)
-	if err != nil {
-		fatalError(t, err)
-	}
+	fatalError(t, err)
 
-	block, _ := pem.Decode([]byte(AndroidRootCAPubKey))
-	trustedPubKey, err := x509.ParsePKIXPublicKey(block.Bytes)
+	root, err := pemutil.ParseCertificate([]byte(AndroidRootCARSA))
+	fatalError(t, err)
 
 	rootAndroid, err := ca.Sign(&x509.Certificate{
 		Subject:   pkix.Name{CommonName: "attestation cert"},
-		PublicKey: trustedPubKey,
-		Extensions: []pkix.Extension{
-			{Id: oidAndroidAttestation, Value: attestByte},
-		},
+		PublicKey: root.PublicKey,
 	})
 
 	leaf, err := ca.Sign(&x509.Certificate{
@@ -175,12 +170,12 @@ func mustAttestAndroid(t *testing.T, keyAuthorization string) ([]byte, *x509.Cer
 	fatalError(t, err)
 
 	attObj, err := cbor.Marshal(struct {
-		Format       string                 `json:"fmt"`
-		AttStatement map[string]interface{} `json:"attStmt,omitempty"`
+		Format       string         `json:"fmt"`
+		AttStatement map[string]any `json:"attStmt,omitempty"`
 	}{
 		Format: "android-key",
-		AttStatement: map[string]interface{}{
-			"x5c": []interface{}{leaf.Raw, ca.Intermediate.Raw, rootAndroid},
+		AttStatement: map[string]any{
+			"x5c": []any{leaf.Raw, ca.Intermediate.Raw, rootAndroid.Raw},
 		},
 	})
 	fatalError(t, err)
@@ -4569,7 +4564,6 @@ func Test_deviceAttest01Validate(t *testing.T) {
 
 			jwk, keyAuth := mustAccountAndKeyAuthorization(t, "token")
 			payload, _, root, attestationRoot := mustAttestAndroid(t, keyAuth)
-
 			caRoot := pem.EncodeToMemory(&pem.Block{Type: "CERTIFICATE", Bytes: root.Raw})
 			ctx := NewProvisionerContext(context.Background(), mustNonCRLAttestationProvisioner(t, caRoot, []string{attestationRoot.SerialNumber.String()}))
 			return test{

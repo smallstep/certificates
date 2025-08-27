@@ -246,7 +246,8 @@ func (p *ACME) fetchAndroidCRL() error {
 			Reason string `json:"reason"`
 		} `json:"entries"`
 	}
-	res, err := p.ctl.httpClient.Get(androidAttestationStatusURL)
+	// res, err := p.ctl.GetHTTPClient().Get(androidAttestationStatusURL)
+	res, err := http.Get(androidAttestationStatusURL)
 	if err != nil {
 		return fmt.Errorf("client: error making Android CRL request: %s\n", err)
 	}
@@ -444,10 +445,10 @@ func (p *ACME) GetAttestationRoots() (*x509.CertPool, bool) {
 	return p.attestationRootPool, p.attestationRootPool != nil
 }
 
-// IsRootRevoked returns true if the provided serialNumber is in the list of revoked
+// IsCertificateRevoked returns true if the provided serialNumber is in the list of revoked
 // certificate serial number.
 // It will also be in charge of updating the list periodically if no CRL list is provided at configuration.
-func (p *ACME) IsRootRevoked(serialNumber string) bool {
+func (p *ACME) IsCertificateRevoked(serialNumber string) bool {
 	if slices.Contains(p.AttestationFormats, ANDROIDKEY) && !p.androidCRLTimeout.IsZero() && time.Now().After(p.androidCRLTimeout) {
 		p.fetchAndroidCRL()
 	}
