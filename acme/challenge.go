@@ -857,12 +857,12 @@ func deviceAttest01Validate(ctx context.Context, ch *Challenge, db DB, jwk *jose
 			return WrapErrorISE(err, "error validating attestation")
 		}
 
-		// 1. attestationSecurityLevel > 0
+		// 1. attestationSecurityLevel > 0 (TrustedEnvironment or Strongbox)
 		if data.Attestation.AttestationSecurityLevel < 1 {
 			return storeError(ctx, db, ch, true, NewDetailedError(ErrorBadAttestationStatementType, "security level does not match"))
 		}
 
-		// 2. hardwareEnforced
+		// 2. validate teeEnforced device identifier against permanent-identifier
 		if ch.Value != string(data.Attestation.TeeEnforced.AttestationIdSerial) {
 			subproblem := NewSubproblemWithIdentifier(
 				ErrorRejectedIdentifierType,
@@ -1483,6 +1483,7 @@ uR2zh/80lQyu9vAFCj6E4AXc+osmRg==`
 // OID for the Android attestation extension
 // https://source.android.com/docs/security/features/keystore/attestation#id-attestation
 var oidAndroidAttestation = asn1.ObjectIdentifier{1, 3, 6, 1, 4, 1, 11129, 2, 1, 17}
+var oidAndroidProvisionningAttestation = asn1.ObjectIdentifier{1, 3, 6, 1, 4, 1, 11129, 2, 1, 30}
 
 type androidKeyAttestationData struct {
 	Certificate *x509.Certificate
@@ -1490,15 +1491,13 @@ type androidKeyAttestationData struct {
 	Attestation *attestation.KeyDescription
 }
 
-func findAndroidAttestationCert(certs []*x509.Certificate) (*x509.Certificate, error) {
-	for _, cert := range certs {
-		for _, ext := range cert.Extensions {
-			if ext.Id.Equal(oidAndroidAttestation) {
-				return cert, nil
-			}
+func hasAndroidAttestation(cert *x509.Certificate) bool {
+	for _, ext := range cert.Extensions {
+		if ext.Id.Equal(oidAndroidAttestation) {
+			return true
 		}
 	}
-	return nil, errors.New("no attestation certificate with OID 1.3.6.1.4.1.11129.2.1.17 found in the cert chain")
+	return false
 }
 
 // https://developer.android.com/privacy-and-security/security-key-attestation
@@ -1521,6 +1520,9 @@ func doAndroidKeyAttestionFormat(_ context.Context, prov Provisioner, ch *Challe
 	if len(x5c) == 0 {
 		return nil, NewDetailedError(ErrorRejectedIdentifierType, "x5c is empty")
 	}
+	if len(x5c) < 3 {
+		return nil, NewDetailedError(ErrorBadAttestationStatementType, "at least 3 certificates are required")
+	}
 	der, ok := x5c[0].([]byte)
 	if !ok {
 		return nil, NewDetailedError(ErrorBadAttestationStatementType, "x5c is malformed")
@@ -1529,6 +1531,10 @@ func doAndroidKeyAttestionFormat(_ context.Context, prov Provisioner, ch *Challe
 	if err != nil {
 		return nil, WrapDetailedError(ErrorBadAttestationStatementType, err, "failed parsing leaf certificate")
 	}
+	if !hasAndroidAttestation(leaf) {
+		return nil, NewDetailedError(ErrorBadAttestationStatementType, "leaf certificate do not contains attestation")
+	}
+
 	certs = append(certs, leaf)
 
 	// Parse intermediates and root
@@ -1573,6 +1579,7 @@ func doAndroidKeyAttestionFormat(_ context.Context, prov Provisioner, ch *Challe
 			if err != nil {
 				return nil, WrapErrorISE(err, "error parsing root ca")
 			}
+			// 1. verify public key
 			if !root.PublicKey.(*rsa.PublicKey).Equal(rsaRoot.PublicKey) {
 				return nil, NewDetailedError(ErrorBadAttestationStatementType, "root certificate not signed by Google")
 			}
@@ -1590,10 +1597,11 @@ func doAndroidKeyAttestionFormat(_ context.Context, prov Provisioner, ch *Challe
 		default:
 			return nil, NewDetailedError(ErrorBadAttestationStatementType, "invalid root certificate key type")
 		}
+		// 2. validate root certificate
 		if _, err := root.Verify(x509.VerifyOptions{
 			Roots:       attestationRoots,
 			CurrentTime: time.Now(),
-			KeyUsages:   []x509.ExtKeyUsage{x509.ExtKeyUsageCodeSigning},
+			KeyUsages:   []x509.ExtKeyUsage{x509.ExtKeyUsageAny},
 		}); err != nil {
 			return nil, WrapDetailedError(ErrorBadAttestationStatementType, err, "root certificate not signed by Google")
 		}
@@ -1601,7 +1609,7 @@ func doAndroidKeyAttestionFormat(_ context.Context, prov Provisioner, ch *Challe
 		if _, err := root.Verify(x509.VerifyOptions{
 			Roots:       attestationRoots,
 			CurrentTime: time.Now(),
-			KeyUsages:   []x509.ExtKeyUsage{x509.ExtKeyUsageCodeSigning},
+			KeyUsages:   []x509.ExtKeyUsage{x509.ExtKeyUsageAny},
 		}); err != nil {
 			return nil, WrapDetailedError(ErrorBadAttestationStatementType, err, "root certificate not signed by provided roots")
 		}
@@ -1615,7 +1623,7 @@ func doAndroidKeyAttestionFormat(_ context.Context, prov Provisioner, ch *Challe
 		Intermediates: intermediates,
 		Roots:         roots,
 		CurrentTime:   time.Now(),
-		KeyUsages:     []x509.ExtKeyUsage{x509.ExtKeyUsageCodeSigning},
+		KeyUsages:     []x509.ExtKeyUsage{x509.ExtKeyUsageAny},
 	}); err != nil {
 		return nil, WrapDetailedError(ErrorBadAttestationStatementType, err, "x5c chain verification failed")
 	}
@@ -1633,10 +1641,11 @@ func doAndroidKeyAttestionFormat(_ context.Context, prov Provisioner, ch *Challe
 
 	// Parse attestation data:
 	// find the attestation certificate
-	attCert, err := findAndroidAttestationCert(certs)
-	if err != nil {
-		return nil, WrapDetailedError(ErrorBadAttestationStatementType, err, "")
-	}
+	// attCert, err := findAndroidAttestationCert(certs)
+	// if err != nil {
+	// 	return nil, WrapDetailedError(ErrorBadAttestationStatementType, err, "")
+	// }
+	attCert := leaf
 
 	switch pub := attCert.PublicKey.(type) {
 	case *ecdsa.PublicKey:

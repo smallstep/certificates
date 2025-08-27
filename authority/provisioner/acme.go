@@ -126,13 +126,13 @@ type ACME struct {
 	// AttestationRoots contains a bundle of root certificates in PEM format
 	// that will be used to verify the attestation certificates. If provided,
 	// this bundle will be used even for well-known CAs like Apple and Yubico.
-	AttestationRoots    []byte   `json:"attestationRoots,omitempty"`
-	Claims              *Claims  `json:"claims,omitempty"`
-	Options             *Options `json:"options,omitempty"`
-	RootCRLs            []string `json:"rootCRLs,omitempty"`
-	androidCRLTimeout   time.Time
-	attestationRootPool *x509.CertPool
-	ctl                 *Controller
+	AttestationRoots          []byte   `json:"attestationRoots,omitempty"`
+	Claims                    *Claims  `json:"claims,omitempty"`
+	Options                   *Options `json:"options,omitempty"`
+	RevokedCertificateSerials []string `json:"revokedCertificateSerials,omitempty"`
+	androidCRLTimeout         time.Time
+	attestationRootPool       *x509.CertPool
+	ctl                       *Controller
 }
 
 // GetID returns the provisioner unique identifier.
@@ -227,7 +227,7 @@ func (p *ACME) Init(config Config) (err error) {
 		return fmt.Errorf("failed initializing Wire options: %w", err)
 	}
 
-	if slices.Contains(p.AttestationFormats, ANDROIDKEY) && len(p.RootCRLs) == 0 {
+	if slices.Contains(p.AttestationFormats, ANDROIDKEY) && len(p.RevokedCertificateSerials) == 0 {
 		p.fetchAndroidCRL()
 	}
 
@@ -267,7 +267,7 @@ func (p *ACME) fetchAndroidCRL() error {
 	for k := range crlResponse.Entries {
 		keys = append(keys, k)
 	}
-	p.RootCRLs = keys
+	p.RevokedCertificateSerials = keys
 	p.androidCRLTimeout = time.Now().Add(24 * time.Hour)
 	return nil
 }
@@ -452,5 +452,5 @@ func (p *ACME) IsCertificateRevoked(serialNumber string) bool {
 	if slices.Contains(p.AttestationFormats, ANDROIDKEY) && !p.androidCRLTimeout.IsZero() && time.Now().After(p.androidCRLTimeout) {
 		p.fetchAndroidCRL()
 	}
-	return slices.Contains(p.RootCRLs, serialNumber)
+	return slices.Contains(p.RevokedCertificateSerials, serialNumber)
 }
