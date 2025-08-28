@@ -532,6 +532,13 @@ func (a *Authority) init() error {
 			switch s := signer.(type) {
 			case *sshagentkms.WrappedSSHSigner:
 				a.sshCAHostCertSignKey = s.Signer
+			case *instrumentedKMSSigner:
+				switch is := s.Signer.(type) {
+				case *sshagentkms.WrappedSSHSigner:
+					a.sshCAHostCertSignKey = is.Signer
+				default:
+					a.sshCAHostCertSignKey, err = ssh.NewSignerFromSigner(s)
+				}
 			case crypto.Signer:
 				a.sshCAHostCertSignKey, err = ssh.NewSignerFromSigner(s)
 			default:
@@ -558,6 +565,13 @@ func (a *Authority) init() error {
 			switch s := signer.(type) {
 			case *sshagentkms.WrappedSSHSigner:
 				a.sshCAUserCertSignKey = s.Signer
+			case *instrumentedKMSSigner:
+				switch is := s.Signer.(type) {
+				case *sshagentkms.WrappedSSHSigner:
+					a.sshCAUserCertSignKey = is.Signer
+				default:
+					a.sshCAUserCertSignKey, err = ssh.NewSignerFromSigner(s)
+				}
 			case crypto.Signer:
 				a.sshCAUserCertSignKey, err = ssh.NewSignerFromSigner(s)
 			default:
