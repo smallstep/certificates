@@ -1412,9 +1412,14 @@ roRcFD354g7rKfu67qFAw9gC4yi0xBTPrY95rh4/HqaUYCA/L8ldRk6H7Xk35D+W
 Vpmq2Sh/xT5HiFuhf4wJb0bK
 -----END CERTIFICATE-----`
 
-// Serial number of the YubiKey, encoded as an integer.
-// https://developers.yubico.com/PIV/Introduction/PIV_attestation.html
-var oidYubicoSerialNumber = asn1.ObjectIdentifier{1, 3, 6, 1, 4, 1, 41482, 3, 7}
+var (
+	// serial number of the YubiKey, encoded as an integer.
+	// https://developers.yubico.com/PIV/Introduction/PIV_attestation.html
+	oidYubicoSerialNumber = asn1.ObjectIdentifier{1, 3, 6, 1, 4, 1, 41482, 3, 7}
+
+	// custom Smallstep managed device extension carrying a device ID or serial number
+	oidStepManagedDevice = asn1.ObjectIdentifier{1, 3, 6, 1, 4, 1, 37476, 9000, 64, 4}
+)
 
 type stepAttestationData struct {
 	Certificate  *x509.Certificate
@@ -1524,16 +1529,27 @@ func doStepAttestationFormat(_ context.Context, prov Provisioner, ch *Challenge,
 		return nil, WrapErrorISE(err, "error calculating key fingerprint")
 	}
 	for _, ext := range leaf.Extensions {
-		if !ext.Id.Equal(oidYubicoSerialNumber) {
-			continue
+		if ext.Id.Equal(oidYubicoSerialNumber) {
+			var serialNumber int
+			rest, err := asn1.Unmarshal(ext.Value, &serialNumber)
+			if err != nil || len(rest) > 0 {
+				return nil, WrapError(ErrorBadAttestationStatementType, err, "error parsing serial number")
+			}
+			data.SerialNumber = strconv.Itoa(serialNumber)
+			break
 		}
-		var serialNumber int
-		rest, err := asn1.Unmarshal(ext.Value, &serialNumber)
-		if err != nil || len(rest) > 0 {
-			return nil, WrapError(ErrorBadAttestationStatementType, err, "error parsing serial number")
+		if ext.Id.Equal(oidStepManagedDevice) {
+			type stepManagedDevice struct {
+				DeviceID string
+			}
+			var md stepManagedDevice
+			rest, err := asn1.Unmarshal(ext.Value, &md)
+			if err != nil || len(rest) > 0 {
+				return nil, WrapError(ErrorBadAttestationStatementType, err, "error parsing serial number")
+			}
+			data.SerialNumber = md.DeviceID
+			break
 		}
-		data.SerialNumber = strconv.Itoa(serialNumber)
-		break
 	}
 
 	return data, nil
