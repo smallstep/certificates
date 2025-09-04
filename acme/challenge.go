@@ -22,6 +22,7 @@ import (
 	"net"
 	"net/url"
 	"reflect"
+	"slices"
 	"strconv"
 	"strings"
 	"time"
@@ -29,12 +30,12 @@ import (
 	"github.com/coreos/go-oidc/v3/oidc"
 	"github.com/fxamacker/cbor/v2"
 	"github.com/google/go-tpm/legacy/tpm2"
+
 	"github.com/smallstep/go-attestation/attest"
 	"go.step.sm/crypto/jose"
 	"go.step.sm/crypto/keyutil"
 	"go.step.sm/crypto/pemutil"
 	"go.step.sm/crypto/x509util"
-	"golang.org/x/exp/slices"
 
 	"github.com/smallstep/certificates/acme/wire"
 	"github.com/smallstep/certificates/authority/provisioner"
@@ -1525,18 +1526,30 @@ func doStepAttestationFormat(_ context.Context, prov Provisioner, ch *Challenge,
 	data := &stepAttestationData{
 		Certificate: leaf,
 	}
+
 	if data.Fingerprint, err = keyutil.Fingerprint(leaf.PublicKey); err != nil {
 		return nil, WrapErrorISE(err, "error calculating key fingerprint")
 	}
-	for _, ext := range leaf.Extensions {
+
+	if data.SerialNumber, err = searchSerialNumber(leaf); err != nil {
+		return nil, WrapErrorISE(err, "error finding serial number")
+	}
+
+	return data, nil
+}
+
+// searchSerialNumber searches the certificate extensions, looking for a serial
+// number encoded in one of them. It is not guaranteed that a certificate contains
+// an extension carrying a serial number, so the result can be empty.
+func searchSerialNumber(cert *x509.Certificate) (string, error) {
+	for _, ext := range cert.Extensions {
 		if ext.Id.Equal(oidYubicoSerialNumber) {
 			var serialNumber int
 			rest, err := asn1.Unmarshal(ext.Value, &serialNumber)
 			if err != nil || len(rest) > 0 {
-				return nil, WrapError(ErrorBadAttestationStatementType, err, "error parsing serial number")
+				return "", WrapError(ErrorBadAttestationStatementType, err, "error parsing serial number")
 			}
-			data.SerialNumber = strconv.Itoa(serialNumber)
-			break
+			return strconv.Itoa(serialNumber), nil
 		}
 		if ext.Id.Equal(oidStepManagedDevice) {
 			type stepManagedDevice struct {
@@ -1545,14 +1558,13 @@ func doStepAttestationFormat(_ context.Context, prov Provisioner, ch *Challenge,
 			var md stepManagedDevice
 			rest, err := asn1.Unmarshal(ext.Value, &md)
 			if err != nil || len(rest) > 0 {
-				return nil, WrapError(ErrorBadAttestationStatementType, err, "error parsing serial number")
+				return "", WrapError(ErrorBadAttestationStatementType, err, "error parsing serial number")
 			}
-			data.SerialNumber = md.DeviceID
-			break
+			return md.DeviceID, nil
 		}
 	}
 
-	return data, nil
+	return "", nil
 }
 
 // serverName determines the SNI HostName to set based on an acme.Challenge

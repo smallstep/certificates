@@ -31,16 +31,18 @@ import (
 	"time"
 
 	"github.com/fxamacker/cbor/v2"
-	"github.com/smallstep/certificates/authority/config"
-	"github.com/smallstep/certificates/authority/provisioner"
-	wireprovisioner "github.com/smallstep/certificates/authority/provisioner/wire"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+
 	"go.step.sm/crypto/jose"
 	"go.step.sm/crypto/keyutil"
 	"go.step.sm/crypto/minica"
 	"go.step.sm/crypto/pemutil"
 	"go.step.sm/crypto/x509util"
+
+	"github.com/smallstep/certificates/authority/config"
+	"github.com/smallstep/certificates/authority/provisioner"
+	wireprovisioner "github.com/smallstep/certificates/authority/provisioner/wire"
 )
 
 type mockClient struct {
