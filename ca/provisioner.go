@@ -1,6 +1,7 @@
 package ca
 
 import (
+	"encoding/base64"
 	"encoding/json"
 	"net/url"
 	"time"
@@ -179,7 +180,15 @@ func (p *Provisioner) SSHToken(certType, keyID string, principals []string) (str
 	return tok.SignedString(p.jwk.Algorithm, p.jwk.Key)
 }
 
-func decryptProvisionerJWK(encryptedKey string, password []byte) (*jose.JSONWebKey, error) {
+func decryptProvisionerJWK(encryptedKeyEnc string, password []byte) (*jose.JSONWebKey, error) {
+	var encryptedKey string
+	encryptedKey_bytes, err := base64.StdEncoding.DecodeString(encryptedKeyEnc)
+	if err != nil {
+		encryptedKey = encryptedKeyEnc
+		return nil, errors.Wrap(err, "Could not decode the encryted key. Passing it through directly")
+	} else {
+		encryptedKey = string(encryptedKey_bytes)
+	}
 	enc, err := jose.ParseEncrypted(encryptedKey)
 	if err != nil {
 		return nil, errors.Wrap(err, "error parsing provisioner encrypted key")
