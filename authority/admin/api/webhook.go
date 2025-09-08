@@ -202,7 +202,7 @@ func (war *webhookAdminResponder) UpdateProvisionerWebhook(w http.ResponseWriter
 	}
 	if !found {
 		msg := fmt.Sprintf("provisioner %q has no webhook with the name %q", prov.Name, newWebhook.Name)
-		err := admin.NewError(admin.ErrorNotFoundType, msg)
+		err := admin.NewError(admin.ErrorNotFoundType, "%s", msg)
 		render.Error(w, r, err)
 		return
 	}
