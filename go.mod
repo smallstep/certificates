@@ -4,7 +4,7 @@ go 1.23.7
 
 require (
 	cloud.google.com/go/longrunning v0.6.7
-	cloud.google.com/go/security v1.19.0
+	cloud.google.com/go/security v1.19.1
 	github.com/Masterminds/sprig/v3 v3.3.0
 	github.com/ccoveille/go-safecast v1.6.1
 	github.com/coreos/go-oidc/v3 v3.15.0
@@ -39,7 +39,6 @@ require (
 	go.step.sm/crypto v0.70.0
 	go.uber.org/mock v0.6.0
 	golang.org/x/crypto v0.41.0
-	golang.org/x/exp v0.0.0-20250620022241-b7579e27df2b
 	golang.org/x/net v0.43.0
 	golang.org/x/sync v0.16.0
 	google.golang.org/api v0.248.0
@@ -167,7 +166,7 @@ require (
 	golang.org/x/time v0.12.0 // indirect
 	golang.org/x/tools v0.36.0 // indirect
 	google.golang.org/genproto v0.0.0-20250603155806-513f23925822 // indirect
-	google.golang.org/genproto/googleapis/api v0.0.0-20250707201910-8d1bb00bc6a7 // indirect
+	google.golang.org/genproto/googleapis/api v0.0.0-20250818200422-3122310a409c // indirect
 	google.golang.org/genproto/googleapis/rpc v0.0.0-20250818200422-3122310a409c // indirect
 	google.golang.org/grpc/cmd/protoc-gen-go-grpc v1.5.1 // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
