@@ -1500,6 +1500,15 @@ func hasAndroidAttestation(cert *x509.Certificate) bool {
 	return false
 }
 
+func findAndroidAttestationCert(intermediates []*x509.Certificate) (*x509.Certificate, error) {
+	for _, cert := range intermediates {
+		if hasAndroidAttestation(cert) {
+			return cert, nil
+		}
+	}
+	return nil, errors.New("no attestation certificate with OID 1.3.6.1.4.1.11129.2.1.17 found in the cert chain")
+}
+
 // https://developer.android.com/privacy-and-security/security-key-attestation
 // 3. Verify that the root public certificate is trustworthy and that each certificate signs the next certificate in the chain.
 // 4. Check each certificate's revocation status to ensure that none of the certificates have been revoked.
@@ -1640,12 +1649,11 @@ func doAndroidKeyAttestionFormat(_ context.Context, prov Provisioner, ch *Challe
 	}
 
 	// Parse attestation data:
-	// find the attestation certificate
-	// attCert, err := findAndroidAttestationCert(certs)
-	// if err != nil {
-	// 	return nil, WrapDetailedError(ErrorBadAttestationStatementType, err, "")
-	// }
-	attCert := leaf
+	// find the nearest attestation certificate
+	attCert, err := findAndroidAttestationCert(certs)
+	if err != nil {
+		return nil, WrapDetailedError(ErrorBadAttestationStatementType, err, "")
+	}
 
 	switch pub := attCert.PublicKey.(type) {
 	case *ecdsa.PublicKey:
