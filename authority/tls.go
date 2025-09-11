@@ -197,7 +197,7 @@ func (a *Authority) signX509(ctx context.Context, csr *x509.CertificateRequest, 
 
 	if err := a.callEnrichingWebhooksX509(ctx, prov, webhookCtl, attData, csr); err != nil {
 		return nil, prov, errs.ApplyOptions(
-			errs.ForbiddenErr(err, err.Error()),
+			errs.ForbiddenErr(err, "%s", err.Error()),
 			errs.WithKeyVal("csr", csr),
 			errs.WithKeyVal("signOptions", signOpts),
 		)
@@ -209,7 +209,7 @@ func (a *Authority) signX509(ctx context.Context, csr *x509.CertificateRequest, 
 		switch {
 		case errors.As(err, &te):
 			return nil, prov, errs.ApplyOptions(
-				errs.BadRequestErr(err, err.Error()),
+				errs.BadRequestErr(err, "%s", err.Error()),
 				errs.WithKeyVal("csr", csr),
 				errs.WithKeyVal("signOptions", signOpts),
 			)
