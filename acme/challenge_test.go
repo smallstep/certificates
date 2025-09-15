@@ -31,6 +31,10 @@ import (
 	"time"
 
 	"github.com/fxamacker/cbor/v2"
+	"github.com/mbreban/attestation"
+	"github.com/smallstep/certificates/authority/config"
+	"github.com/smallstep/certificates/authority/provisioner"
+	wireprovisioner "github.com/smallstep/certificates/authority/provisioner/wire"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
@@ -39,10 +43,6 @@ import (
 	"go.step.sm/crypto/minica"
 	"go.step.sm/crypto/pemutil"
 	"go.step.sm/crypto/x509util"
-
-	"github.com/smallstep/certificates/authority/config"
-	"github.com/smallstep/certificates/authority/provisioner"
-	wireprovisioner "github.com/smallstep/certificates/authority/provisioner/wire"
 )
 
 type mockClient struct {
@@ -98,6 +98,24 @@ func mustAttestationProvisioner(t *testing.T, roots []byte) Provisioner {
 	return prov
 }
 
+func mustNonCRLAttestationProvisioner(t *testing.T, roots []byte, CRLs []string) Provisioner {
+	t.Helper()
+
+	prov := &provisioner.ACME{
+		Type:                      "ACME",
+		Name:                      "acme",
+		Challenges:                []provisioner.ACMEChallenge{provisioner.DEVICE_ATTEST_01},
+		AttestationRoots:          roots,
+		RevokedCertificateSerials: CRLs,
+	}
+	if err := prov.Init(provisioner.Config{
+		Claims: config.GlobalProvisionerClaims,
+	}); err != nil {
+		t.Fatal(err)
+	}
+	return prov
+}
+
 func mustAccountAndKeyAuthorization(t *testing.T, token string) (*jose.JSONWebKey, string) {
 	t.Helper()
 
@@ -107,6 +125,62 @@ func mustAccountAndKeyAuthorization(t *testing.T, token string) (*jose.JSONWebKe
 	keyAuth, err := KeyAuthorization(token, jwk)
 	fatalError(t, err)
 	return jwk, keyAuth
+}
+
+func mustAttestAndroid(t *testing.T, keyAuthorization string) ([]byte, *x509.Certificate, *x509.Certificate) {
+	t.Helper()
+
+	ca, err := minica.New()
+	fatalError(t, err)
+
+	signer, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
+	fatalError(t, err)
+
+	keyAuthSum := sha256.Sum256([]byte(keyAuthorization))
+	fatalError(t, err)
+
+	sig, err := signer.Sign(rand.Reader, keyAuthSum[:], crypto.SHA256)
+	fatalError(t, err)
+
+	atts := attestation.KeyDescription{
+		AttestationVersion:       300,
+		AttestationSecurityLevel: 1,
+		AttestationChallenge:     sig,
+		TeeEnforced: attestation.AuthorizationList{
+			AttestationIdSerial: []byte("serial-number"),
+		},
+	}
+	attestByte, err := attestation.CreateKeyDescription(&atts)
+	fatalError(t, err)
+
+	leaf, err := ca.Sign(&x509.Certificate{
+		Subject:   pkix.Name{CommonName: "attestation cert"},
+		PublicKey: signer.Public(),
+		ExtraExtensions: []pkix.Extension{
+			{Id: oidAndroidAttestation, Value: attestByte},
+		},
+	})
+	fatalError(t, err)
+
+	attObj, err := cbor.Marshal(struct {
+		Format       string         `json:"fmt"`
+		AttStatement map[string]any `json:"attStmt,omitempty"`
+	}{
+		Format: "android-key",
+		AttStatement: map[string]any{
+			"x5c": []any{leaf.Raw, ca.Intermediate.Raw, ca.Root.Raw},
+		},
+	})
+	fatalError(t, err)
+
+	payload, err := json.Marshal(struct {
+		AttObj string `json:"attObj"`
+	}{
+		AttObj: base64.RawURLEncoding.EncodeToString(attObj),
+	})
+	require.NoError(t, err)
+
+	return payload, leaf, ca.Root
 }
 
 func mustAttestApple(t *testing.T, nonce string) ([]byte, *x509.Certificate, *x509.Certificate) {
@@ -4489,6 +4563,95 @@ func Test_deviceAttest01Validate(t *testing.T) {
 								`challenge identifier "non-matching-value" doesn't match any of the attested hardware identifiers ["udid" "serial-number"]`,
 							)
 							err := NewDetailedError(ErrorBadAttestationStatementType, "permanent identifier does not match").AddSubproblems(subproblem)
+
+							assert.EqualError(t, updch.Error.Err, err.Err.Error())
+							assert.Equal(t, err.Type, updch.Error.Type)
+							assert.Equal(t, err.Detail, updch.Error.Detail)
+							assert.Equal(t, err.Status, updch.Error.Status)
+							assert.Equal(t, err.Subproblems, updch.Error.Subproblems)
+
+							return nil
+						},
+					},
+				},
+				wantErr: nil,
+			}
+		},
+		"ok/doAndroidAttestationFormat": func(t *testing.T) test {
+
+			jwk, keyAuth := mustAccountAndKeyAuthorization(t, "token")
+			payload, _, root := mustAttestAndroid(t, keyAuth)
+
+			caRoot := pem.EncodeToMemory(&pem.Block{Type: "CERTIFICATE", Bytes: root.Raw})
+			ctx := NewProvisionerContext(context.Background(), mustAttestationProvisioner(t, caRoot))
+			return test{
+				args: args{
+					ctx: ctx,
+					jwk: jwk,
+					ch: &Challenge{
+						ID:              "chID",
+						AuthorizationID: "azID",
+						Token:           "nonce",
+						Type:            "device-attest-01",
+						Status:          StatusPending,
+						Value:           "serial-number",
+					},
+					payload: payload,
+					db: &MockDB{
+						MockGetAuthorization: func(ctx context.Context, id string) (*Authorization, error) {
+							assert.Equal(t, "azID", id)
+							return &Authorization{ID: "azID"}, nil
+						},
+						MockUpdateChallenge: func(ctx context.Context, updch *Challenge) error {
+							assert.Equal(t, "chID", updch.ID)
+							assert.Equal(t, "nonce", updch.Token)
+							assert.Equal(t, StatusInvalid, updch.Status)
+							assert.Equal(t, ChallengeType("device-attest-01"), updch.Type)
+							assert.Equal(t, "serial-number", updch.Value)
+							assert.Nil(t, updch.Payload)
+							assert.Empty(t, updch.PayloadFormat)
+
+							return nil
+						},
+					},
+				},
+				wantErr: nil,
+			}
+		},
+		"ok/doAndroidAttestationFormat-invalid-root": func(t *testing.T) test {
+
+			jwk, keyAuth := mustAccountAndKeyAuthorization(t, "token")
+			payload, _, root := mustAttestAndroid(t, keyAuth)
+			caRoot := pem.EncodeToMemory(&pem.Block{Type: "CERTIFICATE", Bytes: root.Raw})
+			ctx := NewProvisionerContext(context.Background(), mustNonCRLAttestationProvisioner(t, caRoot, []string{root.SerialNumber.String()}))
+			return test{
+				args: args{
+					ctx: ctx,
+					jwk: jwk,
+					ch: &Challenge{
+						ID:              "chID",
+						AuthorizationID: "azID",
+						Token:           "nonce",
+						Type:            "device-attest-01",
+						Status:          StatusPending,
+						Value:           "serial-number",
+					},
+					payload: payload,
+					db: &MockDB{
+						MockGetAuthorization: func(ctx context.Context, id string) (*Authorization, error) {
+							assert.Equal(t, "azID", id)
+							return &Authorization{ID: "azID"}, nil
+						},
+						MockUpdateChallenge: func(ctx context.Context, updch *Challenge) error {
+							assert.Equal(t, "chID", updch.ID)
+							assert.Equal(t, "nonce", updch.Token)
+							assert.Equal(t, StatusInvalid, updch.Status)
+							assert.Equal(t, ChallengeType("device-attest-01"), updch.Type)
+							assert.Equal(t, "serial-number", updch.Value)
+							assert.Nil(t, updch.Payload)
+							assert.Empty(t, updch.PayloadFormat)
+
+							err := NewDetailedError(ErrorBadAttestationStatementType, "x5c element contain a revoked certificate")
 
 							assert.EqualError(t, updch.Error.Err, err.Err.Error())
 							assert.Equal(t, err.Type, updch.Error.Type)
