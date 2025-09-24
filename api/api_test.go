@@ -1754,3 +1754,217 @@ func TestIntermediatesPEM(t *testing.T) {
 		})
 	}
 }
+
+func TestNewTimeDuration(t *testing.T) {
+	testTime := time.Date(2024, 1, 1, 12, 0, 0, 0, time.UTC)
+	td := NewTimeDuration(testTime)
+
+	assert.NotNil(t, td)
+	assert.Equal(t, testTime, td.Time())
+}
+
+func TestParseTimeDuration(t *testing.T) {
+	tests := []struct {
+		name    string
+		input   string
+		wantErr bool
+	}{
+		{"valid RFC3339", "2024-01-01T12:00:00Z", false},
+		{"valid duration", "24h", false},
+		{"invalid format", "invalid", true},
+		{"empty string", "", false}, // Empty string returns empty TimeDuration, not error
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			td, err := ParseTimeDuration(tt.input)
+			if tt.wantErr {
+				assert.Error(t, err)
+			} else {
+				assert.NoError(t, err)
+				// For empty string, check if it's zero
+				if tt.input == "" {
+					assert.True(t, td.IsZero())
+				}
+			}
+		})
+	}
+}
+
+func TestCertificate_reset(t *testing.T) {
+	cert := parseCertificate(rootPEM)
+	c := &Certificate{Certificate: cert}
+
+	// Verify certificate is set
+	assert.NotNil(t, c.Certificate)
+
+	// Reset the certificate
+	c.reset()
+
+	// Verify certificate is nil
+	assert.Nil(t, c.Certificate)
+
+	// Test with nil Certificate struct
+	var nilCert *Certificate
+	nilCert.reset() // Should not panic
+}
+
+func TestCertificateRequest_reset(t *testing.T) {
+	// Create a simple CSR for testing
+	template := x509.CertificateRequest{
+		Subject: pkix.Name{CommonName: "test"},
+	}
+	key, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
+	require.NoError(t, err)
+
+	csrDER, err := x509.CreateCertificateRequest(rand.Reader, &template, key)
+	require.NoError(t, err)
+
+	csr, err := x509.ParseCertificateRequest(csrDER)
+	require.NoError(t, err)
+
+	cr := &CertificateRequest{CertificateRequest: csr}
+
+	// Verify CSR is set
+	assert.NotNil(t, cr.CertificateRequest)
+
+	// Reset the CSR
+	cr.reset()
+
+	// Verify CSR is nil
+	assert.Nil(t, cr.CertificateRequest)
+
+	// Test with nil CertificateRequest struct
+	var nilCSR *CertificateRequest
+	nilCSR.reset() // Should not panic
+}
+
+// TestCertificate_MarshalUnmarshalJSON tests the JSON marshaling and unmarshaling for Certificate
+func TestCertificate_MarshalUnmarshalJSON(t *testing.T) {
+	// Create a test certificate
+	template := &x509.Certificate{
+		SerialNumber: big.NewInt(1),
+		Subject: pkix.Name{
+			CommonName: "test-cert",
+		},
+		NotBefore: time.Now(),
+		NotAfter:  time.Now().Add(24 * time.Hour),
+	}
+
+	// Generate a key pair for the certificate
+	priv, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
+	require.NoError(t, err)
+
+	certDER, err := x509.CreateCertificate(rand.Reader, template, template, &priv.PublicKey, priv)
+	require.NoError(t, err)
+
+	cert, err := x509.ParseCertificate(certDER)
+	require.NoError(t, err)
+
+	t.Run("marshal and unmarshal valid certificate", func(t *testing.T) {
+		apiCert := NewCertificate(cert)
+
+		// Marshal to JSON
+		jsonData, err := json.Marshal(apiCert)
+		assert.NoError(t, err)
+		assert.NotEmpty(t, jsonData)
+
+		// Unmarshal from JSON
+		var unmarshaledCert Certificate
+		err = json.Unmarshal(jsonData, &unmarshaledCert)
+		assert.NoError(t, err)
+		assert.Equal(t, cert.Subject.CommonName, unmarshaledCert.Subject.CommonName)
+	})
+
+	t.Run("marshal nil certificate", func(t *testing.T) {
+		apiCert := Certificate{Certificate: nil}
+
+		jsonData, err := json.Marshal(apiCert)
+		assert.NoError(t, err)
+		assert.Equal(t, []byte("null"), jsonData)
+	})
+
+	t.Run("unmarshal null certificate", func(t *testing.T) {
+		var apiCert Certificate
+		err := json.Unmarshal([]byte("null"), &apiCert)
+		assert.NoError(t, err)
+		assert.Nil(t, apiCert.Certificate)
+	})
+
+	t.Run("unmarshal empty string certificate", func(t *testing.T) {
+		var apiCert Certificate
+		err := json.Unmarshal([]byte(`""`), &apiCert)
+		assert.NoError(t, err)
+		assert.Nil(t, apiCert.Certificate)
+	})
+
+	t.Run("unmarshal invalid JSON", func(t *testing.T) {
+		var apiCert Certificate
+		err := json.Unmarshal([]byte("invalid-json"), &apiCert)
+		assert.Error(t, err)
+		assert.Contains(t, err.Error(), "invalid character")
+	})
+
+	t.Run("unmarshal invalid PEM", func(t *testing.T) {
+		var apiCert Certificate
+		err := json.Unmarshal([]byte(`"invalid-pem-data"`), &apiCert)
+		assert.Error(t, err)
+		assert.Contains(t, err.Error(), "error decoding certificate")
+	})
+}
+
+// TestCertificateRequest_MarshalUnmarshalJSON tests the JSON marshaling and unmarshaling for CertificateRequest
+func TestCertificateRequest_MarshalUnmarshalJSON(t *testing.T) {
+	// Create a test certificate request
+	priv, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
+	require.NoError(t, err)
+
+	template := &x509.CertificateRequest{
+		Subject: pkix.Name{
+			CommonName: "test-csr",
+		},
+	}
+
+	csrDER, err := x509.CreateCertificateRequest(rand.Reader, template, priv)
+	require.NoError(t, err)
+
+	csr, err := x509.ParseCertificateRequest(csrDER)
+	require.NoError(t, err)
+
+	t.Run("marshal and unmarshal valid CSR", func(t *testing.T) {
+		apiCSR := NewCertificateRequest(csr)
+
+		// Marshal to JSON
+		jsonData, err := json.Marshal(apiCSR)
+		assert.NoError(t, err)
+		assert.NotEmpty(t, jsonData)
+
+		// Unmarshal from JSON
+		var unmarshaledCSR CertificateRequest
+		err = json.Unmarshal(jsonData, &unmarshaledCSR)
+		assert.NoError(t, err)
+		assert.Equal(t, csr.Subject.CommonName, unmarshaledCSR.Subject.CommonName)
+	})
+
+	t.Run("marshal nil CSR", func(t *testing.T) {
+		apiCSR := CertificateRequest{CertificateRequest: nil}
+
+		jsonData, err := json.Marshal(apiCSR)
+		assert.NoError(t, err)
+		assert.Equal(t, []byte("null"), jsonData)
+	})
+
+	t.Run("unmarshal null CSR", func(t *testing.T) {
+		var apiCSR CertificateRequest
+		err := json.Unmarshal([]byte("null"), &apiCSR)
+		assert.NoError(t, err)
+		assert.Nil(t, apiCSR.CertificateRequest)
+	})
+
+	t.Run("unmarshal invalid CSR PEM", func(t *testing.T) {
+		var apiCSR CertificateRequest
+		err := json.Unmarshal([]byte(`"invalid-csr-pem"`), &apiCSR)
+		assert.Error(t, err)
+		assert.Contains(t, err.Error(), "error decoding csr")
+	})
+}
