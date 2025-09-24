@@ -29,14 +29,27 @@ func (p *ProjectValidator) ValidateProject(_ context.Context, projectID string) 
 
 type OrganizationValidator struct {
 	*ProjectValidator
-	OrganizationID string
+	OrganizationID  string
+	projectsService *cloudresourcemanager.ProjectsService
 }
 
-func NewOrganizationValidator(projectIDs []string, organizationID string) *OrganizationValidator {
-	return &OrganizationValidator{
-		&ProjectValidator{projectIDs},
-		organizationID,
+func NewOrganizationValidator(projectIDs []string, organizationID string) (*OrganizationValidator, error) {
+	var svc *cloudresourcemanager.ProjectsService
+
+	if organizationID != "" {
+		crm, err := cloudresourcemanager.NewService(context.Background())
+		if err != nil {
+			return nil, err
+		}
+
+		svc = crm.Projects
 	}
+
+	return &OrganizationValidator{
+		ProjectValidator: &ProjectValidator{projectIDs},
+		OrganizationID:   organizationID,
+		projectsService:  svc,
+	}, nil
 }
 
 func (p *OrganizationValidator) ValidateProject(ctx context.Context, projectID string) error {
@@ -48,12 +61,7 @@ func (p *OrganizationValidator) ValidateProject(ctx context.Context, projectID s
 		return nil
 	}
 
-	crm, err := cloudresourcemanager.NewService(ctx)
-	if err != nil {
-		return err
-	}
-
-	ancestry, err := crm.Projects.
+	ancestry, err := p.projectsService.
 		GetAncestry(projectID, &cloudresourcemanager.GetAncestryRequest{}).
 		Context(ctx).
 		Do()

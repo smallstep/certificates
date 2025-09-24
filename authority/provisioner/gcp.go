@@ -98,9 +98,9 @@ type GCP struct {
 	ID                     string   `json:"-"`
 	Type                   string   `json:"type"`
 	Name                   string   `json:"name"`
-	ServiceAccounts        []string `json:"serviceAccounts"`
-	ProjectIDs             []string `json:"projectIDs"`
-	OrganizationID         string   `json:"organizationID"`
+	ServiceAccounts        []string `json:"serviceAccounts,omitempty"`
+	ProjectIDs             []string `json:"projectIDs,omitempty"`
+	OrganizationID         string   `json:"organizationID,omitempty"`
 	DisableCustomSANs      bool     `json:"disableCustomSANs"`
 	DisableTrustOnFirstUse bool     `json:"disableTrustOnFirstUse"`
 	DisableSSHCAUser       *bool    `json:"disableSSHCAUser,omitempty"`
@@ -245,13 +245,17 @@ func (p *GCP) Init(config Config) (err error) {
 		return
 	}
 
+	// Initialize the project validator
+	if p.projectValidator, err = gcp.NewOrganizationValidator(p.ProjectIDs, p.OrganizationID); err != nil {
+		return
+	}
+
 	config.Audiences = config.Audiences.WithFragment(p.GetIDForToken())
 
 	if p.ctl, err = NewController(p, p.Claims, config, p.Options); err != nil {
 		return
 	}
 
-	p.projectValidator = gcp.NewOrganizationValidator(p.ProjectIDs, p.OrganizationID)
 	return
 }
 
