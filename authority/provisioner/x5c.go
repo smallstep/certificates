@@ -302,7 +302,7 @@ func (p *X5C) AuthorizeSSHSign(_ context.Context, token string) ([]SignOption, e
 	// Use options in the token.
 	if opts.CertType != "" {
 		if certType, err = sshutil.CertTypeFromString(opts.CertType); err != nil {
-			return nil, errs.BadRequestErr(err, err.Error())
+			return nil, errs.BadRequestErr(err, "%s", err.Error())
 		}
 	}
 	if opts.KeyID != "" {
