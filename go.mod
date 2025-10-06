@@ -33,7 +33,7 @@ require (
 	github.com/smallstep/linkedca v0.24.0
 	github.com/smallstep/nosql v0.7.0
 	github.com/smallstep/pkcs7 v0.2.1
-	github.com/smallstep/scep v0.0.0-20240926084937-8cf1ca453101
+	github.com/smallstep/scep v0.0.0-20250318231241-a25cabb69492
 	github.com/stretchr/testify v1.11.1
 	github.com/urfave/cli v1.22.17
 	go.step.sm/crypto v0.70.0

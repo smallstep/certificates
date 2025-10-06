@@ -351,6 +351,8 @@ github.com/smallstep/pkcs7 v0.2.1 h1:6Kfzr/QizdIuB6LSv8y1LJdZ3aPSfTNhTLqAx9CTLfA
 github.com/smallstep/pkcs7 v0.2.1/go.mod h1:RcXHsMfL+BzH8tRhmrF1NkkpebKpq3JEM66cOFxanf0=
 github.com/smallstep/scep v0.0.0-20240926084937-8cf1ca453101 h1:LyZqn24/ZiVg8v9Hq07K6mx6RqPtpDeK+De5vf4QEY4=
 github.com/smallstep/scep v0.0.0-20240926084937-8cf1ca453101/go.mod h1:EuKQjYGQwhUa1mgD21zxIgOgUYLsqikJmvxNscxpS/Y=
+github.com/smallstep/scep v0.0.0-20250318231241-a25cabb69492 h1:k23+s51sgYix4Zgbvpmy+1ZgXLjr4ZTkBTqXmpnImwA=
+github.com/smallstep/scep v0.0.0-20250318231241-a25cabb69492/go.mod h1:QQhwLqCS13nhv8L5ov7NgusowENUtXdEzdytjmJHdZQ=
 github.com/spaolacci/murmur3 v0.0.0-20180118202830-f09979ecbc72/go.mod h1:JwIasOWyU6f++ZhiEuf87xNszmSA2myDM2Kzu9HwQUA=
 github.com/spaolacci/murmur3 v1.1.0 h1:7c1g84S4BPRrfL5Xrdp6fOJ206sU9y293DDHaoy0bLI=
 github.com/spaolacci/murmur3 v1.1.0/go.mod h1:JwIasOWyU6f++ZhiEuf87xNszmSA2myDM2Kzu9HwQUA=
