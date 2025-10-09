@@ -180,7 +180,7 @@ func isAccountAuthorized(_ context.Context, dbCert *acme.Certificate, certToBeRe
 func wrapRevokeErr(err error) *acme.Error {
 	t := err.Error()
 	if strings.Contains(t, "is already revoked") {
-		return acme.NewError(acme.ErrorAlreadyRevokedType, t)
+		return acme.NewError(acme.ErrorAlreadyRevokedType, "%s", t)
 	}
 	return acme.WrapErrorISE(err, "error when revoking certificate")
 }
@@ -190,9 +190,9 @@ func wrapRevokeErr(err error) *acme.Error {
 func wrapUnauthorizedError(cert *x509.Certificate, unauthorizedIdentifiers []acme.Identifier, msg string, err error) *acme.Error {
 	var acmeErr *acme.Error
 	if err == nil {
-		acmeErr = acme.NewError(acme.ErrorUnauthorizedType, msg)
+		acmeErr = acme.NewError(acme.ErrorUnauthorizedType, "%s", msg)
 	} else {
-		acmeErr = acme.WrapError(acme.ErrorUnauthorizedType, err, msg)
+		acmeErr = acme.WrapError(acme.ErrorUnauthorizedType, err, "%s", msg)
 	}
 	acmeErr.Status = http.StatusForbidden // RFC8555 7.6 shows example with 403
 
