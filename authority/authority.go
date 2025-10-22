@@ -882,6 +882,17 @@ func (a *Authority) GetConfig() *config.Config {
 	return a.config
 }
 
+// GetBackdate returns the [time.Duration] representing the
+// amount of time that is to be subtracted from the current
+// time when issuing a new certificate.
+func (a *Authority) GetBackdate() *time.Duration {
+	if a.config == nil || a.config.AuthorityConfig == nil || a.config.AuthorityConfig.Backdate == nil {
+		return nil
+	}
+
+	return &a.config.AuthorityConfig.Backdate.Duration
+}
+
 // GetInfo returns information about the authority.
 func (a *Authority) GetInfo() Info {
 	ai := Info{

@@ -26,6 +26,7 @@ type CertificateAuthority interface {
 	IsRevoked(sn string) (bool, error)
 	Revoke(context.Context, *authority.RevokeOptions) error
 	LoadProvisionerByName(string) (provisioner.Interface, error)
+	GetBackdate() *time.Duration
 }
 
 // NewContext adds the given acme components to the context.
