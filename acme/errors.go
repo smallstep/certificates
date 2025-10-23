@@ -6,6 +6,7 @@ import (
 	"net/http"
 
 	"github.com/pkg/errors"
+
 	"github.com/smallstep/certificates/api/render"
 )
 
@@ -427,4 +428,27 @@ func (e *Error) ToLog() (any, error) {
 func (e *Error) Render(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/problem+json")
 	render.JSONStatus(w, r, e, e.StatusCode())
+}
+
+type errorRecord = map[string]any
+
+func newErrorRecord(e *Error) errorRecord {
+	if e == nil {
+		return nil
+	}
+
+	m := errorRecord{
+		"type":   e.Type,
+		"detail": e.Detail,
+	}
+
+	if len(e.Subproblems) > 0 { // replicate omitempty
+		m["subproblems"] = e.Subproblems
+	}
+
+	if e.Err != nil { // replicate omitempty
+		m["internal"] = e.Err.Error()
+	}
+
+	return m
 }
