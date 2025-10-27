@@ -272,10 +272,15 @@ func NewOrder(w http.ResponseWriter, r *http.Request) {
 	if o.NotAfter.IsZero() {
 		o.NotAfter = o.NotBefore.Add(prov.DefaultTLSCertDuration())
 	}
-	// If request NotBefore was empty then backdate the order.NotBefore (now)
+
+	// if request NotBefore was empty, then backdate the order.NotBefore (now)
 	// to avoid timing issues.
 	if nor.NotBefore.IsZero() {
-		o.NotBefore = o.NotBefore.Add(-defaultOrderBackdate)
+		backdate := defaultOrderBackdate
+		if bd := ca.GetBackdate(); bd != nil {
+			backdate = *bd
+		}
+		o.NotBefore = o.NotBefore.Add(-backdate)
 	}
 
 	if err := db.CreateOrder(ctx, o); err != nil {
