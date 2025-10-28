@@ -265,12 +265,12 @@ func TestClient_GetServerTLSConfig_renew(t *testing.T) {
 	defer srvTLS.Close()
 
 	// Transport
-	client, sr, pk = signDuration(t, ca, clientDomain, 5*time.Second)
+	client, sr, pk = signDuration(t, ca, clientDomain, 3*time.Second)
 	tr1, err := client.Transport(context.Background(), sr, pk)
 	require.NoError(t, err)
 
 	// Transport with tlsConfig
-	client, sr, pk = signDuration(t, ca, clientDomain, 5*time.Second)
+	client, sr, pk = signDuration(t, ca, clientDomain, 3*time.Second)
 	tlsConfig, err = client.GetClientTLSConfig(context.Background(), sr, pk)
 	require.NoError(t, err)
 
@@ -350,8 +350,9 @@ func TestClient_GetServerTLSConfig_renew(t *testing.T) {
 	}
 
 	// Wait for renewal
-	log.Printf("Sleeping for %s ...\n", 5*time.Second)
-	time.Sleep(5 * time.Second)
+	wait := 5 * time.Second
+	log.Printf("Sleeping for %s ...\n", wait)
+	time.Sleep(wait)
 
 	for _, tt := range tests {
 		t.Run("renewed "+tt.name, func(t *testing.T) {
