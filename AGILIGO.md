@@ -30,16 +30,6 @@ make build
 make test
 ```
 
-## Container Features
-
-The development container includes:
-- **Agiligo Go Toolchain** - Built from source (GOROOT: `/usr/local/agiligo`)
-- **Development Tools**: make, golangci-lint, govulncheck, gotestsum
-- **Claude Code CLI** - Pre-installed and ready to use
-- **DNS Configuration**: Google DNS (8.8.8.8, 8.8.4.4) for reliable connectivity
-- **Claude Credentials**: Mounted from `~/.claude` on host
-- **Dependencies**: libpcsclite-dev for HSM support
-
 ## Current Status
 
 ### What Works ✅
