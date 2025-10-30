@@ -172,3 +172,7 @@ require (
 	google.golang.org/grpc/cmd/protoc-gen-go-grpc v1.5.1 // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 )
+
+// Replace go.step.sm/crypto with Agiligo-compatible fork (git submodule)
+// The crypto-agiligo submodule is on the 'agiligo-pqc' branch
+replace go.step.sm/crypto => ./crypto-agiligo
