@@ -1,19 +1,3 @@
-# ========================================================================
-# AGILIGO BUILD SYSTEM
-# ========================================================================
-# This fork of step-ca requires the Agiligo Go toolchain for post-quantum
-# cryptographic support. Ensure your environment is configured correctly:
-#   - GOROOT should point to your Agiligo installation (e.g., /usr/local/agiligo)
-#   - PATH should include the Agiligo bin directory (e.g., /usr/local/agiligo/bin)
-#
-# For development, use the provided devcontainer (.devcontainer/) which
-# automatically builds and configures Agiligo.
-#
-# To verify your setup:
-#   $ go version  # Should show Agiligo version
-#   $ go env GOROOT  # Should point to Agiligo directory
-# ========================================================================
-
 PKG?=github.com/smallstep/certificates/cmd/step-ca
 BINNAME?=step-ca
 
