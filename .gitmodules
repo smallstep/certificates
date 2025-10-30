@@ -1,0 +1,6 @@
+[submodule "crypto-agiligo"]
+	path = crypto-agiligo
+	url = https://github.com/smallstep/crypto.git
+[submodule "cli"]
+	path = cli
+	url = https://github.com/smallstep/cli.git

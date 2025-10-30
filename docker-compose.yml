@@ -1,0 +1,17 @@
+services:
+  dev:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: dev
+    user: "1000:1000"
+    volumes:
+      - .:/workspace
+    working_dir: /workspace
+    stdin_open: true
+    tty: true
+    # Use host network for better DNS resolution (alternative: comment out and use bridge)
+    # network_mode: "host"
+    environment:
+      - GOROOT=/usr/local/agiligo
+      - PATH=/usr/local/agiligo/bin:${PATH}

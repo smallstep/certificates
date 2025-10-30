@@ -1,4 +1,9 @@
-# step-ca
+# step-ca (Agiligo Fork)
+
+> **⚠️ AGILIGO FORK NOTICE**
+> This is a fork of step-ca built with [Agiligo](https://github.com/ISRI-PQC/agiligo), a Go variant that adds cryptographic agility for post-quantum algorithm support.
+> 📖 **See [AGILIGO.md](./AGILIGO.md) for setup and development instructions.**
+> This fork requires the Agiligo Go toolchain and cannot be built with standard Go.
 
 [![GitHub release](https://img.shields.io/github/release/smallstep/certificates.svg)](https://github.com/smallstep/certificates/releases/latest)
 [![Go Report Card](https://goreportcard.com/badge/github.com/smallstep/certificates)](https://goreportcard.com/report/github.com/smallstep/certificates)
