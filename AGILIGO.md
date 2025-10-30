@@ -30,8 +30,6 @@ make build
 make test
 ```
 
-**Note:** The first build takes ~10-15 minutes to compile Agiligo from source. Subsequent starts are much faster thanks to Docker layer caching.
-
 ## Container Features
 
 The development container includes:
