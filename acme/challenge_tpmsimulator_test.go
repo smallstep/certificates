@@ -1,5 +1,4 @@
 //go:build tpmsimulator
-// +build tpmsimulator
 
 package acme
 
