@@ -37,6 +37,9 @@ function step_ca_init () {
     DOCKER_STEPCA_INIT_PROVISIONER_NAME="${DOCKER_STEPCA_INIT_PROVISIONER_NAME:-admin}"
     DOCKER_STEPCA_INIT_ADMIN_SUBJECT="${DOCKER_STEPCA_INIT_ADMIN_SUBJECT:-step}"
     DOCKER_STEPCA_INIT_ADDRESS="${DOCKER_STEPCA_INIT_ADDRESS:-:9000}"
+    DOCKER_STEPCA_INIT_ROOT_FILE="${DOCKER_STEPCA_INIT_ROOT_FILE:-"/run/secrets/root_ca.crt"}"
+    DOCKER_STEPCA_INIT_KEY_FILE="${DOCKER_STEPCA_INIT_KEY_FILE:-"/run/secrets/root_ca_key"}"
+    DOCKER_STEPCA_INIT_KEY_PASSWORD_FILE="${DOCKER_STEPCA_INIT_KEY_PASSWORD_FILE:-"/run/secrets/root_ca_key_password"}"
 
     local -a setup_args=(
         --name "${DOCKER_STEPCA_INIT_NAME}"
@@ -55,6 +58,21 @@ function step_ca_init () {
     else
         generate_password > "${STEPPATH}/password"
         generate_password > "${STEPPATH}/provisioner_password"
+    fi
+    if [ -f "${DOCKER_STEPCA_INIT_ROOT_FILE}" ]; then
+        setup_args=("${setup_args[@]}" --root "${DOCKER_STEPCA_INIT_ROOT_FILE}")
+    fi
+    if [ -f "${DOCKER_STEPCA_INIT_KEY_FILE}" ]; then
+        setup_args=("${setup_args[@]}" --key "${DOCKER_STEPCA_INIT_KEY_FILE}")
+    fi
+    if [ -f "${DOCKER_STEPCA_INIT_KEY_PASSWORD_FILE}" ]; then
+        setup_args=("${setup_args[@]}" --key-password-file "${DOCKER_STEPCA_INIT_KEY_PASSWORD_FILE}")
+    fi
+    if [ -n "${DOCKER_STEPCA_INIT_DEPLOYMENT_TYPE}" ]; then
+        setup_args=("${setup_args[@]}" --deployment-type "${DOCKER_STEPCA_INIT_DEPLOYMENT_TYPE}")
+    fi
+    if [ -n "${DOCKER_STEPCA_INIT_WITH_CA_URL}" ]; then
+        setup_args=("${setup_args[@]}" --with-ca-url "${DOCKER_STEPCA_INIT_WITH_CA_URL}")
     fi
     if [ "${DOCKER_STEPCA_INIT_SSH}" == "true" ]; then
         setup_args=("${setup_args[@]}" --ssh)
