@@ -8,6 +8,7 @@ require (
 	github.com/Masterminds/sprig/v3 v3.3.0
 	github.com/ccoveille/go-safecast v1.8.2
 	github.com/coreos/go-oidc/v3 v3.16.0
+	github.com/coreos/go-systemd/v22 v22.6.0
 	github.com/dgraph-io/badger v1.6.2
 	github.com/dgraph-io/badger/v2 v2.2007.4
 	github.com/fxamacker/cbor/v2 v2.9.0
