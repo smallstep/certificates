@@ -1,7 +1,7 @@
 package cast
 
 import (
-	"github.com/ccoveille/go-safecast"
+	"github.com/ccoveille/go-safecast/v2"
 )
 
 type signed interface {
