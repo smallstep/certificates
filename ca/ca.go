@@ -15,6 +15,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/coreos/go-systemd/v22/daemon"
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
 	"golang.org/x/sync/errgroup"
@@ -469,7 +470,11 @@ func (ca *CA) Run() error {
 		return ca.srv.ListenAndServe()
 	})
 
+	_, _ = daemon.SdNotify(true, daemon.SdNotifyReady)
+
 	err := eg.Wait()
+
+	_, _ = daemon.SdNotify(true, daemon.SdNotifyStopping)
 
 	// if the error is not the usual HTTP server closed error, it is
 	// highly likely that an error occurred when starting one of the
@@ -526,6 +531,8 @@ func (ca *CA) Stop() error {
 // Reload reloads the configuration of the CA and calls to the server Reload
 // method.
 func (ca *CA) Reload() error {
+	_, _ = daemon.SdNotify(true, daemon.SdNotifyReloading)
+
 	cfg, err := config.LoadConfiguration(ca.opts.configFile)
 	if err != nil {
 		return fmt.Errorf("error reloading ca configuration: %w", err)
@@ -590,6 +597,9 @@ func (ca *CA) Reload() error {
 	ca.config = newCA.config
 	ca.opts = newCA.opts
 	ca.renewer = newCA.renewer
+
+	_, _ = daemon.SdNotify(true, daemon.SdNotifyReady)
+
 	return nil
 }
 
