@@ -63,6 +63,8 @@ const (
 	VaultCAS = "vaultcas"
 	// ExternalCAS is a CertificateAuthorityService using an external injected CA implementation
 	ExternalCAS = "externalcas"
+	// ADCSCAS is a CertificateAuthorityService using Active Directory Certificate Services
+	ADCSCAS = "adcscas"
 )
 
 // String returns a string from the type. It will always return the lower case
