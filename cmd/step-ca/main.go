@@ -38,6 +38,7 @@ import (
 	_ "go.step.sm/crypto/kms/yubikey"
 
 	// Enabled cas interfaces.
+	_ "github.com/smallstep/certificates/cas/adcscas"
 	_ "github.com/smallstep/certificates/cas/cloudcas"
 	_ "github.com/smallstep/certificates/cas/softcas"
 	_ "github.com/smallstep/certificates/cas/stepcas"
