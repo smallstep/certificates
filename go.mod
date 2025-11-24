@@ -7,7 +7,7 @@ require (
 	cloud.google.com/go/security v1.19.2
 	github.com/Masterminds/sprig/v3 v3.3.0
 	github.com/ccoveille/go-safecast/v2 v2.0.0
-	github.com/coreos/go-oidc/v3 v3.16.0
+	github.com/coreos/go-oidc/v3 v3.17.0
 	github.com/coreos/go-systemd/v22 v22.6.0
 	github.com/dgraph-io/badger v1.6.2
 	github.com/dgraph-io/badger/v2 v2.2007.4
