@@ -22,7 +22,7 @@ require (
 	github.com/hashicorp/vault/api/auth/approle v0.11.0
 	github.com/hashicorp/vault/api/auth/aws v0.11.0
 	github.com/hashicorp/vault/api/auth/kubernetes v0.10.0
-	github.com/newrelic/go-agent/v3 v3.41.0
+	github.com/newrelic/go-agent/v3 v3.42.0
 	github.com/pkg/errors v0.9.1
 	github.com/prometheus/client_golang v1.23.2
 	github.com/rs/xid v1.6.0
