@@ -39,7 +39,7 @@ require (
 	github.com/urfave/cli v1.22.17
 	go.step.sm/crypto v0.74.0
 	go.uber.org/mock v0.6.0
-	golang.org/x/crypto v0.44.0
+	golang.org/x/crypto v0.45.0
 	golang.org/x/net v0.47.0
 	golang.org/x/sync v0.18.0
 	google.golang.org/api v0.256.0
