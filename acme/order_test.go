@@ -311,6 +311,10 @@ func (m *mockSignAuth) Revoke(context.Context, *authority.RevokeOptions) error {
 	return nil
 }
 
+func (m *mockSignAuth) GetBackdate() *time.Duration {
+	return nil
+}
+
 func TestOrder_Finalize(t *testing.T) {
 	mustSigner := func(kty, crv string, size int) crypto.Signer {
 		s, err := keyutil.GenerateSigner(kty, crv, size)

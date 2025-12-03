@@ -1897,6 +1897,107 @@ MCowBQYDK2VwAyEA5c+4NKZSNQcR1T8qN6SjwgdPZQ0Ge12Ylx/YeGAJ35k=
 				},
 			}
 		},
+		"ok/naf-nbf-from-ca": func(t *testing.T) test {
+			now := clock.Now()
+			expNaf := now.Add(15 * time.Minute)
+			acc := &acme.Account{ID: "accID"}
+			nor := &NewOrderRequest{
+				Identifiers: []acme.Identifier{
+					{Type: "dns", Value: "zap.internal"},
+				},
+				NotAfter: expNaf,
+			}
+			b, err := json.Marshal(nor)
+			assert.FatalError(t, err)
+			ctx := acme.NewProvisionerContext(context.Background(), prov)
+			ctx = context.WithValue(ctx, accContextKey, acc)
+			ctx = context.WithValue(ctx, payloadContextKey, &payloadInfo{value: b})
+			var (
+				ch1, ch2, ch3 **acme.Challenge
+				az1ID         *string
+				count         = 0
+			)
+			return test{
+				ctx:        ctx,
+				statusCode: 201,
+				nor:        nor,
+				ca: &mockCA{
+					MockGetBackdate: func() *time.Duration {
+						d, err := time.ParseDuration("1h")
+						require.NoError(t, err)
+						return &d
+					},
+				},
+				db: &acme.MockDB{
+					MockCreateChallenge: func(ctx context.Context, ch *acme.Challenge) error {
+						switch count {
+						case 0:
+							ch.ID = "dns"
+							assert.Equals(t, ch.Type, acme.DNS01)
+							ch1 = &ch
+						case 1:
+							ch.ID = "http"
+							assert.Equals(t, ch.Type, acme.HTTP01)
+							ch2 = &ch
+						case 2:
+							ch.ID = "tls"
+							assert.Equals(t, ch.Type, acme.TLSALPN01)
+							ch3 = &ch
+						default:
+							assert.FatalError(t, errors.New("test logic error"))
+							return errors.New("force")
+						}
+						count++
+						assert.Equals(t, ch.AccountID, "accID")
+						assert.NotEquals(t, ch.Token, "")
+						assert.Equals(t, ch.Status, acme.StatusPending)
+						assert.Equals(t, ch.Value, "zap.internal")
+						return nil
+					},
+					MockCreateAuthorization: func(ctx context.Context, az *acme.Authorization) error {
+						az.ID = "az1ID"
+						az1ID = &az.ID
+						assert.Equals(t, az.AccountID, "accID")
+						assert.NotEquals(t, az.Token, "")
+						assert.Equals(t, az.Status, acme.StatusPending)
+						assert.Equals(t, az.Identifier, nor.Identifiers[0])
+						assert.Equals(t, az.Challenges, []*acme.Challenge{*ch1, *ch2, *ch3})
+						assert.Equals(t, az.Wildcard, false)
+						return nil
+					},
+					MockCreateOrder: func(ctx context.Context, o *acme.Order) error {
+						o.ID = "ordID"
+						assert.Equals(t, o.AccountID, "accID")
+						assert.Equals(t, o.ProvisionerID, prov.GetID())
+						assert.Equals(t, o.Status, acme.StatusPending)
+						assert.Equals(t, o.Identifiers, nor.Identifiers)
+						assert.Equals(t, o.AuthorizationIDs, []string{*az1ID})
+						return nil
+					},
+					MockGetExternalAccountKeyByAccountID: func(ctx context.Context, provisionerID, accountID string) (*acme.ExternalAccountKey, error) {
+						assert.Equals(t, prov.GetID(), provisionerID)
+						assert.Equals(t, "accID", accountID)
+						return nil, nil
+					},
+				},
+				vr: func(t *testing.T, o *acme.Order) {
+					testBufferDur := 5 * time.Second
+					orderExpiry := now.Add(defaultOrderExpiry)
+					expNbf := now.Add(-1 * time.Hour)
+
+					assert.Equals(t, o.ID, "ordID")
+					assert.Equals(t, o.Status, acme.StatusPending)
+					assert.Equals(t, o.Identifiers, nor.Identifiers)
+					assert.Equals(t, o.AuthorizationURLs, []string{fmt.Sprintf("%s/acme/%s/authz/az1ID", baseURL.String(), escProvName)})
+					assert.True(t, o.NotBefore.Add(-testBufferDur).Before(expNbf))
+					assert.True(t, o.NotBefore.Add(testBufferDur).After(expNbf))
+					assert.True(t, o.NotAfter.Add(-testBufferDur).Before(expNaf))
+					assert.True(t, o.NotAfter.Add(testBufferDur).After(expNaf))
+					assert.True(t, o.ExpiresAt.Add(-testBufferDur).Before(orderExpiry))
+					assert.True(t, o.ExpiresAt.Add(testBufferDur).After(orderExpiry))
+				},
+			}
+		},
 		"ok/default-naf-nbf-wireapp": func(t *testing.T) test {
 			acmeWireProv := newWireProvisionerWithOptions(t, &provisioner.Options{
 				Wire: &wire.Options{

@@ -622,6 +622,16 @@ func (a *Authority) Revoke(ctx context.Context, revokeOpts *RevokeOptions) error
 			return errs.Wrap(http.StatusUnauthorized, err, "authority.Revoke", opts...)
 		}
 
+		// Verify that the serial in the token matches the serial from the request.
+		if revokeOpts.Serial != claims.Subject {
+			return errs.ApplyOptions(
+				errs.Forbidden(
+					"request serial number %q and token subject %q do not match",
+					revokeOpts.Serial, claims.Subject,
+				), opts...,
+			)
+		}
+
 		// This method will also validate the audiences for JWK provisioners.
 		p, err := a.LoadProvisionerByToken(token, &claims.Claims)
 		if err != nil {

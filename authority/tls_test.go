@@ -1652,6 +1652,42 @@ func TestAuthority_Revoke(t *testing.T) {
 				},
 			}
 		},
+		"fail/serial-number": func() test {
+			_a := testAuthority(t, WithDatabase(&db.MockAuthDB{
+				MUseToken: func(id, tok string) (bool, error) {
+					return true, nil
+				},
+				MGetCertificate: func(sn string) (*x509.Certificate, error) {
+					return nil, errors.New("not found")
+				},
+			}))
+
+			cl := jose.Claims{
+				Subject:   "token-sn",
+				Issuer:    validIssuer,
+				NotBefore: jose.NewNumericDate(now),
+				Expiry:    jose.NewNumericDate(now.Add(time.Minute)),
+				Audience:  validAudience,
+				ID:        "44",
+			}
+			raw, err := jose.Signed(sig).Claims(cl).CompactSerialize()
+			require.NoError(t, err)
+			return test{
+				auth: _a,
+				ctx:  tlsRevokeCtx,
+				opts: &RevokeOptions{
+					Serial:     "request-sn",
+					ReasonCode: reasonCode,
+					Reason:     reason,
+					OTT:        raw,
+				},
+				err:  errors.New(`request serial number "request-sn" and token subject "token-sn" do not match`),
+				code: http.StatusForbidden,
+				checkErrDetails: func(err *errs.Error) {
+					assert.Equal(t, raw, err.Details["token"])
+				},
+			}
+		},
 		"ok/token": func() test {
 			_a := testAuthority(t, WithDatabase(&db.MockAuthDB{
 				MUseToken: func(id, tok string) (bool, error) {
@@ -1980,7 +2016,7 @@ func TestAuthority_CRL(t *testing.T) {
 				sn := fmt.Sprintf("%v", i)
 
 				cl := jose.Claims{
-					Subject:   fmt.Sprintf("sn-%v", i),
+					Subject:   sn,
 					Issuer:    validIssuer,
 					NotBefore: jose.NewNumericDate(now),
 					Expiry:    jose.NewNumericDate(now.Add(time.Minute)),

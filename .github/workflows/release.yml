@@ -8,7 +8,7 @@ on:
 
 jobs:
   ci:
-    uses: smallstep/certificates/.github/workflows/ci.yml@master
+    uses: ./.github/workflows/ci.yml
     secrets: inherit
 
   create_release:
@@ -45,7 +45,7 @@ jobs:
           echo "DOCKER_TAGS_HSM=${{ env.DOCKER_TAGS_HSM }},${{ env.DOCKER_IMAGE }}:hsm" >> "${GITHUB_ENV}"
       - name: Create Release
         id: create_release
-        uses: softprops/action-gh-release@6cbd405e2c4e67a21c47fa9e383d020e4e28b836 # v2.3.3
+        uses: softprops/action-gh-release@a06a81a03ee405af7f2048a818ed3f03bbf83c7b # v2.5.0
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:

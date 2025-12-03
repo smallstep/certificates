@@ -193,8 +193,11 @@ func (p *SSHPOP) AuthorizeSSHRevoke(_ context.Context, token string) error {
 	if err != nil {
 		return errs.Wrap(http.StatusInternalServerError, err, "sshpop.AuthorizeSSHRevoke")
 	}
-	if claims.Subject != strconv.FormatUint(claims.sshCert.Serial, 10) {
-		return errs.BadRequest("sshpop token subject must be equivalent to sshpop certificate serial number")
+	if serial := strconv.FormatUint(claims.sshCert.Serial, 10); claims.Subject != serial {
+		return errs.Forbidden(
+			"token subject %q and sshpop certificate serial number %q do not match",
+			claims.Subject, serial,
+		)
 	}
 	return nil
 }

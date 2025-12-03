@@ -613,3 +613,7 @@ func (m *mockCASigner) Revoke(ctx context.Context, opts *authority.RevokeOptions
 func (m *mockCASigner) LoadProvisionerByName(string) (provisioner.Interface, error) {
 	return nil, nil
 }
+
+func (m *mockCASigner) GetBackdate() *time.Duration {
+	return nil
+}

@@ -77,7 +77,7 @@ func (c *Collection) LoadByName(name string) (Interface, bool) {
 }
 
 // LoadByTokenID a provisioner by identifier found in token.
-// For different provisioner types this identifier may be found in in different
+// For different provisioner types this identifier may be found in different
 // attributes of the token.
 func (c *Collection) LoadByTokenID(tokenProvisionerID string) (Interface, bool) {
 	return loadProvisioner(c.byTokenID, tokenProvisionerID)
