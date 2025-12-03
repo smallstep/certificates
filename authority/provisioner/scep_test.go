@@ -26,6 +26,44 @@ import (
 	"go.step.sm/crypto/x509util"
 )
 
+func generateSCEP(t *testing.T) *SCEP {
+	t.Helper()
+
+	ca, err := minica.New()
+	require.NoError(t, err)
+
+	key, err := rsa.GenerateKey(rand.Reader, 2048)
+	require.NoError(t, err)
+
+	cert, err := ca.Sign(&x509.Certificate{
+		Subject:   pkix.Name{CommonName: "SCEP decrypter"},
+		PublicKey: key.Public(),
+	})
+	require.NoError(t, err)
+
+	certPEM := pem.EncodeToMemory(&pem.Block{
+		Type: "CERTIFICATE", Bytes: cert.Raw,
+	})
+
+	block, err := pemutil.Serialize(key, pemutil.WithPassword([]byte("password")))
+	require.NoError(t, err)
+	keyPEM := pem.EncodeToMemory(block)
+
+	p := &SCEP{
+		Type:                          "SCEP",
+		Name:                          "scep",
+		ChallengePassword:             "password123",
+		MinimumPublicKeyLength:        0,
+		DecrypterCertificate:          certPEM,
+		DecrypterKeyPEM:               keyPEM,
+		DecrypterKeyPassword:          "password",
+		EncryptionAlgorithmIdentifier: 0,
+	}
+	require.NoError(t, p.Init(Config{Claims: globalProvisionerClaims}))
+	return p
+
+}
+
 func Test_challengeValidationController_Validate(t *testing.T) {
 	dummyCSR := &x509.CertificateRequest{
 		Raw: []byte{1},
@@ -721,4 +759,18 @@ func TestSCEP_Init(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestSCEP_Getters(t *testing.T) {
+	p := generateSCEP(t)
+	assert.Equal(t, "scep/scep", p.GetID())
+	assert.Equal(t, "scep", p.GetName())
+	assert.Equal(t, TypeSCEP, p.GetType())
+	kid, key, ok := p.GetEncryptedKey()
+	if kid != "" || key != "" || ok == true {
+		t.Errorf("ACME.GetEncryptedKey() = (%v, %v, %v), want (%v, %v, %v)", kid, key, ok, "", "", false)
+	}
+	tokenID, err := p.GetTokenID("token")
+	assert.Empty(t, tokenID)
+	assert.Equal(t, ErrTokenFlowNotSupported, err)
 }

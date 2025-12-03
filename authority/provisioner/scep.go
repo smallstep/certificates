@@ -95,9 +95,10 @@ func (s *SCEP) GetEncryptedKey() (string, string, bool) {
 	return "", "", false
 }
 
-// GetTokenID returns the identifier of the token.
+// GetTokenID returns the identifier of the token. This provisioner will always
+// return [ErrTokenFlowNotSupported].
 func (s *SCEP) GetTokenID(string) (string, error) {
-	return "", errors.New("scep provisioner does not implement GetTokenID")
+	return "", ErrTokenFlowNotSupported
 }
 
 // GetOptions returns the configured provisioner options.

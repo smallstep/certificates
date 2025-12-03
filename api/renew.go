@@ -7,6 +7,7 @@ import (
 
 	"github.com/smallstep/certificates/api/render"
 	"github.com/smallstep/certificates/authority"
+	"github.com/smallstep/certificates/authority/provisioner"
 	"github.com/smallstep/certificates/errs"
 )
 
@@ -60,7 +61,7 @@ func getPeerCertificate(r *http.Request) (*x509.Certificate, string, error) {
 	}
 	if s := r.Header.Get(authorizationHeader); s != "" {
 		if parts := strings.SplitN(s, bearerScheme+" ", 2); len(parts) == 2 {
-			ctx := r.Context()
+			ctx := provisioner.NewContextWithMethod(r.Context(), provisioner.RenewMethod)
 			peer, err := mustAuthority(ctx).AuthorizeRenewToken(ctx, parts[1])
 			return peer, parts[1], err
 		}

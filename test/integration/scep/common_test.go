@@ -103,6 +103,8 @@ func newTestCA(t *testing.T, name string) *testCA {
 	require.NoError(t, err)
 
 	dir := t.TempDir()
+	t.Setenv("STEPPATH", dir)
+
 	m, err := minica.New(minica.WithName(name), minica.WithGetSignerFunc(func() (crypto.Signer, error) {
 		return signer, nil
 	}))

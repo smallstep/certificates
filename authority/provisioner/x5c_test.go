@@ -568,12 +568,30 @@ func TestX5C_AuthorizeRevoke(t *testing.T) {
 		"ok": func(t *testing.T) test {
 			certs, err := pemutil.ReadCertificateBundle("./testdata/certs/x5c-leaf.crt")
 			require.NoError(t, err)
+			serialNumber := certs[0].SerialNumber.String()
 			jwk, err := jose.ReadKey("./testdata/secrets/x5c-leaf.key")
 			require.NoError(t, err)
 
 			p, err := generateX5C(nil)
 			require.NoError(t, err)
-			tok, err := generateToken("foo", p.GetName(), testAudiences.Revoke[0], "",
+			tok, err := generateToken(serialNumber, p.GetName(), testAudiences.Revoke[0], "",
+				[]string{"test.smallstep.com"}, time.Now(), jwk,
+				withX5CHdr(certs))
+			require.NoError(t, err)
+			return test{
+				p:     p,
+				token: tok,
+			}
+		},
+		"ok/different-serial-number": func(t *testing.T) test {
+			certs, err := pemutil.ReadCertificateBundle("./testdata/certs/x5c-leaf.crt")
+			require.NoError(t, err)
+			jwk, err := jose.ReadKey("./testdata/secrets/x5c-leaf.key")
+			require.NoError(t, err)
+
+			p, err := generateX5C(nil)
+			require.NoError(t, err)
+			tok, err := generateToken("123456789", p.GetName(), testAudiences.Revoke[0], "",
 				[]string{"test.smallstep.com"}, time.Now(), jwk,
 				withX5CHdr(certs))
 			require.NoError(t, err)

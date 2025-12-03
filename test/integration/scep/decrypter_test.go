@@ -32,6 +32,8 @@ func TestIssuesCertificateUsingSCEPWithDecrypter(t *testing.T) {
 	require.NoError(t, err)
 
 	dir := t.TempDir()
+	t.Setenv("STEPPATH", dir)
+
 	m, err := minica.New(minica.WithName("Step E2E | SCEP Decrypter"), minica.WithGetSignerFunc(func() (crypto.Signer, error) {
 		return signer, nil
 	}))
