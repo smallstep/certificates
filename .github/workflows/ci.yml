@@ -23,6 +23,5 @@ jobs:
       only-latest-golang: false
       os-dependencies: 'libpcsclite-dev'
       run-codeql: true
-      run-govulncheck: false
       test-command: 'V=1 make test'
     secrets: inherit
