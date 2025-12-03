@@ -127,3 +127,101 @@ func TestError_Unwrap_As(t *testing.T) {
 		})
 	}
 }
+
+func TestErrorf(t *testing.T) {
+	tests := []struct {
+		name   string
+		code   int
+		format string
+		args   []any
+		want   error
+	}{
+		{"bad request", 400, "test error string", nil, &Error{
+			Status: 400,
+			Err:    errors.New("test error string"),
+			Msg:    BadRequestDefaultMsg,
+		}},
+		{"unauthorized", 401, "test error string", nil, &Error{
+			Status: 401,
+			Err:    errors.New("test error string"),
+			Msg:    UnauthorizedDefaultMsg,
+		}},
+		{"forbidden", 403, "test error string", nil, &Error{
+			Status: 403,
+			Err:    errors.New("test error string"),
+			Msg:    ForbiddenDefaultMsg,
+		}},
+		{"not found", 404, "test error string", nil, &Error{
+			Status: 404,
+			Err:    errors.New("test error string"),
+			Msg:    NotFoundDefaultMsg,
+		}},
+		{"internal server error", 500, "test error string", nil, &Error{
+			Status: 500,
+			Err:    errors.New("test error string"),
+			Msg:    InternalServerErrorDefaultMsg,
+		}},
+		{"not implemented", 501, "test error string", nil, &Error{
+			Status: 501,
+			Err:    errors.New("test error string"),
+			Msg:    NotImplementedDefaultMsg,
+		}},
+		{"other", 502, "test error string", nil, &Error{
+			Status: 502,
+			Err:    errors.New("test error string"),
+			Msg:    defaultMsg,
+		}},
+		{"formatted args", 401, "test error string: %s", []any{"some reason"}, &Error{
+			Status: 401,
+			Err:    errors.New("test error string: some reason"),
+			Msg:    UnauthorizedDefaultMsg,
+		}},
+		{"WithMessage", 403, "test error string", []any{WithMessage("%s failed", "something")}, &Error{
+			Status: 403,
+			Err:    errors.New("test error string"),
+			Msg:    "something failed",
+		}},
+		{"WithErrorMessage", 404, "test error string", []any{WithErrorMessage()}, &Error{
+			Status: 404,
+			Err:    errors.New("test error string"),
+			Msg:    "test error string",
+		}},
+		{"WithKeyValue", 500, "test error string", []any{WithKeyVal("foo", 1), WithKeyVal("bar", "zar")}, &Error{
+			Status:  500,
+			Err:     errors.New("test error string"),
+			Msg:     InternalServerErrorDefaultMsg,
+			Details: map[string]interface{}{"foo": 1, "bar": "zar"},
+		}},
+		{"withDefaultMessage", 501, "test error string", []any{withDefaultMessage("some message")}, &Error{
+			Status: 501,
+			Err:    errors.New("test error string"),
+			Msg:    "some message",
+		}},
+		{"withFormattedMessage", 502, "test error string", []any{withFormattedMessage("some message: %s", "the reason")}, &Error{
+			Status: 502,
+			Err:    errors.New("test error string"),
+			Msg:    "some message: the reason",
+		}},
+		{"WithMessage and withDefaultMessage", 500, "test error string", []any{WithMessage("the message"), withDefaultMessage("some message")}, &Error{
+			Status: 500,
+			Err:    errors.New("test error string"),
+			Msg:    "the message",
+		}},
+		{"WithErrorMessage and withFormattedMessage", 500, "test error string", []any{WithErrorMessage(), withFormattedMessage("some message: %s", "the reason")}, &Error{
+			Status: 500,
+			Err:    errors.New("test error string"),
+			Msg:    "test error string",
+		}},
+		{"formatted args and withMessage", 500, "test error string: %s, code %d", []any{"reason", 1234, WithMessage("the message")}, &Error{
+			Status: 500,
+			Err:    errors.New("test error string: reason, code 1234"),
+			Msg:    "the message",
+		}},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			gotErr := Errorf(tt.code, tt.format, tt.args...)
+			assert.Equal(t, tt.want, gotErr)
+		})
+	}
+}

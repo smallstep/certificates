@@ -80,6 +80,10 @@ func testAuthority(t *testing.T, opts ...Option) *Authority {
 				EnableSSHCA: &enableSSHCA,
 			},
 		},
+		&provisioner.ACME{
+			Name: "acme",
+			Type: "ACME",
+		},
 		&provisioner.JWK{
 			Name: "uninitialized",
 			Type: "JWK",

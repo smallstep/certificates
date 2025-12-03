@@ -193,6 +193,25 @@ func TestAuthority_authorizeToken(t *testing.T) {
 				code:  http.StatusUnauthorized,
 			}
 		},
+		"fail/token-flow-not-supported": func(t *testing.T) *authorizeTest {
+			cl := jose.Claims{
+				Subject:   "test.smallstep.com",
+				Issuer:    validIssuer,
+				NotBefore: jose.NewNumericDate(now),
+				Expiry:    jose.NewNumericDate(now.Add(time.Minute)),
+				IssuedAt:  jose.NewNumericDate(now),
+				Audience:  []string{"acme/acme"},
+				ID:        "45",
+			}
+			raw, err := jose.Signed(sig).Claims(cl).CompactSerialize()
+			assert.FatalError(t, err)
+			return &authorizeTest{
+				auth:  a,
+				token: raw,
+				err:   errors.New("token flow is not supported"),
+				code:  http.StatusBadRequest,
+			}
+		},
 		"ok/simpledb": func(t *testing.T) *authorizeTest {
 			cl := jose.Claims{
 				Subject:   "test.smallstep.com",

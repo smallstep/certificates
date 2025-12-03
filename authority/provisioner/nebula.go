@@ -283,20 +283,14 @@ func (p *Nebula) AuthorizeRenew(ctx context.Context, crt *x509.Certificate) erro
 	return p.ctl.AuthorizeRenew(ctx, crt)
 }
 
-// AuthorizeRevoke returns an error if the token is not valid.
-func (p *Nebula) AuthorizeRevoke(_ context.Context, token string) error {
-	return p.validateToken(token, p.ctl.Audiences.Revoke)
+// AuthorizeRevoke returns an unauthorized error.
+func (p *Nebula) AuthorizeRevoke(context.Context, string) error {
+	return errs.Unauthorized("nebula provisioner does not support revoke")
 }
 
-// AuthorizeSSHRevoke returns an error if SSH is disabled or the token is invalid.
-func (p *Nebula) AuthorizeSSHRevoke(_ context.Context, token string) error {
-	if !p.ctl.Claimer.IsSSHCAEnabled() {
-		return errs.Unauthorized("ssh is disabled for nebula provisioner '%s'", p.Name)
-	}
-	if _, _, err := p.authorizeToken(token, p.ctl.Audiences.SSHRevoke); err != nil {
-		return err
-	}
-	return nil
+// AuthorizeSSHRevoke returns an unauthorized error.
+func (p *Nebula) AuthorizeSSHRevoke(context.Context, string) error {
+	return errs.Unauthorized("nebula provisioner does not support SSH revoke")
 }
 
 // AuthorizeSSHRenew returns an unauthorized error.
@@ -307,11 +301,6 @@ func (p *Nebula) AuthorizeSSHRenew(context.Context, string) (*ssh.Certificate, e
 // AuthorizeSSHRekey returns an unauthorized error.
 func (p *Nebula) AuthorizeSSHRekey(context.Context, string) (*ssh.Certificate, []SignOption, error) {
 	return nil, nil, errs.Unauthorized("nebula provisioner does not support SSH rekey")
-}
-
-func (p *Nebula) validateToken(token string, audiences []string) error {
-	_, _, err := p.authorizeToken(token, audiences)
-	return err
 }
 
 func (p *Nebula) authorizeToken(token string, audiences []string) (*nebula.NebulaCertificate, *jwtPayload, error) {

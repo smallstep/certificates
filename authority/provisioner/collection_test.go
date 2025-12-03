@@ -8,13 +8,15 @@ import (
 	"sync"
 	"testing"
 
-	"github.com/smallstep/assert"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+
 	"go.step.sm/crypto/jose"
 )
 
 func TestCollection_Load(t *testing.T) {
 	p, err := generateJWK()
-	assert.FatalError(t, err)
+	require.NoError(t, err)
 	byID := new(sync.Map)
 	byID.Store(p.GetID(), p)
 	byID.Store("string", "a-string")
@@ -52,15 +54,60 @@ func TestCollection_Load(t *testing.T) {
 	}
 }
 
+func TestCollection_LoadByTokenID(t *testing.T) {
+	p1, err := generateJWK()
+	require.NoError(t, err)
+	p2, err := generateACME()
+	require.NoError(t, err)
+
+	byTokenID := new(sync.Map)
+	byTokenID.Store(p1.GetIDForToken(), p1)
+	byTokenID.Store(p2.GetIDForToken(), p2)
+	byTokenID.Store("string", "a-string")
+
+	type fields struct {
+		byTokenID *sync.Map
+	}
+	type args struct {
+		id string
+	}
+	tests := []struct {
+		name   string
+		fields fields
+		args   args
+		want   Interface
+		want1  bool
+	}{
+		{"ok jwk", fields{byTokenID}, args{p1.GetIDForToken()}, p1, true},
+		{"ok acme", fields{byTokenID}, args{p2.GetIDForToken()}, p2, true},
+		{"fail missing", fields{byTokenID}, args{"missing"}, nil, false},
+		{"invalid", fields{byTokenID}, args{"string"}, nil, false},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			c := &Collection{
+				byTokenID: tt.fields.byTokenID,
+			}
+			got, got1 := c.LoadByTokenID(tt.args.id)
+			if !reflect.DeepEqual(got, tt.want) {
+				t.Errorf("Collection.Load() got = %v, want %v", got, tt.want)
+			}
+			if got1 != tt.want1 {
+				t.Errorf("Collection.Load() got1 = %v, want %v", got1, tt.want1)
+			}
+		})
+	}
+}
+
 func TestCollection_LoadByToken(t *testing.T) {
 	p1, err := generateJWK()
-	assert.FatalError(t, err)
+	require.NoError(t, err)
 	p2, err := generateJWK()
-	assert.FatalError(t, err)
+	require.NoError(t, err)
 	p3, err := generateOIDC()
-	assert.FatalError(t, err)
+	require.NoError(t, err)
 	p4, err := generateK8sSA(nil)
-	assert.FatalError(t, err)
+	require.NoError(t, err)
 
 	byID := new(sync.Map)
 	byID.Store(p1.GetID(), p1)
@@ -75,35 +122,35 @@ func TestCollection_LoadByToken(t *testing.T) {
 	byID2.Store(p3.GetID(), p3)
 
 	jwk, err := decryptJSONWebKey(p1.EncryptedKey)
-	assert.FatalError(t, err)
+	require.NoError(t, err)
 	token, err := generateSimpleToken(p1.Name, testAudiences.Sign[0], jwk)
-	assert.FatalError(t, err)
+	require.NoError(t, err)
 	t1, c1, err := parseToken(token)
-	assert.FatalError(t, err)
+	require.NoError(t, err)
 
 	jwk, err = decryptJSONWebKey(p2.EncryptedKey)
-	assert.FatalError(t, err)
+	require.NoError(t, err)
 	token, err = generateSimpleToken(p2.Name, testAudiences.Sign[1], jwk)
-	assert.FatalError(t, err)
+	require.NoError(t, err)
 	t2, c2, err := parseToken(token)
-	assert.FatalError(t, err)
+	require.NoError(t, err)
 
 	token, err = generateSimpleToken(p3.configuration.Issuer, p3.ClientID, &p3.keyStore.keySet.Keys[0])
-	assert.FatalError(t, err)
+	require.NoError(t, err)
 	t3, c3, err := parseToken(token)
-	assert.FatalError(t, err)
+	require.NoError(t, err)
 
 	token, err = generateSimpleToken(p3.configuration.Issuer, "string", &p3.keyStore.keySet.Keys[0])
-	assert.FatalError(t, err)
+	require.NoError(t, err)
 	t4, c4, err := parseToken(token)
-	assert.FatalError(t, err)
+	require.NoError(t, err)
 
 	jwk, err = jose.GenerateJWK("EC", "P-256", "ES256", "sig", "", 0)
-	assert.FatalError(t, err)
+	require.NoError(t, err)
 	token, err = generateK8sSAToken(jwk, nil)
-	assert.FatalError(t, err)
+	require.NoError(t, err)
 	t5, c5, err := parseToken(token)
-	assert.FatalError(t, err)
+	require.NoError(t, err)
 
 	type fields struct {
 		byID      *sync.Map
@@ -159,11 +206,11 @@ func TestCollection_LoadByCertificate(t *testing.T) {
 	}
 
 	p1, err := generateJWK()
-	assert.FatalError(t, err)
+	require.NoError(t, err)
 	p2, err := generateOIDC()
-	assert.FatalError(t, err)
+	require.NoError(t, err)
 	p3, err := generateACME()
-	assert.FatalError(t, err)
+	require.NoError(t, err)
 
 	byName := new(sync.Map)
 	byName.Store(p1.GetName(), p1)
@@ -229,11 +276,11 @@ func TestCollection_LoadByCertificate(t *testing.T) {
 func TestCollection_LoadEncryptedKey(t *testing.T) {
 	c := NewCollection(testAudiences)
 	p1, err := generateJWK()
-	assert.FatalError(t, err)
-	assert.FatalError(t, c.Store(p1))
+	require.NoError(t, err)
+	require.NoError(t, c.Store(p1))
 	p2, err := generateOIDC()
-	assert.FatalError(t, err)
-	assert.FatalError(t, c.Store(p2))
+	require.NoError(t, err)
+	require.NoError(t, c.Store(p2))
 
 	// Add oidc in byKey.
 	// It should not happen.
@@ -269,9 +316,9 @@ func TestCollection_LoadEncryptedKey(t *testing.T) {
 func TestCollection_Store(t *testing.T) {
 	c := NewCollection(testAudiences)
 	p1, err := generateJWK()
-	assert.FatalError(t, err)
+	require.NoError(t, err)
 	p2, err := generateOIDC()
-	assert.FatalError(t, err)
+	require.NoError(t, err)
 
 	type args struct {
 		p Interface
@@ -297,7 +344,7 @@ func TestCollection_Store(t *testing.T) {
 
 func TestCollection_Find(t *testing.T) {
 	c, err := generateCollection(10, 10)
-	assert.FatalError(t, err)
+	require.NoError(t, err)
 
 	trim := func(s string) string {
 		return strings.TrimLeft(s, "0")
@@ -391,7 +438,7 @@ func Test_matchesAudience(t *testing.T) {
 	}
 	for name, tc := range tests {
 		t.Run(name, func(t *testing.T) {
-			assert.Equals(t, tc.exp, matchesAudience(tc.a, tc.b))
+			assert.Equal(t, tc.exp, matchesAudience(tc.a, tc.b))
 		})
 	}
 }

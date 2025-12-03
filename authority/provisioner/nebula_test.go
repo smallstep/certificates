@@ -709,7 +709,7 @@ func TestNebula_AuthorizeRevoke(t *testing.T) {
 		args    args
 		wantErr bool
 	}{
-		{"ok", p, args{ctx, ok}, false},
+		{"fail unauthorized", p, args{ctx, ok}, true},
 		{"fail token", p, args{ctx, failToken}, true},
 	}
 	for _, tt := range tests {
@@ -749,7 +749,7 @@ func TestNebula_AuthorizeSSHRevoke(t *testing.T) {
 		args    args
 		wantErr bool
 	}{
-		{"ok", p, args{ctx, ok}, false},
+		{"fail unauthorized", p, args{ctx, ok}, true},
 		{"fail token", p, args{ctx, failToken}, true},
 		{"fail disabled", pDisabled, args{ctx, ok}, true},
 	}

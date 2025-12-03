@@ -138,9 +138,10 @@ func (p *ACME) GetIDForToken() string {
 	return "acme/" + p.Name
 }
 
-// GetTokenID returns the identifier of the token.
+// GetTokenID returns the identifier of the token. This provisioner will always
+// return [ErrTokenFlowNotSupported].
 func (p *ACME) GetTokenID(string) (string, error) {
-	return "", errors.New("acme provisioner does not implement GetTokenID")
+	return "", ErrTokenFlowNotSupported
 }
 
 // GetName returns the name of the provisioner.

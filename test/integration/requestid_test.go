@@ -53,6 +53,8 @@ func Test_reflectRequestID(t *testing.T) {
 	ctx := context.Background()
 
 	dir := t.TempDir()
+	t.Setenv("STEPPATH", dir)
+
 	m, err := minica.New(minica.WithName("Step E2E"))
 	require.NoError(t, err)
 
