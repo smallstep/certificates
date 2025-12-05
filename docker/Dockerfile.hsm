@@ -18,7 +18,7 @@ COPY --from=kms /usr/local/bin/step-kms-plugin /usr/local/bin/step-kms-plugin
 
 USER root
 RUN apt-get update
-RUN apt-get install -y --no-install-recommends opensc opensc-pkcs11 pcscd gnutls-bin libpcsclite1 p11-kit
+RUN apt-get install -y --no-install-recommends opensc opensc-pkcs11 pcscd gnutls-bin libpcsclite1 p11-kit yubihsm-pkcs11
 RUN mkdir -p /run/pcscd
 RUN chown step:step /run/pcscd
 USER step
@@ -33,4 +33,4 @@ HEALTHCHECK CMD step ca health 2>/dev/null | grep "^ok" >/dev/null
 COPY docker/entrypoint.sh /entrypoint.sh
 
 ENTRYPOINT ["/bin/bash", "/entrypoint.sh"]
-CMD exec /usr/local/bin/step-ca --password-file $PWDPATH $CONFIGPATH
+CMD ["sh", "-c", "/usr/local/bin/step-ca --password-file $PWDPATH $CONFIGPATH"]
