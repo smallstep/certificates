@@ -18,6 +18,7 @@ import (
 	kmsapi "go.step.sm/crypto/kms/apiv1"
 	"go.step.sm/crypto/x509util"
 
+	"github.com/smallstep/certificates/validator"
 	"github.com/smallstep/certificates/internal/httptransport"
 	"github.com/smallstep/certificates/webhook"
 )
@@ -56,6 +57,7 @@ type SCEP struct {
 	EncryptionAlgorithmIdentifier int      `json:"encryptionAlgorithmIdentifier,omitempty"`
 	Options                       *Options `json:"options,omitempty"`
 	Claims                        *Claims  `json:"claims,omitempty"`
+	CustomChallengeValidators     []validator.ChallengeValidator
 	ctl                           *Controller
 	encryptionAlgorithm           int
 	challengeValidationController *challengeValidationController
@@ -113,14 +115,15 @@ func (s *SCEP) DefaultTLSCertDuration() time.Duration {
 }
 
 type challengeValidationController struct {
-	client        *http.Client
-	wrapTransport httptransport.Wrapper
-	webhooks      []*Webhook
+	client              *http.Client
+	wrapTransport       httptransport.Wrapper
+	webhooks            []*Webhook
+	challengeValidators []validator.ChallengeValidator
 }
 
 // newChallengeValidationController creates a new challengeValidationController
 // that performs challenge validation through webhooks.
-func newChallengeValidationController(client *http.Client, tw httptransport.Wrapper, webhooks []*Webhook) *challengeValidationController {
+func newChallengeValidationController(client *http.Client, tw httptransport.Wrapper, webhooks []*Webhook, challengeValidators []validator.ChallengeValidator) *challengeValidationController {
 	scepHooks := []*Webhook{}
 	for _, wh := range webhooks {
 		if wh.Kind != linkedca.Webhook_SCEPCHALLENGE.String() {
@@ -131,10 +134,18 @@ func newChallengeValidationController(client *http.Client, tw httptransport.Wrap
 		}
 		scepHooks = append(scepHooks, wh)
 	}
+	customChallengeValidators := []stepapi.ChallengeValidator{}
+	if len(challengeValidators) > 0 {
+		for _, val := range challengeValidators {
+			customChallengeValidators = append(customChallengeValidators, val)
+		}
+	}
+
 	return &challengeValidationController{
-		client:        client,
-		wrapTransport: tw,
-		webhooks:      scepHooks,
+		client:              client,
+		wrapTransport:       tw,
+		webhooks:            scepHooks,
+		challengeValidators: customChallengeValidators,
 	}
 }
 
@@ -143,13 +154,13 @@ var (
 	ErrSCEPNotificationFailed = errors.New("scep notification failed")
 )
 
-// Validate executes zero or more configured webhooks to
+// ValidateWebhooks executes zero or more configured webhooks to
 // validate the SCEP challenge. If at least one of them indicates
 // the challenge value is accepted, validation succeeds. In
 // that case, the other webhooks will be skipped. If none of
 // the webhooks indicates the value of the challenge was accepted,
 // an error is returned.
-func (c *challengeValidationController) Validate(ctx context.Context, csr *x509.CertificateRequest, provisionerName, challenge, transactionID string) ([]SignCSROption, error) {
+func (c *challengeValidationController) ValidateWebhooks(ctx context.Context, csr *x509.CertificateRequest, provisionerName, challenge, transactionID string) ([]SignCSROption, error) {
 	var opts []SignCSROption
 
 	for _, wh := range c.webhooks {
@@ -176,6 +187,18 @@ func (c *challengeValidationController) Validate(ctx context.Context, csr *x509.
 	}
 
 	return opts, nil
+}
+
+// ValidateCustom executes all of the available custom validators.
+// If any of them fail, the validation fails. All of them will be
+// performed and all must pass for the validation to succeed
+func (c *challengeValidationController) ValidateCustom(ctx context.Context, csr *x509.CertificateRequest) error {
+	for _, validator := range c.challengeValidators {
+		if err := validator.Validate(ctx, validator.ChallengeValidatorRequest{csr: csr}); err != nil {
+			return fmt.Errorf("Custom challenge validation failed: %w", err)
+		}
+	}
+	return nil
 }
 
 type notificationController struct {
@@ -274,6 +297,7 @@ func (s *SCEP) Init(config Config) (err error) {
 		config.WebhookClient,
 		config.WrapTransport,
 		s.GetOptions().GetWebhooks(),
+		s.CustomChallengeValidators,
 	)
 
 	// Prepare the SCEP notification controller
@@ -461,8 +485,10 @@ func (s *SCEP) ValidateChallenge(ctx context.Context, csr *x509.CertificateReque
 		return nil, fmt.Errorf("provisioner %q wasn't initialized", s.Name)
 	}
 	switch s.selectValidationMethod() {
+	case validationMethodCustom:
+		return []SignCSROption{}, s.challengeValidationController.ValidateCustom(ctx, csr)
 	case validationMethodWebhook:
-		return s.challengeValidationController.Validate(ctx, csr, s.Name, challenge, transactionID)
+		return s.challengeValidationController.ValidateWebhooks(ctx, csr, s.Name, challenge, transactionID)
 	default:
 		if subtle.ConstantTimeCompare([]byte(s.ChallengePassword), []byte(challenge)) == 0 {
 			return nil, errors.New("invalid challenge password provided")
@@ -491,13 +517,19 @@ const (
 	validationMethodNone    validationMethod = "none"
 	validationMethodStatic  validationMethod = "static"
 	validationMethodWebhook validationMethod = "webhook"
+	validationMethodCustom  validationMethod = "custom"
 )
 
 // selectValidationMethod returns the method to validate SCEP
-// challenges. If a webhook is configured with kind `SCEPCHALLENGE`,
-// the webhook method will be used. If a challenge password is set,
-// the static method is used. It will default to the `none` method.
+// challenges. If custom challenge validators are specified, they
+// will be used. Otherwise, if a webhook is configured with kind
+// `SCEPCHALLENGE`, the webhook method will be used. Finally, if a
+// challenge password is set, the static method is used. It will
+// default to the `none` method.
 func (s *SCEP) selectValidationMethod() validationMethod {
+	if len(s.CustomChallengeValidators) > 0 {
+		return validationMethodCustom
+	}
 	if len(s.challengeValidationController.webhooks) > 0 {
 		return validationMethodWebhook
 	}
