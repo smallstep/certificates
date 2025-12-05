@@ -102,7 +102,6 @@ Please send us a sentence or two, good or bad: **feedback@smallstep.com** or htt
 `
 
 func main() {
-	fmt.Println(os.Args)
 	// initialize step environment.
 	if err := step.Init(); err != nil {
 		fmt.Fprintln(os.Stderr, err.Error())
