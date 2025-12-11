@@ -32,6 +32,13 @@ function generate_password () {
     set -o pipefail
 }
 
+function set_password_files () {
+    local FILE_PATH=$1
+
+    ln -sf "${FILE_PATH}" "${STEPPATH}/password"
+    ln -sf "${FILE_PATH}" "${STEPPATH}/provisioner_password"
+}
+
 # Initialize a CA if not already initialized
 function step_ca_init () {
     DOCKER_STEPCA_INIT_PROVISIONER_NAME="${DOCKER_STEPCA_INIT_PROVISIONER_NAME:-admin}"
@@ -49,9 +56,8 @@ function step_ca_init () {
         --provisioner-password-file "${STEPPATH}/provisioner_password"
         --address "${DOCKER_STEPCA_INIT_ADDRESS}"
     )
-    if [ -n "${DOCKER_STEPCA_INIT_PASSWORD_FILE}" ]; then
-        cat < "${DOCKER_STEPCA_INIT_PASSWORD_FILE}" > "${STEPPATH}/password"
-        cat < "${DOCKER_STEPCA_INIT_PASSWORD_FILE}" > "${STEPPATH}/provisioner_password"
+    if [ -f "${DOCKER_STEPCA_INIT_PASSWORD_FILE}" ]; then
+	set_password_files "${DOCKER_STEPCA_INIT_PASSWORD_FILE}"
     elif [ -n "${DOCKER_STEPCA_INIT_PASSWORD}" ]; then
         echo "${DOCKER_STEPCA_INIT_PASSWORD}" > "${STEPPATH}/password"
         echo "${DOCKER_STEPCA_INIT_PASSWORD}" > "${STEPPATH}/provisioner_password"
@@ -102,6 +108,10 @@ fi
 
 if [ ! -f "${STEPPATH}/config/ca.json" ]; then
     init_if_possible
+fi
+
+if [ -f "${DOCKER_STEPCA_PASSWORD_FILE}" ]; then
+    set_password_files "${DOCKER_STEPCA_PASSWORD_FILE}"
 fi
 
 exec "${@}"
