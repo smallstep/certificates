@@ -73,7 +73,7 @@ func (p *K8sSA) GetIDForToken() string {
 
 // GetTokenID returns an unimplemented error and does not use the input ott.
 func (p *K8sSA) GetTokenID(string) (string, error) {
-	return "", errors.New("not implemented")
+	return "", ErrNotImplemented
 }
 
 // GetName returns the name of the provisioner.

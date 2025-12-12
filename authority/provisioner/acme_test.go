@@ -82,6 +82,9 @@ func TestACME_Getters(t *testing.T) {
 		t.Errorf("ACME.GetEncryptedKey() = (%v, %v, %v), want (%v, %v, %v)",
 			kid, key, ok, "", "", false)
 	}
+	tokenID, err := p.GetTokenID("token")
+	assert.Empty(t, tokenID)
+	assert.Equal(t, ErrTokenFlowNotSupported, err)
 }
 
 func TestACME_Init(t *testing.T) {

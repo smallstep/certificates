@@ -25,11 +25,19 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
 
 ---
 
-## [0.28.5] - unreleased
+## [0.29.0] - unreleased
 
 ### Added
 
+- Add support for YubiKeys 5.7.4+ (smallstep/certificates#2370)
+- Support managed device ID OID for step attestation format (smallstep/certificates#2382)
+- Add support for remote configuration of GCP Organization-Id (smallstep/certificates#2408)
+- Add additional DOCKER_STEPCA_INIT_* envs for docker/entrypoint.sh (smallstep/certificates#2461)
+- Add sd_notify support (smallstep/certificates#2463)
+
 ### Changed
+
+- Use errgroup to shutdown services concurrently (smallstep/certificates#2343)
 
 ### Deprecated
 
@@ -37,10 +45,14 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
 
 ### Fixed
 
+- Fix process hanging after SIGTERM (smallstep/certificates#2338)
+- Disable execute permission on a few policy/engine source files (smallstep/certificates#2435)
+- Fix backdate support for ACME provisioner (smallstep/certificates#2444)
+
 ### Security
 
 
-## [0.28.4] - unreleased
+## [0.28.4] - 2025-07-13
 
 ### Added
 

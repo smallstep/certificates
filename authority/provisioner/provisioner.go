@@ -77,6 +77,13 @@ func (p Uninitialized) MarshalJSON() ([]byte, error) {
 // the understanding that we are not following security best practices
 var ErrAllowTokenReuse = stderrors.New("allow token reuse")
 
+// ErrTokenFlowNotSupported is an error that is returned by provisioners on
+// GetTokenID when the use of tokens is not supported.
+var ErrTokenFlowNotSupported = stderrors.New("token flow is not supported")
+
+// ErrNotImplemented is an error returned when one method is not implemented.
+var ErrNotImplemented = stderrors.New("not implemented")
+
 // Audiences stores all supported audiences by request type.
 type Audiences struct {
 	Sign      []string

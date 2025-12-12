@@ -268,8 +268,8 @@ func TestSSHPOP_AuthorizeSSHRevoke(t *testing.T) {
 			return test{
 				p:     p,
 				token: tok,
-				code:  http.StatusBadRequest,
-				err:   errors.New("sshpop token subject must be equivalent to sshpop certificate serial number"),
+				code:  http.StatusForbidden,
+				err:   errors.New(`token subject "foo" and sshpop certificate serial number "0" do not match`),
 			}
 		},
 		"ok": func(t *testing.T) test {
