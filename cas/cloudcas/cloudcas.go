@@ -90,7 +90,7 @@ type CloudCAS struct {
 var newCertificateAuthorityClient = func(ctx context.Context, credentialsFile string) (CertificateAuthorityClient, error) {
 	var cloudOpts []option.ClientOption
 	if credentialsFile != "" {
-		cloudOpts = append(cloudOpts, option.WithCredentialsFile(credentialsFile))
+		cloudOpts = append(cloudOpts, option.WithAuthCredentialsFile(option.ServiceAccount, credentialsFile))
 	}
 	client, err := privateca.NewCertificateAuthorityClient(ctx, cloudOpts...)
 	if err != nil {
