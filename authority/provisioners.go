@@ -1003,6 +1003,25 @@ func ProvisionerToCertificates(p *linkedca.Provisioner) (provisioner.Interface, 
 			s.DecrypterKeyPassword = string(decrypter.KeyPassword)
 		}
 		return s, nil
+	case *linkedca.ProvisionerDetails_EST:
+		cfg := d.EST
+		enableTLSClientCertificate := cfg.EnableTlsClientCertificate
+		enableHTTPBasicAuth := cfg.EnableHttpBasicAuth
+		return &provisioner.EST{
+			ID:                         p.Id,
+			Type:                       p.Type.String(),
+			Name:                       p.Name,
+			EnableTLSClientCertificate: &enableTLSClientCertificate,
+			EnableHTTPBasicAuth:        &enableHTTPBasicAuth,
+			BasicAuthUsername:          cfg.BasicAuthUsername,
+			BasicAuthPassword:          cfg.BasicAuthPassword,
+			ClientCertificateRoots:     provisionerPEMToCertificates(cfg.ClientCertificateRoots),
+			ForceCN:                    cfg.ForceCn,
+			IncludeRoot:                cfg.IncludeRoot,
+			MinimumPublicKeyLength:     int(cfg.MinimumPublicKeyLength),
+			Claims:                     claims,
+			Options:                    options,
+		}, nil
 	case *linkedca.ProvisionerDetails_Nebula:
 		var roots []byte
 		for i, root := range d.Nebula.GetRoots() {
@@ -1270,6 +1289,34 @@ func ProvisionerToLinkedca(p provisioner.Interface) (*linkedca.Provisioner, erro
 							KeyUri:      p.DecrypterKeyURI,
 							KeyPassword: []byte(p.DecrypterKeyPassword),
 						},
+					},
+				},
+			},
+			Claims:       claimsToLinkedca(p.Claims),
+			X509Template: x509Template,
+			SshTemplate:  sshTemplate,
+			Webhooks:     webhooks,
+		}, nil
+	case *provisioner.EST:
+		x509Template, sshTemplate, webhooks, err := provisionerOptionsToLinkedca(p.Options)
+		if err != nil {
+			return nil, err
+		}
+		return &linkedca.Provisioner{
+			Id:   p.ID,
+			Type: linkedca.Provisioner_EST,
+			Name: p.GetName(),
+			Details: &linkedca.ProvisionerDetails{
+				Data: &linkedca.ProvisionerDetails_EST{
+					EST: &linkedca.ESTProvisioner{
+						ForceCn:                    p.ForceCN,
+						EnableTlsClientCertificate: p.EnableTLSClientCertificate != nil && *p.EnableTLSClientCertificate,
+						EnableHttpBasicAuth:         p.EnableHTTPBasicAuth != nil && *p.EnableHTTPBasicAuth,
+						MinimumPublicKeyLength:      cast.Int32(p.MinimumPublicKeyLength),
+						IncludeRoot:                 p.IncludeRoot,
+						BasicAuthUsername:           p.BasicAuthUsername,
+						BasicAuthPassword:           p.BasicAuthPassword,
+						ClientCertificateRoots:      provisionerPEMToLinkedca(p.ClientCertificateRoots),
 					},
 				},
 			},
