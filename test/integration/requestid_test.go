@@ -153,11 +153,9 @@ func Test_reflectRequestID(t *testing.T) {
 	var firstErr *errs.Error
 	if assert.ErrorAs(t, err, &firstErr) {
 		assert.Equal(t, 404, firstErr.StatusCode())
-		assert.Equal(t, "The requested resource could not be found. Please see the certificate authority logs for more info.", firstErr.Err.Error())
+		assert.Equal(t, `root certificate with fingerprint "invalid" was not found`, firstErr.Err.Error())
 		assert.NotEmpty(t, firstErr.RequestID)
 
-		// TODO: include the below error in the JSON? It's currently only output to the CA logs. Also see https://github.com/smallstep/certificates/pull/759
-		//assert.Equal(t, "/root/invalid was not found: certificate with fingerprint invalid was not found", apiErr.Msg)
 	}
 	assert.Nil(t, rootResponse)
 
@@ -166,7 +164,7 @@ func Test_reflectRequestID(t *testing.T) {
 	var secondErr *errs.Error
 	if assert.ErrorAs(t, err, &secondErr) {
 		assert.Equal(t, 404, secondErr.StatusCode())
-		assert.Equal(t, "The requested resource could not be found. Please see the certificate authority logs for more info.", secondErr.Err.Error())
+		assert.Equal(t, `root certificate with fingerprint "invalid" was not found`, secondErr.Err.Error())
 		assert.Equal(t, "reqID", secondErr.RequestID)
 	}
 	assert.Nil(t, rootResponse)
