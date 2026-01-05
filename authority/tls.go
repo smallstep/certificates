@@ -849,10 +849,25 @@ func (a *Authority) GenerateCertificateRevocationList() error {
 		fullName = a.config.Audience("/1.0/crl")[0]
 	}
 
+	// By default, IDP only contains user certs and CAs certs.
+	if a.config.CRL.IDPOnlyContainsUserCerts == nil {
+		a.config.CRL.IDPOnlyContainsUserCerts = &config.DefaultCRLIDPOnlyContainsUserCerts
+	}
+	if a.config.CRL.IDPOnlyContainsCACerts == nil {
+		a.config.CRL.IDPOnlyContainsCACerts = &config.DefaultCRLIDPOnlyContainsCACerts
+	}
+	if *a.config.CRL.IDPOnlyContainsUserCerts && *a.config.CRL.IDPOnlyContainsCACerts {
+		return errors.Errorf("IDPOnlyContainsUserCerts and IDPOnlyContainsCACerts cannot both be true")
+	}
+
 	// Add distribution point.
 	//
 	// Note that this is currently using the port 443 by default.
-	if b, err := marshalDistributionPoint(fullName, false); err == nil {
+	if b, err := marshalDistributionPoint(
+		fullName,
+		*a.config.CRL.IDPOnlyContainsUserCerts,
+		*a.config.CRL.IDPOnlyContainsCACerts,
+	); err == nil {
 		revocationList.ExtraExtensions = []pkix.Extension{
 			{Id: oidExtensionIssuingDistributionPoint, Critical: true, Value: b},
 		}
@@ -998,15 +1013,19 @@ type distributionPointName struct {
 	RelativeName pkix.RDNSequence `asn1:"optional,tag:1"`
 }
 
-func marshalDistributionPoint(fullName string, isCA bool) ([]byte, error) {
+func marshalDistributionPoint(
+	fullName string,
+	onlyContainsUserCerts bool,
+	onlyContainsCACerts bool,
+) ([]byte, error) {
 	return asn1.Marshal(distributionPoint{
 		DistributionPoint: distributionPointName{
 			FullName: []asn1.RawValue{
 				{Class: 2, Tag: 6, Bytes: []byte(fullName)},
 			},
 		},
-		OnlyContainsUserCerts: !isCA,
-		OnlyContainsCACerts:   isCA,
+		OnlyContainsUserCerts: onlyContainsUserCerts,
+		OnlyContainsCACerts:   onlyContainsCACerts,
 	})
 }
 
