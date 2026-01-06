@@ -15,12 +15,14 @@ import (
 	"github.com/google/uuid"
 	gax "github.com/googleapis/gax-go/v2"
 	"github.com/pkg/errors"
-	"github.com/smallstep/certificates/cas/apiv1"
-	"go.step.sm/crypto/x509util"
 	"google.golang.org/api/option"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 	durationpb "google.golang.org/protobuf/types/known/durationpb"
+
+	"go.step.sm/crypto/x509util"
+
+	"github.com/smallstep/certificates/cas/apiv1"
 )
 
 func init() {
@@ -186,7 +188,7 @@ func (c *CloudCAS) GetCertificateAuthority(req *apiv1.GetCertificateAuthorityReq
 	for i := 0; i < len(resp.PemCaCertificates)-1; i++ {
 		intermediate, err := parseCertificate(resp.PemCaCertificates[i])
 		if err != nil {
-			return nil, err
+			return nil, errors.Wrap(err, "parsing cloudCAS intermediates failed")
 		}
 		intermediates[i] = intermediate
 	}
@@ -194,7 +196,7 @@ func (c *CloudCAS) GetCertificateAuthority(req *apiv1.GetCertificateAuthorityReq
 	// Last certificate in the chain is the root
 	root, err := parseCertificate(resp.PemCaCertificates[len(resp.PemCaCertificates)-1])
 	if err != nil {
-		return nil, err
+		return nil, errors.Wrap(err, "parsing cloudCAS root failed")
 	}
 
 	return &apiv1.GetCertificateAuthorityResponse{

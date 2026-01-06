@@ -29,8 +29,6 @@ import (
 	"github.com/google/uuid"
 	"github.com/googleapis/gax-go/v2"
 	"github.com/pkg/errors"
-	"github.com/smallstep/certificates/cas/apiv1"
-	kmsapi "go.step.sm/crypto/kms/apiv1"
 	"go.uber.org/mock/gomock"
 	"google.golang.org/api/option"
 	"google.golang.org/grpc"
@@ -39,6 +37,10 @@ import (
 	"google.golang.org/grpc/status"
 	"google.golang.org/grpc/test/bufconn"
 	"google.golang.org/protobuf/types/known/anypb"
+
+	kmsapi "go.step.sm/crypto/kms/apiv1"
+
+	"github.com/smallstep/certificates/cas/apiv1"
 )
 
 var (
