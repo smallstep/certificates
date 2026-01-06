@@ -2,31 +2,47 @@ package logging
 
 import (
 	"bytes"
+	"context"
 	"fmt"
+	"io"
+	"log/slog"
 	"strconv"
 	"time"
-
-	"github.com/sirupsen/logrus"
 )
 
 var clfFields = [...]string{
 	"request-id", "remote-address", "name", "user-id", "time", "duration", "method", "path", "protocol", "status", "size",
 }
 
-// CommonLogFormat implements the logrus.Formatter interface it writes logrus
+// CommonLogFormat implements the slog.Handler interface it writes slog
 // entries using a CLF format prepended by the request-id.
-type CommonLogFormat struct{}
+type CommonLogFormat struct {
+	output io.Writer
+}
 
-// Format implements the logrus.Formatter interface. It returns the given
-// logrus entry as a CLF line with the following format:
+// Enabled implements the slog.Handler interface.
+func (f *CommonLogFormat) Enabled(ctx context.Context, level slog.Level) bool {
+	return true
+}
+
+// Handle implements the slog.Handler interface. It returns the given
+// slog record as a CLF line with the following format:
 //
 //	<request-id> <remote-address> <name> <user-id> <time> <duration> "<method> <path> <protocol>" <status> <size>
 //
 // If a field is not known, the hyphen symbol (-) will be used.
-func (f *CommonLogFormat) Format(entry *logrus.Entry) ([]byte, error) {
+func (f *CommonLogFormat) Handle(ctx context.Context, record slog.Record) error {
 	data := make([]string, len(clfFields))
+
+	// Extract fields from the record
+	fields := make(map[string]interface{})
+	record.Attrs(func(attr slog.Attr) bool {
+		fields[attr.Key] = attr.Value.Any()
+		return true
+	})
+
 	for i, name := range clfFields {
-		if v, ok := entry.Data[name]; ok {
+		if v, ok := fields[name]; ok {
 			switch v := v.(type) {
 			case error:
 				data[i] = v.Error()
@@ -75,5 +91,21 @@ func (f *CommonLogFormat) Format(entry *logrus.Entry) ([]byte, error) {
 	buf.WriteByte(' ')
 	buf.WriteString(data[10])
 	buf.WriteByte('\n')
-	return buf.Bytes(), nil
+
+	_, err := f.output.Write(buf.Bytes())
+	return err
+}
+
+// WithAttrs implements the slog.Handler interface.
+func (f *CommonLogFormat) WithAttrs(attrs []slog.Attr) slog.Handler {
+	// For simplicity, return the same handler since CLF format
+	// doesn't support additional attributes
+	return f
+}
+
+// WithGroup implements the slog.Handler interface.
+func (f *CommonLogFormat) WithGroup(name string) slog.Handler {
+	// For simplicity, return the same handler since CLF format
+	// doesn't support groups
+	return f
 }
