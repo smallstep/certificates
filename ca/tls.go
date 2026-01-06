@@ -367,6 +367,9 @@ func getPEM(i interface{}) ([]byte, error) {
 
 func getRenewFunc(ctx *TLSOptionCtx, client *Client, tr *http.Transport, pk crypto.PrivateKey) RenewFunc {
 	return func() (*tls.Certificate, error) {
+		// Close connections in keep-alive state
+		defer client.CloseIdleConnections()
+
 		// Get updated list of roots
 		if err := ctx.applyRenew(); err != nil {
 			return nil, err
