@@ -80,6 +80,10 @@ func (c *uaClient) SetTransport(tr http.RoundTripper) {
 	c.Client.Transport = tr
 }
 
+func (c *uaClient) CloseIdleConnections() {
+	c.Client.CloseIdleConnections()
+}
+
 func (c *uaClient) Get(u string) (*http.Response, error) {
 	return c.GetWithContext(context.Background(), u)
 }
@@ -637,6 +641,13 @@ func (c *Client) GetRootCAs() *x509.CertPool {
 // SetTransport updates the transport of the internal HTTP client.
 func (c *Client) SetTransport(tr http.RoundTripper) {
 	c.client.SetTransport(tr)
+}
+
+// CloseIdleConnections closes any connections on its Transport which were
+// previously connected from previous requests but are now sitting idle in a
+// "keep-alive" state. It does not interrupt any connections currently in use.
+func (c *Client) CloseIdleConnections() {
+	c.client.CloseIdleConnections()
 }
 
 // Version performs the version request to the CA with an empty context and returns the
