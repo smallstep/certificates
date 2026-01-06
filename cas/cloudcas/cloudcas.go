@@ -181,14 +181,25 @@ func (c *CloudCAS) GetCertificateAuthority(req *apiv1.GetCertificateAuthorityReq
 		return nil, errors.New("cloudCAS GetCertificateAuthority: PemCACertificate should not be empty")
 	}
 
-	// Last certificate in the chain is the root.
+	// Parse intermediate certificates
+	var intermediates = make([]*x509.Certificate, len(resp.PemCaCertificates)-1)
+	for i := 0; i < len(resp.PemCaCertificates)-1; i++ {
+		intermediate, err := parseCertificate(resp.PemCaCertificates[i])
+		if err != nil {
+			return nil, err
+		}
+		intermediates[i] = intermediate
+	}
+
+	// Last certificate in the chain is the root
 	root, err := parseCertificate(resp.PemCaCertificates[len(resp.PemCaCertificates)-1])
 	if err != nil {
 		return nil, err
 	}
 
 	return &apiv1.GetCertificateAuthorityResponse{
-		RootCertificate: root,
+		RootCertificate:          root,
+		IntermediateCertificates: intermediates,
 	}, nil
 }
 
