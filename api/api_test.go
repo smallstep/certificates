@@ -860,7 +860,7 @@ func Test_Root(t *testing.T) {
 		statusCode  int
 	}{
 		{"ok", parseCertificate(rootPEM), nil, "", 200},
-		{"fail", nil, fmt.Errorf("not found"), fmt.Sprintf("root certificate with fingerprint %q was not found", sha), 404},
+		{"fail", nil, fmt.Errorf("not found"), fmt.Sprintf(`root certificate with fingerprint \"%s\" was not found`, sha), 404},
 	}
 
 	// Request with chi context
