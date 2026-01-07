@@ -84,12 +84,16 @@ func GetUnescapedPathSuffix(typ LinkType, provisionerName string, inputs ...stri
 	case NewNonceLinkType, NewAccountLinkType, NewOrderLinkType, NewAuthzLinkType, DirectoryLinkType, KeyChangeLinkType, RevokeCertLinkType:
 		return fmt.Sprintf("/%s/%s", provisionerName, typ)
 	case AccountLinkType, OrderLinkType, AuthzLinkType, CertificateLinkType:
+		//nolint:gosec // operating on internally defined inputs
 		return fmt.Sprintf("/%s/%s/%s", provisionerName, typ, inputs[0])
 	case ChallengeLinkType:
+		//nolint:gosec // operating on internally defined inputs
 		return fmt.Sprintf("/%s/%s/%s/%s", provisionerName, typ, inputs[0], inputs[1])
 	case OrdersByAccountLinkType:
+		//nolint:gosec // operating on internally defined inputs
 		return fmt.Sprintf("/%s/%s/%s/orders", provisionerName, AccountLinkType, inputs[0])
 	case FinalizeLinkType:
+		//nolint:gosec // operating on internally defined inputs
 		return fmt.Sprintf("/%s/%s/%s/finalize", provisionerName, OrderLinkType, inputs[0])
 	default:
 		return ""
