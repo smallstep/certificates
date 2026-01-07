@@ -93,3 +93,16 @@ func Uint16(x int) uint16 {
 
 	return u16
 }
+
+func SafeUint8[T number](x T) (uint8, error) {
+	return safecast.Convert[uint8](x)
+}
+
+func Uint8[T number](x T) uint8 {
+	u8, err := SafeUint8(x)
+	if err != nil {
+		panic(err)
+	}
+
+	return u8
+}

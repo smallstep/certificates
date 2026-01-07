@@ -25,7 +25,18 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
 
 ---
 
-## [0.29.0] - unreleased
+### [x.y.z] - unreleased
+
+### Changed
+
+- Upgrade HSM-enabled Docker images from Debian Bookworm (12) to Debian Trixie
+  (13) (smallstep/certificates#2493)
+- Use JSON array format for Dockerfile's `CMD` instruction. This prevents shell
+  interpolation of environment variables like `CONFIGPATH` and `PWDPATH`,
+  ensuring consistent command execution. Commands can still be overridden via
+  Kubernetes or Docker configuration when needed (smallstep/certificates#2493)
+
+## [0.29.0] - 2025-12-03
 
 ### Added
 
