@@ -78,3 +78,17 @@ func TestUint16PanicsOnNegativeValue(t *testing.T) {
 func TestUint16PanicsOnLargeValue(t *testing.T) {
 	require.Panics(t, func() { Uint16(math.MaxUint16 + 1) })
 }
+
+func TestUint8ConvertsValues(t *testing.T) {
+	require.Equal(t, uint8(0), Uint8(0))
+	require.Equal(t, uint8(math.MaxUint8), Uint8(math.MaxUint8))
+	require.Equal(t, uint8(42), Uint8(42))
+}
+
+func TestUint8PanicsOnNegativeValue(t *testing.T) {
+	require.Panics(t, func() { Uint8(-1) })
+}
+
+func TestUint8PanicsOnLargeValue(t *testing.T) {
+	require.Panics(t, func() { Uint8(math.MaxUint8 + 1) })
+}
