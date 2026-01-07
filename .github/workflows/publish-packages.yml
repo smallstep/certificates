@@ -38,10 +38,12 @@ jobs:
     steps:
       - name: Validate tag (block pre-releases)
         run: |
-          if [[ "${{ inputs.tag }}" == *"-rc"* ]]; then
+          if [[ "$TAG" == *"-rc"* ]]; then
             echo "::error::Pre-release tags (-rc) cannot be published to production repos"
             exit 1
           fi
+        env:
+          TAG: ${{ inputs.tag }}
 
       - name: Checkout
         uses: actions/checkout@v4
@@ -51,7 +53,7 @@ jobs:
 
       - name: Extract version
         id: version
-        run: echo "version=${TAG#v}" >> $GITHUB_OUTPUT
+        run: echo "version=${TAG#v}" >> "$GITHUB_OUTPUT"
         env:
           TAG: ${{ inputs.tag }}
 
