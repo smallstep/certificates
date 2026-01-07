@@ -757,7 +757,11 @@ func (a *Authority) init() error {
 						// only pass the decrypter down when it was successfully created,
 						// meaning it's an RSA key, and `CreateDecrypter` did not fail.
 						options.Decrypter = decrypter
-						options.DecrypterCert = options.Intermediates[0]
+
+						// intermediate certificates can be empty in RA mode
+						if len(options.Intermediates) > 0 {
+							options.DecrypterCert = options.Intermediates[0]
+						}
 					}
 				}
 			}
