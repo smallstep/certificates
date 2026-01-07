@@ -44,12 +44,6 @@ var (
 	// DefaultCRLExpiredDuration is the default duration in which expired
 	// certificates will remain in the CRL after expiration.
 	DefaultCRLExpiredDuration = time.Hour
-	// DefaultCRLIDPOnlyContainsUserCerts is the default value for the
-	// Issuing Distribution Point property.
-	DefaultCRLIDPOnlyContainsUserCerts = true
-	// DefaultCRLIDPOnlyContainsCACerts is the default value for the
-	// Issuing Distribution Point property.
-	DefaultCRLIDPOnlyContainsCACerts = false
 	// GlobalProvisionerClaims is the default duration that expired certificates
 	// remain in the CRL after expiration.
 	GlobalProvisionerClaims = provisioner.Claims{
@@ -98,13 +92,11 @@ type Config struct {
 
 // CRLConfig represents config options for CRL generation
 type CRLConfig struct {
-	Enabled                  bool                  `json:"enabled"`
-	GenerateOnRevoke         bool                  `json:"generateOnRevoke,omitempty"`
-	CacheDuration            *provisioner.Duration `json:"cacheDuration,omitempty"`
-	RenewPeriod              *provisioner.Duration `json:"renewPeriod,omitempty"`
-	IDPurl                   string                `json:"idpURL,omitempty"`
-	IDPOnlyContainsUserCerts *bool                 `json:"idpOnlyContainsUserCerts,omitempty"`
-	IDPOnlyContainsCACerts   *bool                 `json:"idpOnlyContainsCACerts,omitempty"`
+	Enabled          bool                  `json:"enabled"`
+	GenerateOnRevoke bool                  `json:"generateOnRevoke,omitempty"`
+	CacheDuration    *provisioner.Duration `json:"cacheDuration,omitempty"`
+	RenewPeriod      *provisioner.Duration `json:"renewPeriod,omitempty"`
+	IDPurl           string                `json:"idpURL,omitempty"`
 }
 
 // IsEnabled returns if the CRL is enabled.
