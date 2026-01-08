@@ -1,33 +1,19 @@
 name: Publish to packages.smallstep.com
 
 # Independently publish packages to Red Hat (RPM) and Debian (DEB) repositories
-# without running a full release. Useful for:
-# - Re-importing packages after a failed/partial release
-# - Rebuilding packages from an existing tag
+# without running a full release. Downloads packages from GitHub releases,
+# uploads to GCS, and imports to Artifact Registry.
 #
 # Usage (CLI):
-#   gh workflow run publish-packages.yml -f tag=v0.28.0 -f mode=import-only
-#   gh workflow run publish-packages.yml -f tag=v0.28.0 -f mode=rebuild
+#   gh workflow run publish-packages.yml -f tag=v0.28.0
 
 on:
   workflow_dispatch:
     inputs:
       tag:
-        description: |
-          Git tag to publish (e.g., v0.28.0).
-          Pre-release tags (-rc) are blocked.
+        description: 'Git tag to publish (e.g., v0.28.0)'
         required: true
         type: string
-      mode:
-        description: |
-          import-only: Import existing packages from GCS (~30s)
-          rebuild: Build packages, upload to GCS, then import (~5-10min)
-        required: true
-        type: choice
-        options:
-          - import-only
-          - rebuild
-        default: import-only
 
 jobs:
   publish:
@@ -36,17 +22,8 @@ jobs:
       id-token: write
       contents: read
     steps:
-      - name: Validate tag (block pre-releases)
-        run: |
-          if [[ "$TAG" == *"-rc"* ]]; then
-            echo "::error::Pre-release tags (-rc) cannot be published to production repos"
-            exit 1
-          fi
-        env:
-          TAG: ${{ inputs.tag }}
-
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8 # v6.0.1
         with:
           ref: ${{ inputs.tag }}
           fetch-depth: 0
@@ -57,52 +34,44 @@ jobs:
         env:
           TAG: ${{ inputs.tag }}
 
+      - name: Is Pre-release
+        id: is_prerelease
+        run: |
+          if [[ "$TAG" == *"-rc"* ]]; then
+            echo "is_prerelease=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "is_prerelease=false" >> "$GITHUB_OUTPUT"
+          fi
+        env:
+          TAG: ${{ inputs.tag }}
+
       - name: Authenticate to Google Cloud
-        uses: google-github-actions/auth@v2
+        uses: google-github-actions/auth@7c6bc770dae815cd3e89ee6cdf493a5fab2cc093 # v3.0.0
         with:
           workload_identity_provider: ${{ secrets.GOOGLE_CLOUD_WORKLOAD_IDENTITY_PROVIDER }}
           service_account: ${{ secrets.GOOGLE_CLOUD_GITHUB_SERVICE_ACCOUNT }}
 
       - name: Set up Cloud SDK
-        uses: google-github-actions/setup-gcloud@v2
+        uses: google-github-actions/setup-gcloud@aa5489c8933f4cc7a4f7d45035b3b1440c9c10db # v3.0.1
         with:
           project_id: ${{ secrets.GOOGLE_CLOUD_PACKAGES_PROJECT_ID }}
 
-      # === REBUILD MODE ONLY ===
-      - name: Set up Go
-        if: inputs.mode == 'rebuild'
-        uses: actions/setup-go@v5
-        with:
-          go-version: stable
-
-      - name: Write GPG key
-        if: inputs.mode == 'rebuild'
-        run: echo "${{ secrets.GPG_PRIVATE_KEY }}" > "$GPG_PRIVATE_KEY_FILE"
+      - name: Download packages from GitHub release
+        run: |
+          mkdir -p dist
+          gh release download "$TAG" --pattern "*${VERSION}*.deb" --pattern "*${VERSION}*.rpm" --dir dist
         env:
-          GPG_PRIVATE_KEY_FILE: "0x889B19391F774443-Certify.key"
-
-      - name: Run GoReleaser (build packages only)
-        if: inputs.mode == 'rebuild'
-        uses: goreleaser/goreleaser-action@v6
-        with:
-          distribution: goreleaser-pro
-          version: "~> v2"
-          args: release --clean --skip=announce,publish
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          GORELEASER_KEY: ${{ secrets.GORELEASER_KEY }}
-          NFPM_PASSPHRASE: ${{ secrets.GPG_PRIVATE_KEY_PASSWORD }}
-          GPG_PRIVATE_KEY_FILE: "0x889B19391F774443-Certify.key"
+          TAG: ${{ inputs.tag }}
+          VERSION: ${{ steps.version.outputs.version }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Upload packages to GCS
-        if: inputs.mode == 'rebuild'
         run: |
           for pkg in dist/*.deb dist/*.rpm; do
             ./scripts/package-upload.sh "$pkg" step-ca ${{ steps.version.outputs.version }}
           done
 
-      # === BOTH MODES ===
       - name: Import packages to Artifact Registry
         run: ./scripts/package-repo-import.sh step-ca ${{ steps.version.outputs.version }}
         env:
-          IS_PRERELEASE: 'false'
+          IS_PRERELEASE: ${{ steps.is_prerelease.outputs.is_prerelease }}
