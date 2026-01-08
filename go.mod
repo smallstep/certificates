@@ -174,3 +174,5 @@ require (
 	google.golang.org/grpc/cmd/protoc-gen-go-grpc v1.5.1 // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 )
+
+replace github.com/smallstep/linkedca => github.com/jbpin/linkedca v0.0.0-20251224103807-5e7deb3d4d49
