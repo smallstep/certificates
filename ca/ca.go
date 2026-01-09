@@ -262,6 +262,9 @@ func (ca *CA) Init(cfg *config.Config) (*CA, error) {
 	// ACME Router is only available if we have a database.
 	var acmeDB acme.DB
 	var acmeLinker acme.Linker
+	if cfg.DB == nil && auth.HasACMEProvisioner() {
+		log.Println("WARNING: No database is configured. ACME provisioners are disabled.")
+	}
 	if cfg.DB != nil {
 		acmeDB, err = acmeNoSQL.New(auth.GetDatabase().(nosql.DB))
 		if err != nil {
