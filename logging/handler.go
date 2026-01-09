@@ -1,14 +1,13 @@
 package logging
 
 import (
+	"log/slog"
 	"net"
 	"net/http"
 	"os"
 	"strconv"
 	"strings"
 	"time"
-
-	"github.com/sirupsen/logrus"
 
 	"github.com/smallstep/certificates/internal/userid"
 	"github.com/smallstep/certificates/middleware/requestid"
@@ -25,7 +24,7 @@ var (
 // LoggerHandler creates a logger handler
 type LoggerHandler struct {
 	name    string
-	logger  *logrus.Logger
+	logger  *slog.Logger
 	options options
 	next    http.Handler
 }
@@ -104,38 +103,39 @@ func (l *LoggerHandler) writeEntry(w ResponseLogger, r *http.Request, t time.Tim
 
 	status := w.StatusCode()
 
-	fields := logrus.Fields{
-		"request-id":     requestID,
-		"remote-address": addr,
-		"name":           l.name,
-		"user-id":        userID,
-		"time":           t.Format(time.RFC3339),
-		"duration-ns":    d.Nanoseconds(),
-		"duration":       d.String(),
-		"method":         r.Method,
-		"path":           uri,
-		"protocol":       r.Proto,
-		"status":         status,
-		"size":           w.Size(),
-		"referer":        sanitizeLogEntry(r.Referer()),
-		"user-agent":     sanitizeLogEntry(r.UserAgent()),
+	attrs := []slog.Attr{
+		slog.String("request-id", requestID),
+		slog.String("remote-address", addr),
+		slog.String("name", l.name),
+		slog.String("user-id", userID),
+		slog.String("time", t.Format(time.RFC3339)),
+		slog.Int64("duration-ns", d.Nanoseconds()),
+		slog.String("duration", d.String()),
+		slog.String("method", r.Method),
+		slog.String("path", uri),
+		slog.String("protocol", r.Proto),
+		slog.Int("status", status),
+		slog.Int("size", w.Size()),
+		slog.String("referer", sanitizeLogEntry(r.Referer())),
+		slog.String("user-agent", sanitizeLogEntry(r.UserAgent())),
 	}
 
+	// Add additional fields from ResponseLogger
 	for k, v := range w.Fields() {
-		fields[k] = v
+		attrs = append(attrs, slog.Any(k, v))
 	}
 
 	switch {
 	case status < http.StatusBadRequest:
 		if l.options.onlyTraceHealthEndpoint && uri == "/health" {
-			l.logger.WithFields(fields).Trace()
+			l.logger.LogAttrs(r.Context(), slog.LevelDebug-1, "", attrs...) // Use Debug-1 as trace level
 		} else {
-			l.logger.WithFields(fields).Info()
+			l.logger.LogAttrs(r.Context(), slog.LevelInfo, "", attrs...)
 		}
 	case status < http.StatusInternalServerError:
-		l.logger.WithFields(fields).Warn()
+		l.logger.LogAttrs(r.Context(), slog.LevelWarn, "", attrs...)
 	default:
-		l.logger.WithFields(fields).Error()
+		l.logger.LogAttrs(r.Context(), slog.LevelError, "", attrs...)
 	}
 }
 

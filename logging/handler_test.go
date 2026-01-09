@@ -1,16 +1,78 @@
 package logging
 
 import (
+	"context"
 	"fmt"
+	"log/slog"
 	"net/http"
 	"net/http/httptest"
+	"sync"
 	"testing"
 
 	"github.com/smallstep/assert"
-
-	"github.com/sirupsen/logrus"
-	"github.com/sirupsen/logrus/hooks/test"
 )
+
+// testHandler is a custom slog handler for testing that records log entries
+type testHandler struct {
+	mu      sync.Mutex
+	entries []testEntry
+}
+
+type testEntry struct {
+	level   slog.Level
+	message string
+	attrs   map[string]interface{}
+}
+
+func newTestHandler() *testHandler {
+	return &testHandler{
+		entries: make([]testEntry, 0),
+	}
+}
+
+func (h *testHandler) Enabled(_ context.Context, level slog.Level) bool {
+	return true
+}
+
+func (h *testHandler) Handle(_ context.Context, record slog.Record) error {
+	h.mu.Lock()
+	defer h.mu.Unlock()
+
+	attrs := make(map[string]interface{})
+	record.Attrs(func(attr slog.Attr) bool {
+		attrs[attr.Key] = attr.Value.Any()
+		return true
+	})
+
+	h.entries = append(h.entries, testEntry{
+		level:   record.Level,
+		message: record.Message,
+		attrs:   attrs,
+	})
+	return nil
+}
+
+func (h *testHandler) WithAttrs(attrs []slog.Attr) slog.Handler {
+	return h
+}
+
+func (h *testHandler) WithGroup(name string) slog.Handler {
+	return h
+}
+
+func (h *testHandler) getEntries() []testEntry {
+	h.mu.Lock()
+	defer h.mu.Unlock()
+	return append([]testEntry(nil), h.entries...)
+}
+
+func (h *testHandler) lastEntry() *testEntry {
+	entries := h.getEntries()
+	if len(entries) == 0 {
+		return nil
+	}
+	return &entries[len(entries)-1]
+}
 
 // TestHealthOKHandling ensures that http requests from the Kubernetes
 // liveness/readiness probes are only logged at Trace level if they are HTTP
@@ -29,13 +91,13 @@ func TestHealthOKHandling(t *testing.T) {
 		path    string
 		options options
 		handler http.HandlerFunc
-		want    logrus.Level
+		want    slog.Level
 	}{
 		{
 			name:    "200 should be logged at Info level for /health request without explicit opt-in",
 			path:    "/health",
 			handler: statusHandler(http.StatusOK),
-			want:    logrus.InfoLevel,
+			want:    slog.LevelInfo,
 		},
 		{
 			name: "200 should be logged only at Trace level for /health request if opt-in",
@@ -44,14 +106,15 @@ func TestHealthOKHandling(t *testing.T) {
 				onlyTraceHealthEndpoint: true,
 			},
 			handler: statusHandler(http.StatusOK),
-			want:    logrus.TraceLevel,
+			want:    slog.LevelDebug - 1, // Trace level
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			logger, hook := test.NewNullLogger()
-			logger.SetLevel(logrus.TraceLevel)
+			testHandler := newTestHandler()
+			logger := slog.New(testHandler)
+
 			l := &LoggerHandler{
 				logger:  logger,
 				options: tt.options,
@@ -62,8 +125,9 @@ func TestHealthOKHandling(t *testing.T) {
 			w := httptest.NewRecorder()
 			l.ServeHTTP(w, r)
 
-			if assert.Equals(t, 1, len(hook.AllEntries())) {
-				assert.Equals(t, tt.want, hook.LastEntry().Level)
+			entries := testHandler.getEntries()
+			if assert.Equals(t, 1, len(entries)) {
+				assert.Equals(t, tt.want, entries[0].level)
 			}
 		})
 	}
@@ -85,45 +149,46 @@ func TestHandlingRegardlessOfOptions(t *testing.T) {
 		name    string
 		path    string
 		handler http.HandlerFunc
-		want    logrus.Level
+		want    slog.Level
 	}{
 		{
 			name:    "200 should be logged at Info level for non-health requests",
 			path:    "/info",
 			handler: statusHandler(http.StatusOK),
-			want:    logrus.InfoLevel,
+			want:    slog.LevelInfo,
 		},
 		{
 			name:    "400 should be logged at Warn level for non-health requests",
 			path:    "/info",
 			handler: statusHandler(http.StatusBadRequest),
-			want:    logrus.WarnLevel,
+			want:    slog.LevelWarn,
 		},
 		{
 			name:    "500 should be logged at Error level for non-health requests",
 			path:    "/info",
 			handler: statusHandler(http.StatusInternalServerError),
-			want:    logrus.ErrorLevel,
+			want:    slog.LevelError,
 		},
 		{
 			name:    "400 should be logged at Warn level even for /health requests",
 			path:    "/health",
 			handler: statusHandler(http.StatusBadRequest),
-			want:    logrus.WarnLevel,
+			want:    slog.LevelWarn,
 		},
 		{
 			name:    "500 should be logged at Error level even for /health requests",
 			path:    "/health",
 			handler: statusHandler(http.StatusInternalServerError),
-			want:    logrus.ErrorLevel,
+			want:    slog.LevelError,
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			for _, b := range []bool{true, false} {
-				logger, hook := test.NewNullLogger()
-				logger.SetLevel(logrus.TraceLevel)
+				testHandler := newTestHandler()
+				logger := slog.New(testHandler)
+
 				l := &LoggerHandler{
 					logger: logger,
 					options: options{
@@ -136,8 +201,9 @@ func TestHandlingRegardlessOfOptions(t *testing.T) {
 				w := httptest.NewRecorder()
 				l.ServeHTTP(w, r)
 
-				if assert.Equals(t, 1, len(hook.AllEntries())) {
-					assert.Equals(t, tt.want, hook.LastEntry().Level)
+				entries := testHandler.getEntries()
+				if assert.Equals(t, 1, len(entries)) {
+					assert.Equals(t, tt.want, entries[0].level)
 				}
 			}
 		})
@@ -239,9 +305,9 @@ func TestLogRealIP(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Setenv("STEP_LOGGER_LOG_REAL_IP", tt.logRealIP)
 
-			baseLogger, hook := test.NewNullLogger()
+			testHandler := newTestHandler()
 			logger := &Logger{
-				Logger: baseLogger,
+				Logger: slog.New(testHandler),
 			}
 			l := NewLoggerHandler("test", logger, statusHandler(http.StatusOK))
 
@@ -253,9 +319,10 @@ func TestLogRealIP(t *testing.T) {
 			w := httptest.NewRecorder()
 			l.ServeHTTP(w, r)
 
-			if assert.Equals(t, 1, len(hook.AllEntries())) {
-				entry := hook.LastEntry()
-				assert.Equals(t, tt.expected, entry.Data["remote-address"])
+			entries := testHandler.getEntries()
+			if assert.Equals(t, 1, len(entries)) {
+				entry := entries[0]
+				assert.Equals(t, tt.expected, entry.attrs["remote-address"])
 			}
 		})
 	}
