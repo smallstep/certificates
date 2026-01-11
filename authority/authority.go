@@ -988,6 +988,16 @@ func (a *Authority) GetSCEP() *scep.Authority {
 	return a.scepAuthority
 }
 
+// HasACMEProvisioner returns true if at least one ACME provisioner is configured.
+func (a *Authority) HasACMEProvisioner() bool {
+	for _, p := range a.config.AuthorityConfig.Provisioners {
+		if p.GetType() == provisioner.TypeACME {
+			return true
+		}
+	}
+	return false
+}
+
 func (a *Authority) startCRLGenerator() error {
 	if !a.config.CRL.IsEnabled() {
 		return nil
