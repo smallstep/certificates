@@ -110,7 +110,7 @@ func (c *Client) GetClientTLSConfig(ctx context.Context, sign *api.SignResponse,
 	return tlsConfig, nil
 }
 
-func (c *Client) getClientTLSConfig(ctx context.Context, sign *api.SignResponse, pk crypto.PrivateKey, options []TLSOption) (*tls.Config, *http.Transport, error) {
+func (c *Client) getClientTLSConfig(ctx context.Context, sign *api.SignResponse, pk crypto.PrivateKey, options []TLSOption) (*tls.Config, http.RoundTripper, error) {
 	cert, err := TLSCertificate(sign, pk)
 	if err != nil {
 		return nil, nil, err
@@ -133,14 +133,17 @@ func (c *Client) getClientTLSConfig(ctx context.Context, sign *api.SignResponse,
 
 	tr := getDefaultTransport(tlsConfig)
 	tr.DialTLSContext = c.buildDialTLSContext(tlsCtx)
-	renewer.RenewCertificate = getRenewFunc(tlsCtx, c, tr, pk) //nolint:contextcheck // deeply nested context
+
+	// Add decorator if necessary and use this round tripper going forward
+	rt := getTransportWithDecorator(tr, c.transportDecorator)
+	renewer.RenewCertificate = getRenewFunc(tlsCtx, c, rt, pk) //nolint:contextcheck // deeply nested context
 
 	// Update client transport
-	c.SetTransport(tr)
+	c.SetTransport(rt)
 
 	// Start renewer
 	renewer.RunContext(ctx)
-	return tlsConfig, tr, nil
+	return tlsConfig, rt, nil
 }
 
 // GetServerTLSConfig returns a tls.Config for server use configured with the
@@ -179,10 +182,13 @@ func (c *Client) GetServerTLSConfig(ctx context.Context, sign *api.SignResponse,
 	// Update renew function with transport
 	tr := getDefaultTransport(tlsConfig)
 	tr.DialTLSContext = c.buildDialTLSContext(tlsCtx)
-	renewer.RenewCertificate = getRenewFunc(tlsCtx, c, tr, pk) //nolint:contextcheck // deeply nested context
+
+	// Add decorator if necessary and use this round tripper going forward
+	rt := getTransportWithDecorator(tr, c.transportDecorator)
+	renewer.RenewCertificate = getRenewFunc(tlsCtx, c, rt, pk) //nolint:contextcheck // deeply nested context
 
 	// Update client transport
-	c.SetTransport(tr)
+	c.SetTransport(rt)
 
 	// Start renewer
 	renewer.RunContext(ctx)
@@ -190,7 +196,7 @@ func (c *Client) GetServerTLSConfig(ctx context.Context, sign *api.SignResponse,
 }
 
 // Transport returns an http.Transport configured to use the client certificate from the sign response.
-func (c *Client) Transport(ctx context.Context, sign *api.SignResponse, pk crypto.PrivateKey, options ...TLSOption) (*http.Transport, error) {
+func (c *Client) Transport(ctx context.Context, sign *api.SignResponse, pk crypto.PrivateKey, options ...TLSOption) (http.RoundTripper, error) {
 	_, tr, err := c.getClientTLSConfig(ctx, sign, pk, options)
 	if err != nil {
 		return nil, err
@@ -365,7 +371,7 @@ func getPEM(i interface{}) ([]byte, error) {
 	return pem.EncodeToMemory(block), nil
 }
 
-func getRenewFunc(ctx *TLSOptionCtx, client *Client, tr *http.Transport, pk crypto.PrivateKey) RenewFunc {
+func getRenewFunc(ctx *TLSOptionCtx, client *Client, tr http.RoundTripper, pk crypto.PrivateKey) RenewFunc {
 	return func() (*tls.Certificate, error) {
 		// Close connections in keep-alive state
 		defer client.CloseIdleConnections()
