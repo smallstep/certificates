@@ -135,7 +135,7 @@ func (c *Client) getClientTLSConfig(ctx context.Context, sign *api.SignResponse,
 	tr.DialTLSContext = c.buildDialTLSContext(tlsCtx)
 
 	// Add decorator if necessary and use this round tripper going forward
-	rt := getTransportWithDecorator(tr, c.transportDecorator)
+	rt := decorateTransport(tr, c.transportDecorator)
 	renewer.RenewCertificate = getRenewFunc(tlsCtx, c, rt, pk) //nolint:contextcheck // deeply nested context
 
 	// Update client transport
@@ -184,7 +184,7 @@ func (c *Client) GetServerTLSConfig(ctx context.Context, sign *api.SignResponse,
 	tr.DialTLSContext = c.buildDialTLSContext(tlsCtx)
 
 	// Add decorator if necessary and use this round tripper going forward
-	rt := getTransportWithDecorator(tr, c.transportDecorator)
+	rt := decorateTransport(tr, c.transportDecorator)
 	renewer.RenewCertificate = getRenewFunc(tlsCtx, c, rt, pk) //nolint:contextcheck // deeply nested context
 
 	// Update client transport

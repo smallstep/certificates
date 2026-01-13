@@ -153,7 +153,7 @@ type RetryFunc func(code int) bool
 // ClientOption is the type of options passed to the Client constructor.
 type ClientOption func(o *clientOptions) error
 
-// TransportDecorator is the type used to allows customization of the HTTP
+// TransportDecorator is the type used to support customization of the HTTP
 // transport.
 type TransportDecorator func(http.RoundTripper) http.RoundTripper
 
@@ -278,7 +278,7 @@ func (o *clientOptions) getTransport(endpoint string) (tr http.RoundTripper, err
 	}
 
 	// Wrap the transport using the decorator function if necessary
-	return getTransportWithDecorator(tr, o.transportDecorator), nil
+	return decorateTransport(tr, o.transportDecorator), nil
 }
 
 // WithTransport adds a custom transport to the Client. It will fail if a
@@ -293,9 +293,9 @@ func WithTransport(tr http.RoundTripper) ClientOption {
 	}
 }
 
-// WithTransportDecorator allows customization of the HTTP transport used by the client.
-// The provided function receives the configured http.RoundTripper and can wrap it
-// with additional functionality.
+// WithTransportDecorator allows customization of the HTTP transport used by the
+// client. The provided function receives the configured [http.RoundTripper] and
+// can wrap it with additional functionality.
 func WithTransportDecorator(fn TransportDecorator) ClientOption {
 	return func(o *clientOptions) error {
 		o.transportDecorator = fn
@@ -1602,7 +1602,7 @@ func clientError(err error) error {
 	return fmt.Errorf("client request failed: %w", err)
 }
 
-func getTransportWithDecorator(tr http.RoundTripper, td TransportDecorator) http.RoundTripper {
+func decorateTransport(tr http.RoundTripper, td TransportDecorator) http.RoundTripper {
 	if td != nil {
 		return td(tr)
 	}
