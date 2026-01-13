@@ -134,7 +134,8 @@ func (c *Client) getClientTLSConfig(ctx context.Context, sign *api.SignResponse,
 	tr := getDefaultTransport(tlsConfig)
 	tr.DialTLSContext = c.buildDialTLSContext(tlsCtx)
 
-	// Add decorator if necessary and use this round tripper going forward
+	// Add decorator if available, and use the resulting [http.RoundTripper]
+	// going forward
 	rt := decorateTransport(tr, c.transportDecorator)
 	renewer.RenewCertificate = getRenewFunc(tlsCtx, c, rt, pk) //nolint:contextcheck // deeply nested context
 
@@ -183,7 +184,8 @@ func (c *Client) GetServerTLSConfig(ctx context.Context, sign *api.SignResponse,
 	tr := getDefaultTransport(tlsConfig)
 	tr.DialTLSContext = c.buildDialTLSContext(tlsCtx)
 
-	// Add decorator if necessary and use this round tripper going forward
+	// Add decorator if available, and use the resulting [http.RoundTripper]
+	// going forward
 	rt := decorateTransport(tr, c.transportDecorator)
 	renewer.RenewCertificate = getRenewFunc(tlsCtx, c, rt, pk) //nolint:contextcheck // deeply nested context
 
@@ -195,7 +197,8 @@ func (c *Client) GetServerTLSConfig(ctx context.Context, sign *api.SignResponse,
 	return tlsConfig, nil
 }
 
-// Transport returns an http.Transport configured to use the client certificate from the sign response.
+// Transport returns an [http.RoundTripper] configured to use the client
+// certificate from the sign response.
 func (c *Client) Transport(ctx context.Context, sign *api.SignResponse, pk crypto.PrivateKey, options ...TLSOption) (http.RoundTripper, error) {
 	_, tr, err := c.getClientTLSConfig(ctx, sign, pk, options)
 	if err != nil {
