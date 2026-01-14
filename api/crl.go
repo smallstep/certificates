@@ -40,7 +40,7 @@ func CRL(w http.ResponseWriter, r *http.Request) {
 		})
 	} else {
 		w.Header().Add("Content-Type", "application/pkix-crl")
-		w.Header().Add("Content-Disposition", "attachment; filename=\"crl.der\"")
+		w.Header().Add("Content-Disposition", "attachment; filename=\"crl.crl\"")
 		w.Write(crlInfo.Data)
 	}
 }
