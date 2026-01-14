@@ -278,7 +278,7 @@ func (o *clientOptions) getTransport(endpoint string) (tr http.RoundTripper, err
 	}
 
 	// Wrap the transport using the decorator function if necessary
-	return decorateTransport(tr, o.transportDecorator), nil
+	return decorateRoundTripper(tr, o.transportDecorator), nil
 }
 
 // WithTransport adds a custom transport to the Client. It will fail if a
@@ -1602,7 +1602,7 @@ func clientError(err error) error {
 	return fmt.Errorf("client request failed: %w", err)
 }
 
-func decorateTransport(tr http.RoundTripper, td TransportDecorator) http.RoundTripper {
+func decorateRoundTripper(tr http.RoundTripper, td TransportDecorator) http.RoundTripper {
 	if td != nil {
 		return td(tr)
 	}

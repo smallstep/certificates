@@ -136,7 +136,7 @@ func (c *Client) getClientTLSConfig(ctx context.Context, sign *api.SignResponse,
 
 	// Add decorator if available, and use the resulting [http.RoundTripper]
 	// going forward
-	rt := decorateTransport(tr, c.transportDecorator)
+	rt := decorateRoundTripper(tr, c.transportDecorator)
 	renewer.RenewCertificate = getRenewFunc(tlsCtx, c, rt, pk) //nolint:contextcheck // deeply nested context
 
 	// Update client transport
@@ -186,7 +186,7 @@ func (c *Client) GetServerTLSConfig(ctx context.Context, sign *api.SignResponse,
 
 	// Add decorator if available, and use the resulting [http.RoundTripper]
 	// going forward
-	rt := decorateTransport(tr, c.transportDecorator)
+	rt := decorateRoundTripper(tr, c.transportDecorator)
 	renewer.RenewCertificate = getRenewFunc(tlsCtx, c, rt, pk) //nolint:contextcheck // deeply nested context
 
 	// Update client transport
