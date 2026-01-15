@@ -2,25 +2,27 @@ package logging
 
 import (
 	"encoding/json"
+	"io"
+	"log/slog"
 	"net/http"
 	"os"
 	"strings"
 
 	"github.com/pkg/errors"
-	"github.com/sirupsen/logrus"
 )
 
 // defaultTraceIdHeader is the default header used as a trace id.
 const defaultTraceIDHeader = "X-Smallstep-Id"
 
 // ErrorKey defines the key used to log errors.
-var ErrorKey = logrus.ErrorKey
+const ErrorKey = "error"
 
-// Logger is an alias of logrus.Logger.
+// Logger wraps slog.Logger with additional functionality.
 type Logger struct {
-	*logrus.Logger
+	*slog.Logger
 	name        string
 	traceHeader string
+	handler     slog.Handler
 }
 
 // loggerConfig represents the configuration options for the logger.
@@ -36,37 +38,42 @@ func New(name string, raw json.RawMessage) (*Logger, error) {
 		return nil, errors.Wrap(err, "error unmarshalling logging attribute")
 	}
 
-	var formatter logrus.Formatter
+	var output io.Writer = os.Stderr
+	var handler slog.Handler
+
 	switch strings.ToLower(config.Format) {
 	case "", "text":
 		_, noColor := os.LookupEnv("NO_COLOR")
-		// With EnvironmentOverrideColors set, logrus looks at CLICOLOR and
-		// CLICOLOR_FORCE
-		formatter = &logrus.TextFormatter{
-			DisableColors:             noColor,
-			EnvironmentOverrideColors: true,
+		opts := &slog.HandlerOptions{
+			Level: slog.LevelDebug,
+		}
+		if noColor {
+			handler = slog.NewTextHandler(output, opts)
+		} else {
+			handler = slog.NewTextHandler(output, opts)
 		}
 	case "json":
-		formatter = new(logrus.JSONFormatter)
+		opts := &slog.HandlerOptions{
+			Level: slog.LevelDebug,
+		}
+		handler = slog.NewJSONHandler(output, opts)
 	case "common":
-		formatter = new(CommonLogFormat)
+		handler = &CommonLogFormat{output: output}
 	default:
 		return nil, errors.Errorf("unsupported logger.format '%s'", config.Format)
 	}
 
 	logger := &Logger{
-		Logger:      logrus.New(),
+		Logger:      slog.New(handler),
 		name:        name,
 		traceHeader: config.TraceHeader,
-	}
-	if formatter != nil {
-		logger.Formatter = formatter
+		handler:     handler,
 	}
 	return logger, nil
 }
 
 // GetImpl returns the real implementation of the logger.
-func (l *Logger) GetImpl() *logrus.Logger {
+func (l *Logger) GetImpl() *slog.Logger {
 	return l.Logger
 }
 
