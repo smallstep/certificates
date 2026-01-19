@@ -266,8 +266,10 @@ func TestClient_GetServerTLSConfig_renew(t *testing.T) {
 
 	// Transport
 	client, sr, pk = signDuration(t, ca, clientDomain, 5*time.Second)
-	tr1, err := client.Transport(context.Background(), sr, pk)
+	tr, err := client.Transport(context.Background(), sr, pk)
 	require.NoError(t, err)
+	tr1, ok := tr.(*http.Transport)
+	require.True(t, ok)
 
 	// Transport with tlsConfig
 	client, sr, pk = signDuration(t, ca, clientDomain, 5*time.Second)

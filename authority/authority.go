@@ -770,7 +770,11 @@ func (a *Authority) init() error {
 						// only pass the decrypter down when it was successfully created,
 						// meaning it's an RSA key, and `CreateDecrypter` did not fail.
 						options.Decrypter = decrypter
-						options.DecrypterCert = options.Intermediates[0]
+
+						// intermediate certificates can be empty in RA mode
+						if len(options.Intermediates) > 0 {
+							options.DecrypterCert = options.Intermediates[0]
+						}
 					}
 				}
 			}
@@ -1042,11 +1046,10 @@ func (a *Authority) GetSCEP() *scep.Authority {
 	return a.scepAuthority
 }
 
-// requiresEST iterates over the configured provisioners
-// and determines if at least one of them is an EST provisioner.
-func (a *Authority) requiresEST() bool {
+// HasACMEProvisioner returns true if at least one ACME provisioner is configured.
+func (a *Authority) HasACMEProvisioner() bool {
 	for _, p := range a.config.AuthorityConfig.Provisioners {
-		if p.GetType() == provisioner.TypeEST {
+		if p.GetType() == provisioner.TypeACME {
 			return true
 		}
 	}
@@ -1068,6 +1071,17 @@ func (a *Authority) getESTProvisionerNames() (names []string) {
 // GetEST returns the configured EST Authority
 func (a *Authority) GetEST() *est.Authority {
 	return a.estAuthority
+}
+
+// requiresEST iterates over the configured provisioners
+// and determines if at least one of them is an EST provisioner.
+func (a *Authority) requiresEST() bool {
+	for _, p := range a.config.AuthorityConfig.Provisioners {
+		if p.GetType() == provisioner.TypeEST {
+			return true
+		}
+	}
+	return false
 }
 
 func (a *Authority) startCRLGenerator() error {

@@ -1045,6 +1045,43 @@ func TestClient_WithTimeout(t *testing.T) {
 	}
 }
 
+type decoratedRoundTripper func(*http.Request) (*http.Response, error)
+
+func (rt decoratedRoundTripper) RoundTrip(req *http.Request) (*http.Response, error) {
+	return rt(req)
+}
+
+func TestClient_WithTransportDecorator(t *testing.T) {
+	var srv *httptest.Server
+	srv = httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if strings.HasPrefix(r.RequestURI, "/root") {
+			render.JSONStatus(w, r, api.RootResponse{
+				RootPEM: api.NewCertificate(srv.Certificate()),
+			}, 200)
+			return
+		}
+
+		if s := r.Header.Get("X-Test-Header"); s != "" {
+			render.JSONStatus(w, r, api.HealthResponse{Status: s}, 200)
+		} else {
+			render.JSONStatus(w, r, api.HealthResponse{Status: "ok"}, 200)
+		}
+	}))
+	defer srv.Close()
+
+	fp := x509util.Fingerprint(srv.Certificate())
+	c, err := NewClient(srv.URL, WithRootSHA256(fp), WithTransportDecorator(func(tr http.RoundTripper) http.RoundTripper {
+		return decoratedRoundTripper(func(r *http.Request) (*http.Response, error) {
+			r.Header.Add("X-Test-Header", "some-data")
+			return tr.RoundTrip(r)
+		})
+	}))
+	require.NoError(t, err)
+	resp, err := c.Health()
+	require.NoError(t, err)
+	assert.Equal(t, "some-data", resp.Status)
+}
+
 func Test_enforceRequestID(t *testing.T) {
 	set := httptest.NewRequest(http.MethodGet, "https://example.com", http.NoBody)
 	set.Header.Set("X-Request-Id", "already-set")

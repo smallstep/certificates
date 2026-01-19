@@ -231,7 +231,7 @@ func tlsAlert(err error) uint8 {
 	if errors.As(err, &opErr) {
 		v := reflect.ValueOf(opErr.Err)
 		if v.Kind() == reflect.Uint8 {
-			return uint8(v.Uint()) //nolint:gosec // handled by checking its type
+			return cast.Uint8(v.Uint())
 		}
 	}
 	return 0
