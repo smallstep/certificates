@@ -122,6 +122,30 @@ func WithX5CCertificate(leaf *x509.Certificate) RequestBodyOption {
 	}
 }
 
+func WithClientCertificate(cert *x509.Certificate) RequestBodyOption {
+	return func(rb *RequestBody) error {
+		certificate, err := x509util.NewCertificateFromX509(cert)
+		if err != nil {
+			return err
+		}
+		rb.ClientCertificate = &X509Certificate{
+			Raw:                cert.Raw,
+			PublicKeyAlgorithm: cert.PublicKeyAlgorithm.String(),
+			NotBefore:          cert.NotBefore,
+			NotAfter:           cert.NotAfter,
+			Certificate:        certificate,
+		}
+		if cert.PublicKey != nil {
+			key, err := x509.MarshalPKIXPublicKey(cert.PublicKey)
+			if err != nil {
+				return err
+			}
+			rb.ClientCertificate.PublicKey = key
+		}
+		return nil
+	}
+}
+
 func WithAuthenticationHeader(header string) RequestBodyOption {
 	return func(rb *RequestBody) error {
 		rb.AuthenticationHeader = header

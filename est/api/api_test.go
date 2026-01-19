@@ -57,7 +57,7 @@ func Test_writeResponse(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			writeResponse(tt.args.w, tt.args.r, tt.args.data, tt.args.contentType, tt.args.status)
+			writeResponse(tt.args.w, tt.args.data, tt.args.contentType, tt.args.status)
 			resp := tt.args.w.(*httptest.ResponseRecorder)
 
 			assert.Equal(t, tt.args.status, resp.Code)
