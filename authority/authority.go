@@ -757,7 +757,11 @@ func (a *Authority) init() error {
 						// only pass the decrypter down when it was successfully created,
 						// meaning it's an RSA key, and `CreateDecrypter` did not fail.
 						options.Decrypter = decrypter
-						options.DecrypterCert = options.Intermediates[0]
+
+						// intermediate certificates can be empty in RA mode
+						if len(options.Intermediates) > 0 {
+							options.DecrypterCert = options.Intermediates[0]
+						}
 					}
 				}
 			}
@@ -982,6 +986,16 @@ func (a *Authority) getSCEPProvisionerNames() (names []string) {
 // GetSCEP returns the configured SCEP Authority
 func (a *Authority) GetSCEP() *scep.Authority {
 	return a.scepAuthority
+}
+
+// HasACMEProvisioner returns true if at least one ACME provisioner is configured.
+func (a *Authority) HasACMEProvisioner() bool {
+	for _, p := range a.config.AuthorityConfig.Provisioners {
+		if p.GetType() == provisioner.TypeACME {
+			return true
+		}
+	}
+	return false
 }
 
 func (a *Authority) startCRLGenerator() error {

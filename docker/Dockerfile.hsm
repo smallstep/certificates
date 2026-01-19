@@ -1,4 +1,4 @@
-FROM golang:bookworm AS builder
+FROM golang:trixie AS builder
 
 WORKDIR /src
 COPY . .
@@ -9,16 +9,16 @@ RUN apt-get install -y --no-install-recommends \
 RUN make V=1 GO_ENVS="CGO_ENABLED=1" bin/step-ca
 RUN setcap CAP_NET_BIND_SERVICE=+eip bin/step-ca
 
-FROM smallstep/step-kms-plugin:bookworm AS kms
+FROM smallstep/step-kms-plugin:trixie AS kms
 
-FROM smallstep/step-cli:bookworm
+FROM smallstep/step-cli:trixie
 
 COPY --from=builder /src/bin/step-ca /usr/local/bin/step-ca
 COPY --from=kms /usr/local/bin/step-kms-plugin /usr/local/bin/step-kms-plugin
 
 USER root
 RUN apt-get update
-RUN apt-get install -y --no-install-recommends opensc opensc-pkcs11 pcscd gnutls-bin libpcsclite1 p11-kit
+RUN apt-get install -y --no-install-recommends opensc opensc-pkcs11 pcscd gnutls-bin libpcsclite1 p11-kit yubihsm-pkcs11
 RUN mkdir -p /run/pcscd
 RUN chown step:step /run/pcscd
 USER step
@@ -33,4 +33,4 @@ HEALTHCHECK CMD step ca health 2>/dev/null | grep "^ok" >/dev/null
 COPY docker/entrypoint.sh /entrypoint.sh
 
 ENTRYPOINT ["/bin/bash", "/entrypoint.sh"]
-CMD exec /usr/local/bin/step-ca --password-file $PWDPATH $CONFIGPATH
+CMD ["/usr/local/bin/step-ca", "--password-file", "/home/step/secrets/password", "/home/step/config/ca.json"]

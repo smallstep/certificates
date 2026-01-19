@@ -80,6 +80,10 @@ func (c *uaClient) SetTransport(tr http.RoundTripper) {
 	c.Client.Transport = tr
 }
 
+func (c *uaClient) CloseIdleConnections() {
+	c.Client.CloseIdleConnections()
+}
+
 func (c *uaClient) Get(u string) (*http.Response, error) {
 	return c.GetWithContext(context.Background(), u)
 }
@@ -149,8 +153,13 @@ type RetryFunc func(code int) bool
 // ClientOption is the type of options passed to the Client constructor.
 type ClientOption func(o *clientOptions) error
 
+// TransportDecorator is the type used to support customization of the HTTP
+// transport.
+type TransportDecorator func(http.RoundTripper) http.RoundTripper
+
 type clientOptions struct {
 	transport            http.RoundTripper
+	transportDecorator   TransportDecorator
 	timeout              time.Duration
 	rootSHA256           string
 	rootFilename         string
@@ -268,7 +277,8 @@ func (o *clientOptions) getTransport(endpoint string) (tr http.RoundTripper, err
 		}
 	}
 
-	return tr, nil
+	// Wrap the transport using the decorator function if necessary
+	return decorateRoundTripper(tr, o.transportDecorator), nil
 }
 
 // WithTransport adds a custom transport to the Client. It will fail if a
@@ -279,6 +289,16 @@ func WithTransport(tr http.RoundTripper) ClientOption {
 			return err
 		}
 		o.transport = tr
+		return nil
+	}
+}
+
+// WithTransportDecorator allows customization of the HTTP transport used by the
+// client. The provided function receives the configured [http.RoundTripper] and
+// can wrap it with additional functionality.
+func WithTransportDecorator(fn TransportDecorator) ClientOption {
+	return func(o *clientOptions) error {
+		o.transportDecorator = fn
 		return nil
 	}
 }
@@ -558,11 +578,12 @@ func WithProvisionerName(name string) ProvisionerOption {
 
 // Client implements an HTTP client for the CA server.
 type Client struct {
-	client    *uaClient
-	endpoint  *url.URL
-	retryFunc RetryFunc
-	timeout   time.Duration
-	opts      []ClientOption
+	client             *uaClient
+	endpoint           *url.URL
+	retryFunc          RetryFunc
+	timeout            time.Duration
+	opts               []ClientOption
+	transportDecorator TransportDecorator
 }
 
 // NewClient creates a new Client with the given endpoint and options.
@@ -583,11 +604,12 @@ func NewClient(endpoint string, opts ...ClientOption) (*Client, error) {
 	}
 
 	return &Client{
-		client:    newClient(tr, o.timeout),
-		endpoint:  u,
-		retryFunc: o.retryFunc,
-		timeout:   o.timeout,
-		opts:      opts,
+		client:             newClient(tr, o.timeout),
+		endpoint:           u,
+		retryFunc:          o.retryFunc,
+		timeout:            o.timeout,
+		opts:               opts,
+		transportDecorator: o.transportDecorator,
 	}, nil
 }
 
@@ -637,6 +659,13 @@ func (c *Client) GetRootCAs() *x509.CertPool {
 // SetTransport updates the transport of the internal HTTP client.
 func (c *Client) SetTransport(tr http.RoundTripper) {
 	c.client.SetTransport(tr)
+}
+
+// CloseIdleConnections closes any connections on its Transport which were
+// previously connected from previous requests but are now sitting idle in a
+// "keep-alive" state. It does not interrupt any connections currently in use.
+func (c *Client) CloseIdleConnections() {
+	c.client.CloseIdleConnections()
 }
 
 // Version performs the version request to the CA with an empty context and returns the
@@ -1571,4 +1600,11 @@ func clientError(err error) error {
 			strings.ToUpper(uerr.Op), uerr.URL, uerr.Err)
 	}
 	return fmt.Errorf("client request failed: %w", err)
+}
+
+func decorateRoundTripper(tr http.RoundTripper, td TransportDecorator) http.RoundTripper {
+	if td != nil {
+		return td(tr)
+	}
+	return tr
 }

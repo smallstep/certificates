@@ -29,8 +29,6 @@ import (
 	"github.com/google/uuid"
 	"github.com/googleapis/gax-go/v2"
 	"github.com/pkg/errors"
-	"github.com/smallstep/certificates/cas/apiv1"
-	kmsapi "go.step.sm/crypto/kms/apiv1"
 	"go.uber.org/mock/gomock"
 	"google.golang.org/api/option"
 	"google.golang.org/grpc"
@@ -39,6 +37,10 @@ import (
 	"google.golang.org/grpc/status"
 	"google.golang.org/grpc/test/bufconn"
 	"google.golang.org/protobuf/types/known/anypb"
+
+	kmsapi "go.step.sm/crypto/kms/apiv1"
+
+	"github.com/smallstep/certificates/cas/apiv1"
 )
 
 var (
@@ -145,6 +147,34 @@ func okTestClient() *testClient {
 	}
 }
 
+func okTestClientRootOnly() *testClient {
+	return &testClient{
+		credentialsFile: "testdata/credentials.json",
+		certificate: &pb.Certificate{
+			Name:                testCertificateName,
+			PemCertificate:      testSignedCertificate,
+			PemCertificateChain: []string{testRootCertificate},
+		},
+		certificateAuthority: &pb.CertificateAuthority{
+			PemCaCertificates: []string{testRootCertificate},
+		},
+	}
+}
+
+func okTestClientWithMultipleIntermediates() *testClient {
+	return &testClient{
+		credentialsFile: "testdata/credentials.json",
+		certificate: &pb.Certificate{
+			Name:                testCertificateName,
+			PemCertificate:      testSignedCertificate,
+			PemCertificateChain: []string{testIntermediateCertificate, testIntermediateCertificate, testIntermediateCertificate, testRootCertificate},
+		},
+		certificateAuthority: &pb.CertificateAuthority{
+			PemCaCertificates: []string{testIntermediateCertificate, testIntermediateCertificate, testIntermediateCertificate, testRootCertificate},
+		},
+	}
+}
+
 func failTestClient() *testClient {
 	return &testClient{
 		credentialsFile: "testdata/credentials.json",
@@ -152,7 +182,7 @@ func failTestClient() *testClient {
 	}
 }
 
-func badTestClient() *testClient {
+func badRootTestClient() *testClient {
 	return &testClient{
 		credentialsFile: "testdata/credentials.json",
 		certificate: &pb.Certificate{
@@ -162,6 +192,20 @@ func badTestClient() *testClient {
 		},
 		certificateAuthority: &pb.CertificateAuthority{
 			PemCaCertificates: []string{testIntermediateCertificate, "not a pem cert"},
+		},
+	}
+}
+
+func badIntermediateTestClient() *testClient {
+	return &testClient{
+		credentialsFile: "testdata/credentials.json",
+		certificate: &pb.Certificate{
+			Name:                testCertificateName,
+			PemCertificate:      "this is not a pem",
+			PemCertificateChain: []string{testIntermediateCertificate, testRootCertificate},
+		},
+		certificateAuthority: &pb.CertificateAuthority{
+			PemCaCertificates: []string{"this intermediate is not a pem", testRootCertificate},
 		},
 	}
 }
@@ -462,6 +506,7 @@ func TestCloudCAS_Type(t *testing.T) {
 }
 
 func TestCloudCAS_GetCertificateAuthority(t *testing.T) {
+	intermediate := mustParseCertificate(t, testIntermediateCertificate)
 	root := mustParseCertificate(t, testRootCertificate)
 	type fields struct {
 		client               CertificateAuthorityClient
@@ -478,15 +523,26 @@ func TestCloudCAS_GetCertificateAuthority(t *testing.T) {
 		wantErr bool
 	}{
 		{"ok", fields{okTestClient(), testCertificateName}, args{&apiv1.GetCertificateAuthorityRequest{}}, &apiv1.GetCertificateAuthorityResponse{
-			RootCertificate: root,
+			RootCertificate:          root,
+			IntermediateCertificates: []*x509.Certificate{intermediate},
 		}, false},
 		{"ok with name", fields{okTestClient(), testCertificateName}, args{&apiv1.GetCertificateAuthorityRequest{
 			Name: testCertificateName,
 		}}, &apiv1.GetCertificateAuthorityResponse{
-			RootCertificate: root,
+			RootCertificate:          root,
+			IntermediateCertificates: []*x509.Certificate{intermediate},
+		}, false},
+		{"ok with root only", fields{okTestClientRootOnly(), testCertificateName}, args{&apiv1.GetCertificateAuthorityRequest{}}, &apiv1.GetCertificateAuthorityResponse{
+			RootCertificate:          root,
+			IntermediateCertificates: []*x509.Certificate{},
+		}, false},
+		{"ok with multiple intermediates", fields{okTestClientWithMultipleIntermediates(), testCertificateName}, args{&apiv1.GetCertificateAuthorityRequest{}}, &apiv1.GetCertificateAuthorityResponse{
+			RootCertificate:          root,
+			IntermediateCertificates: []*x509.Certificate{intermediate, intermediate, intermediate},
 		}, false},
 		{"fail GetCertificateAuthority", fields{failTestClient(), testCertificateName}, args{&apiv1.GetCertificateAuthorityRequest{}}, nil, true},
-		{"fail bad root", fields{badTestClient(), testCertificateName}, args{&apiv1.GetCertificateAuthorityRequest{}}, nil, true},
+		{"fail bad root", fields{badRootTestClient(), testCertificateName}, args{&apiv1.GetCertificateAuthorityRequest{}}, nil, true},
+		{"fail bad intermediate", fields{badIntermediateTestClient(), testCertificateName}, args{&apiv1.GetCertificateAuthorityRequest{}}, nil, true},
 		{"fail no pems", fields{&testClient{certificateAuthority: &pb.CertificateAuthority{}}, testCertificateName}, args{&apiv1.GetCertificateAuthorityRequest{}}, nil, true},
 	}
 	for _, tt := range tests {
@@ -539,7 +595,7 @@ func TestCloudCAS_CreateCertificate(t *testing.T) {
 			Template: mustParseCertificate(t, testLeafCertificate),
 			Lifetime: 24 * time.Hour,
 		}}, nil, true},
-		{"fail Certificate", fields{badTestClient(), testCertificateName}, args{&apiv1.CreateCertificateRequest{
+		{"fail Certificate", fields{badRootTestClient(), testCertificateName}, args{&apiv1.CreateCertificateRequest{
 			Template: mustParseCertificate(t, testLeafCertificate),
 			Lifetime: 24 * time.Hour,
 		}}, nil, true},
@@ -587,7 +643,7 @@ func TestCloudCAS_createCertificate(t *testing.T) {
 		{"ok", fields{okTestClient(), testAuthorityName}, args{leaf, 24 * time.Hour, "request-id"}, signed, chain, false},
 		{"fail CertificateConfig", fields{okTestClient(), testAuthorityName}, args{&x509.Certificate{}, 24 * time.Hour, "request-id"}, nil, nil, true},
 		{"fail CreateCertificate", fields{failTestClient(), testAuthorityName}, args{leaf, 24 * time.Hour, "request-id"}, nil, nil, true},
-		{"fail ParseCertificates", fields{badTestClient(), testAuthorityName}, args{leaf, 24 * time.Hour, "request-id"}, nil, nil, true},
+		{"fail ParseCertificates", fields{badRootTestClient(), testAuthorityName}, args{leaf, 24 * time.Hour, "request-id"}, nil, nil, true},
 		{"fail create id", fields{okTestClient(), testAuthorityName}, args{leaf, 24 * time.Hour, "request-id"}, nil, nil, true},
 	}
 
@@ -655,7 +711,7 @@ func TestCloudCAS_RenewCertificate(t *testing.T) {
 			Template: mustParseCertificate(t, testLeafCertificate),
 			Lifetime: 24 * time.Hour,
 		}}, nil, true},
-		{"fail Certificate", fields{badTestClient(), testCertificateName}, args{&apiv1.RenewCertificateRequest{
+		{"fail Certificate", fields{badRootTestClient(), testCertificateName}, args{&apiv1.RenewCertificateRequest{
 			Template: mustParseCertificate(t, testLeafCertificate),
 			Lifetime: 24 * time.Hour,
 		}}, nil, true},
@@ -734,7 +790,7 @@ func TestCloudCAS_RevokeCertificate(t *testing.T) {
 			Certificate: mustParseCertificate(t, testSignedCertificate),
 			ReasonCode:  1,
 		}}, nil, true},
-		{"fail ParseCertificate", fields{badTestClient(), testCertificateName}, args{&apiv1.RevokeCertificateRequest{
+		{"fail ParseCertificate", fields{badRootTestClient(), testCertificateName}, args{&apiv1.RevokeCertificateRequest{
 			Certificate: mustParseCertificate(t, testSignedCertificate),
 			ReasonCode:  1,
 		}}, nil, true},
@@ -862,7 +918,7 @@ func Test_getCertificateAndChain(t *testing.T) {
 }
 
 func TestCloudCAS_CreateCertificateAuthority(t *testing.T) {
-	must := func(a, b interface{}) interface{} {
+	must := func(a, _ any) any {
 		return a
 	}
 

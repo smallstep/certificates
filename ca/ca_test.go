@@ -482,7 +482,7 @@ func TestCARoot(t *testing.T) {
 				ca:     ca,
 				sha:    "foo",
 				status: http.StatusNotFound,
-				errMsg: errs.NotFoundDefaultMsg,
+				errMsg: `root certificate with fingerprint "foo" was not found`,
 			}
 		},
 		"success": func(t *testing.T) *rootTest {
