@@ -1,0 +1,222 @@
+package api
+
+import (
+	"context"
+	"errors"
+	"fmt"
+	"net/http"
+	"net/http/httptest"
+	"testing"
+
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+)
+
+// TestCustomerValidationIntegration tests the integration between customer validation
+// middleware and the ACME API to ensure our custom attestation requirements work.
+func TestCustomerValidationIntegration(t *testing.T) {
+	tests := []struct {
+		name           string
+		customerID     string
+		validatorValid bool
+		validatorError error
+		expectedStatus int
+		expectNext     bool
+	}{
+		{
+			name:           "valid customer ID",
+			customerID:     "valid-customer-123",
+			validatorValid: true,
+			validatorError: nil,
+			expectedStatus: http.StatusOK,
+			expectNext:     true,
+		},
+		{
+			name:           "invalid customer ID",
+			customerID:     "invalid-customer-456",
+			validatorValid: false,
+			validatorError: nil,
+			expectedStatus: http.StatusUnauthorized,
+			expectNext:     false,
+		},
+		{
+			name:           "validator error",
+			customerID:     "error-customer-789",
+			validatorValid: false,
+			validatorError: errors.New("validation service unavailable"),
+			expectedStatus: http.StatusInternalServerError,
+			expectNext:     false,
+		},
+		{
+			name:           "missing customer ID",
+			customerID:     "",
+			validatorValid: true,
+			validatorError: nil,
+			expectedStatus: http.StatusUnauthorized,
+			expectNext:     false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// Create a mock customer validator
+			mockValidator := &mockCustomerValidator{
+				valid: tt.validatorValid,
+				err:   tt.validatorError,
+			}
+
+			// Track if next middleware was called
+			nextCalled := false
+			next := func(w http.ResponseWriter, r *http.Request) {
+				nextCalled = true
+				w.WriteHeader(http.StatusOK)
+				w.Write([]byte("success"))
+			}
+
+			// Create test request
+			url := "https://example.com/acme/test"
+			if tt.customerID != "" {
+				url += "?customerId=" + tt.customerID
+			}
+			req := httptest.NewRequest("GET", url, nil)
+			w := httptest.NewRecorder()
+
+			// Test requireCustomerID middleware first
+			requireCustomerIDHandler := requireCustomerID(next)
+			if tt.customerID == "" {
+				// Should fail at requireCustomerID step
+				requireCustomerIDHandler(w, req)
+				assert.Equal(t, tt.expectedStatus, w.Code)
+				assert.False(t, nextCalled)
+				return
+			}
+
+			// Test validateCustomerID middleware
+			validateCustomerIDHandler := validateCustomerID(mockValidator, next)
+			validateCustomerIDHandler(w, req)
+
+			assert.Equal(t, tt.expectedStatus, w.Code)
+			assert.Equal(t, tt.expectNext, nextCalled)
+
+			if w.Code >= 400 {
+				// Verify error response format is correct ACME error
+				contentType := w.Header().Get("Content-Type")
+				assert.Equal(t, "application/problem+json", contentType)
+			}
+		})
+	}
+}
+
+// TestACMEErrorHandlingWithCustomerValidation tests that our customer validation
+// errors are properly formatted as ACME errors.
+func TestACMEErrorHandlingWithCustomerValidation(t *testing.T) {
+	tests := []struct {
+		name           string
+		validatorError error
+		expectedType   string
+		expectedDetail string
+	}{
+		{
+			name:           "service unavailable",
+			validatorError: errors.New("connection timeout"),
+			expectedType:   "urn:ietf:params:acme:error:serverInternal",
+			expectedDetail: "internal error",
+		},
+		{
+			name:           "invalid customer format",
+			validatorError: fmt.Errorf("invalid customer ID format"),
+			expectedType:   "urn:ietf:params:acme:error:serverInternal",
+			expectedDetail: "internal error",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			mockValidator := &mockCustomerValidator{
+				valid: false,
+				err:   tt.validatorError,
+			}
+
+			req := httptest.NewRequest("GET", "https://example.com/acme/test?customerId=test", nil)
+			w := httptest.NewRecorder()
+
+			next := func(w http.ResponseWriter, r *http.Request) {
+				t.Error("next handler should not be called")
+			}
+
+			validateCustomerIDHandler := validateCustomerID(mockValidator, next)
+			validateCustomerIDHandler(w, req)
+
+			require.Equal(t, http.StatusInternalServerError, w.Code)
+
+			// The error handling is done by the render.Error function,
+			// which should format it as a proper ACME error response
+			contentType := w.Header().Get("Content-Type")
+			assert.Equal(t, "application/problem+json", contentType)
+		})
+	}
+}
+
+// mockCustomerValidator implements the customerValidator interface for testing
+type mockCustomerValidator struct {
+	valid bool
+	err   error
+}
+
+func (m *mockCustomerValidator) Validate(ctx context.Context, customerID string) (bool, error) {
+	return m.valid, m.err
+}
+
+// TestRequireCustomerIDMiddleware tests the requireCustomerID middleware in isolation
+func TestRequireCustomerIDMiddleware(t *testing.T) {
+	tests := []struct {
+		name           string
+		url            string
+		expectedStatus int
+		expectNext     bool
+	}{
+		{
+			name:           "customer ID present",
+			url:            "https://example.com/acme/test?customerId=12345",
+			expectedStatus: http.StatusOK,
+			expectNext:     true,
+		},
+		{
+			name:           "customer ID empty",
+			url:            "https://example.com/acme/test?customerId=",
+			expectedStatus: http.StatusUnauthorized,
+			expectNext:     false,
+		},
+		{
+			name:           "customer ID missing",
+			url:            "https://example.com/acme/test",
+			expectedStatus: http.StatusUnauthorized,
+			expectNext:     false,
+		},
+		{
+			name:           "customer ID with other params",
+			url:            "https://example.com/acme/test?other=value&customerId=67890&another=param",
+			expectedStatus: http.StatusOK,
+			expectNext:     true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			nextCalled := false
+			next := func(w http.ResponseWriter, r *http.Request) {
+				nextCalled = true
+				w.WriteHeader(http.StatusOK)
+			}
+
+			req := httptest.NewRequest("GET", tt.url, nil)
+			w := httptest.NewRecorder()
+
+			handler := requireCustomerID(next)
+			handler(w, req)
+
+			assert.Equal(t, tt.expectedStatus, w.Code)
+			assert.Equal(t, tt.expectNext, nextCalled)
+		})
+	}
+}
