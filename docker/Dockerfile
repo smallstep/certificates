@@ -12,10 +12,14 @@ FROM smallstep/step-kms-plugin:cloud AS kms
 FROM smallstep/step-cli:latest
 
 USER root
-RUN apk add --no-cache su-exec
+RUN apk add --no-cache sudo \
+    && echo "step ALL=(root) NOPASSWD: /bin/tee -a /etc/ssl/certs/ca-certificates.crt" >> /etc/sudoers.d/step \
+    && chmod 0440 /etc/sudoers.d/step
 
 COPY --from=builder /src/bin/step-ca /usr/local/bin/step-ca
 COPY --from=kms /usr/local/bin/step-kms-plugin /usr/local/bin/step-kms-plugin
+
+USER step
 
 ENV CONFIGPATH="/home/step/config/ca.json"
 ENV PWDPATH="/home/step/secrets/password"

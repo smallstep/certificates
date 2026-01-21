@@ -7,16 +7,6 @@ set -eo pipefail
 
 export STEPPATH=$(step path)
 
-# Determine which tool to use for dropping privileges
-if command -v gosu &> /dev/null; then
-    DROP_PRIV="gosu step"
-elif command -v su-exec &> /dev/null; then
-    DROP_PRIV="su-exec step"
-else
-    echo "Warning: Neither gosu nor su-exec found, running as current user"
-    DROP_PRIV=""
-fi
-
 # Install the CA root certificate to the system trust store
 function trust_root_ca () {
     local root_ca="${STEPPATH}/certs/root_ca.crt"
@@ -25,8 +15,8 @@ function trust_root_ca () {
         return 0
     fi
 
-    # Append root CA to system trust bundle
-    cat "${root_ca}" >> /etc/ssl/certs/ca-certificates.crt
+    # Append root CA to system trust bundle (requires sudo)
+    cat "${root_ca}" | sudo tee -a /etc/ssl/certs/ca-certificates.crt > /dev/null
 }
 
 # List of env vars required for step ca init
@@ -81,8 +71,6 @@ function step_ca_init () {
         generate_password > "${STEPPATH}/password"
         generate_password > "${STEPPATH}/provisioner_password"
     fi
-    # Ensure password files are owned by step user
-    chown step:step "${STEPPATH}/password" "${STEPPATH}/provisioner_password"
     if [ -f "${DOCKER_STEPCA_INIT_ROOT_FILE}" ]; then
         setup_args=("${setup_args[@]}" --root "${DOCKER_STEPCA_INIT_ROOT_FILE}")
     fi
@@ -109,12 +97,7 @@ function step_ca_init () {
                        --admin-subject "${DOCKER_STEPCA_INIT_ADMIN_SUBJECT}"
         )
     fi
-    # Run step ca init as the step user to ensure correct file ownership
-    if [ -n "${DROP_PRIV}" ]; then
-        ${DROP_PRIV} step ca init "${setup_args[@]}"
-    else
-        step ca init "${setup_args[@]}"
-    fi
+    step ca init "${setup_args[@]}"
    	echo ""
     if [ "${DOCKER_STEPCA_INIT_REMOTE_MANAGEMENT}" == "true" ]; then
         echo "👉 Your CA administrative username is: ${DOCKER_STEPCA_INIT_ADMIN_SUBJECT}"
@@ -136,9 +119,4 @@ fi
 # Install CA root certificate to system trust store so the CA trusts itself
 trust_root_ca
 
-# Drop privileges and exec the command
-if [ -n "${DROP_PRIV}" ]; then
-    exec ${DROP_PRIV} "${@}"
-else
-    exec "${@}"
-fi
+exec "${@}"

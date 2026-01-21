@@ -18,9 +18,12 @@ COPY --from=kms /usr/local/bin/step-kms-plugin /usr/local/bin/step-kms-plugin
 
 USER root
 RUN apt-get update
-RUN apt-get install -y --no-install-recommends opensc opensc-pkcs11 pcscd gnutls-bin libpcsclite1 p11-kit yubihsm-pkcs11 gosu
+RUN apt-get install -y --no-install-recommends opensc opensc-pkcs11 pcscd gnutls-bin libpcsclite1 p11-kit yubihsm-pkcs11 sudo
 RUN mkdir -p /run/pcscd
 RUN chown step:step /run/pcscd
+RUN echo "step ALL=(root) NOPASSWD: /usr/bin/tee -a /etc/ssl/certs/ca-certificates.crt" > /etc/sudoers.d/step \
+    && chmod 0440 /etc/sudoers.d/step
+USER step
 
 ENV CONFIGPATH="/home/step/config/ca.json"
 ENV PWDPATH="/home/step/secrets/password"
