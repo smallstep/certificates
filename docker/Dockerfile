@@ -13,7 +13,7 @@ FROM smallstep/step-cli:latest
 
 USER root
 RUN apk add --no-cache sudo \
-    && echo "step ALL=(root) NOPASSWD: /bin/tee -a /etc/ssl/certs/ca-certificates.crt" >> /etc/sudoers.d/step \
+    && echo "step ALL=(root) NOPASSWD: /usr/bin/tee -a /etc/ssl/certs/ca-certificates.crt" >> /etc/sudoers.d/step \
     && chmod 0440 /etc/sudoers.d/step
 
 COPY --from=builder /src/bin/step-ca /usr/local/bin/step-ca
