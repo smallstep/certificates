@@ -805,9 +805,9 @@ func (a *Authority) GenerateCertificateRevocationList() error {
 		bn.SetInt64(crlInfo.Number + 1)
 	}
 
-	// Convert our database db.RevokedCertificateInfo types into the pkix
+	// Convert our database db.RevokedCertificateInfo types into the x509
 	// representation ready for the CAS to sign it
-	var revokedCertificates []pkix.RevokedCertificate
+	var revokedCertificateEntries []x509.RevocationListEntry
 	skipExpiredTime := now.Add(-config.DefaultCRLExpiredDuration)
 	for _, revokedCert := range *revokedList {
 		// skip expired certificates
@@ -817,10 +817,9 @@ func (a *Authority) GenerateCertificateRevocationList() error {
 
 		var sn big.Int
 		sn.SetString(revokedCert.Serial, 10)
-		revokedCertificates = append(revokedCertificates, pkix.RevokedCertificate{
+		revokedCertificateEntries = append(revokedCertificateEntries, x509.RevocationListEntry{
 			SerialNumber:   &sn,
 			RevocationTime: revokedCert.RevokedAt,
-			Extensions:     nil,
 		})
 	}
 
@@ -834,11 +833,11 @@ func (a *Authority) GenerateCertificateRevocationList() error {
 	// Create a RevocationList representation ready for the CAS to sign
 	// TODO: allow SignatureAlgorithm to be specified?
 	revocationList := x509.RevocationList{
-		SignatureAlgorithm:  0,
-		RevokedCertificates: revokedCertificates,
-		Number:              &bn,
-		ThisUpdate:          now,
-		NextUpdate:          now.Add(updateDuration),
+		SignatureAlgorithm:        0,
+		RevokedCertificateEntries: revokedCertificateEntries,
+		Number:                    &bn,
+		ThisUpdate:                now,
+		NextUpdate:                now.Add(updateDuration),
 	}
 
 	// Set CRL IDP to config item, otherwise, leave as default
