@@ -116,7 +116,8 @@ if [ ! -f "${STEPPATH}/config/ca.json" ]; then
     init_if_possible
 fi
 
-# Install CA root certificate to system trust store so the CA trusts itself
+# Install CA root certificate to system trust store.
+# Allows local commands to trust the CA.
 trust_root_ca
 
 exec "${@}"
