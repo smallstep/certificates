@@ -820,6 +820,7 @@ func (a *Authority) GenerateCertificateRevocationList() error {
 		revokedCertificateEntries = append(revokedCertificateEntries, x509.RevocationListEntry{
 			SerialNumber:   &sn,
 			RevocationTime: revokedCert.RevokedAt,
+			ReasonCode:     revokedCert.ReasonCode,
 		})
 	}
 
