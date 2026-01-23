@@ -33,6 +33,7 @@ import (
 	"github.com/smallstep/certificates/cas"
 	casapi "github.com/smallstep/certificates/cas/apiv1"
 	"github.com/smallstep/certificates/db"
+	"github.com/smallstep/certificates/est"
 	"github.com/smallstep/certificates/internal/httptransport"
 	"github.com/smallstep/certificates/scep"
 	"github.com/smallstep/certificates/templates"
@@ -69,6 +70,11 @@ type Authority struct {
 	validateSCEP   bool
 	scepAuthority  *scep.Authority
 	scepKeyManager provisioner.SCEPKeyManager
+
+	// EST CA
+	estOptions   *est.Options
+	validateEST  bool
+	estAuthority *est.Authority
 
 	// SSH CA
 	sshHostPassword         []byte
@@ -133,6 +139,7 @@ func New(cfg *config.Config, opts ...Option) (*Authority, error) {
 		config:        cfg,
 		certificates:  new(sync.Map),
 		validateSCEP:  true,
+		validateEST:   true,
 		meter:         noopMeter{},
 		wrapTransport: httptransport.NoopWrapper(),
 	}
@@ -170,6 +177,7 @@ func NewEmbedded(opts ...Option) (*Authority, error) {
 		certificates:  new(sync.Map),
 		meter:         noopMeter{},
 		wrapTransport: httptransport.NoopWrapper(),
+		validateEST:   true,
 	}
 
 	// Apply options.
@@ -314,6 +322,11 @@ func (a *Authority) ReloadAdminResources(ctx context.Context) error {
 		// TODO(hs): don't remove the authority if we can't also
 		// reload it.
 		//a.scepAuthority = nil
+	case a.requiresEST() && a.GetEST() != nil:
+		a.estAuthority.UpdateProvisioners(a.getESTProvisionerNames())
+		if err := a.estAuthority.Validate(); err != nil {
+			log.Printf("failed validating EST authority: %v\n", err)
+		}
 	}
 
 	return nil
@@ -800,6 +813,51 @@ func (a *Authority) init() error {
 		}
 	}
 
+	// EST functionality is provided through an instance of est.Authority.
+	switch {
+	case a.requiresEST() && a.GetEST() == nil:
+		if a.estOptions == nil {
+			options := &est.Options{
+				Roots:         a.rootX509Certs,
+				Intermediates: a.intermediateX509Certs,
+			}
+			if len(a.intermediateX509Certs) > 0 {
+				options.SignerCert = a.intermediateX509Certs[0]
+			}
+			if a.config.IntermediateKey != "" {
+				if signer, err := a.keyManager.CreateSigner(&kmsapi.CreateSignerRequest{
+					SigningKey: a.config.IntermediateKey,
+					Password:   a.password,
+				}); err == nil {
+					options.Signer = signer
+				}
+			}
+			a.estOptions = options
+		}
+
+		a.estOptions.ESTProvisionerNames = a.getESTProvisionerNames()
+
+		estAuthority, err := est.New(a, *a.estOptions)
+		if err != nil {
+			return err
+		}
+
+		if a.validateEST {
+			if err := estAuthority.Validate(); err != nil {
+				a.initLogf("failed validating EST authority: %v", err)
+			}
+		}
+
+		a.estAuthority = estAuthority
+	case !a.requiresEST() && a.GetEST() != nil:
+		a.estAuthority = nil
+	case a.requiresEST() && a.GetEST() != nil:
+		a.estAuthority.UpdateProvisioners(a.getESTProvisionerNames())
+		if err := a.estAuthority.Validate(); err != nil {
+			log.Printf("failed validating EST authority: %v\n", err)
+		}
+	}
+
 	// Load X509 constraints engine.
 	//
 	// This is currently only available in CA mode.
@@ -992,6 +1050,34 @@ func (a *Authority) GetSCEP() *scep.Authority {
 func (a *Authority) HasACMEProvisioner() bool {
 	for _, p := range a.config.AuthorityConfig.Provisioners {
 		if p.GetType() == provisioner.TypeACME {
+			return true
+		}
+	}
+	return false
+}
+
+// getESTProvisionerNames returns the names of the EST provisioners
+// that are currently available in the CA.
+func (a *Authority) getESTProvisionerNames() (names []string) {
+	for _, p := range a.config.AuthorityConfig.Provisioners {
+		if p.GetType() == provisioner.TypeEST {
+			names = append(names, p.GetName())
+		}
+	}
+
+	return
+}
+
+// GetEST returns the configured EST Authority
+func (a *Authority) GetEST() *est.Authority {
+	return a.estAuthority
+}
+
+// requiresEST iterates over the configured provisioners
+// and determines if at least one of them is an EST provisioner.
+func (a *Authority) requiresEST() bool {
+	for _, p := range a.config.AuthorityConfig.Provisioners {
+		if p.GetType() == provisioner.TypeEST {
 			return true
 		}
 	}
