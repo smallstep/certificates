@@ -120,9 +120,12 @@ checksum:
 
 signs:
 - cmd: cosign
-  signature: "${artifact}.sig"
-  certificate: "${artifact}.pem"
-  args: ["sign-blob", "--oidc-issuer=https://token.actions.githubusercontent.com", "--output-certificate=${certificate}", "--output-signature=${signature}", "${artifact}", "--yes"]
+  signature: "${artifact}.sigstore.json"
+  args:
+    - "sign-blob"
+    - "--bundle=${signature}"
+    - "${artifact}"
+    - "--yes"
   artifacts: all
 
 publishers:
@@ -197,8 +200,7 @@ release:
 
     ```
     cosign verify-blob \
-      --certificate step-ca_darwin_{{ .Version }}_amd64.tar.gz.pem \
-      --signature step-ca_darwin_{{ .Version }}_amd64.tar.gz.sig \
+      --bundle step-ca_darwin_{{ .Version }}_amd64.tar.gz.sigstore.json \
       --certificate-identity-regexp "https://github\.com/smallstep/workflows/.*" \
       --certificate-oidc-issuer https://token.actions.githubusercontent.com \
       step-ca_darwin_{{ .Version }}_amd64.tar.gz
