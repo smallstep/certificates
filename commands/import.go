@@ -56,7 +56,7 @@ $ step-ca import $(step path)/config/ca.json export.json --dry-run
 
 ## MIGRATION FROM LINKED CA
 
-1. Export from linked CA (while CA is running):
+1. Export from linked CA:
 '''
 $ step-ca export $(step path)/config/ca.json --token $STEP_CA_TOKEN > export.json
 '''
