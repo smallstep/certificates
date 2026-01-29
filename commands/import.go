@@ -52,30 +52,6 @@ $ step-ca import $(step path)/config/ca.json export.json
 Preview the import without making changes:
 '''
 $ step-ca import $(step path)/config/ca.json export.json --dry-run
-'''
-
-## MIGRATION FROM LINKED CA
-
-1. Export from linked CA:
-'''
-$ step-ca export $(step path)/config/ca.json --token $STEP_CA_TOKEN > export.json
-'''
-
-2. Stop the CA
-
-3. Update ca.json:
-   - Remove the 'authority.linkedca' section
-   - Ensure 'authority.enableAdmin: true'
-   - Ensure 'db' is configured
-
-4. Import the provisioners and admins:
-'''
-$ step-ca import $(step path)/config/ca.json export.json
-'''
-
-5. Start the CA without the --token flag:
-'''
-$ step-ca $(step path)/config/ca.json
 '''`,
 		Flags: []cli.Flag{
 			cli.BoolFlag{
