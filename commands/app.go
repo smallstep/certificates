@@ -112,6 +112,12 @@ func appAction(ctx *cli.Context) error {
 	token := ctx.String("token")
 	quiet := ctx.Bool("quiet")
 
+	if token != "" {
+		fmt.Fprintln(os.Stderr, "DEPRECATION WARNING: Linked CA (--token) in open-source "+
+			"step-ca is deprecated and will be removed in a future version. "+
+			"Please unlink your CA or migrate to Step CA Pro. https://smallstep.com/product/step-ca-pro/")
+	}
+
 	if ctx.NArg() > 1 {
 		return errs.TooManyArguments(ctx)
 	}

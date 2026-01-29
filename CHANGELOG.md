@@ -27,6 +27,13 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
 
 ### [x.y.z] - unreleased
 
+### Deprecated
+
+- Linked CA functionality is deprecated in open-source step-ca and will be
+  removed in a future version. Existing Linked CAs will continue to work but
+  will show a deprecation warning. Users requiring Linked CA features should
+  migrate to Step CA Pro. See https://smallstep.com/product/step-ca-pro/
+
 ### Changed
 
 - Upgrade HSM-enabled Docker images from Debian Bookworm (12) to Debian Trixie
