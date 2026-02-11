@@ -841,11 +841,11 @@ func TestNebula_authorizeToken(t *testing.T) {
 		audiences []string
 	}
 	tests := []struct {
-		name      string
-		p         *Nebula
-		args      args
+		name       string
+		p          *Nebula
+		args       args
 		wantClaims *jwtPayload
-		wantErr   bool
+		wantErr    bool
 	}{
 		{"ok x509", p, args{ok, p.ctl.Audiences.Sign}, &jwtPayload{
 			Claims: x509Claims,
@@ -948,11 +948,11 @@ func TestNebula_authorizeToken_P256(t *testing.T) {
 		audiences []string
 	}
 	tests := []struct {
-		name      string
-		p         *Nebula
-		args      args
+		name       string
+		p          *Nebula
+		args       args
 		wantClaims *jwtPayload
-		wantErr   bool
+		wantErr    bool
 	}{
 		{"ok x509", p, args{ok, p.ctl.Audiences.Sign}, &jwtPayload{
 			Claims: x509Claims,
