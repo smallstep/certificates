@@ -84,14 +84,24 @@ func (f ACMEAttestationFormat) Validate() error {
 // ACME is the acme provisioner type, an entity that can authorize the ACME
 // provisioning flow.
 type ACME struct {
-	*base
-	ID      string `json:"-"`
-	Type    string `json:"type"`
-	Name    string `json:"name"`
-	ForceCN bool   `json:"forceCN,omitempty"`
-	// TermsOfService contains a URL pointing to the ACME server's
-	// terms of service. Defaults to empty.
-	TermsOfService string `json:"termsOfService,omitempty"`
+    	*base
+    	ID      string `json:"-"`
+    	Type    string `json:"type"`
+    	Name    string `json:"name"`
+    	ForceCN bool   `json:"forceCN,omitempty"`
+    	// ProxyURL enables configuring a custom HTTP(S) proxy for outbound
+    	// ACME validation requests performed by the server (e.g., http-01 fetches).
+    	// If empty, the default proxy from the environment is used.
+    	ProxyURL string `json:"proxyURL,omitempty"`
+    	// DisableProxy disables usage of any proxy (including environment variables)
+    	// for outbound ACME validation requests.
+    	DisableProxy bool `json:"disableProxy,omitempty"`
+    	// DNS allows forcing a specific DNS resolver in the form "host:port"
+    	// (e.g., "8.8.8.8:53") for DNS queries executed during ACME challenges.
+    	DNS string `json:"dns,omitempty"`
+    	// TermsOfService contains a URL pointing to the ACME server's
+    	// terms of service. Defaults to empty.
+    	TermsOfService string `json:"termsOfService,omitempty"`
 	// Website contains an URL pointing to more information about
 	// the ACME server. Defaults to empty.
 	Website string `json:"website,omitempty"`
