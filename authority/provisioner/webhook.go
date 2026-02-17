@@ -11,6 +11,8 @@ import (
 	"fmt"
 	"log"
 	"net/http"
+	"net/url"
+	"strings"
 	"text/template"
 	"time"
 
@@ -141,6 +143,45 @@ type Webhook struct {
 		Username string
 		Password string
 	} `json:"-"`
+}
+
+// Validate validates a webhook, only name, url and kind are required.
+func (w *Webhook) Validate() error {
+	if w == nil {
+		return nil
+	}
+
+	// name
+	if w.Name == "" {
+		return errors.New("webhook name is required")
+	}
+
+	// url
+	parsedURL, err := url.Parse(w.URL)
+	if err != nil {
+		return errors.New("webhook url is invalid")
+	}
+	if parsedURL.Host == "" {
+		return errors.New("webhook url is invalid")
+	}
+	if parsedURL.Scheme != "https" {
+		return errors.New("webhook url must use https")
+	}
+	if parsedURL.User != nil {
+		return errors.New("webhook url may not contain username or password")
+	}
+
+	// kind
+	if w.Kind == "" {
+		return errors.New("webhook kind is required")
+	}
+	w.Kind = strings.ToUpper(w.Kind)
+	kind, ok := linkedca.Webhook_Kind_value[w.Kind]
+	if !ok || kind == 0 {
+		return errors.New("webhook kind is invalid")
+	}
+
+	return nil
 }
 
 // TransportWrapper wraps the set of functions mapping [http.Transport] references to
