@@ -1250,7 +1250,7 @@ func validateAKCertificateExtendedKeyUsage(c *x509.Certificate) error {
 	)
 	for _, ext := range c.Extensions {
 		if ext.Id.Equal(oidExtensionExtendedKeyUsage) {
-			if _, err := asn1.Unmarshal(ext.Value, &ekus); err != nil || !ekus[0].Equal(oidTCGKpAIKCertificate) {
+			if _, err := asn1.Unmarshal(ext.Value, &ekus); err != nil || len(ekus) == 0 || !ekus[0].Equal(oidTCGKpAIKCertificate) {
 				return errors.New("AK certificate is missing Extended Key Usage value tcg-kp-AIKCertificate (2.23.133.8.3)")
 			}
 			valid = true

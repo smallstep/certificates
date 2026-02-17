@@ -5115,6 +5115,15 @@ func Test_validateAKCertificateExtendedKeyUsage(t *testing.T) {
 	require.NoError(t, err)
 	wrongEKU, err := ca.Sign(template)
 	require.NoError(t, err)
+	emptyEKU, err := ca.Sign(&x509.Certificate{
+		PublicKey: signer.Public(),
+		ExtraExtensions: []pkix.Extension{{
+			Id:    oidExtensionExtendedKeyUsage,
+			Value: []byte{0x30, 0x00}, // DER: empty SEQUENCE
+		}},
+	})
+	require.NoError(t, err)
+
 	tests := []struct {
 		name   string
 		c      *x509.Certificate
@@ -5122,6 +5131,7 @@ func Test_validateAKCertificateExtendedKeyUsage(t *testing.T) {
 	}{
 		{"ok", ok, nil},
 		{"fail/wrong-eku", wrongEKU, errors.New("AK certificate is missing Extended Key Usage value tcg-kp-AIKCertificate (2.23.133.8.3)")},
+		{"fail/empty-eku", emptyEKU, errors.New("AK certificate is missing Extended Key Usage value tcg-kp-AIKCertificate (2.23.133.8.3)")},
 		{"fail/missing-eku", missingEKU, errors.New("AK certificate is missing Extended Key Usage extension")},
 	}
 	for _, tt := range tests {
