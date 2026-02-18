@@ -199,7 +199,7 @@ func (p *GCP) GetIdentityToken(subject, caURL string) (string, error) {
 		return "", errors.Wrap(err, "error creating identity request")
 	}
 	req.Header.Set("Metadata-Flavor", "Google")
-	resp, err := http.DefaultClient.Do(req)
+	resp, err := http.DefaultClient.Do(req) //nolint:gosec // request to GCP metadata service
 	if err != nil {
 		return "", errors.Wrap(err, "error doing identity request, are you in a GCP VM?")
 	}

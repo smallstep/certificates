@@ -84,7 +84,7 @@ type OIDC struct {
 	Type                  string   `json:"type"`
 	Name                  string   `json:"name"`
 	ClientID              string   `json:"clientID"`
-	ClientSecret          string   `json:"clientSecret"`
+	ClientSecret          string   `json:"clientSecret"` //nolint:gosec // field name required by OIDC configuration
 	ConfigurationEndpoint string   `json:"configurationEndpoint"`
 	TenantID              string   `json:"tenantID,omitempty"`
 	Admins                []string `json:"admins,omitempty"`

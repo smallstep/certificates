@@ -64,14 +64,14 @@ func (*dryRunDB) Set(bucket, key, value []byte) error { return nil }
 
 func usage(fs *flag.FlagSet) {
 	name := filepath.Base(os.Args[0])
-	fmt.Fprintf(os.Stderr, "%s is a tool to migrate data from BadgerDB to MySQL or PostgreSQL.\n", name)
+	fmt.Fprintf(os.Stderr, "%s is a tool to migrate data from BadgerDB to MySQL or PostgreSQL.\n", name) //nolint:gosec // script usage message
 	fmt.Fprintln(os.Stderr, "\nUsage:")
-	fmt.Fprintf(os.Stderr, "  %s [-v1|-v2] -dir=<path> [-value-dir=<path>] -type=type -database=<source>\n", name)
+	fmt.Fprintf(os.Stderr, "  %s [-v1|-v2] -dir=<path> [-value-dir=<path>] -type=type -database=<source>\n", name) //nolint:gosec // script usage message
 	fmt.Fprintln(os.Stderr, "\nExamples:")
-	fmt.Fprintf(os.Stderr, "  %s -v1 -dir /var/lib/step-ca/db -type=mysql -database \"user@unix/step_ca\"\n", name)
-	fmt.Fprintf(os.Stderr, "  %s -v1 -dir /var/lib/step-ca/db -type=mysql -database \"user:password@tcp(localhost:3306)/step_ca\"\n", name)
-	fmt.Fprintf(os.Stderr, "  %s -v2 -dir /var/lib/step-ca/db -type=postgresql -database \"user=postgres dbname=step_ca\"\n", name)
-	fmt.Fprintf(os.Stderr, "  %s -v2 -dir /var/lib/step-ca/db -dry-run\"\n", name)
+	fmt.Fprintf(os.Stderr, "  %s -v1 -dir /var/lib/step-ca/db -type=mysql -database \"user@unix/step_ca\"\n", name)                         //nolint:gosec // script usage message
+	fmt.Fprintf(os.Stderr, "  %s -v1 -dir /var/lib/step-ca/db -type=mysql -database \"user:password@tcp(localhost:3306)/step_ca\"\n", name) //nolint:gosec // script usage message
+	fmt.Fprintf(os.Stderr, "  %s -v2 -dir /var/lib/step-ca/db -type=postgresql -database \"user=postgres dbname=step_ca\"\n", name)         //nolint:gosec // script usage message
+	fmt.Fprintf(os.Stderr, "  %s -v2 -dir /var/lib/step-ca/db -dry-run\"\n", name)                                                          //nolint:gosec // script usage message
 	fmt.Fprintln(os.Stderr, "\nOptions:")
 	fs.PrintDefaults()
 }

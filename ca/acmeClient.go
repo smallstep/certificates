@@ -51,7 +51,7 @@ func NewACMEClient(endpoint string, contact []string, opts ...ClientOption) (*AC
 	}
 	req.Header.Set("User-Agent", UserAgent)
 	enforceRequestID(req)
-	resp, err := ac.client.Do(req)
+	resp, err := ac.client.Do(req) //nolint:gosec // request to configured ACME server
 	if err != nil {
 		return nil, errors.Wrapf(err, "client GET %s failed", endpoint)
 	}
@@ -113,7 +113,7 @@ func (c *ACMEClient) GetNonce() (string, error) {
 	}
 	req.Header.Set("User-Agent", UserAgent)
 	enforceRequestID(req)
-	resp, err := c.client.Do(req)
+	resp, err := c.client.Do(req) //nolint:gosec // request to configured ACME server
 	if err != nil {
 		return "", errors.Wrapf(err, "client GET %s failed", c.dir.NewNonce)
 	}
@@ -193,7 +193,7 @@ func (c *ACMEClient) post(payload []byte, url string, headerOps ...withHeaderOpt
 	req.Header.Set("Content-Type", "application/jose+json")
 	req.Header.Set("User-Agent", UserAgent)
 	enforceRequestID(req)
-	resp, err := c.client.Do(req)
+	resp, err := c.client.Do(req) //nolint:gosec // request to configured ACME server
 	if err != nil {
 		return nil, errors.Wrapf(err, "client POST %s failed", c.dir.NewOrder)
 	}

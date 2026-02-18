@@ -143,7 +143,7 @@ func enforceRequestID(r *http.Request) {
 func (c *uaClient) Do(req *http.Request) (*http.Response, error) {
 	req.Header.Set("User-Agent", UserAgent)
 	enforceRequestID(req)
-	return c.Client.Do(req)
+	return c.Client.Do(req) //nolint:gosec // request to configured CA server
 }
 
 // RetryFunc defines the method used to retry a request. If it returns true, the
@@ -823,7 +823,7 @@ retry:
 		return nil, err
 	}
 	req.Header.Set("Content-Type", "application/json")
-	resp, err := httpClient.Do(req)
+	resp, err := httpClient.Do(req) //nolint:gosec // request to configured CA server
 	if err != nil {
 		return nil, clientError(err)
 	}
@@ -900,7 +900,7 @@ retry:
 		return nil, err
 	}
 	httpReq.Header.Set("Content-Type", "application/json")
-	resp, err := httpClient.Do(httpReq)
+	resp, err := httpClient.Do(httpReq) //nolint:gosec // request to configured CA server
 	if err != nil {
 		return nil, clientError(err)
 	}
