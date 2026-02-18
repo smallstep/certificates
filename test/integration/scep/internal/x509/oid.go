@@ -80,7 +80,7 @@ func base128IntLength(n uint64) int {
 
 func appendBase128Int(dst []byte, n uint64) []byte {
 	for i := base128IntLength(n) - 1; i >= 0; i-- {
-		o := byte(n >> cast.Uint(i*7))
+		o := byte(n >> cast.Uint(i*7)) //nolint:gosec // masked to 7 bits below
 		o &= 0x7f
 		if i != 0 {
 			o |= 0x80

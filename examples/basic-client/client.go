@@ -23,7 +23,7 @@ func printResponse(name string, v interface{}) {
 
 func main() {
 	if len(os.Args) != 2 {
-		fmt.Fprintf(os.Stderr, "Usage: %s <token>\n", os.Args[0])
+		fmt.Fprintf(os.Stderr, "Usage: %s <token>\n", os.Args[0]) //nolint:gosec // example code writing to stderr
 		os.Exit(1)
 	}
 

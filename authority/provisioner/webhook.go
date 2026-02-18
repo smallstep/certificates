@@ -141,7 +141,7 @@ type Webhook struct {
 	BearerToken          string `json:"-"`
 	BasicAuth            struct {
 		Username string
-		Password string
+		Password string //nolint:gosec // field name for basic auth configuration
 	} `json:"-"`
 }
 
@@ -197,7 +197,7 @@ func (w *Webhook) DoWithContext(ctx context.Context, client HTTPClient, tw Trans
 	if err := tmpl.Execute(buf, data); err != nil {
 		return nil, err
 	}
-	url := buf.String()
+	webhookURL := buf.String()
 
 	/*
 		Sending the token to the webhook server is a security risk. A K8sSA
@@ -222,7 +222,7 @@ func (w *Webhook) DoWithContext(ctx context.Context, client HTTPClient, tw Trans
 	retries := 1
 retry:
 
-	req, err := http.NewRequestWithContext(ctx, "POST", url, bytes.NewReader(reqBytes))
+	req, err := http.NewRequestWithContext(ctx, "POST", webhookURL, bytes.NewReader(reqBytes))
 	if err != nil {
 		return nil, err
 	}

@@ -469,7 +469,7 @@ func (p *AWS) readURLv1(url string) (*http.Response, error) {
 	if err != nil {
 		return nil, err
 	}
-	resp, err := client.Do(req)
+	resp, err := client.Do(req) //nolint:gosec // request to AWS metadata service
 	if err != nil {
 		return nil, err
 	}
@@ -485,7 +485,7 @@ func (p *AWS) readURLv2(url string) (*http.Response, error) {
 		return nil, err
 	}
 	req.Header.Set(awsMetadataTokenTTLHeader, p.config.tokenTTL)
-	resp, err := client.Do(req)
+	resp, err := client.Do(req) //nolint:gosec // request to AWS metadata service
 	if err != nil {
 		return nil, err
 	}
@@ -504,7 +504,7 @@ func (p *AWS) readURLv2(url string) (*http.Response, error) {
 		return nil, err
 	}
 	req.Header.Set(awsMetadataTokenHeader, string(token))
-	resp, err = client.Do(req)
+	resp, err = client.Do(req) //nolint:gosec // request to AWS metadata service
 	if err != nil {
 		return nil, err
 	}
