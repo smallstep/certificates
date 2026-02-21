@@ -857,3 +857,156 @@ func Test_doTPMAttestationFormat(t *testing.T) {
 		})
 	}
 }
+
+// Test_doTPMAttestationFormat_AlgCastingEdgeCases tests the new cast.SafeInt32 logic
+// that was added in the upstream merge to handle integer overflow scenarios
+func Test_doTPMAttestationFormat_AlgCastingEdgeCases(t *testing.T) {
+	ctx := context.Background()
+	aca, err := minica.New(
+		minica.WithName("TPM Testing"),
+		minica.WithGetSignerFunc(
+			func() (crypto.Signer, error) {
+				return keyutil.GenerateSigner("RSA", "", 2048)
+			},
+		),
+	)
+	require.NoError(t, err)
+	acaRoot := pem.EncodeToMemory(&pem.Block{Type: "CERTIFICATE", Bytes: aca.Root.Raw})
+
+	// prepare simulated TPM and create an AK
+	stpm := newSimulatedTPM(t)
+	eks, err := stpm.GetEKs(context.Background())
+	require.NoError(t, err)
+	ak, err := stpm.CreateAK(context.Background(), "edge-case-ak")
+	require.NoError(t, err)
+	require.NotNil(t, ak)
+
+	// extract the AK public key
+	ap, err := ak.AttestationParameters(context.Background())
+	require.NoError(t, err)
+	akp, err := attest.ParseAKPublic(attest.TPMVersion20, ap.Public)
+	require.NoError(t, err)
+
+	// create template and sign certificate for the AK public key
+	keyID := generateKeyID(t, eks[0].Public())
+	template := &x509.Certificate{
+		PublicKey:          akp.Public,
+		IsCA:               false,
+		UnknownExtKeyUsage: []asn1.ObjectIdentifier{oidTCGKpAIKCertificate},
+	}
+	sans := []x509util.SubjectAlternativeName{}
+	uris := []*url.URL{{Scheme: "urn", Opaque: "ek:sha256:" + base64.StdEncoding.EncodeToString(keyID)}}
+	asn1Value := []byte(fmt.Sprintf(`{"extraNames":[{"type": %q, "value": %q},{"type": %q, "value": %q},{"type": %q, "value": %q}]}`, oidTPMManufacturer, "1414747215", oidTPMModel, "SLB 9670 TPM2.0", oidTPMVersion, "7.55"))
+	sans = append(sans, x509util.SubjectAlternativeName{
+		Type:      x509util.DirectoryNameType,
+		ASN1Value: asn1Value,
+	})
+	ext, err := createSubjectAltNameExtension(nil, nil, nil, uris, sans, true)
+	require.NoError(t, err)
+	ext.Set(template)
+	akCert, err := aca.Sign(template)
+	require.NoError(t, err)
+	require.NotNil(t, akCert)
+
+	// generate a JWK and the key authorization value
+	jwk, err := jose.GenerateJWK("EC", "P-256", "ES256", "sig", "", 0)
+	require.NoError(t, err)
+	keyAuthorization, err := KeyAuthorization("token", jwk)
+	require.NoError(t, err)
+
+	// create a new key attested by the AK
+	keyAuthSum := sha256.Sum256([]byte(keyAuthorization))
+	config := tpm.AttestKeyConfig{
+		Algorithm:      "RSA",
+		Size:           2048,
+		QualifyingData: keyAuthSum[:],
+	}
+	key, err := stpm.AttestKey(context.Background(), "edge-case-ak", "edge-case-key", config)
+	require.NoError(t, err)
+	require.NotNil(t, key)
+	params, err := key.CertificationParameters(context.Background())
+	require.NoError(t, err)
+
+	type args struct {
+		ctx  context.Context
+		prov Provisioner
+		ch   *Challenge
+		jwk  *jose.JSONWebKey
+		att  *attestationObject
+	}
+	tests := []struct {
+		name   string
+		args   args
+		want   *tpmAttestationData
+		expErr *Error
+	}{
+		// Test case for int64 value that causes SafeInt32 to fail due to overflow
+		{"fail alg SafeInt32 overflow", args{ctx, mustAttestationProvisioner(t, acaRoot), &Challenge{Token: "token"}, jwk, &attestationObject{
+			Format: "tpm",
+			AttStatement: map[string]interface{}{
+				"ver":      "2.0",
+				"x5c":      []interface{}{akCert.Raw, aca.Intermediate.Raw},
+				"alg":      int64(9223372036854775807), // math.MaxInt64 - will cause SafeInt32 overflow
+				"sig":      params.CreateSignature,
+				"certInfo": params.CreateAttestation,
+				"pubArea":  params.Public,
+			},
+		}}, nil, WrapDetailedError(ErrorBadAttestationStatementType, nil, "invalid alg %d in attestation statement", int64(9223372036854775807))},
+		// Test case for large negative value that causes SafeInt32 to fail
+		{"fail alg SafeInt32 underflow", args{ctx, mustAttestationProvisioner(t, acaRoot), &Challenge{Token: "token"}, jwk, &attestationObject{
+			Format: "tpm",
+			AttStatement: map[string]interface{}{
+				"ver":      "2.0",
+				"x5c":      []interface{}{akCert.Raw, aca.Intermediate.Raw},
+				"alg":      int64(-9223372036854775808), // math.MinInt64 - will cause SafeInt32 underflow
+				"sig":      params.CreateSignature,
+				"certInfo": params.CreateAttestation,
+				"pubArea":  params.Public,
+			},
+		}}, nil, WrapDetailedError(ErrorBadAttestationStatementType, nil, "invalid alg %d in attestation statement", int64(-9223372036854775808))},
+		// Test case to ensure valid algorithm values still work after the change
+		{"ok alg ES256 with new casting", args{ctx, mustAttestationProvisioner(t, acaRoot), &Challenge{Token: "token"}, jwk, &attestationObject{
+			Format: "tpm",
+			AttStatement: map[string]interface{}{
+				"ver":      "2.0",
+				"x5c":      []interface{}{akCert.Raw, aca.Intermediate.Raw},
+				"alg":      int64(-7), // ES256 - should work fine with new casting
+				"sig":      params.CreateSignature,
+				"certInfo": params.CreateAttestation,
+				"pubArea":  params.Public,
+			},
+		}}, nil, nil},
+		// Test case to ensure RS1 algorithm still works after the change
+		{"ok alg RS1 with new casting", args{ctx, mustAttestationProvisioner(t, acaRoot), &Challenge{Token: "token"}, jwk, &attestationObject{
+			Format: "tpm",
+			AttStatement: map[string]interface{}{
+				"ver":      "2.0",
+				"x5c":      []interface{}{akCert.Raw, aca.Intermediate.Raw},
+				"alg":      int64(-65535), // RS1 - should work fine with new casting
+				"sig":      params.CreateSignature,
+				"certInfo": params.CreateAttestation,
+				"pubArea":  params.Public,
+			},
+		}}, nil, nil},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, err := doTPMAttestationFormat(tt.args.ctx, tt.args.prov, tt.args.ch, tt.args.jwk, tt.args.att)
+			if tt.expErr != nil {
+				assert.Error(t, err)
+				assert.Contains(t, err.Error(), fmt.Sprintf("invalid alg %d in attestation statement", tt.args.att.AttStatement["alg"]))
+				assert.Nil(t, got)
+				return
+			}
+			if err != nil {
+				t.Errorf("doTPMAttestationFormat() unexpected error = %v", err)
+				return
+			}
+			if got == nil && tt.want == nil {
+				return // both nil, test passed
+			}
+			assert.NotNil(t, got)
+		})
+	}
+}
