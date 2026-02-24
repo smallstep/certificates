@@ -1,6 +1,6 @@
 module github.com/smallstep/certificates
 
-go 1.25
+go 1.25.0
 
 require (
 	cloud.google.com/go/longrunning v0.8.0
@@ -42,7 +42,7 @@ require (
 	golang.org/x/crypto v0.48.0
 	golang.org/x/net v0.50.0
 	golang.org/x/sync v0.19.0
-	google.golang.org/api v0.266.0
+	google.golang.org/api v0.268.0
 	google.golang.org/grpc v1.79.1
 	google.golang.org/protobuf v1.36.11
 )
