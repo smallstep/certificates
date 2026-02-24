@@ -422,7 +422,7 @@ func WithTimeout(d time.Duration) ClientOption {
 }
 
 func getTransportFromFile(filename string) (http.RoundTripper, error) {
-	data, err := os.ReadFile(filename)
+	data, err := os.ReadFile(filename) // #nosec G703 -- filename is based on configuration; data read from file is processed with expected format
 	if err != nil {
 		return nil, errors.Wrapf(err, "error reading %s", filename)
 	}
