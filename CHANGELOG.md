@@ -27,6 +27,50 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
 
 ### [x.y.z] - unreleased
 
+### Added
+
+- Add `--token` flag to `step-ca export` command to export provisioners and
+  admins from linked CAs before migrating to standalone mode.
+- Add `step-ca import` command to import provisioners and admins from an export
+  file into a standalone CA's admin database. This enables migration from Linked
+  CA to standalone mode, or migration between standalone CAs. Features include:
+  - Automatic ID remapping for provisioners and admins
+  - Duplicate detection (skips existing provisioners by name, admins by subject)
+  - `--dry-run` flag to preview changes without modifying the database
+
+### Deprecated
+
+- Linked CA functionality is deprecated in open-source step-ca and will be
+  removed in a future version. Existing Linked CAs will continue to work but
+  will show a deprecation warning. Users requiring Linked CA features should
+  migrate to Step CA Pro. See https://smallstep.com/product/step-ca-pro/
+
+#### Migrating from Linked CA to Standalone
+
+To migrate an existing linked CA to standalone mode:
+
+1. Export your current configuration including cloud-stored provisioners:
+   ```
+   step-ca export $(step path)/config/ca.json --token $STEP_CA_TOKEN > export.json
+   ```
+
+2. Stop the CA
+
+3. Update your `ca.json`:
+   - Remove the `authority.linkedca` section
+   - Ensure `authority.enableAdmin: true`
+   - Ensure `db` is configured
+
+4. Import the provisioners and admins:
+   ```
+   step-ca import $(step path)/config/ca.json export.json
+   ```
+
+5. Start the CA without the `--token` flag:
+   ```
+   step-ca $(step path)/config/ca.json
+   ```
+
 ### Changed
 
 - Upgrade HSM-enabled Docker images from Debian Bookworm (12) to Debian Trixie
