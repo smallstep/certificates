@@ -6,13 +6,20 @@ on:
     tags:
     - 'v*' # Push events to matching v*, i.e. v1.0, v20.15.10
 
+permissions:
+  contents: write
+
 jobs:
   ci:
+    permissions:
+      contents: read
     uses: smallstep/certificates/.github/workflows/ci.yml@master
     secrets: inherit
 
   create_release:
     name: Create Release
+    permissions:
+      contents: write
     needs: ci
     runs-on: ubuntu-latest
     env:
