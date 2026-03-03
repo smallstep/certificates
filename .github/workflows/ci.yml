@@ -17,7 +17,9 @@ concurrency:
   cancel-in-progress: true
 
 permissions:
+  actions: read
   contents: read
+  security-events: write
 
 jobs:
   ci:
