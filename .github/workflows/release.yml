@@ -25,9 +25,11 @@ jobs:
     steps:
       - name: Is Pre-release
         id: is_prerelease
+        env:
+          REF: ${{ github.ref }}
         run: |
           set +e
-          echo ${{ github.ref }} | grep "\-rc.*"
+          echo "${REF}" | grep "\-rc.*"
           OUT=$?
           if [ $OUT -eq 0 ]; then IS_PRERELEASE=true; else IS_PRERELEASE=false; fi
           echo "IS_PRERELEASE=${IS_PRERELEASE}" >> "${GITHUB_OUTPUT}"

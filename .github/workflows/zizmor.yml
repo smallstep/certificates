@@ -1,0 +1,16 @@
+name: Zizmor security scan
+on:
+  push:
+  workflow_call:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  zizmor:
+    uses: smallstep/workflows/.github/workflows/zizmor.yml@main
+    secrets: inherit
