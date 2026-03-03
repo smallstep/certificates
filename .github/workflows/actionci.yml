@@ -1,0 +1,22 @@
+name: Action CI
+
+on:
+  push:
+    tags-ignore:
+    - 'v*'
+    branches:
+    - "master"
+  pull_request:
+  workflow_call:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  actionci:
+    permissions:
+      contents: read
+      security-events: write
+    uses: smallstep/workflows/.github/workflows/actionci.yml@main
+    secrets: inherit
