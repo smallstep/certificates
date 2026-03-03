@@ -16,8 +16,15 @@ concurrency:
   group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: true
 
+permissions:
+  contents: read
+
 jobs:
   ci:
+    permissions:
+      actions: read
+      contents: read
+      security-events: write
     uses: smallstep/workflows/.github/workflows/goCI.yml@main
     with:
       only-latest-golang: false

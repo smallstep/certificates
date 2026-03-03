@@ -2,6 +2,11 @@ on:
   schedule:
     - cron: '0 0 * * *'
 
+permissions:
+  actions: read
+  contents: read
+  security-events: write
+
 jobs:
   code-scan:
     uses: smallstep/workflows/.github/workflows/code-scan.yml@main
