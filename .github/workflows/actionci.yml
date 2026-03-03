@@ -19,4 +19,6 @@ jobs:
       contents: read
       security-events: write
     uses: smallstep/workflows/.github/workflows/actionci.yml@main
+    with:
+      zizmor-advanced-security: true
     secrets: inherit
