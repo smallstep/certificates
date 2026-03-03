@@ -10,6 +10,10 @@ on:
       - opened
       - reopened
 
+permissions:
+  pull-requests: write
+  issues: write
+
 jobs:
   triage:
     uses: smallstep/workflows/.github/workflows/triage.yml@main
