@@ -88,7 +88,7 @@ type CertificateIssuer struct {
 	Provisioner string `json:"provisioner,omitempty"`
 	Certificate string `json:"crt,omitempty"`
 	Key         string `json:"key,omitempty"`
-	Password    string `json:"password,omitempty"`
+	Password    string `json:"password,omitempty"` //nolint:gosec // field name for CA configuration
 }
 
 // Validate checks the fields in Options.

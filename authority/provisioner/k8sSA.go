@@ -36,7 +36,7 @@ const (
 type k8sSAPayload struct {
 	jose.Claims
 	Namespace          string `json:"kubernetes.io/serviceaccount/namespace,omitempty"`
-	SecretName         string `json:"kubernetes.io/serviceaccount/secret.name,omitempty"`
+	SecretName         string `json:"kubernetes.io/serviceaccount/secret.name,omitempty"` //nolint:gosec // field name required by Kubernetes API
 	ServiceAccountName string `json:"kubernetes.io/serviceaccount/service-account.name,omitempty"`
 	ServiceAccountUID  string `json:"kubernetes.io/serviceaccount/service-account.uid,omitempty"`
 }

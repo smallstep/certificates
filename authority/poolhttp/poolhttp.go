@@ -70,10 +70,10 @@ func (c *Client) Get(u string) (resp *http.Response, err error) {
 // as redirects, cookies, auth) as configured on the client.
 func (c *Client) Do(req *http.Request) (resp *http.Response, err error) {
 	if hc := c.getClient(); hc != nil {
-		resp, err = hc.Do(req)
+		resp, err = hc.Do(req) //nolint:gosec // intentional HTTP request to configured endpoint
 		c.pool.Put(hc)
 	} else {
-		resp, err = http.DefaultClient.Do(req)
+		resp, err = http.DefaultClient.Do(req) //nolint:gosec // intentional HTTP request to configured endpoint
 	}
 
 	return

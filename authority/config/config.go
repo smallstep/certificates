@@ -79,7 +79,7 @@ type Config struct {
 	Monitoring       json.RawMessage      `json:"monitoring,omitempty"`
 	AuthorityConfig  *AuthConfig          `json:"authority,omitempty"`
 	TLS              *TLSOptions          `json:"tls,omitempty"`
-	Password         string               `json:"password,omitempty"`
+	Password         string               `json:"password,omitempty"` //nolint:gosec // field name for CA configuration
 	Templates        *templates.Templates `json:"templates,omitempty"`
 	CommonName       string               `json:"commonName,omitempty"`
 	CRL              *CRLConfig           `json:"crl,omitempty"`

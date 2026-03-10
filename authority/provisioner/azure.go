@@ -66,8 +66,8 @@ func newAzureConfig(tenantID string) *azureConfig {
 }
 
 type azureIdentityToken struct {
-	AccessToken  string `json:"access_token"`
-	RefreshToken string `json:"refresh_token"`
+	AccessToken  string `json:"access_token"`  //nolint:gosec // field name required by Azure API
+	RefreshToken string `json:"refresh_token"` //nolint:gosec // field name required by Azure API
 	ClientID     string `json:"client_id"`
 	ExpiresIn    int64  `json:"expires_in,string"`
 	ExpiresOn    int64  `json:"expires_on,string"`
@@ -212,7 +212,7 @@ func (p *Azure) GetIdentityToken(subject, caURL string) (string, error) {
 	query.Add("api-version", azureIdentityTokenAPIVersion)
 	req.URL.RawQuery = query.Encode()
 
-	resp, err := http.DefaultClient.Do(req)
+	resp, err := http.DefaultClient.Do(req) //nolint:gosec // request to Azure metadata service
 	if err != nil {
 		return "", errors.Wrap(err, "error getting identity token, are you in a Azure VM?")
 	}
@@ -510,7 +510,7 @@ func (p *Azure) getAzureEnvironment() (string, error) {
 	query.Add("api-version", "2021-02-01")
 	req.URL.RawQuery = query.Encode()
 
-	resp, err := http.DefaultClient.Do(req)
+	resp, err := http.DefaultClient.Do(req) //nolint:gosec // request to Azure metadata service
 	if err != nil {
 		return "", errors.Wrap(err, "error getting azure instance environment, are you in a Azure VM?")
 	}

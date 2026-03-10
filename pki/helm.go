@@ -16,7 +16,7 @@ import (
 type helmVariables struct {
 	*linkedca.Configuration
 	Defaults     *linkedca.Defaults
-	Password     string
+	Password     string //nolint:gosec // field name for helm template variables
 	EnableSSH    bool
 	EnableAdmin  bool
 	TLS          authconfig.TLSOptions
