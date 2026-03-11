@@ -852,7 +852,7 @@ func (a *Authority) GenerateCertificateRevocationList() error {
 	// Add distribution point.
 	//
 	// Note that this is currently using the port 443 by default.
-	if b, err := marshalDistributionPoint(fullName, false); err == nil {
+	if b, err := marshalDistributionPoint(fullName); err == nil {
 		revocationList.ExtraExtensions = []pkix.Extension{
 			{Id: oidExtensionIssuingDistributionPoint, Critical: true, Value: b},
 		}
@@ -998,15 +998,21 @@ type distributionPointName struct {
 	RelativeName pkix.RDNSequence `asn1:"optional,tag:1"`
 }
 
-func marshalDistributionPoint(fullName string, isCA bool) ([]byte, error) {
+/*
+marshalDistributionPoint currently marshals only DP, citing spec
+https://datatracker.ietf.org/doc/html/rfc5280#section-5.2.5:
+
+	That is, if onlyContainsUserCerts, onlyContainsCACerts, indirectCRL, and
+	onlyContainsAttributeCerts are all FALSE, then either the
+	distributionPoint field or the onlySomeReasons field MUST be present.
+*/
+func marshalDistributionPoint(fullName string) ([]byte, error) {
 	return asn1.Marshal(distributionPoint{
 		DistributionPoint: distributionPointName{
 			FullName: []asn1.RawValue{
 				{Class: 2, Tag: 6, Bytes: []byte(fullName)},
 			},
 		},
-		OnlyContainsUserCerts: !isCA,
-		OnlyContainsCACerts:   isCA,
 	})
 }
 
