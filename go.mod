@@ -43,7 +43,7 @@ require (
 	golang.org/x/net v0.51.0
 	golang.org/x/sync v0.20.0
 	google.golang.org/api v0.269.0
-	google.golang.org/grpc v1.79.1
+	google.golang.org/grpc v1.79.2
 	google.golang.org/protobuf v1.36.11
 )
 

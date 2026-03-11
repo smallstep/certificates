@@ -79,7 +79,7 @@ type Config struct {
 	Monitoring       json.RawMessage      `json:"monitoring,omitempty"`
 	AuthorityConfig  *AuthConfig          `json:"authority,omitempty"`
 	TLS              *TLSOptions          `json:"tls,omitempty"`
-	Password         string               `json:"password,omitempty"` //nolint:gosec // field name for CA configuration
+	Password         string               `json:"password,omitempty"`
 	Templates        *templates.Templates `json:"templates,omitempty"`
 	CommonName       string               `json:"commonName,omitempty"`
 	CRL              *CRLConfig           `json:"crl,omitempty"`
@@ -263,7 +263,7 @@ func (c *Config) Save(filename string) error {
 	var b bytes.Buffer
 	enc := json.NewEncoder(&b)
 	enc.SetIndent("", "\t")
-	if err := enc.Encode(c); err != nil {
+	if err := enc.Encode(c); err != nil { //nolint:gosec // config struct contains password field by design
 		return fmt.Errorf("error encoding configuration: %w", err)
 	}
 	if err := os.WriteFile(filename, b.Bytes(), 0600); err != nil {
