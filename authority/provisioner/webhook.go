@@ -141,7 +141,7 @@ type Webhook struct {
 	BearerToken          string `json:"-"`
 	BasicAuth            struct {
 		Username string
-		Password string //nolint:gosec // field name for basic auth configuration
+		Password string
 	} `json:"-"`
 }
 
