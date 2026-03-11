@@ -986,7 +986,7 @@ func (p *PKI) Save(opt ...ConfigOption) error {
 			return err
 		}
 
-		b, err := json.MarshalIndent(cfg, "", "\t")
+		b, err := json.MarshalIndent(cfg, "", "\t") //nolint:gosec // config struct contains password field by design
 		if err != nil {
 			return errors.Wrapf(err, "error marshaling %s", p.config)
 		}

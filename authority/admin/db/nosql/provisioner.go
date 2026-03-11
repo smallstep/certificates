@@ -29,7 +29,7 @@ type dbProvisioner struct {
 
 type dbBasicAuth struct {
 	Username string `json:"username"`
-	Password string `json:"password"` //nolint:gosec // field name for database storage
+	Password string `json:"password"`
 }
 
 type dbWebhook struct {
@@ -37,8 +37,8 @@ type dbWebhook struct {
 	ID                   string       `json:"id"`
 	URL                  string       `json:"url"`
 	Kind                 string       `json:"kind"`
-	Secret               string       `json:"secret"`                //nolint:gosec // field name for database storage
-	BearerToken          string       `json:"bearerToken,omitempty"` //nolint:gosec // field name for database storage
+	Secret               string       `json:"secret"`
+	BearerToken          string       `json:"bearerToken,omitempty"`
 	BasicAuth            *dbBasicAuth `json:"basicAuth,omitempty"`
 	DisableTLSClientAuth bool         `json:"disableTLSClientAuth,omitempty"`
 	CertType             string       `json:"certType,omitempty"`
