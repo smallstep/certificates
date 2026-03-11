@@ -29,26 +29,26 @@ func (f *CommonLogFormat) Format(entry *logrus.Entry) ([]byte, error) {
 		if v, ok := entry.Data[name]; ok {
 			switch v := v.(type) {
 			case error:
-				data[i] = v.Error() //nolint:gosec // i is bounded by len(clfFields)
+				data[i] = v.Error()
 			case string:
 				if v == "" {
-					data[i] = "-" //nolint:gosec // i is bounded by len(clfFields)
+					data[i] = "-"
 				} else {
-					data[i] = v //nolint:gosec // i is bounded by len(clfFields)
+					data[i] = v
 				}
 			case time.Time:
-				data[i] = v.Format(time.RFC3339) //nolint:gosec // i is bounded by len(clfFields)
+				data[i] = v.Format(time.RFC3339)
 			case time.Duration:
-				data[i] = strconv.FormatInt(int64(v/time.Millisecond), 10) //nolint:gosec // i is bounded by len(clfFields)
+				data[i] = strconv.FormatInt(int64(v/time.Millisecond), 10)
 			case int:
-				data[i] = strconv.FormatInt(int64(v), 10) //nolint:gosec // i is bounded by len(clfFields)
+				data[i] = strconv.FormatInt(int64(v), 10)
 			case int64:
-				data[i] = strconv.FormatInt(v, 10) //nolint:gosec // i is bounded by len(clfFields)
+				data[i] = strconv.FormatInt(v, 10)
 			default:
-				data[i] = fmt.Sprintf("%v", v) //nolint:gosec // i is bounded by len(clfFields)
+				data[i] = fmt.Sprintf("%v", v)
 			}
 		} else {
-			data[i] = "-" //nolint:gosec // i is bounded by len(clfFields)
+			data[i] = "-"
 		}
 	}
 

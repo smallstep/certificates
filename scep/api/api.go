@@ -443,7 +443,7 @@ func writeResponse(w http.ResponseWriter, r *http.Request, res Response) {
 	}
 
 	w.Header().Set("Content-Type", contentHeader(res))
-	_, _ = w.Write(res.Data) //nolint:gosec // writing SCEP protocol response
+	_, _ = w.Write(res.Data)
 }
 
 func fail(w http.ResponseWriter, r *http.Request, err error) {
