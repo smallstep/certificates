@@ -5283,3 +5283,101 @@ func Test_dns01ChallengeHost(t *testing.T) {
 		})
 	}
 }
+
+func TestChallengeLogsResponses(t *testing.T) {
+	t.Parallel()
+
+	t.Run("ok", func(t *testing.T) {
+		t.Parallel()
+
+		ch := &Challenge{
+			Type:        HTTP01,
+			Status:      StatusPending,
+			Token:       "token",
+			ValidatedAt: "",
+			URL:         "http://test.example.com/.well-known/acme-challenge/identifier",
+			Target:      "target",
+			Error:       newError(ErrorConnectionType, errors.New("timeout")),
+		}
+
+		v, err := ch.ToLog()
+		require.NoError(t, err)
+		require.NotNil(t, v)
+		require.IsType(t, "string", v)
+
+		m := map[string]any{
+			"type":   "http-01",
+			"status": "pending",
+			"url":    "http://test.example.com/.well-known/acme-challenge/identifier",
+			"target": "target",
+			"token":  "token",
+			"error": map[string]any{
+				"type":     "urn:ietf:params:acme:error:connection",
+				"detail":   "The server could not connect to validation target",
+				"internal": "timeout",
+			},
+		}
+
+		exp, err := json.Marshal(m)
+		require.NoError(t, err)
+
+		assert.JSONEq(t, string(exp), v.(string))
+	})
+
+	t.Run("subproblem", func(t *testing.T) {
+		t.Parallel()
+
+		e := newError(ErrorConnectionType, errors.New("timeout"))
+		s1 := NewSubproblem(ErrorConnectionType, "sub-timeout")
+		s1.Identifier = &Identifier{Type: DNS, Value: "test.example.com"}
+		s2 := NewSubproblem(ErrorMalformedType, "sub-malformed")
+		e.AddSubproblems(s1, s2)
+
+		ch := &Challenge{
+			Type:        HTTP01,
+			Status:      StatusPending,
+			Token:       "token",
+			ValidatedAt: "",
+			URL:         "http://test.example.com/.well-known/acme-challenge/identifier",
+			Target:      "target",
+			Error:       e,
+		}
+
+		v, err := ch.ToLog()
+		require.NoError(t, err)
+		require.NotNil(t, v)
+		require.IsType(t, "string", v)
+
+		m := map[string]any{
+			"type":   "http-01",
+			"status": "pending",
+			"url":    "http://test.example.com/.well-known/acme-challenge/identifier",
+			"target": "target",
+			"token":  "token",
+			"error": map[string]any{
+				"type":   "urn:ietf:params:acme:error:connection",
+				"detail": "The server could not connect to validation target",
+				"subproblems": []map[string]any{
+					map[string]any{
+						"detail": "sub-timeout",
+						"type":   "urn:ietf:params:acme:error:connection",
+						"identifier": map[string]any{
+							"type":  "dns",
+							"value": "test.example.com",
+						},
+					},
+					map[string]any{
+						"detail": "sub-malformed",
+						"type":   "urn:ietf:params:acme:error:malformed",
+					},
+				},
+				"internal": "timeout",
+			},
+		}
+
+		exp, err := json.Marshal(m)
+		require.NoError(t, err)
+
+		assert.JSONEq(t, string(exp), v.(string))
+	})
+}
