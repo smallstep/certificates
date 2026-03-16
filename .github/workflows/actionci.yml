@@ -1,4 +1,4 @@
-name: CI
+name: Action CI
 
 on:
   push:
@@ -8,27 +8,17 @@ on:
     - "master"
   pull_request:
   workflow_call:
-    secrets:
-      CODECOV_TOKEN:
-        required: true
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: true
 
-permissions:
-  contents: read
-
 jobs:
-  ci:
+  actionci:
     permissions:
-      actions: read
       contents: read
       security-events: write
-    uses: smallstep/workflows/.github/workflows/goCI.yml@main
+    uses: smallstep/workflows/.github/workflows/actionci.yml@main
     with:
-      only-latest-golang: false
-      os-dependencies: 'libpcsclite-dev'
-      run-codeql: true
-      test-command: 'V=1 make test'
+      zizmor-advanced-security: true
     secrets: inherit

@@ -103,7 +103,7 @@ func appendBase128BigInt(dst []byte, n *big.Int) []byte {
 	}
 
 	for i := base128BigIntLength(n) - 1; i >= 0; i-- {
-		o := byte(big.NewInt(0).Rsh(n, uint(i)*7).Bits()[0])
+		o := byte(big.NewInt(0).Rsh(n, uint(i)*7).Bits()[0]) //nolint:gosec // intentional truncation, masked to 0x7f immediately after
 		o &= 0x7f
 		if i != 0 {
 			o |= 0x80

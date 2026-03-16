@@ -25,7 +25,12 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
 
 ---
 
-### [x.y.z] - unreleased
+### [0.30.0] - unreleased
+
+### Added
+
+- Validate webhooks configured on the ca.json (smallstep/certificates#2570)
+- Add HTTP transport decorator (smallstep/certificates#2533)
 
 ### Changed
 
@@ -35,6 +40,13 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
   interpolation of environment variables like `CONFIGPATH` and `PWDPATH`,
   ensuring consistent command execution. Commands can still be overridden via
   Kubernetes or Docker configuration when needed (smallstep/certificates#2493)
+
+### Fixed
+
+- Fix potential panic if a certificate had an empty tcg-kp-AIKCertificate extended key usage (smallstep/certificates#2569)
+- Fix CA startup when configured with SCEP and Google Cloud CAS (smallstep/certificates#2517)
+- Close idle connections on client certificate renew (smallstep/certificates#2515)
+
 
 ## [0.29.0] - 2025-12-03
 
@@ -50,10 +62,6 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
 
 - Use errgroup to shutdown services concurrently (smallstep/certificates#2343)
 
-### Deprecated
-
-### Removed
-
 ### Fixed
 
 - Fix process hanging after SIGTERM (smallstep/certificates#2338)
@@ -61,6 +69,9 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
 - Fix backdate support for ACME provisioner (smallstep/certificates#2444)
 
 ### Security
+
+- Authorization Bypass in ACME and SCEP Provisioners (smallstep/certificates#2491)
+- Improper Authorization Check for SSH Certificate Revocation (smallstep/certificates#2491)
 
 
 ## [0.28.4] - 2025-07-13
