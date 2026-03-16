@@ -13,6 +13,8 @@ jobs:
   ci:
     permissions:
       contents: read
+      actions: read
+      security-events: write
     uses: smallstep/certificates/.github/workflows/ci.yml@master
     secrets: inherit
 
