@@ -213,7 +213,7 @@ func onboardPKI(cfg onboardingConfiguration) (*config.Config, string, error) {
 		return nil, "", err
 	}
 
-	b, err := json.MarshalIndent(caConfig, "", "   ")
+	b, err := json.MarshalIndent(caConfig, "", "   ") //nolint:gosec // config struct contains password field by design
 	if err != nil {
 		return nil, "", errors.Wrapf(err, "error marshaling %s", p.GetCAConfigPath())
 	}

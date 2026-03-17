@@ -6,6 +6,7 @@ import (
 	"crypto/sha256"
 	"crypto/tls"
 	"crypto/x509"
+	_ "embed"
 	"encoding/base64"
 	"encoding/hex"
 	"encoding/json"
@@ -17,16 +18,14 @@ import (
 	"testing"
 	"time"
 
-	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
-
-	"github.com/smallstep/linkedca"
-	"go.step.sm/crypto/pemutil"
-	"go.step.sm/crypto/x509util"
-
 	"github.com/smallstep/certificates/internal/httptransport"
 	"github.com/smallstep/certificates/middleware/requestid"
 	"github.com/smallstep/certificates/webhook"
+	"github.com/smallstep/linkedca"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+	"go.step.sm/crypto/pemutil"
+	"go.step.sm/crypto/x509util"
 )
 
 func TestWebhookController_isCertTypeOK(t *testing.T) {
@@ -673,4 +672,28 @@ func TestWebhook_Do(t *testing.T) {
 		_, err = wh.DoWithContext(ctx, client, httptransport.NoopWrapper(), reqBody, nil)
 		require.Error(t, err)
 	})
+}
+
+func TestWebhook_Validate(t *testing.T) {
+	tests := []struct {
+		name      string
+		webhook   *Webhook
+		assertion assert.ErrorAssertionFunc
+	}{
+		{"ok enriching", &Webhook{Name: "devices", URL: "https://localhost:3000", Kind: "ENRICHING"}, assert.NoError},
+		{"ok authorizing", &Webhook{Name: "devices", URL: "https://localhost:3000/devices", Kind: "AUTHORIZING"}, assert.NoError},
+		{"fail name", &Webhook{Name: "", URL: "https://localhost:3000", Kind: "ENRICHING"}, assert.Error},
+		{"fail url", &Webhook{Name: "devices", URL: "", Kind: "ENRICHING"}, assert.Error},
+		{"fail bad url", &Webhook{Name: "devices", URL: "https://{{.Templated.Host}}", Kind: "ENRICHING"}, assert.Error},
+		{"fail host", &Webhook{Name: "devices", URL: "https:opaque", Kind: "ENRICHING"}, assert.Error},
+		{"fail scheme", &Webhook{Name: "devices", URL: "http://localhost", Kind: "ENRICHING"}, assert.Error},
+		{"fail user", &Webhook{Name: "devices", URL: "https://user:pass@localhost", Kind: "ENRICHING"}, assert.Error},
+		{"fail kind", &Webhook{Name: "devices", URL: "https://localhost:3000", Kind: ""}, assert.Error},
+		{"fail bad kind", &Webhook{Name: "devices", URL: "https://localhost:3000", Kind: "SOMETHING"}, assert.Error},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			tt.assertion(t, tt.webhook.Validate())
+		})
+	}
 }
