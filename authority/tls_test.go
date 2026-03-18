@@ -1942,10 +1942,11 @@ func TestAuthority_CRL(t *testing.T) {
 	var revokedList []db.RevokedCertificateInfo
 
 	type test struct {
-		auth     *Authority
-		ctx      context.Context
-		expected []string
-		err      error
+		auth               *Authority
+		ctx                context.Context
+		expected           []string
+		expectedReasonCode *int
+		err                error
 	}
 	tests := map[string]func() test{
 		"fail/empty-crl": func() test {
@@ -2038,9 +2039,72 @@ func TestAuthority_CRL(t *testing.T) {
 			}
 
 			return test{
-				auth:     a,
-				ctx:      crlCtx,
-				expected: ex,
+				auth:               a,
+				ctx:                crlCtx,
+				expected:           ex,
+				expectedReasonCode: &reasonCode,
+			}
+		},
+		"ok/crl-no-reason-code": func() test {
+			var localRevokedList []db.RevokedCertificateInfo
+			var localCRLStore db.CertificateRevocationListInfo
+			a := testAuthority(t, WithDatabase(&db.MockAuthDB{
+				MUseToken: func(id, tok string) (bool, error) {
+					return true, nil
+				},
+				MGetCertificate: func(sn string) (*x509.Certificate, error) {
+					return nil, errors.New("not found")
+				},
+				MStoreCRL: func(i *db.CertificateRevocationListInfo) error {
+					localCRLStore = *i
+					return nil
+				},
+				MGetCRL: func() (*db.CertificateRevocationListInfo, error) {
+					return &localCRLStore, nil
+				},
+				MGetRevokedCertificates: func() (*[]db.RevokedCertificateInfo, error) {
+					return &localRevokedList, nil
+				},
+				MRevoke: func(rci *db.RevokedCertificateInfo) error {
+					localRevokedList = append(localRevokedList, *rci)
+					return nil
+				},
+			}))
+			a.config.CRL = &config.CRLConfig{
+				Enabled:          true,
+				GenerateOnRevoke: true,
+			}
+
+			var ex []string
+			zeroReasonCode := 0
+
+			for i := 0; i < 5; i++ {
+				sn := fmt.Sprintf("%v", i)
+				cl := jose.Claims{
+					Subject:   sn,
+					Issuer:    validIssuer,
+					NotBefore: jose.NewNumericDate(now),
+					Expiry:    jose.NewNumericDate(now.Add(time.Minute)),
+					Audience:  validAudience,
+					ID:        sn,
+				}
+				raw, err := jose.Signed(sig).Claims(cl).CompactSerialize()
+				require.NoError(t, err)
+				err = a.Revoke(crlCtx, &RevokeOptions{
+					Serial:     sn,
+					ReasonCode: zeroReasonCode,
+					Reason:     reason,
+					OTT:        raw,
+				})
+				require.NoError(t, err)
+				ex = append(ex, sn)
+			}
+
+			return test{
+				auth:               a,
+				ctx:                crlCtx,
+				expected:           ex,
+				expectedReasonCode: &zeroReasonCode,
 			}
 		},
 	}
@@ -2060,6 +2124,14 @@ func TestAuthority_CRL(t *testing.T) {
 			var cmpList []string
 			for _, c := range crl.RevokedCertificateEntries {
 				cmpList = append(cmpList, c.SerialNumber.String())
+				// ReasonCode 0 causes Go's x509 package to omit the reasonCode
+				// extension entirely. Parsing it back yields 0 as the zero value
+				// of the field, not from an explicit extension. This confirms the
+				// zero-code path produces a well-formed CRL, not that the
+				// extension round-trips.
+				if tc.expectedReasonCode != nil {
+					assert.Equal(t, *tc.expectedReasonCode, c.ReasonCode)
+				}
 			}
 
 			assert.Equal(t, tc.expected, cmpList)
