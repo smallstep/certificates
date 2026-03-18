@@ -28,6 +28,7 @@ import (
 
 	"github.com/smallstep/pkcs7"
 	"github.com/smallstep/scep"
+	scepx509util "github.com/smallstep/scep/x509util"
 	"go.step.sm/crypto/keyutil"
 	"go.step.sm/crypto/minica"
 	"go.step.sm/crypto/pemutil"
@@ -130,7 +131,7 @@ func newTestCA(t *testing.T, name string) *testCA {
 		Name:                          "scep",
 		Type:                          "SCEP",
 		ForceCN:                       false,
-		ChallengePassword:             "",
+		ChallengePassword:             "the-challenge",
 		EncryptionAlgorithmIdentifier: 2,
 		MinimumPublicKeyLength:        2048,
 		Claims:                        &config.GlobalProvisionerClaims,
@@ -235,52 +236,132 @@ func (c *client) getCACert(t *testing.T) error {
 	return nil
 }
 
-func (c *client) requestCertificate(t *testing.T, commonName string, sans []string) (*x509.Certificate, error) {
+type certificateParserFunc = func(der []byte) (*x509.Certificate, error)
+
+type option func(o *options)
+
+type options struct {
+	commonName        string
+	sans              []string
+	challenge         string
+	template          *x509.Certificate
+	signer            crypto.Signer
+	messageType       scep.MessageType
+	certificateParser certificateParserFunc
+}
+
+func withChallenge(challenge string) option {
+	return func(o *options) {
+		o.challenge = challenge
+	}
+}
+
+func withTemplate(tmpl *x509.Certificate) option {
+	return func(o *options) {
+		o.template = tmpl
+	}
+}
+
+func withSigner(signer crypto.Signer) option {
+	return func(o *options) {
+		o.signer = signer
+	}
+}
+
+func withMessageType(messageType scep.MessageType) option {
+	return func(o *options) {
+		o.messageType = messageType
+	}
+}
+
+func withCertificateParser(certificateParser certificateParserFunc) option {
+	return func(o *options) {
+		o.certificateParser = certificateParser
+	}
+}
+
+func (c *client) requestCertificate(t *testing.T, opts ...option) (*x509.Certificate, error) {
+	o := &options{
+		commonName:        "test.localhost",
+		sans:              []string{"test.localhost"},
+		challenge:         "the-challenge",
+		messageType:       scep.PKCSReq,
+		certificateParser: x509.ParseCertificate,
+	}
+	for _, applyTo := range opts {
+		applyTo(o)
+	}
+
 	if err := c.getCACert(t); err != nil {
 		return nil, fmt.Errorf("failed getting CA certificate: %w", err)
 	}
 
-	signer, err := rsa.GenerateKey(rand.Reader, 2048)
-	if err != nil {
-		return nil, fmt.Errorf("failed creating SCEP private key: %w", err)
+	var (
+		signer = o.signer
+		tmpl   = o.template
+		err    error
+	)
+	if signer == nil {
+		signer, err = rsa.GenerateKey(rand.Reader, 2048)
+		if err != nil {
+			return nil, fmt.Errorf("failed creating SCEP private key: %w", err)
+		}
 	}
 
-	csr, err := x509util.CreateCertificateRequest(commonName, sans, signer)
+	csr, err := x509util.CreateCertificateRequest(o.commonName, o.sans, signer)
 	if err != nil {
 		return nil, fmt.Errorf("failed creating CSR: %w", err)
 	}
 
-	tmpl := &x509.Certificate{
-		Subject:        csr.Subject,
-		PublicKey:      signer.Public(),
-		SerialNumber:   big.NewInt(1),
-		NotBefore:      time.Now().Add(-1 * time.Hour),
-		NotAfter:       time.Now().Add(1 * time.Hour),
-		DNSNames:       csr.DNSNames,
-		IPAddresses:    csr.IPAddresses,
-		EmailAddresses: csr.EmailAddresses,
-		URIs:           csr.URIs,
+	if tmpl == nil {
+		tmpl = &x509.Certificate{
+			Subject:        csr.Subject,
+			PublicKey:      signer.Public(),
+			SerialNumber:   big.NewInt(1),
+			NotBefore:      time.Now().Add(-1 * time.Hour),
+			NotAfter:       time.Now().Add(1 * time.Hour),
+			DNSNames:       csr.DNSNames,
+			IPAddresses:    csr.IPAddresses,
+			EmailAddresses: csr.EmailAddresses,
+			URIs:           csr.URIs,
+		}
+	}
+
+	crTmpl := &scepx509util.CertificateRequest{
+		CertificateRequest: *csr,
+		ChallengePassword:  o.challenge,
+	}
+
+	newCSR, err := scepx509util.CreateCertificateRequest(rand.Reader, crTmpl, signer)
+	if err != nil {
+		return nil, fmt.Errorf("failed creating csr: %w", err)
+	}
+
+	cr, err := x509.ParseCertificateRequest(newCSR)
+	if err != nil {
+		return nil, fmt.Errorf("failed parsing certificate request: %w", err)
 	}
 
 	selfSigned, err := x509.CreateCertificate(rand.Reader, tmpl, tmpl, signer.Public(), signer)
 	if err != nil {
 		return nil, fmt.Errorf("failed creating self signed certificate: %w", err)
 	}
-	selfSignedCertificate, err := x509.ParseCertificate(selfSigned)
+
+	selfSignedCertificate, err := o.certificateParser(selfSigned)
 	if err != nil {
 		return nil, fmt.Errorf("failed parsing self signed certificate: %w", err)
 	}
 
 	msgTmpl := &scep.PKIMessage{
 		TransactionID: "test-1",
-		MessageType:   scep.PKCSReq,
+		MessageType:   o.messageType,
 		SenderNonce:   []byte("test-nonce-1"),
 		Recipients:    []*x509.Certificate{c.caCert},
 		SignerCert:    selfSignedCertificate,
 		SignerKey:     signer,
 	}
 
-	msg, err := scep.NewCSRRequest(csr, msgTmpl)
+	msg, err := scep.NewCSRRequest(cr, msgTmpl)
 	if err != nil {
 		return nil, fmt.Errorf("failed creating SCEP PKCSReq message: %w", err)
 	}
@@ -351,29 +432,14 @@ type pkcs1PublicKey struct {
 	E int
 }
 
-type parseFunc = func(der []byte) (*x509.Certificate, error)
-
-func (c *client) requestCertificateEmulatingWindowsClient(t *testing.T, commonName string, sans []string, parseCertificate parseFunc) (*x509.Certificate, error) {
-	if err := c.getCACert(t); err != nil {
-		return nil, fmt.Errorf("failed getting CA certificate: %w", err)
-	}
-
-	signer, err := rsa.GenerateKey(rand.Reader, 2048)
-	if err != nil {
-		return nil, fmt.Errorf("failed creating SCEP private key: %w", err)
-	}
-
-	csr, err := x509util.CreateCertificateRequest(commonName, sans, signer)
-	if err != nil {
-		return nil, fmt.Errorf("failed creating CSR: %w", err)
-	}
+func createWindowsTemplate(t *testing.T, signer *rsa.PrivateKey) *x509.Certificate {
+	t.Helper()
 
 	// on Windows the self-signed certificate contains an authority key identifier
 	// extension that is marked critical
 	value, err := asn1.Marshal(authorityKeyID{[]byte("bla")}) // fake value
-	if err != nil {
-		return nil, fmt.Errorf("failed marshaling authority key ID")
-	}
+	require.NoError(t, err)
+
 	authorityKeyIDExtension := pkix.Extension{
 		Id:       oidExtensionAuthorityKeyID,
 		Critical: true,
@@ -385,24 +451,21 @@ func (c *client) requestCertificateEmulatingWindowsClient(t *testing.T, commonNa
 		N: signer.N,
 		E: signer.E,
 	})
-	if err != nil {
-		return nil, fmt.Errorf("failed marshaling RSA public key: %w", err)
-	}
+	require.NoError(t, err)
 
 	h := sha1.Sum(publicKeyBytes)
 	subjectKeyID := h[:]
 
 	// create subject key ID extension
 	value, err = asn1.Marshal(subjectKeyID)
-	if err != nil {
-		return nil, fmt.Errorf("failed marshaling subject key ID: %w", err)
-	}
+	require.NoError(t, err)
+
 	subjectKeyIDExtension := pkix.Extension{
 		Id:    oidExtensionSubjectKeyID,
 		Value: value,
 	}
 
-	tmpl := &x509.Certificate{
+	return &x509.Certificate{
 		Subject:            pkix.Name{CommonName: "SCEP Protocol Certificate"},
 		SignatureAlgorithm: x509.SHA1WithRSA,
 		PublicKey:          signer.Public(),
@@ -411,80 +474,6 @@ func (c *client) requestCertificateEmulatingWindowsClient(t *testing.T, commonNa
 		NotAfter:           time.Now().Add(365 * 24 * time.Hour),
 		ExtraExtensions:    []pkix.Extension{authorityKeyIDExtension, subjectKeyIDExtension},
 	}
-
-	selfSignedDER, err := x509.CreateCertificate(rand.Reader, tmpl, tmpl, signer.Public(), signer)
-	if err != nil {
-		return nil, fmt.Errorf("failed creating self signed certificate: %w", err)
-	}
-	selfSignedCertificate, err := parseCertificate(selfSignedDER)
-	if err != nil {
-		return nil, fmt.Errorf("failed parsing self signed certificate: %w", err)
-	}
-
-	msgTmpl := &scep.PKIMessage{
-		TransactionID: "test-1",
-		MessageType:   scep.PKCSReq,
-		SenderNonce:   []byte("test-nonce-1"),
-		Recipients:    []*x509.Certificate{c.caCert},
-		SignerCert:    selfSignedCertificate,
-		SignerKey:     signer,
-	}
-
-	msg, err := scep.NewCSRRequest(csr, msgTmpl)
-	if err != nil {
-		return nil, fmt.Errorf("failed creating SCEP PKCSReq message: %w", err)
-	}
-
-	t.Log(string(msg.Raw))
-
-	u, err := url.Parse(c.caURL)
-	if err != nil {
-		return nil, fmt.Errorf("failed parsing CA URL: %w", err)
-	}
-
-	opURL := u.ResolveReference(&url.URL{RawQuery: fmt.Sprintf("operation=PKIOperation&message=%s", url.QueryEscape(base64.StdEncoding.EncodeToString(msg.Raw)))})
-	resp, err := c.httpClient.Get(opURL.String())
-	if err != nil {
-		return nil, fmt.Errorf("failed get request: %w", err)
-	}
-	defer resp.Body.Close()
-
-	if ct := resp.Header.Get("Content-Type"); ct != "application/x-pki-message" {
-		return nil, fmt.Errorf("received unexpected content type %q", ct)
-	}
-
-	body, err := io.ReadAll(resp.Body)
-	if err != nil {
-		return nil, fmt.Errorf("failed reading response body: %w", err)
-	}
-
-	t.Log(string(body))
-
-	signedData, err := pkcs7.Parse(body)
-	if err != nil {
-		return nil, fmt.Errorf("failed parsing response body: %w", err)
-	}
-
-	// TODO: verify the signature?
-
-	p7, err := pkcs7.Parse(signedData.Content)
-	if err != nil {
-		return nil, fmt.Errorf("failed decrypting inner p7: %w", err)
-	}
-
-	content, err := p7.Decrypt(selfSignedCertificate, signer)
-	if err != nil {
-		return nil, fmt.Errorf("failed decrypting response: %w", err)
-	}
-
-	p7, err = pkcs7.Parse(content)
-	if err != nil {
-		return nil, fmt.Errorf("failed parsing p7 content: %w", err)
-	}
-
-	cert := p7.Certificates[0]
-
-	return cert, nil
 }
 
 type testCAS struct {
@@ -502,6 +491,7 @@ func (c *testCAS) CreateCertificate(req *apiv1.CreateCertificateRequest) (*apiv1
 		CertificateChain: []*x509.Certificate{cert, c.ca.Intermediate},
 	}, nil
 }
+
 func (c *testCAS) RenewCertificate(req *apiv1.RenewCertificateRequest) (*apiv1.RenewCertificateResponse, error) {
 	return nil, errors.New("not implemented")
 }
