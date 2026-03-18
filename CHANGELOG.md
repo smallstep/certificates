@@ -25,10 +25,11 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
 
 ---
 
-### [0.30.0] - unreleased
+### [0.30.0] - 2026-03-18
 
 ### Added
 
+- Warn when ACME provisioner is configured without a database (smallstep/certificates#2526)
 - Validate webhooks configured on the ca.json (smallstep/certificates#2570)
 - Add HTTP transport decorator (smallstep/certificates#2533)
 
@@ -43,6 +44,11 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
 
 ### Fixed
 
+- Fix CRL IssuingDistributionPoint marshaling to correctly unset `OnlyContainsUserCerts` and `OnlyContainsCACerts` flags (smallstep/certificates#2511)
+- Fix CRL DER download content-disposition filename extension from `.der` to `.crl` (smallstep/certificates#2537)
+- Fix SSH agent KMS when CA is configured with Prometheus instrumented signer (smallstep/certificates#2379)
+- Return helpful error message when root certificate is not found (smallstep/certificates#1893)
+- Fix missing version number when building step-ca from source archive (smallstep/certificates#2513)
 - Fix potential panic if a certificate had an empty tcg-kp-AIKCertificate extended key usage (smallstep/certificates#2569)
 - Fix CA startup when configured with SCEP and Google Cloud CAS (smallstep/certificates#2517)
 - Close idle connections on client certificate renew (smallstep/certificates#2515)
