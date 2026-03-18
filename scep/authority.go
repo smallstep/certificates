@@ -213,7 +213,7 @@ func (a *Authority) DecryptPKIEnvelope(ctx context.Context, msg *PKIMessage) err
 		}
 		msg.CertRepMessage.Certificate = certs[0]
 		return nil
-	case smallscep.PKCSReq, smallscep.UpdateReq, smallscep.RenewalReq:
+	case smallscep.PKCSReq, smallscep.RenewalReq:
 		csr, err := x509.ParseCertificateRequest(msg.pkiEnvelope)
 		if err != nil {
 			return fmt.Errorf("parse CSR from pkiEnvelope: %w", err)
@@ -232,11 +232,10 @@ func (a *Authority) DecryptPKIEnvelope(ctx context.Context, msg *PKIMessage) err
 			ChallengePassword: cp,
 		}
 		return nil
-	case smallscep.GetCRL, smallscep.GetCert, smallscep.CertPoll:
+	default:
+		// this is for e.g. GetCRL, GetCert and CertPoll
 		return errors.New("not implemented")
 	}
-
-	return nil
 }
 
 // SignCSR creates an x509.Certificate based on a CSR template and Cert Authority credentials

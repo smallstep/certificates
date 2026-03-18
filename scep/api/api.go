@@ -395,6 +395,9 @@ func PKIOperation(ctx context.Context, req request) (Response, error) {
 			return createFailureResponse(ctx, csr, msg, smallscep.BadRequest, scepErr.Error(), scepErr)
 		}
 		signCSROpts = append(signCSROpts, challengeOptions...)
+	} else {
+		scepErr := fmt.Errorf("unexpected message type: (%s)", string(msg.MessageType))
+		return createFailureResponse(ctx, csr, msg, smallscep.BadRequest, scepErr.Error(), scepErr)
 	}
 
 	// TODO: authorize renewal: we can authorize renewals with the challenge password (if reusable secrets are used).
