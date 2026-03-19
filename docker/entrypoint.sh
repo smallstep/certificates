@@ -97,7 +97,7 @@ function step_ca_init () {
 }
 
 if [ -f /usr/sbin/pcscd ]; then
-    /usr/sbin/pcscd
+    /usr/sbin/pcscd --disable-polkit
 fi
 
 if [ ! -f "${STEPPATH}/config/ca.json" ]; then
