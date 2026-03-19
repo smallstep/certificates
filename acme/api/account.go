@@ -119,6 +119,12 @@ func NewAccount(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 
+		if prov.TermsOfService != "" && !nar.TermsOfServiceAgreed {
+			render.Error(w, r, acme.NewError(acme.ErrorUserActionRequiredType,
+				"terms of service must be agreed to: %s", prov.TermsOfService))
+			return
+		}
+
 		jwk, err := jwkFromContext(ctx)
 		if err != nil {
 			render.Error(w, r, err)
