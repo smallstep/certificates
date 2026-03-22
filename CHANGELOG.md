@@ -25,7 +25,13 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
 
 ---
 
+## [0.30.2] - 2026-03-22
+
+- Update golang.org/grpc to patch security advisory
+
+
 ### [0.30.1] - 2026-03-18
+
  - Fix release issue
 
 
