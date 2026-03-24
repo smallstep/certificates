@@ -1053,6 +1053,9 @@ func (a *Authority) callEnrichingWebhooksX509(ctx context.Context, prov provisio
 		webhook.WithX509CertificateRequest(csr),
 		webhook.WithAttestationData(attested),
 	); err == nil {
+		if prov != nil {
+			whEnrichReq.ProvisionerName = prov.GetName()
+		}
 		err = webhookCtl.Enrich(ctx, whEnrichReq)
 	}
 
@@ -1077,6 +1080,9 @@ func (a *Authority) callAuthorizingWebhooksX509(ctx context.Context, prov provis
 		webhook.WithX509Certificate(cert, leaf),
 		webhook.WithAttestationData(attested),
 	); err == nil {
+		if prov != nil {
+			whAuthBody.ProvisionerName = prov.GetName()
+		}
 		err = webhookCtl.Authorize(ctx, whAuthBody)
 	}
 
