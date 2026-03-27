@@ -3,6 +3,8 @@
 package sceptest
 
 import (
+	"crypto/rand"
+	"crypto/rsa"
 	"crypto/x509"
 	"fmt"
 	"net/http"
@@ -41,7 +43,12 @@ func TestIssuesCertificateToEmulatedWindowsClientGo123(t *testing.T) {
 	requireHealthyCA(t, caClient)
 
 	scepClient := createSCEPClient(t, c.caURL, c.root)
-	cert, err := scepClient.requestCertificateEmulatingWindowsClient(t, "test.localhost", []string{"test.localhost"}, legacyCertificateParser)
+
+	signer, err := rsa.GenerateKey(rand.Reader, 2048)
+	require.NoError(t, err)
+
+	tmpl := createWindowsTemplate(t, signer)
+	cert, err := scepClient.requestCertificate(t, withTemplate(tmpl), withSigner(signer), withCertificateParser(legacyCertificateParser))
 	require.NoError(t, err)
 	require.NotNil(t, cert)
 

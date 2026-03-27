@@ -84,7 +84,7 @@ func TestIssuesCertificateUsingSCEPWithDecrypter(t *testing.T) {
 		Name:                          "scep",
 		Type:                          "SCEP",
 		ForceCN:                       false,
-		ChallengePassword:             "",
+		ChallengePassword:             "the-challenge",
 		EncryptionAlgorithmIdentifier: 2,
 		MinimumPublicKeyLength:        2048,
 		Claims:                        &config.GlobalProvisionerClaims,
@@ -126,7 +126,7 @@ func TestIssuesCertificateUsingSCEPWithDecrypter(t *testing.T) {
 	requireHealthyCA(t, caClient)
 
 	scepClient := createSCEPClient(t, fmt.Sprintf("https://localhost:%s/scep/scep", port), m.Root)
-	cert, err := scepClient.requestCertificate(t, "test.localhost", []string{"test.localhost"})
+	cert, err := scepClient.requestCertificate(t)
 	assert.NoError(t, err)
 	require.NotNil(t, cert)
 

@@ -805,9 +805,9 @@ func (a *Authority) GenerateCertificateRevocationList() error {
 		bn.SetInt64(crlInfo.Number + 1)
 	}
 
-	// Convert our database db.RevokedCertificateInfo types into the pkix
+	// Convert our database db.RevokedCertificateInfo types into the x509
 	// representation ready for the CAS to sign it
-	var revokedCertificates []pkix.RevokedCertificate
+	var revokedCertificateEntries []x509.RevocationListEntry
 	skipExpiredTime := now.Add(-config.DefaultCRLExpiredDuration)
 	for _, revokedCert := range *revokedList {
 		// skip expired certificates
@@ -817,10 +817,10 @@ func (a *Authority) GenerateCertificateRevocationList() error {
 
 		var sn big.Int
 		sn.SetString(revokedCert.Serial, 10)
-		revokedCertificates = append(revokedCertificates, pkix.RevokedCertificate{
+		revokedCertificateEntries = append(revokedCertificateEntries, x509.RevocationListEntry{
 			SerialNumber:   &sn,
 			RevocationTime: revokedCert.RevokedAt,
-			Extensions:     nil,
+			ReasonCode:     revokedCert.ReasonCode,
 		})
 	}
 
@@ -834,11 +834,11 @@ func (a *Authority) GenerateCertificateRevocationList() error {
 	// Create a RevocationList representation ready for the CAS to sign
 	// TODO: allow SignatureAlgorithm to be specified?
 	revocationList := x509.RevocationList{
-		SignatureAlgorithm:  0,
-		RevokedCertificates: revokedCertificates,
-		Number:              &bn,
-		ThisUpdate:          now,
-		NextUpdate:          now.Add(updateDuration),
+		SignatureAlgorithm:        0,
+		RevokedCertificateEntries: revokedCertificateEntries,
+		Number:                    &bn,
+		ThisUpdate:                now,
+		NextUpdate:                now.Add(updateDuration),
 	}
 
 	// Set CRL IDP to config item, otherwise, leave as default
@@ -852,7 +852,7 @@ func (a *Authority) GenerateCertificateRevocationList() error {
 	// Add distribution point.
 	//
 	// Note that this is currently using the port 443 by default.
-	if b, err := marshalDistributionPoint(fullName, false); err == nil {
+	if b, err := marshalDistributionPoint(fullName); err == nil {
 		revocationList.ExtraExtensions = []pkix.Extension{
 			{Id: oidExtensionIssuingDistributionPoint, Critical: true, Value: b},
 		}
@@ -998,15 +998,21 @@ type distributionPointName struct {
 	RelativeName pkix.RDNSequence `asn1:"optional,tag:1"`
 }
 
-func marshalDistributionPoint(fullName string, isCA bool) ([]byte, error) {
+/*
+marshalDistributionPoint currently marshals only DP, citing spec
+https://datatracker.ietf.org/doc/html/rfc5280#section-5.2.5:
+
+	That is, if onlyContainsUserCerts, onlyContainsCACerts, indirectCRL, and
+	onlyContainsAttributeCerts are all FALSE, then either the
+	distributionPoint field or the onlySomeReasons field MUST be present.
+*/
+func marshalDistributionPoint(fullName string) ([]byte, error) {
 	return asn1.Marshal(distributionPoint{
 		DistributionPoint: distributionPointName{
 			FullName: []asn1.RawValue{
 				{Class: 2, Tag: 6, Bytes: []byte(fullName)},
 			},
 		},
-		OnlyContainsUserCerts: !isCA,
-		OnlyContainsCACerts:   isCA,
 	})
 }
 

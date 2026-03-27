@@ -25,7 +25,23 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
 
 ---
 
-### [x.y.z] - unreleased
+## [0.30.2] - 2026-03-22
+
+- Update golang.org/grpc to patch security advisory
+
+
+### [0.30.1] - 2026-03-18
+
+ - Fix release issue
+
+
+### [0.30.0] - 2026-03-18
+
+### Added
+
+- Warn when ACME provisioner is configured without a database (smallstep/certificates#2526)
+- Validate webhooks configured on the ca.json (smallstep/certificates#2570)
+- Add HTTP transport decorator (smallstep/certificates#2533)
 
 ### Changed
 
@@ -35,6 +51,18 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
   interpolation of environment variables like `CONFIGPATH` and `PWDPATH`,
   ensuring consistent command execution. Commands can still be overridden via
   Kubernetes or Docker configuration when needed (smallstep/certificates#2493)
+
+### Fixed
+
+- Fix CRL IssuingDistributionPoint marshaling to correctly unset `OnlyContainsUserCerts` and `OnlyContainsCACerts` flags (smallstep/certificates#2511)
+- Fix CRL DER download content-disposition filename extension from `.der` to `.crl` (smallstep/certificates#2537)
+- Fix SSH agent KMS when CA is configured with Prometheus instrumented signer (smallstep/certificates#2379)
+- Return helpful error message when root certificate is not found (smallstep/certificates#1893)
+- Fix missing version number when building step-ca from source archive (smallstep/certificates#2513)
+- Fix potential panic if a certificate had an empty tcg-kp-AIKCertificate extended key usage (smallstep/certificates#2569)
+- Fix CA startup when configured with SCEP and Google Cloud CAS (smallstep/certificates#2517)
+- Close idle connections on client certificate renew (smallstep/certificates#2515)
+
 
 ## [0.29.0] - 2025-12-03
 
@@ -50,10 +78,6 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
 
 - Use errgroup to shutdown services concurrently (smallstep/certificates#2343)
 
-### Deprecated
-
-### Removed
-
 ### Fixed
 
 - Fix process hanging after SIGTERM (smallstep/certificates#2338)
@@ -61,6 +85,9 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
 - Fix backdate support for ACME provisioner (smallstep/certificates#2444)
 
 ### Security
+
+- Authorization Bypass in ACME and SCEP Provisioners (smallstep/certificates#2491)
+- Improper Authorization Check for SSH Certificate Revocation (smallstep/certificates#2491)
 
 
 ## [0.28.4] - 2025-07-13

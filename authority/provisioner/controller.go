@@ -48,6 +48,11 @@ func NewController(p Interface, claims *Claims, config Config, options *Options)
 	if wt == nil {
 		wt = httptransport.NoopWrapper()
 	}
+	for _, wh := range options.GetWebhooks() {
+		if err := wh.Validate(); err != nil {
+			return nil, err
+		}
+	}
 
 	return &Controller{
 		Interface:             p,
