@@ -5093,6 +5093,74 @@ func Test_deviceAttest01Validate(t *testing.T) {
 	}
 }
 
+func Test_doAndroidKeyAttestionFormat_noAttestationRoots(t *testing.T) {
+	// This test exercises the fallback path when no attestation roots
+	// are configured (the !attOk branch), verifying that:
+	// 1. The ECDSA root parsing and type assertion works correctly
+	// 2. Non-Google roots are properly rejected
+	ca, err := minica.New()
+	require.NoError(t, err)
+
+	signer, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
+	require.NoError(t, err)
+
+	jwk, keyAuth := mustAccountAndKeyAuthorization(t, "token")
+	keyAuthSum := sha256.Sum256([]byte(keyAuth))
+	sig, err := signer.Sign(rand.Reader, keyAuthSum[:], crypto.SHA256)
+	require.NoError(t, err)
+
+	atts := attestation.KeyDescription{
+		AttestationVersion:       300,
+		AttestationSecurityLevel: 1,
+		AttestationChallenge:     sig,
+		TeeEnforced: attestation.AuthorizationList{
+			AttestationIdSerial: []byte("serial-number"),
+		},
+	}
+	attestByte, err := attestation.CreateKeyDescription(&atts)
+	require.NoError(t, err)
+
+	leaf, err := ca.Sign(&x509.Certificate{
+		Subject:   pkix.Name{CommonName: "attestation cert"},
+		PublicKey: signer.Public(),
+		ExtraExtensions: []pkix.Extension{
+			{Id: oidAndroidAttestation, Value: attestByte},
+		},
+	})
+	require.NoError(t, err)
+
+	att := &attestationObject{
+		Format: "android-key",
+		AttStatement: map[string]any{
+			"x5c": []any{leaf.Raw, ca.Intermediate.Raw, ca.Root.Raw},
+		},
+	}
+
+	// Create provisioner without attestation roots
+	prov := &provisioner.ACME{
+		Type:       "ACME",
+		Name:       "acme",
+		Challenges: []provisioner.ACMEChallenge{provisioner.DEVICE_ATTEST_01},
+	}
+	require.NoError(t, prov.Init(provisioner.Config{
+		Claims: config.GlobalProvisionerClaims,
+	}))
+
+	ch := &Challenge{
+		ID:    "chID",
+		Token: "nonce",
+		Type:  "device-attest-01",
+		Value: "serial-number",
+	}
+
+	_, err = doAndroidKeyAttestionFormat(context.Background(), prov, ch, jwk, att)
+	require.Error(t, err)
+
+	var acmeErr *Error
+	require.ErrorAs(t, err, &acmeErr)
+	assert.Contains(t, acmeErr.Error(), "root certificate not signed by Google")
+}
+
 var (
 	oidTPMManufacturer = asn1.ObjectIdentifier{2, 23, 133, 2, 1}
 	oidTPMModel        = asn1.ObjectIdentifier{2, 23, 133, 2, 2}
