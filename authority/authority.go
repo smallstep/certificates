@@ -450,6 +450,16 @@ func (a *Authority) init() error {
 			if len(a.intermediateX509Certs) == 0 {
 				a.intermediateX509Certs = append(a.intermediateX509Certs, options.CertificateChain...)
 			}
+
+			// Validate that neither config.commonName nor authority.template.commonName
+			// collides with the issuing CA's CommonName. If they match, issued
+			// certificates (or the CA's own TLS certificate) will have Subject == Issuer
+			// and be incorrectly treated as self-signed by TLS stacks and validators.
+			if len(a.intermediateX509Certs) > 0 {
+				if err := a.validateCommonNames(a.intermediateX509Certs[0].Subject.CommonName); err != nil {
+					return err
+				}
+			}
 		}
 		a.x509CAService, err = cas.New(ctx, options)
 		if err != nil {
@@ -873,6 +883,28 @@ func (a *Authority) initLogf(format string, v ...any) {
 	if !a.quietInit {
 		log.Printf(format, v...)
 	}
+}
+
+// validateCommonNames returns an error if config.commonName or
+// authority.template.commonName equals the issuing CA certificate's CommonName.
+// When Subject.CommonName equals Issuer.CommonName the certificate looks
+// self-signed to TLS stacks and certificate validators, which causes
+// handshake failures and trust errors.
+func (a *Authority) validateCommonNames(issuerCN string) error {
+	if issuerCN == "" {
+		return nil
+	}
+	if a.config.CommonName == issuerCN {
+		return fmt.Errorf("config commonName %q must not be equal to the issuing CA "+
+			"certificate's CommonName; the CA's own TLS certificate would appear "+
+			"self-signed — use a distinct name or leave commonName empty to use the default", issuerCN)
+	}
+	if tmpl := a.config.AuthorityConfig.Template; tmpl != nil && tmpl.CommonName == issuerCN {
+		return fmt.Errorf("authority.template.commonName %q must not be equal to the "+
+			"issuing CA certificate's CommonName; issued leaf certificates would appear "+
+			"self-signed — use a distinct name or remove authority.template.commonName", issuerCN)
+	}
+	return nil
 }
 
 // GetID returns the define authority id or a zero uuid.
