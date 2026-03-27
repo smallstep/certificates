@@ -263,7 +263,7 @@ func (c *Config) Save(filename string) error {
 	var b bytes.Buffer
 	enc := json.NewEncoder(&b)
 	enc.SetIndent("", "\t")
-	if err := enc.Encode(c); err != nil {
+	if err := enc.Encode(c); err != nil { //nolint:gosec // config struct contains password field by design
 		return fmt.Errorf("error encoding configuration: %w", err)
 	}
 	if err := os.WriteFile(filename, b.Bytes(), 0600); err != nil {

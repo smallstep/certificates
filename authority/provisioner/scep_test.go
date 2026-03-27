@@ -279,6 +279,8 @@ func Test_selectValidationMethod(t *testing.T) {
 			Options: &Options{
 				Webhooks: []*Webhook{
 					{
+						Name: "challenge",
+						URL:  "https://scep.challenge",
 						Kind: linkedca.Webhook_SCEPCHALLENGE.String(),
 					},
 				},
@@ -295,6 +297,8 @@ func Test_selectValidationMethod(t *testing.T) {
 			Options: &Options{
 				Webhooks: []*Webhook{
 					{
+						Name: "authorizing",
+						URL:  "https://scep.authorizing",
 						Kind: linkedca.Webhook_AUTHORIZING.String(),
 					},
 				},
@@ -311,6 +315,8 @@ func Test_selectValidationMethod(t *testing.T) {
 			Options: &Options{
 				Webhooks: []*Webhook{
 					{
+						Name: "authorizing",
+						URL:  "https://scep.authorizing",
 						Kind: linkedca.Webhook_AUTHORIZING.String(),
 					},
 				},
@@ -341,7 +347,7 @@ func TestSCEP_ValidateChallenge(t *testing.T) {
 		Allow bool `json:"allow"`
 		Data  any  `json:"data"`
 	}
-	okServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	okServer := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		req := &request{}
 		err := json.NewDecoder(r.Body).Decode(req)
 		require.NoError(t, err)
@@ -363,6 +369,7 @@ func TestSCEP_ValidateChallenge(t *testing.T) {
 		w.WriteHeader(200)
 		w.Write(b)
 	}))
+	httpclient := okServer.Client()
 	t.Cleanup(okServer.Close)
 	type args struct {
 		challenge     string
@@ -471,7 +478,7 @@ func TestSCEP_ValidateChallenge(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			err := tt.p.Init(Config{Claims: globalProvisionerClaims, WebhookClient: http.DefaultClient})
+			err := tt.p.Init(Config{Claims: globalProvisionerClaims, WebhookClient: httpclient})
 			require.NoError(t, err)
 			ctx := context.Background()
 

@@ -57,7 +57,7 @@ func TestFailsIssuingCertificateUsingRegularSCEPWithUpstreamCAS(t *testing.T) {
 		Name:                          "scep",
 		Type:                          "SCEP",
 		ForceCN:                       false,
-		ChallengePassword:             "",
+		ChallengePassword:             "the-challenge",
 		EncryptionAlgorithmIdentifier: 2,
 		MinimumPublicKeyLength:        2048,
 		Claims:                        &config.GlobalProvisionerClaims,
@@ -106,7 +106,7 @@ func TestFailsIssuingCertificateUsingRegularSCEPWithUpstreamCAS(t *testing.T) {
 	// issuance is expected to fail when an upstream CAS is configured, as the current
 	// CAS interfaces do not support providing a decrypter.
 	scepClient := createSCEPClient(t, fmt.Sprintf("https://localhost:%s/scep/scep", port), m.Root)
-	cert, err := scepClient.requestCertificate(t, "test.localhost", []string{"test.localhost"})
+	cert, err := scepClient.requestCertificate(t)
 	assert.Error(t, err)
 	assert.Nil(t, cert)
 
