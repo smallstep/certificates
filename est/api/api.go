@@ -100,7 +100,7 @@ func getCACertsHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	writeResponse(w, r, data, "application/pkcs7-mime; smime-type=certs-only", http.StatusOK)
+	writeResponse(w, data, "application/pkcs7-mime; smime-type=certs-only", http.StatusOK)
 }
 
 func getCSRAttrs(w http.ResponseWriter, r *http.Request) {
@@ -120,7 +120,7 @@ func getCSRAttrsHandler(w http.ResponseWriter, r *http.Request) {
 		attrs = []byte{}
 	}
 	// Minimal implementation: allow provisioner to return nil/empty for "no attributes".
-	writeResponse(w, r, attrs, "application/csrattrs", http.StatusOK)
+	writeResponse(w, attrs, "application/csrattrs", http.StatusOK)
 }
 
 func enroll(w http.ResponseWriter, r *http.Request) {
@@ -183,7 +183,7 @@ func enrollHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	writeResponse(w, r, signed, "application/pkcs7-mime; smime-type=certs-only", http.StatusOK)
+	writeResponse(w, signed, "application/pkcs7-mime; smime-type=certs-only", http.StatusOK)
 }
 
 var errMissingAuth = errors.New("missing authentication material")
@@ -193,10 +193,30 @@ func authContextFromRequest(ctx context.Context, r *http.Request) (context.Conte
 	if r.TLS == nil {
 		return ctx, errors.New("missing TLS connection")
 	}
+	prov := est.ProvisionerFromContext(ctx)
+	cfg := prov.GetClientCertificateConfig()
 
-	if len(r.TLS.PeerCertificates) > 0 {
-		ctx = est.NewClientCertificateContext(ctx, r.TLS.PeerCertificates[0])
-		ctx = est.NewClientCertificateChainContext(ctx, r.TLS.PeerCertificates)
+	if cfg.Enable {
+		if cfg.ForwardedTLSClientCertHeader != "" {
+			if forwardedtlsClientCert := r.Header.Get(cfg.ForwardedTLSClientCertHeader); forwardedtlsClientCert != "" {
+				certPEM, err := base64.StdEncoding.DecodeString(forwardedtlsClientCert)
+				if err != nil {
+					// fmt.Printf("failed to decode client cert in forwarded header: %w", err)
+				}
+				certs, err := x509.ParseCertificates(certPEM)
+				if err != nil {
+					// return ctx, fmt.Errorf("failed to parse certificate from header: %w", err)
+				}
+				if len(certs) == 0 {
+					// return ctx, errors.New("no certificates found in header")
+				}
+				ctx = est.NewClientCertificateContext(ctx, certs[0])
+				ctx = est.NewClientCertificateChainContext(ctx, certs)
+			}
+		} else if len(r.TLS.PeerCertificates) > 0 {
+			ctx = est.NewClientCertificateContext(ctx, r.TLS.PeerCertificates[0])
+			ctx = est.NewClientCertificateChainContext(ctx, r.TLS.PeerCertificates)
+		}
 	}
 
 	if authHeader := r.Header.Get("Authorization"); authHeader != "" {
@@ -301,7 +321,7 @@ func requireContentType(r *http.Request, want string) error {
 	return nil
 }
 
-func writeResponse(w http.ResponseWriter, r *http.Request, data []byte, contentType string, status int) {
+func writeResponse(w http.ResponseWriter, data []byte, contentType string, status int) {
 	w.Header().Set("Content-Type", contentType)
 	w.Header().Set("Content-Transfer-Encoding", "base64")
 	w.WriteHeader(status)

@@ -13,6 +13,7 @@ import (
 type Provisioner interface {
 	provisioner.Interface
 	GetOptions() *provisioner.Options
+	GetClientCertificateConfig() *provisioner.ClientCertificateConfig
 	ShouldIncludeRootInChain() bool
 	ShouldIncludeIntermediateInChain() bool
 	GetSigner() (*x509.Certificate, crypto.Signer)

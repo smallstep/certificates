@@ -19,6 +19,12 @@ var (
 	ErrESTAuthDenied              = errors.New("est authentication denied")
 )
 
+// ClientCertificateConfig holds the EST client certificate authentication configuration.
+type ClientCertificateConfig struct {
+	Enable                       bool
+	ForwardedTLSClientCertHeader string
+}
+
 // ESTAuthRequest contains authentication material extracted from the request.
 type ESTAuthRequest struct {
 	CSR                    *x509.CertificateRequest
@@ -30,6 +36,14 @@ type ESTAuthRequest struct {
 	BasicAuthUsername      string
 	BasicAuthPassword      string
 	BearerToken            string
+}
+
+func (s *EST) GetClientCertificateConfig() *ClientCertificateConfig {
+	fmt.Printf("EST provisioner: %#v\n", s)
+	return &ClientCertificateConfig{
+		Enable:                       boolValue(s.EnableTLSClientCertificate, false),
+		ForwardedTLSClientCertHeader: s.ForwardedTLSClientCertHeader,
+	}
 }
 
 // AuthorizeRequest validates the request against configured EST auth methods.
@@ -101,7 +115,7 @@ func (s *EST) authorizeWithWebhook(ctx context.Context, req *ESTAuthRequest) ([]
 	)
 	switch {
 	case req.ClientCertificate != nil:
-		whreq, err = webhook.NewRequestBody(webhook.WithX509CertificateRequest(req.CSR), webhook.WithX509Certificate(nil, req.ClientCertificate))
+		whreq, err = webhook.NewRequestBody(webhook.WithX509CertificateRequest(req.CSR), webhook.WithClientCertificate(req.ClientCertificate))
 		if err != nil {
 			return nil, fmt.Errorf("failed creating webhook request: %w", err)
 		}
