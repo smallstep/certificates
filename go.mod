@@ -20,7 +20,7 @@ require (
 	github.com/googleapis/gax-go/v2 v2.19.0
 	github.com/hashicorp/vault/api v1.23.0
 	github.com/hashicorp/vault/api/auth/approle v0.11.0
-	github.com/hashicorp/vault/api/auth/aws v0.11.0
+	github.com/hashicorp/vault/api/auth/aws v0.12.0
 	github.com/hashicorp/vault/api/auth/kubernetes v0.12.0
 	github.com/newrelic/go-agent/v3 v3.42.0
 	github.com/pkg/errors v0.9.1
