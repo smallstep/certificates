@@ -154,7 +154,7 @@ func enrollHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	ctx, err = authorizeEnrollRequest(ctx, csr)
+	opts, err := authorizeEnrollRequest(ctx, csr)
 	if err != nil {
 		failWithStatus(w, r, http.StatusUnauthorized, err)
 		return
@@ -163,7 +163,7 @@ func enrollHandler(w http.ResponseWriter, r *http.Request) {
 	r = r.WithContext(ctx)
 	auth := est.MustFromContext(ctx)
 
-	issued, err := auth.SignCSR(ctx, csr)
+	issued, err := auth.SignCSR(ctx, csr, opts...)
 	if err != nil {
 		failWithStatus(w, r, http.StatusInternalServerError, fmt.Errorf("failed issuing certificate: %w", err))
 		return
@@ -207,7 +207,7 @@ func authContextFromRequest(ctx context.Context, r *http.Request) (context.Conte
 }
 
 // authorizeEnrollRequest validates the request against provisioner-configured auth methods.
-func authorizeEnrollRequest(ctx context.Context, csr *x509.CertificateRequest) (context.Context, error) {
+func authorizeEnrollRequest(ctx context.Context, csr *x509.CertificateRequest) ([]provisioner.SignCSROption, error) {
 	prov := est.ProvisionerFromContext(ctx)
 	ca := authority.MustFromContext(ctx)
 
@@ -225,12 +225,11 @@ func authorizeEnrollRequest(ctx context.Context, csr *x509.CertificateRequest) (
 		req.BasicAuthPassword = auth.Password
 	}
 
-	method, err := prov.AuthorizeRequest(ctx, req)
+	opts, err := prov.AuthorizeRequest(ctx, req)
 	if err != nil {
-		return ctx, err
+		return nil, err
 	}
-	ctx = est.NewAuthMethodContext(ctx, est.AuthMethod(method))
-	return ctx, nil
+	return opts, nil
 }
 
 func parseCSR(body []byte) (*x509.CertificateRequest, error) {

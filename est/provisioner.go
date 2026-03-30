@@ -16,7 +16,7 @@ type Provisioner interface {
 	ShouldIncludeRootInChain() bool
 	ShouldIncludeIntermediateInChain() bool
 	GetSigner() (*x509.Certificate, crypto.Signer)
-	AuthorizeRequest(ctx context.Context, req provisioner.ESTAuthRequest) (provisioner.ESTAuthMethod, error)
+	AuthorizeRequest(ctx context.Context, req provisioner.ESTAuthRequest) ([]provisioner.SignCSROption, error)
 	NotifySuccess(ctx context.Context, csr *x509.CertificateRequest, cert *x509.Certificate, transactionID string) error
 	NotifyFailure(ctx context.Context, csr *x509.CertificateRequest, transactionID string, errorCode int, errorDescription string) error
 	GetCSRAttributes(ctx context.Context) ([]byte, error)

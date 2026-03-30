@@ -85,21 +85,18 @@ func (s *EST) DefaultTLSCertDuration() time.Duration {
 // newChallengeValidationController creates a new challengeValidationController
 // that performs challenge validation through webhooks.
 func newESTChallengeValidationController(client HTTPClient, tw httptransport.Wrapper, webhooks []*Webhook) *challengeValidationController {
-	scepHooks := []*Webhook{}
+	estHooks := []*Webhook{}
 	for _, wh := range webhooks {
 		// if wh.Kind != linkedca.Webhook_ESTCHALLENGE.String() {
 		if wh.Kind != "ESTCHALLENGE" {
 			continue
 		}
-		if !isCertTypeOK(wh) {
-			continue
-		}
-		scepHooks = append(scepHooks, wh)
+		estHooks = append(estHooks, wh)
 	}
 	return &challengeValidationController{
 		client:        client,
 		wrapTransport: tw,
-		webhooks:      scepHooks,
+		webhooks:      estHooks,
 	}
 }
 
