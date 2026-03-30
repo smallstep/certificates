@@ -1481,7 +1481,8 @@ Eczm34A5FNijV3s0/f0UPl7zbJcTx6xwqMIRq6NCMEAwDwYDVR0TAQH/BAUwAwEB
 /zAOBgNVHQ8BAf8EBAMCAQYwHQYDVR0OBBYEFFIyuyz7RkOb3NaBqQ5lZuA0QepA
 MAoGCCqGSM49BAMDA2gAMGUCMETfjPO/HwqReR2CS7p0ZWoD/LHs6hDi422opifH
 EUaYLxwGlT9SLdjkVpz0UUOR5wIxAIoGyxGKRHVTpqpGRFiJtQEOOTp/+s1GcxeY
-uR2zh/80lQyu9vAFCj6E4AXc+osmRg==`
+uR2zh/80lQyu9vAFCj6E4AXc+osmRg==
+-----END CERTIFICATE-----`
 
 // OID for the Android attestation extension
 // https://source.android.com/docs/security/features/keystore/attestation#id-attestation
@@ -1587,9 +1588,12 @@ func doAndroidKeyAttestionFormat(_ context.Context, prov Provisioner, ch *Challe
 		switch root.PublicKey.(type) {
 		case *rsa.PublicKey:
 			rsaRoot, err := pemutil.ParseCertificate([]byte(AndroidRootCARSA))
+			if err != nil {
+				return nil, WrapErrorISE(err, "error parsing root CA RSA")
+			}
 			oldRsaRoot, err := pemutil.ParseCertificate([]byte(OldAndroidRootCARSA))
 			if err != nil {
-				return nil, WrapErrorISE(err, "error parsing root ca")
+				return nil, WrapErrorISE(err, "error parsing old root CA RSA")
 			}
 			// 1. verify public key
 			if !root.PublicKey.(*rsa.PublicKey).Equal(rsaRoot.PublicKey) {
@@ -1602,7 +1606,7 @@ func doAndroidKeyAttestionFormat(_ context.Context, prov Provisioner, ch *Challe
 			if err != nil {
 				return nil, WrapErrorISE(err, "error parsing root ca")
 			}
-			if !root.PublicKey.(*rsa.PublicKey).Equal(ecdsaRoot.PublicKey) {
+			if !root.PublicKey.(*ecdsa.PublicKey).Equal(ecdsaRoot.PublicKey) {
 				return nil, NewDetailedError(ErrorBadAttestationStatementType, "root certificate not signed by Google")
 			}
 			attestationRoots.AddCert(ecdsaRoot)
@@ -1701,7 +1705,7 @@ func doAndroidKeyAttestionFormat(_ context.Context, prov Provisioner, ch *Challe
 
 	// validate challenge
 	if subtle.ConstantTimeCompare([]byte(keyAuth), data.Attestation.AttestationChallenge) != 1 {
-		return nil, NewDetailedError(ErrorBadAttestationStatementType, fmt.Sprintf("challenge mismatch; expected %q, got %q", keyAuth, string(data.Attestation.AttestationChallenge)))
+		return nil, NewDetailedError(ErrorBadAttestationStatementType, "challenge mismatch; expected %q, got %q", keyAuth, string(data.Attestation.AttestationChallenge))
 	}
 
 	return data, nil
