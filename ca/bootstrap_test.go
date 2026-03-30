@@ -54,7 +54,7 @@ func startCABootstrapServer() *httptest.Server {
 	if err != nil {
 		panic(err)
 	}
-	baseContext := buildContext(ca.auth, nil, nil, nil)
+	baseContext := buildContext(ca.auth, nil, nil, nil, nil)
 	srv.Config.Handler = ca.srv.Handler
 	srv.Config.BaseContext = func(net.Listener) context.Context {
 		return baseContext
