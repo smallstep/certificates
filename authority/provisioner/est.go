@@ -16,28 +16,27 @@ import (
 // EST is the EST provisioner type, an entity that can authorize the EST flow.
 type EST struct {
 	*base
-	ID                                 string   `json:"-"`
-	Type                               string   `json:"type"`
-	Name                               string   `json:"name"`
-	EnableTLSClientCertificate         *bool    `json:"enableTLSClientCertificate,omitempty"`
-	EnableHTTPBasicAuth                *bool    `json:"enableHTTPBasicAuth,omitempty"`
-	BasicAuthUsername                  string   `json:"basicAuthUsername,omitempty"`
-	BasicAuthPassword                  string   `json:"basicAuthPassword,omitempty"`
-	ClientCertificateRoots             []byte   `json:"clientCertificateRoots,omitempty"`
-	ForceCN                            bool     `json:"forceCN,omitempty"`
-	Capabilities                       []string `json:"capabilities,omitempty"`
-	IncludeRoot                        bool     `json:"includeRoot,omitempty"`
-	ExcludeIntermediate                bool     `json:"excludeIntermediate,omitempty"`
-	MinimumPublicKeyLength             int      `json:"minimumPublicKeyLength,omitempty"`
-	CSRAttrs                           []byte   `json:"csrAttrs,omitempty"`
-	Options                            *Options `json:"options,omitempty"`
-	Claims                             *Claims  `json:"claims,omitempty"`
-	ctl                                *Controller
-	signer                             crypto.Signer
-	signerCertificate                  *x509.Certificate
-	challengeValidationController      *challengeValidationController
-	notificationController             *notificationController
-	clientCertificateRootPool          *x509.CertPool
+	ID                            string   `json:"-"`
+	Type                          string   `json:"type"`
+	Name                          string   `json:"name"`
+	EnableTLSClientCertificate    *bool    `json:"enableTLSClientCertificate,omitempty"`
+	EnableHTTPBasicAuth           *bool    `json:"enableHTTPBasicAuth,omitempty"`
+	BasicAuthUsername             string   `json:"basicAuthUsername,omitempty"`
+	BasicAuthPassword             string   `json:"basicAuthPassword,omitempty"`
+	ClientCertificateRoots        []byte   `json:"clientCertificateRoots,omitempty"`
+	ForceCN                       bool     `json:"forceCN,omitempty"`
+	IncludeRoot                   bool     `json:"includeRoot,omitempty"`
+	ExcludeIntermediate           bool     `json:"excludeIntermediate,omitempty"`
+	MinimumPublicKeyLength        int      `json:"minimumPublicKeyLength,omitempty"`
+	CSRAttrs                      []byte   `json:"csrAttrs,omitempty"`
+	Options                       *Options `json:"options,omitempty"`
+	Claims                        *Claims  `json:"claims,omitempty"`
+	ctl                           *Controller
+	signer                        crypto.Signer
+	signerCertificate             *x509.Certificate
+	challengeValidationController *challengeValidationController
+	notificationController        *notificationController
+	clientCertificateRootPool     *x509.CertPool
 }
 
 // GetID returns the provisioner unique identifier.
