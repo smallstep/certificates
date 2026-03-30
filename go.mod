@@ -173,3 +173,5 @@ require (
 	google.golang.org/genproto/googleapis/rpc v0.0.0-20260803160001-6ac0973c030d // indirect
 	google.golang.org/grpc/cmd/protoc-gen-go-grpc v1.6.2 // indirect
 )
+
+replace github.com/smallstep/linkedca => github.com/jbpin/linkedca v0.0.0-20251224103807-5e7deb3d4d49

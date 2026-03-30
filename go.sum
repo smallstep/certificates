@@ -261,6 +261,8 @@ github.com/jackc/pgx/v5 v5.9.2 h1:3ZhOzMWnR4yJ+RW1XImIPsD1aNSz4T4fyP7zlQb56hw=
 github.com/jackc/pgx/v5 v5.9.2/go.mod h1:mal1tBGAFfLHvZzaYh77YS/eC6IX9OWbRV1QIIM0Jn4=
 github.com/jackc/puddle/v2 v2.2.2 h1:PR8nw+E/1w0GLuRFSmiioY6UooMp6KJv0/61nB7icHo=
 github.com/jackc/puddle/v2 v2.2.2/go.mod h1:vriiEXHvEE654aYKXXjOvZM39qJ0q+azkZFrfEOc3H4=
+github.com/jbpin/linkedca v0.0.0-20251224103807-5e7deb3d4d49 h1:rFx5O4hmVJ3fQ90n1PP8fjBWIQoSuBSqbdts6UfnaVk=
+github.com/jbpin/linkedca v0.0.0-20251224103807-5e7deb3d4d49/go.mod h1:bUm0HgkgtOjbnwShtNKu3XPuQ6AA/o680sxTfy9vdYk=
 github.com/jmespath/go-jmespath v0.3.0/go.mod h1:9QtRXoHjLGCJ5IBSaohpXITPlowMeeYCZ7fLUTSywik=
 github.com/jmespath/go-jmespath v0.4.0/go.mod h1:T8mJZnbsbmF+m6zOOFylbeCJqk5+pHWvzYPziyZiYoo=
 github.com/jmespath/go-jmespath v0.4.1-0.20220621161143-b0104c826a24 h1:liMMTbpW34dhU4az1GN0pTPADwNmvoRSeoZ6PItiqnY=
@@ -360,8 +362,6 @@ github.com/smallstep/cli-utils v0.12.2 h1:lGzM9PJrH/qawbzMC/s2SvgLdJPKDWKwKzx9do
 github.com/smallstep/cli-utils v0.12.2/go.mod h1:uCPqefO29goHLGqFnwk0i8W7XJu18X3WHQFRtOm/00Y=
 github.com/smallstep/go-attestation v0.4.4-0.20260814222900-a849f4e2cd68 h1:KcK2guFXrE5sX/nvF1b+atHP6DjRB1gCv3ppyTXB2Zk=
 github.com/smallstep/go-attestation v0.4.4-0.20260814222900-a849f4e2cd68/go.mod h1:vNAduivU014fubg6ewygkAvQC0IQVXqdc8vaGl/0er4=
-github.com/smallstep/linkedca v0.26.0 h1:NsxTVo3zI3KwOFFiVodeHtuGgKq0b5kOUXVLjjNTvXY=
-github.com/smallstep/linkedca v0.26.0/go.mod h1:Z8c7EgVrSHNhshIhRnUGfKfE796+TwF2eyErhqANmJQ=
 github.com/smallstep/nosql v0.8.0 h1:FBTCUfKPmWYbrozW+RBKu+fnvbn+zr5rVli/XB4Jp4A=
 github.com/smallstep/nosql v0.8.0/go.mod h1:5dUpNotHLHhOUapP0PLBVVfp3tG1DFC31VRccg+Cqwo=
 github.com/smallstep/pkcs7 v0.2.1/go.mod h1:RcXHsMfL+BzH8tRhmrF1NkkpebKpq3JEM66cOFxanf0=
