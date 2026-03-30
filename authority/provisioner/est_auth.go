@@ -39,7 +39,6 @@ type ESTAuthRequest struct {
 }
 
 func (s *EST) GetClientCertificateConfig() *ClientCertificateConfig {
-	fmt.Printf("EST provisioner: %#v\n", s)
 	return &ClientCertificateConfig{
 		Enable:                       boolValue(s.EnableTLSClientCertificate, false),
 		ForwardedTLSClientCertHeader: s.ForwardedTLSClientCertHeader,
