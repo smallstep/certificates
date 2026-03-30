@@ -106,11 +106,11 @@ func mustNonCRLAttestationProvisioner(t *testing.T, roots []byte, CRLs []string)
 	t.Helper()
 
 	prov := &provisioner.ACME{
-		Type:             "ACME",
-		Name:             "acme",
-		Challenges:       []provisioner.ACMEChallenge{provisioner.DEVICE_ATTEST_01},
-		AttestationRoots: roots,
-		RootCRLs:         CRLs,
+		Type:                      "ACME",
+		Name:                      "acme",
+		Challenges:                []provisioner.ACMEChallenge{provisioner.DEVICE_ATTEST_01},
+		AttestationRoots:          roots,
+		RevokedCertificateSerials: CRLs,
 	}
 	if err := prov.Init(provisioner.Config{
 		Claims: config.GlobalProvisionerClaims,
@@ -131,7 +131,7 @@ func mustAccountAndKeyAuthorization(t *testing.T, token string) (*jose.JSONWebKe
 	return jwk, keyAuth
 }
 
-func mustAttestAndroid(t *testing.T, keyAuthorization string) ([]byte, *x509.Certificate, *x509.Certificate, *x509.Certificate) {
+func mustAttestAndroid(t *testing.T, keyAuthorization string) ([]byte, *x509.Certificate, *x509.Certificate) {
 	t.Helper()
 
 	ca, err := minica.New()
@@ -157,18 +157,10 @@ func mustAttestAndroid(t *testing.T, keyAuthorization string) ([]byte, *x509.Cer
 	attestByte, err := attestation.CreateKeyDescription(&atts)
 	fatalError(t, err)
 
-	root, err := pemutil.ParseCertificate([]byte(AndroidRootCARSA))
-	fatalError(t, err)
-
-	rootAndroid, err := ca.Sign(&x509.Certificate{
-		Subject:   pkix.Name{CommonName: "attestation cert"},
-		PublicKey: root.PublicKey,
-	})
-
 	leaf, err := ca.Sign(&x509.Certificate{
 		Subject:   pkix.Name{CommonName: "attestation cert"},
 		PublicKey: signer.Public(),
-		Extensions: []pkix.Extension{
+		ExtraExtensions: []pkix.Extension{
 			{Id: oidAndroidAttestation, Value: attestByte},
 		},
 	})
@@ -180,7 +172,7 @@ func mustAttestAndroid(t *testing.T, keyAuthorization string) ([]byte, *x509.Cer
 	}{
 		Format: "android-key",
 		AttStatement: map[string]any{
-			"x5c": []any{leaf.Raw, ca.Intermediate.Raw, rootAndroid.Raw},
+			"x5c": []any{leaf.Raw, ca.Intermediate.Raw, ca.Root.Raw},
 		},
 	})
 	fatalError(t, err)
@@ -192,7 +184,7 @@ func mustAttestAndroid(t *testing.T, keyAuthorization string) ([]byte, *x509.Cer
 	})
 	require.NoError(t, err)
 
-	return payload, leaf, ca.Root, rootAndroid
+	return payload, leaf, ca.Root
 }
 
 func mustAttestApple(t *testing.T, nonce string) ([]byte, *x509.Certificate, *x509.Certificate) {
@@ -4592,7 +4584,7 @@ func Test_deviceAttest01Validate(t *testing.T) {
 		"ok/doAndroidAttestationFormat": func(t *testing.T) test {
 
 			jwk, keyAuth := mustAccountAndKeyAuthorization(t, "token")
-			payload, _, root, _ := mustAttestAndroid(t, keyAuth)
+			payload, _, root := mustAttestAndroid(t, keyAuth)
 
 			caRoot := pem.EncodeToMemory(&pem.Block{Type: "CERTIFICATE", Bytes: root.Raw})
 			ctx := NewProvisionerContext(context.Background(), mustAttestationProvisioner(t, caRoot))
@@ -4633,9 +4625,9 @@ func Test_deviceAttest01Validate(t *testing.T) {
 		"ok/doAndroidAttestationFormat-invalid-root": func(t *testing.T) test {
 
 			jwk, keyAuth := mustAccountAndKeyAuthorization(t, "token")
-			payload, _, root, attestationRoot := mustAttestAndroid(t, keyAuth)
+			payload, _, root := mustAttestAndroid(t, keyAuth)
 			caRoot := pem.EncodeToMemory(&pem.Block{Type: "CERTIFICATE", Bytes: root.Raw})
-			ctx := NewProvisionerContext(context.Background(), mustNonCRLAttestationProvisioner(t, caRoot, []string{attestationRoot.SerialNumber.String()}))
+			ctx := NewProvisionerContext(context.Background(), mustNonCRLAttestationProvisioner(t, caRoot, []string{root.SerialNumber.String()}))
 			return test{
 				args: args{
 					ctx: ctx,
