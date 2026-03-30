@@ -118,7 +118,20 @@ func WithX5CCertificate(leaf *x509.Certificate) RequestBodyOption {
 			}
 			rb.X5CCertificate.PublicKey = key
 		}
+		return nil
+	}
+}
 
+func WithAuthenticationHeader(header string) RequestBodyOption {
+	return func(rb *RequestBody) error {
+		rb.AuthenticationHeader = header
+		return nil
+	}
+}
+
+func WithBearerToken(token string) RequestBodyOption {
+	return func(rb *RequestBody) error {
+		rb.BearerToken = token
 		return nil
 	}
 }

@@ -19,15 +19,6 @@ var (
 	ErrESTAuthDenied              = errors.New("est authentication denied")
 )
 
-// ESTAuthMethod identifies the EST authentication method used.
-type ESTAuthMethod string
-
-const (
-	ESTAuthMethodTLSClientCertificate         ESTAuthMethod = "tls-client-certificate"
-	ESTAuthMethodTLSExternalClientCertificate ESTAuthMethod = "tls-external-client-certificate"
-	ESTAuthMethodHTTPBasicAuth                ESTAuthMethod = "http-basic-auth"
-)
-
 // ESTAuthRequest contains authentication material extracted from the request.
 type ESTAuthRequest struct {
 	CSR                    *x509.CertificateRequest
@@ -35,8 +26,10 @@ type ESTAuthRequest struct {
 	ClientCertificateChain []*x509.Certificate
 	CARoots                []*x509.Certificate
 	CAIntermediates        []*x509.Certificate
+	AuthenticationHeader   string
 	BasicAuthUsername      string
 	BasicAuthPassword      string
+	BearerToken            string
 }
 
 // AuthorizeRequest validates the request against configured EST auth methods.
@@ -44,43 +37,11 @@ func (s *EST) AuthorizeRequest(ctx context.Context, req ESTAuthRequest) ([]SignC
 	if s.hasAuthWebhooks() {
 		return s.authorizeWithWebhook(ctx, &req)
 	}
-	return s.authorizeRequestLocal(ctx, req)
-}
-
-// AuthorizeTLSClientCertificate validates a CA-issued client certificate.
-func (s *EST) AuthorizeTLSClientCertificate(ctx context.Context, csr *x509.CertificateRequest, cert *x509.Certificate, chain, roots, intermediates []*x509.Certificate) error {
-	_, err := s.AuthorizeRequest(ctx, ESTAuthRequest{
-		CSR:                    csr,
-		ClientCertificate:      cert,
-		ClientCertificateChain: chain,
-		CARoots:                roots,
-		CAIntermediates:        intermediates,
-	})
-	return err
-}
-
-// AuthorizeTLSExternalClientCertificate validates a client certificate against external roots.
-func (s *EST) AuthorizeTLSExternalClientCertificate(ctx context.Context, csr *x509.CertificateRequest, cert *x509.Certificate, chain []*x509.Certificate) error {
-	_, err := s.AuthorizeRequest(ctx, ESTAuthRequest{
-		CSR:                    csr,
-		ClientCertificate:      cert,
-		ClientCertificateChain: chain,
-	})
-	return err
-}
-
-// AuthorizeHTTPBasicAuth validates a username/password pair for EST.
-func (s *EST) AuthorizeHTTPBasicAuth(ctx context.Context, csr *x509.CertificateRequest, username, password string) error {
-	_, err := s.AuthorizeRequest(ctx, ESTAuthRequest{
-		CSR:               csr,
-		BasicAuthUsername: username,
-		BasicAuthPassword: password,
-	})
-	return err
+	return s.authorizeRequestLocal(req)
 }
 
 // authorizeRequestLocal validates the request using provisioner configuration.
-func (s *EST) authorizeRequestLocal(ctx context.Context, req ESTAuthRequest) ([]SignCSROption, error) {
+func (s *EST) authorizeRequestLocal(req ESTAuthRequest) ([]SignCSROption, error) {
 	var lastErr error = ErrESTAuthMethodNotFound
 	if req.ClientCertificate != nil {
 		if boolValue(s.EnableTLSClientCertificate, false) {
@@ -144,12 +105,14 @@ func (s *EST) authorizeWithWebhook(ctx context.Context, req *ESTAuthRequest) ([]
 		if err != nil {
 			return nil, fmt.Errorf("failed creating webhook request: %w", err)
 		}
-	case req.hasBasicAuth():
-		whreq, err = webhook.NewRequestBody(webhook.WithX509CertificateRequest(req.CSR), webhook.WithAuthorizationPrincipal(req.BasicAuthUsername))
+	case req.AuthenticationHeader != "":
+		whreq, err = webhook.NewRequestBody(webhook.WithX509CertificateRequest(req.CSR), webhook.WithAuthenticationHeader(req.AuthenticationHeader))
 		if err != nil {
 			return nil, fmt.Errorf("failed creating webhook request: %w", err)
 		}
-		whreq.SCEPChallenge = req.BasicAuthPassword
+		if req.BearerToken != "" {
+			whreq.BearerToken = req.BearerToken
+		}
 	default:
 		return nil, errors.New("missing certificate or basic auth for webhook validation")
 	}
@@ -187,12 +150,11 @@ func (s *EST) hasAuthWebhooks() bool {
 
 // normalizeAuthConfig applies defaults and validates auth configuration.
 func (s *EST) normalizeAuthConfig() error {
+	enable := true
 	if !s.authMethodsConfigured() {
-		enable := true
 		s.EnableHTTPBasicAuth = &enable
 	}
 	if s.EnableHTTPBasicAuth == nil && (s.BasicAuthUsername != "" || s.BasicAuthPassword != "") {
-		enable := true
 		s.EnableHTTPBasicAuth = &enable
 	}
 	if boolValue(s.EnableHTTPBasicAuth, false) && s.BasicAuthPassword == "" && !s.hasAuthWebhooks() {

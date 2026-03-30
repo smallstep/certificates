@@ -102,4 +102,7 @@ type RequestBody struct {
 	X5CCertificate *X5CCertificate `json:"x5cCertificate,omitempty"`
 	// Set for X5C, AWS, GCP, and Azure provisioners
 	AuthorizationPrincipal string `json:"authorizationPrincipal,omitempty"`
+	// Set for EST webhook requests
+	AuthenticationHeader string `json:"authenticationHeader,omitempty"`
+	BearerToken          string `json:"bearerToken,omitempty"`
 }
