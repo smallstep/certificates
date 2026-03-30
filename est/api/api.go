@@ -26,6 +26,17 @@ const (
 	maxPayloadSize = 2 << 20
 )
 
+// Util to extract bearer token from request
+func BearerToken(r *http.Request) (string, bool) {
+	auth := r.Header.Get("Authorization")
+	const prefix = "Bearer "
+	// Case insensitive prefix match. See Issue 22736.
+	if len(auth) < len(prefix) || !strings.EqualFold(auth[:len(prefix)], prefix) {
+		return "", false
+	}
+	return auth[len(prefix):], true
+}
+
 // Route configures the EST routes under the provided router.
 func Route(r api.Router) {
 	r.MethodFunc(http.MethodGet, "/{provisionerName}/cacerts", getCACerts)
@@ -120,9 +131,6 @@ func enrollHandler(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	ctx, err := authContextFromRequest(ctx, r)
 	if err != nil {
-		if errors.Is(err, errMissingClientCertificateOrBasicAuth) {
-			w.Header().Set("WWW-Authenticate", `Basic realm="EST"`)
-		}
 		failWithStatus(w, r, http.StatusUnauthorized, err)
 		return
 	}
@@ -178,7 +186,7 @@ func enrollHandler(w http.ResponseWriter, r *http.Request) {
 	writeResponse(w, r, signed, "application/pkcs7-mime; smime-type=certs-only", http.StatusOK)
 }
 
-var errMissingClientCertificateOrBasicAuth = errors.New("missing client certificate or basic auth")
+var errMissingAuth = errors.New("missing authentication material")
 
 // authContextFromRequest extracts auth material from the request into the context.
 func authContextFromRequest(ctx context.Context, r *http.Request) (context.Context, error) {
@@ -191,16 +199,21 @@ func authContextFromRequest(ctx context.Context, r *http.Request) (context.Conte
 		ctx = est.NewClientCertificateChainContext(ctx, r.TLS.PeerCertificates)
 	}
 
-	if username, password, ok := r.BasicAuth(); ok {
-		ctx = est.NewBasicAuthContext(ctx, est.BasicAuth{
-			Username: username,
-			Password: password,
-		})
+	if authHeader := r.Header.Get("Authorization"); authHeader != "" {
+		ctx = est.NewAuthenticationHeaderContext(ctx, authHeader)
+		if token, ok := BearerToken(r); ok {
+			ctx = est.NewBearerTokenContext(ctx, token)
+		} else if username, password, ok := r.BasicAuth(); ok {
+			ctx = est.NewBasicAuthContext(ctx, est.BasicAuth{
+				Username: username,
+				Password: password,
+			})
+		}
 	}
 
 	if _, ok := est.ClientCertificateFromContext(ctx); !ok {
-		if _, ok := est.BasicAuthFromContext(ctx); !ok {
-			return ctx, errMissingClientCertificateOrBasicAuth
+		if _, ok := est.AuthenticationHeaderFromContext(ctx); !ok {
+			return ctx, errMissingAuth
 		}
 	}
 	return ctx, nil
@@ -220,9 +233,15 @@ func authorizeEnrollRequest(ctx context.Context, csr *x509.CertificateRequest) (
 		req.ClientCertificate = cert
 		req.ClientCertificateChain, _ = est.ClientCertificateChainFromContext(ctx)
 	}
-	if auth, ok := est.BasicAuthFromContext(ctx); ok {
-		req.BasicAuthUsername = auth.Username
-		req.BasicAuthPassword = auth.Password
+	if authHeader, ok := est.AuthenticationHeaderFromContext(ctx); ok {
+		req.AuthenticationHeader = authHeader
+		if auth, ok := est.BasicAuthFromContext(ctx); ok {
+			req.BasicAuthUsername = auth.Username
+			req.BasicAuthPassword = auth.Password
+		}
+		if token, ok := est.BearerTokenFromContext(ctx); ok {
+			req.BearerToken = token
+		}
 	}
 
 	opts, err := prov.AuthorizeRequest(ctx, req)

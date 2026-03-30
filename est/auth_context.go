@@ -2,29 +2,21 @@ package est
 
 import "context"
 
-// AuthMethod describes the authentication method used for an EST request.
-type AuthMethod string
+// AuthenticationHeaderKey is the context key used to store the EST authentication header.
+type AuthenticationHeaderKey struct{}
 
-const (
-	AuthMethodTLSClientCertificate         AuthMethod = "tls-client-certificate"
-	AuthMethodTLSExternalClientCertificate AuthMethod = "tls-external-client-certificate"
-	AuthMethodHTTPBasicAuth                AuthMethod = "http-basic-auth"
-)
-
-type authMethodKey struct{}
-
-// NewAuthMethodContext stores the EST authentication method in the context.
-func NewAuthMethodContext(ctx context.Context, method AuthMethod) context.Context {
-	if method == "" {
+// NewAuthenticationHeaderContext stores the EST authentication header in the context.
+func NewAuthenticationHeaderContext(ctx context.Context, header string) context.Context {
+	if header == "" {
 		return ctx
 	}
-	return context.WithValue(ctx, authMethodKey{}, method)
+	return context.WithValue(ctx, AuthenticationHeaderKey{}, header)
 }
 
-// AuthMethodFromContext returns the EST authentication method stored in the context.
-func AuthMethodFromContext(ctx context.Context) (AuthMethod, bool) {
-	method, ok := ctx.Value(authMethodKey{}).(AuthMethod)
-	return method, ok
+// AuthenticationHeaderFromContext returns the EST authentication header stored in the context.
+func AuthenticationHeaderFromContext(ctx context.Context) (string, bool) {
+	header, ok := ctx.Value(AuthenticationHeaderKey{}).(string)
+	return header, ok
 }
 
 // BasicAuth holds the HTTP basic auth credentials for an EST request.
@@ -47,4 +39,20 @@ func NewBasicAuthContext(ctx context.Context, auth BasicAuth) context.Context {
 func BasicAuthFromContext(ctx context.Context) (BasicAuth, bool) {
 	auth, ok := ctx.Value(basicAuthKey{}).(BasicAuth)
 	return auth, ok
+}
+
+type BearerTokenKey struct{}
+
+// NewBearerTokenContext stores the HTTP bearer token in the context.
+func NewBearerTokenContext(ctx context.Context, token string) context.Context {
+	if token == "" {
+		return ctx
+	}
+	return context.WithValue(ctx, BearerTokenKey{}, token)
+}
+
+// BearerTokenFromContext returns the HTTP bearer token stored in the context.
+func BearerTokenFromContext(ctx context.Context) (string, bool) {
+	token, ok := ctx.Value(BearerTokenKey{}).(string)
+	return token, ok
 }
