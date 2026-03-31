@@ -699,10 +699,8 @@ func (a *Authority) callEnrichingWebhooksSSH(ctx context.Context, prov provision
 	var whEnrichReq *webhook.RequestBody
 	if whEnrichReq, err = webhook.NewRequestBody(
 		webhook.WithSSHCertificateRequest(cr),
+		webhook.WithProvisionerName(prov),
 	); err == nil {
-		if prov != nil {
-			whEnrichReq.ProvisionerName = prov.GetName()
-		}
 		err = webhookCtl.Enrich(ctx, whEnrichReq)
 	}
 
@@ -718,10 +716,8 @@ func (a *Authority) callAuthorizingWebhooksSSH(ctx context.Context, prov provisi
 	var whAuthBody *webhook.RequestBody
 	if whAuthBody, err = webhook.NewRequestBody(
 		webhook.WithSSHCertificate(cert, certTpl),
+		webhook.WithProvisionerName(prov),
 	); err == nil {
-		if prov != nil {
-			whAuthBody.ProvisionerName = prov.GetName()
-		}
 		err = webhookCtl.Authorize(ctx, whAuthBody)
 	}
 
