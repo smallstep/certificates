@@ -83,6 +83,13 @@ func (o *Order) UpdateStatus(ctx context.Context, db DB) error {
 	case StatusValid:
 		return nil
 	case StatusProcessing:
+		// Check expiry so orphaned orders (e.g. from a server restart mid-goroutine)
+		// eventually transition to invalid rather than staying stuck forever.
+		if now.After(o.ExpiresAt) {
+			o.Status = StatusInvalid
+			o.Error = NewError(ErrorMalformedType, "order has expired")
+			break
+		}
 		return nil
 	case StatusReady:
 		// Check expiry
