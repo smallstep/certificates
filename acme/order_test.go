@@ -48,6 +48,14 @@ func TestOrder_UpdateStatus(t *testing.T) {
 				o: o,
 			}
 		},
+		"ok/already-processing": func(t *testing.T) test {
+			o := &Order{
+				Status: StatusProcessing,
+			}
+			return test{
+				o: o,
+			}
+		},
 		"fail/error-unexpected-status": func(t *testing.T) test {
 			o := &Order{
 				Status: "foo",
