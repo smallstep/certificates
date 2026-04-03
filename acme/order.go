@@ -82,6 +82,8 @@ func (o *Order) UpdateStatus(ctx context.Context, db DB) error {
 		return nil
 	case StatusValid:
 		return nil
+	case StatusProcessing:
+		return nil
 	case StatusReady:
 		// Check expiry
 		if now.After(o.ExpiresAt) {
