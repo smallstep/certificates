@@ -48,6 +48,55 @@ func TestOrder_UpdateStatus(t *testing.T) {
 				o: o,
 			}
 		},
+		"ok/already-processing": func(t *testing.T) test {
+			now := clock.Now()
+			o := &Order{
+				Status:    StatusProcessing,
+				ExpiresAt: now.Add(5 * time.Minute),
+			}
+			return test{
+				o: o,
+			}
+		},
+		"ok/processing-expired": func(t *testing.T) test {
+			now := clock.Now()
+			o := &Order{
+				ID:        "oID",
+				AccountID: "accID",
+				Status:    StatusProcessing,
+				ExpiresAt: now.Add(-5 * time.Minute),
+			}
+			return test{
+				o: o,
+				db: &MockDB{
+					MockUpdateOrder: func(ctx context.Context, updo *Order) error {
+						assert.Equals(t, updo.ID, o.ID)
+						assert.Equals(t, updo.AccountID, o.AccountID)
+						assert.Equals(t, updo.Status, StatusInvalid)
+						assert.Equals(t, updo.ExpiresAt, o.ExpiresAt)
+						return nil
+					},
+				},
+			}
+		},
+		"fail/processing-expired-db.UpdateOrder-error": func(t *testing.T) test {
+			now := clock.Now()
+			o := &Order{
+				ID:        "oID",
+				AccountID: "accID",
+				Status:    StatusProcessing,
+				ExpiresAt: now.Add(-5 * time.Minute),
+			}
+			return test{
+				o: o,
+				db: &MockDB{
+					MockUpdateOrder: func(ctx context.Context, updo *Order) error {
+						return errors.New("force")
+					},
+				},
+				err: NewErrorISE("error updating order: force"),
+			}
+		},
 		"fail/error-unexpected-status": func(t *testing.T) test {
 			o := &Order{
 				Status: "foo",
