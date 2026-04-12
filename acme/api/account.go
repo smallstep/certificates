@@ -250,6 +250,12 @@ func GetOrdersByAccountID(w http.ResponseWriter, r *http.Request) {
 
 	linker.LinkOrdersByAccountID(ctx, orders)
 
-	render.JSON(w, r, orders)
+	// RFC 8555 § 7.1.2.1: response must be {"orders": [...]}
+	if orders == nil {
+		orders = []string{}
+	}
+	render.JSON(w, r, struct {
+		Orders []string `json:"orders"`
+	}{Orders: orders})
 	logOrdersByAccount(w, orders)
 }
