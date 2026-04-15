@@ -3549,6 +3549,111 @@ MCowBQYDK2VwAyEA5c+4NKZSNQcR1T8qN6SjwgdPZQ0Ge12Ylx/YeGAJ35k=
 				},
 			}
 		},
+		"fail/sign-key-mismatch-oidc": func(t *testing.T) test {
+			jwk, keyAuth := mustAccountAndKeyAuthorization(t, "token")
+			signerJWK, err := jose.GenerateJWK("EC", "P-256", "ES256", "sig", "", 0)
+			require.NoError(t, err)
+			maliciousJwk, err := jose.GenerateJWK("EC", "P-256", "ES256", "sig", "", 0)
+			require.NoError(t, err)
+			maliciousSigner, err := jose.NewSigner(jose.SigningKey{
+				Algorithm: jose.SignatureAlgorithm(jwk.Algorithm),
+				Key:       maliciousJwk,
+			}, new(jose.SignerOptions))
+			require.NoError(t, err)
+			srv := mustJWKServer(t, signerJWK.Public())
+			tokenBytes, err := json.Marshal(struct {
+				jose.Claims
+				Name              string `json:"name,omitempty"`
+				PreferredUsername string `json:"preferred_username,omitempty"`
+				KeyAuth           string `json:"keyauth"`
+				ACMEAudience      string `json:"acme_aud"`
+			}{
+				Claims: jose.Claims{
+					Issuer:   srv.URL,
+					Audience: []string{"test"},
+					Expiry:   jose.NewNumericDate(time.Now().Add(1 * time.Minute)),
+				},
+				Name:              "Alice Smith",
+				PreferredUsername: "wireapp://%40alice_wire@wire.com",
+				KeyAuth:           keyAuth,
+				ACMEAudience:      "https://ca.example.com/acme/wire/challenge/azID/chID",
+			})
+			require.NoError(t, err)
+			signed, err := maliciousSigner.Sign(tokenBytes)
+			require.NoError(t, err)
+			idToken, err := signed.CompactSerialize()
+			require.NoError(t, err)
+			payload, err := json.Marshal(struct {
+				IDToken string `json:"id_token"`
+			}{
+				IDToken: idToken,
+			})
+			require.NoError(t, err)
+			valueBytes, err := json.Marshal(struct {
+				Name     string `json:"name,omitempty"`
+				Domain   string `json:"domain,omitempty"`
+				ClientID string `json:"client-id,omitempty"`
+				Handle   string `json:"handle,omitempty"`
+			}{
+				Name:     "Alice Smith",
+				Domain:   "wire.com",
+				ClientID: "wireapp://CzbfFjDOQrenCbDxVmgnFw!594930e9d50bb175@wire.com",
+				Handle:   "wireapp://%40alice_wire@wire.com",
+			})
+			require.NoError(t, err)
+			ctx := NewProvisionerContext(context.Background(), newWireProvisionerWithOptions(t, &provisioner.Options{
+				Wire: &wireprovisioner.Options{
+					OIDC: &wireprovisioner.OIDCOptions{
+						Provider: &wireprovisioner.Provider{
+							IssuerURL:  srv.URL,
+							JWKSURL:    srv.URL + "/keys",
+							Algorithms: []string{"ES256"},
+						},
+						Config: &wireprovisioner.Config{
+							ClientID:            "test",
+							SignatureAlgorithms: []string{"ES256"},
+							Now:                 time.Now,
+						},
+						TransformTemplate: "",
+					},
+					DPOP: &wireprovisioner.DPOPOptions{
+						SigningKey: []byte(fakeKey),
+					},
+				},
+			}))
+			ctx = NewLinkerContext(ctx, NewLinker("ca.example.com", "acme"))
+			return test{
+				ch: &Challenge{
+					ID:              "chID",
+					AuthorizationID: "azID",
+					AccountID:       "accID",
+					Token:           "token",
+					Type:            "wire-oidc-01",
+					Status:          StatusPending,
+					Value:           string(valueBytes),
+				},
+				srv:     srv,
+				payload: payload,
+				ctx:     ctx,
+				jwk:     jwk,
+				db: &MockWireDB{
+					MockDB: MockDB{
+						MockUpdateChallenge: func(ctx context.Context, updch *Challenge) error {
+							assert.Equal(t, "chID", updch.ID)
+							assert.Equal(t, "token", updch.Token)
+							assert.Equal(t, StatusInvalid, updch.Status)
+							assert.Equal(t, ChallengeType("wire-oidc-01"), updch.Type)
+							assert.Equal(t, string(valueBytes), updch.Value)
+							assert.Equal(t, "urn:ietf:params:acme:error:rejectedIdentifier", updch.Error.Type)
+							assert.Equal(t, "The server will not issue certificates for the identifier", updch.Error.Detail)
+							assert.Equal(t, 400, updch.Error.Status)
+							assert.Equal(t, `error verifying ID token signature: failed to verify signature: failed to verify id token signature`, updch.Error.Err.Error())
+							return nil
+						},
+					},
+				},
+			}
+		},
 		"ok/wire-oidc-01": func(t *testing.T) test {
 			jwk, keyAuth := mustAccountAndKeyAuthorization(t, "token")
 			signerJWK, err := jose.GenerateJWK("EC", "P-256", "ES256", "sig", "", 0)
