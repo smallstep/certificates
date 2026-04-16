@@ -198,17 +198,20 @@ func authContextFromRequest(ctx context.Context, r *http.Request) (context.Conte
 
 	if cfg.Enable {
 		if cfg.ForwardedTLSClientCertHeader != "" {
+			// When a forwarded header is configured, only use it — never
+			// fall back to r.TLS.PeerCertificates, which would be the
+			// proxy's own certificate, not the actual client's.
 			if forwardedtlsClientCert := r.Header.Get(cfg.ForwardedTLSClientCertHeader); forwardedtlsClientCert != "" {
-				certPEM, err := base64.StdEncoding.DecodeString(forwardedtlsClientCert)
+				certDER, err := base64.StdEncoding.DecodeString(forwardedtlsClientCert)
 				if err != nil {
-					// fmt.Printf("failed to decode client cert in forwarded header: %w", err)
+					return ctx, fmt.Errorf("failed to decode client certificate from forwarded header: %w", err)
 				}
-				certs, err := x509.ParseCertificates(certPEM)
+				certs, err := x509.ParseCertificates(certDER)
 				if err != nil {
-					// return ctx, fmt.Errorf("failed to parse certificate from header: %w", err)
+					return ctx, fmt.Errorf("failed to parse client certificate from forwarded header: %w", err)
 				}
 				if len(certs) == 0 {
-					// return ctx, errors.New("no certificates found in header")
+					return ctx, errors.New("no certificates found in forwarded header")
 				}
 				ctx = est.NewClientCertificateContext(ctx, certs[0])
 				ctx = est.NewClientCertificateChainContext(ctx, certs)
