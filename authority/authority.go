@@ -1071,6 +1071,17 @@ func (a *Authority) requiresEST() bool {
 	return false
 }
 
+// HasACMEProvisioner iterates over the configured provisioners
+// and determines if at least one of them is an ACME provisioner.
+func (a *Authority) HasACMEProvisioner() bool {
+	for _, p := range a.config.AuthorityConfig.Provisioners {
+		if p.GetType() == provisioner.TypeACME {
+			return true
+		}
+	}
+	return false
+}
+
 // getESTProvisionerNames returns the names of the EST provisioners
 // that are currently available in the CA.
 func (a *Authority) getESTProvisionerNames() (names []string) {
