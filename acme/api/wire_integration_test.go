@@ -65,6 +65,16 @@ func newWireProvisionerWithOptions(t *testing.T, options *provisioner.Options) *
 // TODO(hs): replace with test CA server + acmez based test client for
 // more realistic integration test?
 func TestWireIntegration(t *testing.T) {
+	runWireIntegration(t, nil, nil)
+}
+
+func runWireIntegration(
+	t *testing.T,
+	beforeFinalize func(t *testing.T, rawDB nosqlDB.DB, order *acme.Order),
+	checkFinalizeResponse func(t *testing.T, res *http.Response, body []byte),
+) {
+	t.Helper()
+
 	accessTokenSignerJWK, err := jose.GenerateJWK("EC", "P-256", "ES256", "sig", "", 0)
 	require.NoError(t, err)
 
@@ -488,6 +498,9 @@ func TestWireIntegration(t *testing.T) {
 		return
 	}(ctx)
 	t.Log("updated order status:", updatedOrder.Status)
+	if beforeFinalize != nil {
+		beforeFinalize(t, rawDB, order)
+	}
 
 	// finalize order
 	finalizedOrder := func(ctx context.Context) (finalizedOrder *acme.Order) {
@@ -568,11 +581,14 @@ func TestWireIntegration(t *testing.T) {
 		FinalizeOrder(w, req)
 
 		res := w.Result()
-		require.Equal(t, http.StatusOK, res.StatusCode)
-
 		body, err := io.ReadAll(res.Body)
 		defer res.Body.Close()
 		require.NoError(t, err)
+		if checkFinalizeResponse != nil {
+			checkFinalizeResponse(t, res, body)
+			return nil
+		}
+		require.Equal(t, http.StatusOK, res.StatusCode)
 
 		err = json.Unmarshal(bytes.TrimSpace(body), &finalizedOrder)
 		require.NoError(t, err)
@@ -584,7 +600,9 @@ func TestWireIntegration(t *testing.T) {
 
 		return
 	}(ctx)
-	t.Log("finalized order status:", finalizedOrder.Status)
+	if finalizedOrder != nil {
+		t.Log("finalized order status:", finalizedOrder.Status)
+	}
 }
 
 type mockCASigner struct {
