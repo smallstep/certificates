@@ -62,10 +62,64 @@ func newWireProvisionerWithOptions(t *testing.T, options *provisioner.Options) *
 	return prov
 }
 
+func mutateStoredWireOrderDeviceID(t *testing.T, rawDB nosqlDB.DB, orderID, newValue string) {
+	var wireIntegrationOrderTable = []byte("acme_orders")
+	oldValue, err := rawDB.Get(wireIntegrationOrderTable, []byte(orderID))
+	require.NoError(t, err)
+
+	var stored map[string]json.RawMessage
+	err = json.Unmarshal(oldValue, &stored)
+	require.NoError(t, err)
+
+	var identifiers []acme.Identifier
+	err = json.Unmarshal(stored["identifiers"], &identifiers)
+	require.NoError(t, err)
+
+	replaced := false
+	for i, identifier := range identifiers {
+		if identifier.Type == acme.WireDevice {
+			identifiers[i].Value = newValue
+			replaced = true
+			break
+		}
+	}
+	require.True(t, replaced)
+
+	stored["identifiers"], err = json.Marshal(identifiers)
+	require.NoError(t, err)
+
+	newStoredValue, err := json.Marshal(stored)
+	require.NoError(t, err)
+
+	_, swapped, err := rawDB.CmpAndSwap(wireIntegrationOrderTable, []byte(orderID), oldValue, newStoredValue)
+	require.NoError(t, err)
+	require.True(t, swapped)
+}
+
 // TODO(hs): replace with test CA server + acmez based test client for
 // more realistic integration test?
 func TestWireIntegration(t *testing.T) {
 	runWireIntegration(t, nil, nil)
+}
+
+func TestWireIntegration_DBMutation_GetOrderWireDeviceMismatch(t *testing.T) {
+	runWireIntegration(t, func(t *testing.T, rawDB nosqlDB.DB, order *acme.Order) {
+		const substitutedWireDevice = `{
+			"name": "Smith, Alice M (QA)",
+			"domain": "example.com",
+			"client-id": "wireapp://lJGYPz0ZRq2kvc_XpdaDlA!deadbeefdeadbeef@example.com",
+			"handle": "wireapp://%40alice.smith.qa@example.com"
+		}`
+		mutateStoredWireOrderDeviceID(t, rawDB, order.ID, substitutedWireDevice)
+	}, func(t *testing.T, res *http.Response, body []byte) {
+		require.Equal(t, http.StatusBadRequest, res.StatusCode)
+
+		var acmeErr acme.Error
+		err := json.Unmarshal(bytes.TrimSpace(body), &acmeErr)
+		require.NoError(t, err)
+		require.Equal(t, acme.NewError(acme.ErrorBadCSRType, "").Type, acmeErr.Type)
+		require.Equal(t, "The CSR is unacceptable", acmeErr.Detail)
+	})
 }
 
 func runWireIntegration(
