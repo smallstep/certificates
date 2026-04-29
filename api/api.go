@@ -257,22 +257,32 @@ func scepFromProvisioner(p *provisioner.SCEP) *models.SCEP {
 	}
 }
 
+func estFromProvisioner(p *provisioner.EST) *provisioner.EST {
+	prov := *p
+	prov.ClientCertificateRoots = []byte(redacted)
+	prov.BasicAuthUsername = redacted
+	prov.BasicAuthPassword = redacted
+	return &prov
+}
+
 // MarshalJSON implements json.Marshaler. It marshals the ProvisionersResponse
 // into a byte slice.
 //
 // Special treatment is given to the SCEP provisioner, as it contains a
 // challenge secret that MUST NOT be leaked in (public) HTTP responses. The
-// challenge value is thus redacted in HTTP responses.
+// challenge value is thus redacted in HTTP responses. EST provisioners also
+// contain a shared secret and are redacted in responses.
 func (p ProvisionersResponse) MarshalJSON() ([]byte, error) {
 	var responseProvisioners provisioner.List
 	for _, item := range p.Provisioners {
-		scepProv, ok := item.(*provisioner.SCEP)
-		if !ok {
+		switch prov := item.(type) {
+		case *provisioner.SCEP:
+			responseProvisioners = append(responseProvisioners, scepFromProvisioner(prov))
+		case *provisioner.EST:
+			responseProvisioners = append(responseProvisioners, estFromProvisioner(prov))
+		default:
 			responseProvisioners = append(responseProvisioners, item)
-			continue
 		}
-
-		responseProvisioners = append(responseProvisioners, scepFromProvisioner(scepProv))
 	}
 
 	var list = struct {
