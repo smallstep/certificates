@@ -2424,10 +2424,11 @@ func TestHandler_FinalizeOrder(t *testing.T) {
 	assert.FatalError(t, err)
 
 	type test struct {
-		db         acme.DB
-		ctx        context.Context
-		statusCode int
-		err        *acme.Error
+		db             acme.DB
+		ctx            context.Context
+		statusCode     int
+		err            *acme.Error
+		expectedStatus acme.Status // for success cases; empty means skip status assertion
 	}
 	var tests = map[string]func(t *testing.T) test{
 		"fail/no-account": func(t *testing.T) test {
@@ -2569,7 +2570,9 @@ func TestHandler_FinalizeOrder(t *testing.T) {
 				err:        acme.NewError(acme.ErrorUnauthorizedType, "provisioner id mismatch"),
 			}
 		},
-		"fail/order-finalize-error": func(t *testing.T) test {
+		// Tests that an expired ready order fails at UpdateStatus, which tries to
+	// write StatusInvalid to the DB and gets an error back.
+	"fail/update-status-error": func(t *testing.T) test {
 			acc := &acme.Account{ID: "accountID"}
 			ctx := acme.NewProvisionerContext(context.Background(), prov)
 			ctx = context.WithValue(ctx, accContextKey, acc)
@@ -2594,7 +2597,8 @@ func TestHandler_FinalizeOrder(t *testing.T) {
 				err:        acme.NewErrorISE("force"),
 			}
 		},
-		"ok": func(t *testing.T) test {
+		// Tests that a DB failure when writing the processing status returns 500.
+		"fail/db.UpdateOrder-processing-error": func(t *testing.T) test {
 			acc := &acme.Account{ID: "accountID"}
 			ctx := acme.NewProvisionerContext(context.Background(), prov)
 			ctx = context.WithValue(ctx, accContextKey, acc)
@@ -2604,30 +2608,66 @@ func TestHandler_FinalizeOrder(t *testing.T) {
 				db: &acme.MockDB{
 					MockGetOrder: func(ctx context.Context, id string) (*acme.Order, error) {
 						return &acme.Order{
-							ID:               "orderID",
-							AccountID:        "accountID",
-							ProvisionerID:    fmt.Sprintf("acme/%s", prov.GetName()),
-							ExpiresAt:        naf,
-							Status:           acme.StatusValid,
-							AuthorizationIDs: []string{"foo", "bar", "baz"},
-							NotBefore:        nbf,
-							NotAfter:         naf,
-							Identifiers: []acme.Identifier{
-								{
-									Type:  "dns",
-									Value: "example.com",
-								},
-								{
-									Type:  "dns",
-									Value: "*.smallstep.com",
-								},
-							},
-							CertificateID: "certID",
+							ID:            "orderID",
+							AccountID:     "accountID",
+							ProvisionerID: fmt.Sprintf("acme/%s", prov.GetName()),
+							ExpiresAt:     naf,
+							Status:        acme.StatusReady,
 						}, nil
+					},
+					MockUpdateOrder: func(ctx context.Context, o *acme.Order) error {
+						return acme.NewErrorISE("force")
 					},
 				},
 				ctx:        ctx,
-				statusCode: 200,
+				statusCode: 500,
+				err:        acme.NewErrorISE("force"),
+			}
+		},
+		// Tests the happy path: a ready order immediately returns processing + Retry-After,
+		// and the background goroutine is short-circuited by an error on re-fetch.
+		"ok": func(t *testing.T) test {
+			acc := &acme.Account{ID: "accountID"}
+			ctx := acme.NewProvisionerContext(context.Background(), prov)
+			ctx = context.WithValue(ctx, accContextKey, acc)
+			ctx = context.WithValue(ctx, payloadContextKey, &payloadInfo{value: payloadBytes})
+			ctx = context.WithValue(ctx, chi.RouteCtxKey, chiCtx)
+			// firstCall acts as a one-shot token: the HTTP handler consumes it,
+			// the background goroutine gets the default error path and exits early.
+			firstCall := make(chan struct{}, 1)
+			firstCall <- struct{}{}
+			return test{
+				db: &acme.MockDB{
+					MockGetOrder: func(ctx context.Context, id string) (*acme.Order, error) {
+						select {
+						case <-firstCall:
+							return &acme.Order{
+								ID:               "orderID",
+								AccountID:        "accountID",
+								ProvisionerID:    fmt.Sprintf("acme/%s", prov.GetName()),
+								ExpiresAt:        naf,
+								Status:           acme.StatusReady,
+								AuthorizationIDs: []string{"foo", "bar", "baz"},
+								NotBefore:        nbf,
+								NotAfter:         naf,
+								Identifiers: []acme.Identifier{
+									{Type: "dns", Value: "example.com"},
+									{Type: "dns", Value: "*.smallstep.com"},
+								},
+							}, nil
+						default:
+							// Second call is from the background goroutine; return an
+							// error to short-circuit it so it doesn't race with assertions.
+							return nil, acme.NewErrorISE("test: short-circuit goroutine")
+						}
+					},
+					MockUpdateOrder: func(ctx context.Context, o *acme.Order) error {
+						return nil
+					},
+				},
+				ctx:            ctx,
+				statusCode:     200,
+				expectedStatus: acme.StatusProcessing,
 			}
 		},
 	}
@@ -2656,13 +2696,15 @@ func TestHandler_FinalizeOrder(t *testing.T) {
 				assert.Equals(t, ae.Subproblems, tc.err.Subproblems)
 				assert.Equals(t, res.Header["Content-Type"], []string{"application/problem+json"})
 			} else {
-				expB, err := json.Marshal(o)
-				assert.FatalError(t, err)
-
 				ro := new(acme.Order)
-				assert.FatalError(t, json.Unmarshal(body, ro))
+				assert.FatalError(t, json.Unmarshal(bytes.TrimSpace(body), ro))
 
-				assert.Equals(t, bytes.TrimSpace(body), expB)
+				if tc.expectedStatus != "" {
+					assert.Equals(t, ro.Status, tc.expectedStatus)
+				}
+				if tc.expectedStatus == acme.StatusProcessing {
+					assert.Equals(t, res.Header["Retry-After"], []string{"15"})
+				}
 				assert.Equals(t, res.Header["Location"], []string{u})
 				assert.Equals(t, res.Header["Content-Type"], []string{"application/json"})
 			}
