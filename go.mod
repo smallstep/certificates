@@ -3,7 +3,7 @@ module github.com/smallstep/certificates
 go 1.25.0
 
 require (
-	cloud.google.com/go/longrunning v0.11.0
+	cloud.google.com/go/longrunning v0.12.0
 	cloud.google.com/go/security v1.22.0
 	github.com/Masterminds/sprig/v3 v3.3.0
 	github.com/ccoveille/go-safecast/v2 v2.0.0
