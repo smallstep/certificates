@@ -3,6 +3,7 @@ package api
 import (
 	"context"
 	"crypto/rsa"
+	"encoding/json"
 	"errors"
 	"io"
 	"net/http"
@@ -101,6 +102,10 @@ func parseJWS(next nextHTTP) nextHTTP {
 			render.Error(w, r, acme.WrapErrorISE(err, "failed to read request body"))
 			return
 		}
+		if err := rejectGeneralJWS(body); err != nil {
+			render.Error(w, r, acme.WrapError(acme.ErrorMalformedType, err, "failed to parse JWS from request body"))
+			return
+		}
 		jws, err := jose.ParseJWS(string(body))
 		if err != nil {
 			render.Error(w, r, acme.WrapError(acme.ErrorMalformedType, err, "failed to parse JWS from request body"))
@@ -109,6 +114,28 @@ func parseJWS(next nextHTTP) nextHTTP {
 		ctx := context.WithValue(r.Context(), jwsContextKey, jws)
 		next(w, r.WithContext(ctx))
 	}
+}
+
+// rejectGeneralJWS enforces RFC 8555 section 6.2: ACME JWS requests MUST use
+// the Flattened JSON Serialization. go-jose/v3's ParseSigned accepts both the
+// Flattened and the General serialization, so the flattened-only requirement
+// has to be checked at the JSON layer before handing off. A General-form body
+// carries a top-level "signatures" array (plural); flattened bodies have
+// singular "signature" + "protected" alongside "payload".
+func rejectGeneralJWS(body []byte) error {
+	var peek struct {
+		Signatures json.RawMessage `json:"signatures"`
+	}
+	if err := json.Unmarshal(body, &peek); err != nil {
+		// Not JSON, or malformed. Fall through to ParseJWS so the
+		// existing ErrorMalformedType with go-jose's message wins.
+		return nil
+	}
+	if len(peek.Signatures) > 0 {
+		return errors.New("JWS MUST be in the Flattened JSON Serialization (RFC 8555 section 6.2); " +
+			"General JSON Serialization with a top-level \"signatures\" array is rejected")
+	}
+	return nil
 }
 
 // validateJWS checks the request body for to verify that it meets ACME
