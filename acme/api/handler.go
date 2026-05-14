@@ -1,13 +1,14 @@
 package api
 
 import (
-	"context"
-	"crypto/x509"
-	"encoding/json"
-	"encoding/pem"
-	"fmt"
-	"net/http"
-	"time"
+    "context"
+    "crypto/x509"
+    "encoding/json"
+    "encoding/pem"
+    "fmt"
+    "net/http"
+    "net/url"
+    "time"
 
 	"github.com/go-chi/chi/v5"
 
@@ -120,17 +121,44 @@ func Route(r api.Router) {
 }
 
 func route(r api.Router, middleware func(next nextHTTP) nextHTTP) {
-	commonMiddleware := func(next nextHTTP) nextHTTP {
-		handler := func(w http.ResponseWriter, r *http.Request) {
-			// Linker middleware gets the provisioner and current url from the
-			// request and sets them in the context.
-			linker := acme.MustLinkerFromContext(r.Context())
-			linker.Middleware(http.HandlerFunc(checkPrerequisites(next))).ServeHTTP(w, r)
-		}
-		if middleware != nil {
-			handler = middleware(handler)
-		}
-		return handler
+    // providerClient injecte un client ACME configuré selon le provisioner courant (proxy/DNS)
+    providerClient := func(next nextHTTP) nextHTTP {
+        return func(w http.ResponseWriter, r *http.Request) {
+            ctx := r.Context()
+            // Le provisioner est fixé par linker.Middleware en amont
+            if acmeProv, err := acmeProvisionerFromContext(ctx); err == nil && acmeProv != nil {
+                var opts []acme.ClientOption
+                if acmeProv.ProxyURL != "" {
+                    opts = append(opts, acme.WithProxyURL(acmeProv.ProxyURL))
+                }
+                if acmeProv.DisableProxy {
+                    // Désactive totalement le proxy (ignore les variables d'environnement)
+                    opts = append(opts, acme.WithProxyFunc(func(req *http.Request) (*url.URL, error) { return nil, nil }))
+                }
+                if acmeProv.DNS != "" {
+                    opts = append(opts, acme.WithDNS(acmeProv.DNS))
+                }
+                if len(opts) > 0 {
+                    c := acme.NewClient(opts...)
+                    ctx = acme.NewClientContext(ctx, c)
+                }
+            }
+            next(w, r.WithContext(ctx))
+        }
+    }
+
+    commonMiddleware := func(next nextHTTP) nextHTTP {
+        handler := func(w http.ResponseWriter, r *http.Request) {
+            // Linker middleware gets the provisioner and current url from the
+            // request and sets them in the context.
+            linker := acme.MustLinkerFromContext(r.Context())
+            // Après que linker.Middleware ait résolu le provisioner, injecter un client ACME spécifique au provider
+            linker.Middleware(http.HandlerFunc(providerClient(checkPrerequisites(next)))).ServeHTTP(w, r)
+        }
+        if middleware != nil {
+            handler = middleware(handler)
+        }
+        return handler
 	}
 	validatingMiddleware := func(next nextHTTP) nextHTTP {
 		return commonMiddleware(addNonce(addDirLink(verifyContentType(parseJWS(validateJWS(next))))))
