@@ -339,6 +339,7 @@ func Route(r Router) {
 	r.MethodFunc("GET", "/roots.pem", RootsPEM)
 	r.MethodFunc("GET", "/intermediates", Intermediates)
 	r.MethodFunc("GET", "/intermediates.pem", IntermediatesPEM)
+	r.MethodFunc("GET", "/intermediate.crt", IntermediateCert)
 	r.MethodFunc("GET", "/federation", Federation)
 
 	// SSH CA
@@ -508,6 +509,25 @@ func IntermediatesPEM(w http.ResponseWriter, r *http.Request) {
 			log.Error(w, r, err)
 			return
 		}
+	}
+}
+
+// IntermediateCert returns the CA's issuing intermediate certificate as a
+// single DER-encoded X.509 certificate for use as an Authority Information
+// Access (AIA) caIssuers URI. RFC 5280 Section 4.2.2.1 permits HTTP
+// caIssuers URIs to point to a single DER certificate as specified by RFC
+// 2585 Section 3; RFC 5280 Section 4.2.2.1 and RFC 2585 Section 4.1 use
+// Content-Type application/pkix-cert for that representation.
+func IntermediateCert(w http.ResponseWriter, r *http.Request) {
+	intermediates := mustAuthority(r.Context()).GetIntermediateCertificates()
+	if len(intermediates) == 0 {
+		render.Error(w, r, errs.NotImplemented("error getting intermediate: method not implemented"))
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/pkix-cert")
+	if _, err := w.Write(intermediates[0].Raw); err != nil {
+		log.Error(w, r, err)
 	}
 }
 
