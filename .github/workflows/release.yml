@@ -82,7 +82,7 @@ jobs:
     needs: create_release
     permissions:
       id-token: write
-      contents: write
+      contents: read
     uses: smallstep/workflows/.github/workflows/docker-buildx-push.yml@main
     with:
       platforms: linux/amd64,linux/386,linux/arm,linux/arm64
@@ -96,7 +96,7 @@ jobs:
     needs: create_release
     permissions:
       id-token: write
-      contents: write
+      contents: read
     uses: smallstep/workflows/.github/workflows/docker-buildx-push.yml@main
     with:
       platforms: linux/amd64,linux/386,linux/arm,linux/arm64
