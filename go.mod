@@ -40,7 +40,7 @@ require (
 	go.step.sm/crypto v0.77.9
 	go.uber.org/mock v0.6.0
 	golang.org/x/crypto v0.51.0
-	golang.org/x/net v0.53.0
+	golang.org/x/net v0.54.0
 	golang.org/x/sync v0.20.0
 	google.golang.org/api v0.278.0
 	google.golang.org/grpc v1.81.1
