@@ -360,6 +360,26 @@ func TestHandler_parseJWS(t *testing.T) {
 				err:        acme.NewError(acme.ErrorMalformedType, "failed to parse JWS from request body: go-jose/go-jose: compact JWS format must have three parts"),
 			}
 		},
+		"fail/general-jws": func(t *testing.T) test {
+			// General JSON serialization carries a "signatures" array.
+			// RFC 8555 section 6.2 requires Flattened; reject with
+			// ErrorMalformedType.
+			return test{
+				body:       strings.NewReader(`{"payload":"e30","signatures":[{"protected":"e30","signature":"sig"}]}`),
+				statusCode: 400,
+				err:        acme.NewError(acme.ErrorMalformedType, `failed to parse JWS from request body: JWS MUST be in the Flattened JSON Serialization (RFC 8555 section 6.2); General JSON Serialization with a top-level "signatures" array is rejected`),
+			}
+		},
+		"fail/unprotected-header": func(t *testing.T) test {
+			// RFC 8555 section 6.2 forbids the JWS Unprotected Header;
+			// a top-level "header" member must be rejected with
+			// ErrorMalformedType.
+			return test{
+				body:       strings.NewReader(`{"payload":"e30","protected":"e30","header":{"kid":"x"},"signature":"sig"}`),
+				statusCode: 400,
+				err:        acme.NewError(acme.ErrorMalformedType, `failed to parse JWS from request body: JWS MUST NOT use the Unprotected Header (RFC 8555 section 6.2); a top-level "header" member is rejected`),
+			}
+		},
 		"ok": func(t *testing.T) test {
 			jwk, err := jose.GenerateJWK("EC", "P-256", "ES256", "sig", "", 0)
 			assert.FatalError(t, err)
