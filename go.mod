@@ -12,7 +12,7 @@ require (
 	github.com/dgraph-io/badger v1.6.2
 	github.com/dgraph-io/badger/v2 v2.2007.4
 	github.com/fxamacker/cbor/v2 v2.9.2
-	github.com/go-chi/chi/v5 v5.2.5
+	github.com/go-chi/chi/v5 v5.3.0
 	github.com/go-jose/go-jose/v3 v3.0.5
 	github.com/google/go-cmp v0.7.0
 	github.com/google/go-tpm v0.9.8
@@ -39,8 +39,8 @@ require (
 	github.com/urfave/cli v1.22.17
 	go.step.sm/crypto v0.81.0
 	go.uber.org/mock v0.6.0
-	golang.org/x/crypto v0.51.0
-	golang.org/x/net v0.54.0
+	golang.org/x/crypto v0.52.0
+	golang.org/x/net v0.55.0
 	golang.org/x/sync v0.20.0
 	google.golang.org/api v0.280.0
 	google.golang.org/grpc v1.81.1
@@ -164,7 +164,7 @@ require (
 	go.yaml.in/yaml/v2 v2.4.3 // indirect
 	golang.org/x/mod v0.35.0 // indirect
 	golang.org/x/oauth2 v0.36.0 // indirect
-	golang.org/x/sys v0.44.0 // indirect
+	golang.org/x/sys v0.45.0 // indirect
 	golang.org/x/term v0.43.0 // indirect
 	golang.org/x/text v0.37.0 // indirect
 	golang.org/x/time v0.15.0 // indirect
