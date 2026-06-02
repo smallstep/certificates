@@ -6,7 +6,7 @@ require (
 	cloud.google.com/go/longrunning v1.0.0
 	cloud.google.com/go/security v1.24.0
 	github.com/Masterminds/sprig/v3 v3.3.0
-	github.com/ccoveille/go-safecast/v2 v2.0.0
+	github.com/ccoveille/go-safecast/v2 v2.0.1
 	github.com/coreos/go-oidc/v3 v3.18.0
 	github.com/coreos/go-systemd/v22 v22.7.0
 	github.com/dgraph-io/badger v1.6.2
