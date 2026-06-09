@@ -30,14 +30,14 @@ require (
 	github.com/slackhq/nebula v1.10.3
 	github.com/smallstep/assert v0.0.0-20200723003110-82e2b9b3b262
 	github.com/smallstep/cli-utils v0.12.2
-	github.com/smallstep/go-attestation v0.4.4-0.20241119153605-2306d5b464ca
+	github.com/smallstep/go-attestation v0.4.4-0.20260603212853-e1a87a0b07d9
 	github.com/smallstep/linkedca v0.25.0
 	github.com/smallstep/nosql v0.8.0
 	github.com/smallstep/pkcs7 v0.2.1
 	github.com/smallstep/scep v0.0.0-20250318231241-a25cabb69492
 	github.com/stretchr/testify v1.11.1
 	github.com/urfave/cli v1.22.17
-	go.step.sm/crypto v0.81.1
+	go.step.sm/crypto v0.82.0
 	go.uber.org/mock v0.6.0
 	golang.org/x/crypto v0.52.0
 	golang.org/x/net v0.55.0
@@ -68,21 +68,21 @@ require (
 	github.com/Masterminds/semver/v3 v3.3.1 // indirect
 	github.com/ThalesGroup/crypto11 v1.6.0 // indirect
 	github.com/aws/aws-sdk-go v1.55.7 // indirect
-	github.com/aws/aws-sdk-go-v2 v1.41.7 // indirect
-	github.com/aws/aws-sdk-go-v2/config v1.32.17 // indirect
-	github.com/aws/aws-sdk-go-v2/credentials v1.19.16 // indirect
-	github.com/aws/aws-sdk-go-v2/feature/ec2/imds v1.18.23 // indirect
-	github.com/aws/aws-sdk-go-v2/internal/configsources v1.4.23 // indirect
-	github.com/aws/aws-sdk-go-v2/internal/endpoints/v2 v2.7.23 // indirect
-	github.com/aws/aws-sdk-go-v2/internal/v4a v1.4.24 // indirect
-	github.com/aws/aws-sdk-go-v2/service/internal/accept-encoding v1.13.9 // indirect
-	github.com/aws/aws-sdk-go-v2/service/internal/presigned-url v1.13.23 // indirect
-	github.com/aws/aws-sdk-go-v2/service/kms v1.52.0 // indirect
-	github.com/aws/aws-sdk-go-v2/service/signin v1.0.11 // indirect
-	github.com/aws/aws-sdk-go-v2/service/sso v1.30.17 // indirect
-	github.com/aws/aws-sdk-go-v2/service/ssooidc v1.35.21 // indirect
-	github.com/aws/aws-sdk-go-v2/service/sts v1.42.1 // indirect
-	github.com/aws/smithy-go v1.25.1 // indirect
+	github.com/aws/aws-sdk-go-v2 v1.41.11 // indirect
+	github.com/aws/aws-sdk-go-v2/config v1.32.22 // indirect
+	github.com/aws/aws-sdk-go-v2/credentials v1.19.21 // indirect
+	github.com/aws/aws-sdk-go-v2/feature/ec2/imds v1.18.27 // indirect
+	github.com/aws/aws-sdk-go-v2/internal/configsources v1.4.27 // indirect
+	github.com/aws/aws-sdk-go-v2/internal/endpoints/v2 v2.7.27 // indirect
+	github.com/aws/aws-sdk-go-v2/internal/v4a v1.4.28 // indirect
+	github.com/aws/aws-sdk-go-v2/service/internal/accept-encoding v1.13.11 // indirect
+	github.com/aws/aws-sdk-go-v2/service/internal/presigned-url v1.13.27 // indirect
+	github.com/aws/aws-sdk-go-v2/service/kms v1.53.2 // indirect
+	github.com/aws/aws-sdk-go-v2/service/signin v1.1.3 // indirect
+	github.com/aws/aws-sdk-go-v2/service/sso v1.31.1 // indirect
+	github.com/aws/aws-sdk-go-v2/service/ssooidc v1.36.4 // indirect
+	github.com/aws/aws-sdk-go-v2/service/sts v1.43.1 // indirect
+	github.com/aws/smithy-go v1.27.0 // indirect
 	github.com/beorn7/perks v1.0.1 // indirect
 	github.com/cenkalti/backoff/v4 v4.3.0 // indirect
 	github.com/cespare/xxhash v1.1.0 // indirect
