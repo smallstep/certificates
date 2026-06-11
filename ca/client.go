@@ -143,7 +143,7 @@ func enforceRequestID(r *http.Request) {
 func (c *uaClient) Do(req *http.Request) (*http.Response, error) {
 	req.Header.Set("User-Agent", UserAgent)
 	enforceRequestID(req)
-	return c.Client.Do(req) //nolint:gosec // request to user-configured CA server
+	return c.Client.Do(req)
 }
 
 // RetryFunc defines the method used to retry a request. If it returns true, the

@@ -26,8 +26,8 @@ import (
 // NewOrderRequest represents the body for a NewOrder request.
 type NewOrderRequest struct {
 	Identifiers []acme.Identifier `json:"identifiers"`
-	NotBefore   time.Time         `json:"notBefore,omitempty"`
-	NotAfter    time.Time         `json:"notAfter,omitempty"`
+	NotBefore   time.Time         `json:"notBefore,omitempty,omitzero"`
+	NotAfter    time.Time         `json:"notAfter,omitempty,omitzero"`
 }
 
 // Validate validates a new-order request body.
