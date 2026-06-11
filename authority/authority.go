@@ -346,6 +346,9 @@ func (a *Authority) init() error {
 
 	// Automatically enable admin for all linked cas.
 	if a.linkedCAToken != "" {
+		log.Println("DEPRECATION WARNING: Linked CA functionality in open-source step-ca " +
+			"is deprecated and will be removed in a future version. Please migrate to " +
+			"Step CA Pro. See https://smallstep.com/product/step-ca-pro/")
 		a.config.AuthorityConfig.EnableAdmin = true
 	}
 
