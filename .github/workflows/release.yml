@@ -7,7 +7,7 @@ on:
     - 'v*' # Push events to matching v*, i.e. v1.0, v20.15.10
 
 permissions:
-  contents: write
+  contents: read
 
 jobs:
   ci:
@@ -18,16 +18,15 @@ jobs:
     uses: smallstep/certificates/.github/workflows/ci.yml@master
     secrets: inherit
 
-  create_release:
-    name: Create Release
+  release_metadata:
+    name: Release Metadata
     permissions:
-      contents: write
+      contents: read
     needs: ci
     runs-on: ubuntu-latest
     env:
       DOCKER_IMAGE: smallstep/step-ca
     outputs:
-      version: ${{ steps.extract-tag.outputs.VERSION }}
       is_prerelease: ${{ steps.is_prerelease.outputs.IS_PRERELEASE }}
       docker_tags: ${{ env.DOCKER_TAGS }}
       docker_tags_hsm: ${{ env.DOCKER_TAGS_HSM }}
@@ -46,7 +45,6 @@ jobs:
         id: extract-tag
         run: |
           VERSION=${GITHUB_REF#refs/tags/v}
-          echo "VERSION=${VERSION}" >> "${GITHUB_OUTPUT}"
           echo "DOCKER_TAGS=${{ env.DOCKER_IMAGE }}:${VERSION}" >> "${GITHUB_ENV}"
           echo "DOCKER_TAGS_HSM=${{ env.DOCKER_IMAGE }}:${VERSION}-hsm" >> "${GITHUB_ENV}"
       - name: Add Latest Tag
@@ -54,19 +52,9 @@ jobs:
         run: |
           echo "DOCKER_TAGS=${{ env.DOCKER_TAGS }},${{ env.DOCKER_IMAGE }}:latest" >> "${GITHUB_ENV}"
           echo "DOCKER_TAGS_HSM=${{ env.DOCKER_TAGS_HSM }},${{ env.DOCKER_IMAGE }}:hsm" >> "${GITHUB_ENV}"
-      - name: Create Release
-        id: create_release
-        uses: softprops/action-gh-release@b4309332981a82ec1c5618f44dd2e27cc8bfbfda # v3.0.0
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        with:
-          tag_name: ${{ github.ref_name }}
-          name: Release ${{ github.ref_name }}
-          draft: false
-          prerelease: ${{ steps.is_prerelease.outputs.IS_PRERELEASE }}
 
   goreleaser:
-    needs: create_release
+    needs: release_metadata
     permissions:
       id-token: write
       contents: write
@@ -74,33 +62,33 @@ jobs:
     uses: smallstep/workflows/.github/workflows/goreleaser.yml@main
     with:
       enable-packages-upload: true
-      is-prerelease: ${{ needs.create_release.outputs.is_prerelease == 'true' }}
+      is-prerelease: ${{ needs.release_metadata.outputs.is_prerelease == 'true' }}
     secrets: inherit
 
   build_upload_docker:
     name: Build & Upload Docker Images
-    needs: create_release
+    needs: release_metadata
     permissions:
       id-token: write
       contents: read
     uses: smallstep/workflows/.github/workflows/docker-buildx-push.yml@main
     with:
       platforms: linux/amd64,linux/386,linux/arm,linux/arm64
-      tags: ${{ needs.create_release.outputs.docker_tags }}
+      tags: ${{ needs.release_metadata.outputs.docker_tags }}
       docker_image: smallstep/step-ca
       docker_file: docker/Dockerfile
     secrets: inherit
 
   build_upload_docker_hsm:
     name: Build & Upload HSM Enabled Docker Images
-    needs: create_release
+    needs: release_metadata
     permissions:
       id-token: write
       contents: read
     uses: smallstep/workflows/.github/workflows/docker-buildx-push.yml@main
     with:
       platforms: linux/amd64,linux/386,linux/arm,linux/arm64
-      tags: ${{ needs.create_release.outputs.docker_tags_hsm }}
+      tags: ${{ needs.release_metadata.outputs.docker_tags_hsm }}
       docker_image: smallstep/step-ca
       docker_file: docker/Dockerfile.hsm
     secrets: inherit
