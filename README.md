@@ -136,6 +136,9 @@ See our installation docs [here](https://smallstep.com/docs/step-ca/installation
 [on smallstep.com](https://smallstep.com/docs/step-cli/reference/),
 or by running `step help --http=:8080` from the command line
 and visiting http://localhost:8080.
+* [Examples](https://github.com/smallstep/certificates/tree/master/examples) including
+[Podman](https://github.com/smallstep/certificates/tree/master/examples/podman) &
+[Docker](https://github.com/smallstep/certificates/tree/master/examples/docker)
 
 ## Feedback?
 
