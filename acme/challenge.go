@@ -96,10 +96,28 @@ type Challenge struct {
 
 // ToLog enables response logging.
 func (ch *Challenge) ToLog() (interface{}, error) {
-	b, err := json.Marshal(ch)
+	type Record struct {
+		Type        ChallengeType `json:"type"`
+		Status      Status        `json:"status"`
+		Token       string        `json:"token"`
+		ValidatedAt string        `json:"validated,omitempty"`
+		URL         string        `json:"url"`
+		Target      string        `json:"target,omitempty"`
+		Error       errorRecord   `json:"error,omitempty"`
+	}
+	b, err := json.Marshal(Record{
+		Type:        ch.Type,
+		Status:      ch.Status,
+		Token:       ch.Token,
+		ValidatedAt: ch.ValidatedAt,
+		URL:         ch.URL,
+		Target:      ch.Target,
+		Error:       newErrorRecord(ch.Error),
+	})
 	if err != nil {
 		return nil, WrapErrorISE(err, "error marshaling challenge for logging")
 	}
+
 	return string(b), nil
 }
 
