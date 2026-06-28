@@ -3399,3 +3399,14 @@ func TestNamePolicyError_Error(t *testing.T) {
 		})
 	}
 }
+
+func TestEmptyDomainEmailPanic(t *testing.T) {
+	// Regression test: an email SAN with an empty domain (e.g. "a@") should
+	// be rejected gracefully, not cause a panic.
+	e, err := New(WithPermittedEmailAddresses("@example.com"))
+	if err != nil {
+		t.Fatalf("New() error = %v", err)
+	}
+	err = e.AreSANsAllowed([]string{"a@"})
+	assert.Error(t, err, "email with empty domain should be rejected")
+}

@@ -455,6 +455,11 @@ func parseRFC2821Mailbox(in string) (mailbox rfc2821Mailbox, ok bool) {
 	}
 	in = in[1:]
 
+	// An empty domain after '@' is not valid.
+	if in == "" {
+		return mailbox, false
+	}
+
 	// The RFC species a format for domains, but that's known to be
 	// violated in practice so we accept that anything after an '@' is the
 	// domain part.
