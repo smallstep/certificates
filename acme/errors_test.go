@@ -2,6 +2,7 @@ package acme
 
 import (
 	"encoding/json"
+	"errors"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -51,4 +52,60 @@ func TestError_WithAdditionalErrorDetail(t *testing.T) {
 			assert.JSONEq(t, tt.want, string(b))
 		})
 	}
+}
+
+func Test_newErrorRecordCreatesErrorRecords(t *testing.T) {
+	t.Parallel()
+
+	t.Run("nil", func(t *testing.T) {
+		t.Parallel()
+
+		got := newErrorRecord(nil)
+		assert.Nil(t, got)
+	})
+
+	t.Run("ok", func(t *testing.T) {
+		t.Parallel()
+
+		exp := map[string]any{
+			"type":     "urn:ietf:params:acme:error:malformed",
+			"detail":   "The request message was malformed",
+			"internal": "fail",
+		}
+		expBytes, err := json.Marshal(exp)
+		require.NoError(t, err)
+
+		got := newErrorRecord(newError(ErrorMalformedType, errors.New("fail")))
+
+		gotBytes, err := json.Marshal(got)
+		require.NoError(t, err)
+
+		assert.JSONEq(t, string(expBytes), string(gotBytes))
+	})
+
+	t.Run("subproblems", func(t *testing.T) {
+		t.Parallel()
+
+		s1 := NewSubproblem(ErrorMalformedType, "first-subproblem-msg")
+		s1.Identifier = &Identifier{Type: DNS, Value: "test.example.com"}
+		s2 := NewSubproblem(ErrorMalformedType, "second-subproblem-msg")
+		e := newError(ErrorMalformedType, errors.New("fail"))
+		e.AddSubproblems(s1, s2)
+
+		exp := map[string]any{
+			"type":        "urn:ietf:params:acme:error:malformed",
+			"detail":      "The request message was malformed",
+			"subproblems": []Subproblem{s1, s2},
+			"internal":    "fail",
+		}
+		expBytes, err := json.Marshal(exp)
+		require.NoError(t, err)
+
+		got := newErrorRecord(e)
+
+		gotBytes, err := json.Marshal(got)
+		require.NoError(t, err)
+
+		assert.JSONEq(t, string(expBytes), string(gotBytes))
+	})
 }
