@@ -151,7 +151,7 @@ func (v commonNameValidator) Valid(req *x509.CertificateRequest) error {
 	return nil
 }
 
-// commonNameSliceValidator validates thats the common name of a certificate
+// commonNameSliceValidator validates that the common name of a certificate
 // request is present in the slice. An empty common name is considered valid.
 type commonNameSliceValidator []string
 

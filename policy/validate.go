@@ -553,7 +553,7 @@ func (e *NamePolicyEngine) matchDomainConstraint(domain, constraint string) (boo
 func matchIPConstraint(ip net.IP, constraint *net.IPNet) (bool, error) {
 	// TODO(hs): this is code from Go library, but I got some unexpected result:
 	// with permitted net 127.0.0.0/24, 127.0.0.1 is NOT allowed. When parsing 127.0.0.1 as net.IP
-	// which is in the IPAddresses slice, the underlying length is 16. The contraint.IP has a length
+	// which is in the IPAddresses slice, the underlying length is 16. The constraint.IP has a length
 	// of 4 instead. I currently don't believe that this is a bug in Go now, but why is it like that?
 	// Is there a difference because we're not operating on a sans []string slice? Or is the Go
 	// implementation stricter regarding IPv4 vs. IPv6? I've been bitten by some unfortunate differences

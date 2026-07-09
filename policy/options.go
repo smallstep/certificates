@@ -261,7 +261,7 @@ func isIPv4(ip net.IP) bool {
 func normalizeAndValidateCommonName(constraint string) (string, error) {
 	normalizedConstraint := strings.ToLower(strings.TrimSpace(constraint))
 	if normalizedConstraint == "" {
-		return "", fmt.Errorf("contraint %q can not be empty or white space string", constraint)
+		return "", fmt.Errorf("constraint %q can not be empty or white space string", constraint)
 	}
 	if normalizedConstraint == "*" {
 		return "", fmt.Errorf("wildcard constraint %q is not supported", constraint)
@@ -272,7 +272,7 @@ func normalizeAndValidateCommonName(constraint string) (string, error) {
 func normalizeAndValidateDNSDomainConstraint(constraint string) (string, error) {
 	normalizedConstraint := strings.ToLower(strings.TrimSpace(constraint))
 	if normalizedConstraint == "" {
-		return "", fmt.Errorf("contraint %q can not be empty or white space string", constraint)
+		return "", fmt.Errorf("constraint %q can not be empty or white space string", constraint)
 	}
 	if strings.Contains(normalizedConstraint, "..") {
 		return "", fmt.Errorf("domain constraint %q cannot have empty labels", constraint)
@@ -302,7 +302,7 @@ func normalizeAndValidateDNSDomainConstraint(constraint string) (string, error) 
 func normalizeAndValidateEmailConstraint(constraint string) (string, error) {
 	normalizedConstraint := strings.ToLower(strings.TrimSpace(constraint))
 	if normalizedConstraint == "" {
-		return "", fmt.Errorf("email contraint %q can not be empty or white space string", constraint)
+		return "", fmt.Errorf("email constraint %q can not be empty or white space string", constraint)
 	}
 	if strings.Contains(normalizedConstraint, "*") {
 		return "", fmt.Errorf("email constraint %q cannot contain asterisk wildcard", constraint)
@@ -345,7 +345,7 @@ func normalizeAndValidateEmailConstraint(constraint string) (string, error) {
 func normalizeAndValidateURIDomainConstraint(constraint string) (string, error) {
 	normalizedConstraint := strings.ToLower(strings.TrimSpace(constraint))
 	if normalizedConstraint == "" {
-		return "", fmt.Errorf("URI domain contraint %q cannot be empty or white space string", constraint)
+		return "", fmt.Errorf("URI domain constraint %q cannot be empty or white space string", constraint)
 	}
 	if strings.Contains(normalizedConstraint, "://") {
 		return "", fmt.Errorf("URI domain constraint %q contains scheme (not supported yet)", constraint)

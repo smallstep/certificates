@@ -77,7 +77,7 @@ func verifyContentType(next nextHTTP) nextHTTP {
 			// GET /certificate requests allow a greater range of content types.
 			expected = []string{"application/jose+json", "application/pkix-cert", "application/pkcs7-mime"}
 		} else {
-			// By default every request should have content-type applictaion/jose+json.
+			// By default every request should have content-type application/jose+json.
 			expected = []string{"application/jose+json"}
 		}
 
