@@ -58,8 +58,8 @@ func (c ACMEChallenge) Validate() error {
 type ACMEAttestationFormat string
 
 const (
-	// APPLE is the format used to enable device-attest-01 on Apple devices.
-	ANDROID ACMEAttestationFormat = "android-key"
+	// ANDROID_KEY is the format used to enable device-attest-01 on Android devices.
+	ANDROID_KEY ACMEAttestationFormat = "android-key"
 
 	// APPLE is the format used to enable device-attest-01 on Apple devices.
 	APPLE ACMEAttestationFormat = "apple"
@@ -82,7 +82,7 @@ func (f ACMEAttestationFormat) String() string {
 // Validate returns an error if the attestation format is not a valid one.
 func (f ACMEAttestationFormat) Validate() error {
 	switch ACMEAttestationFormat(f.String()) {
-	case APPLE, STEP, TPM, ANDROID:
+	case APPLE, STEP, TPM, ANDROID_KEY:
 		return nil
 	default:
 		return fmt.Errorf("acme attestation format %q is not supported", f)
@@ -422,7 +422,7 @@ func (p *ACME) IsChallengeEnabled(_ context.Context, challenge ACMEChallenge) bo
 // AttestationFormat provisioner property should have at least one element.
 func (p *ACME) IsAttestationFormatEnabled(_ context.Context, format ACMEAttestationFormat) bool {
 	enabledFormats := []ACMEAttestationFormat{
-		APPLE, STEP, TPM, ANDROID,
+		APPLE, STEP, TPM, ANDROID_KEY,
 	}
 	if len(p.AttestationFormats) > 0 {
 		enabledFormats = p.AttestationFormats

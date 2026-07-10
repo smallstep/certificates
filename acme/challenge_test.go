@@ -177,12 +177,12 @@ func mustAttestAndroid(t *testing.T, keyAuthorization string) ([]byte, *x509.Cer
 	fatalError(t, err)
 
 	attObj, err := cbor.Marshal(struct {
-		Format       string                 `json:"fmt"`
-		AttStatement map[string]interface{} `json:"attStmt,omitempty"`
+		Format       string         `json:"fmt"`
+		AttStatement map[string]any `json:"attStmt,omitempty"`
 	}{
 		Format: "android-key",
-		AttStatement: map[string]interface{}{
-			"x5c": []interface{}{leaf.Raw, ca.Intermediate.Raw, rootAndroid},
+		AttStatement: map[string]any{
+			"x5c": []any{leaf.Raw, ca.Intermediate.Raw, rootAndroid},
 		},
 	})
 	fatalError(t, err)
