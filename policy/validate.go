@@ -480,13 +480,18 @@ func (e *NamePolicyEngine) matchDomainConstraint(domain, constraint string) (boo
 		return false, nil
 	}
 
+	// An empty domain never matches a constraint.
+	if domain == "" {
+		return false, nil
+	}
+
 	// Block domains that start with just a period
 	if domain[0] == '.' {
 		return false, nil
 	}
 
 	// Block wildcard domains that don't start with exactly "*." (i.e. double wildcards and such)
-	if domain[0] == '*' && domain[1] != '.' {
+	if domain[0] == '*' && (len(domain) < 2 || domain[1] != '.') {
 		return false, nil
 	}
 
