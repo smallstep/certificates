@@ -386,7 +386,7 @@ func WithX509Enforcers(ces ...provisioner.CertificateEnforcer) Option {
 	}
 }
 
-// WithSkipInit is an option that allows the constructor to skip initializtion
+// WithSkipInit is an option that allows the constructor to skip initialization
 // of the authority.
 func WithSkipInit() Option {
 	return func(a *Authority) error {

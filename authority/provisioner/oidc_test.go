@@ -618,7 +618,7 @@ func TestOIDC_AuthorizeSSHSign(t *testing.T) {
 		{"fail-user-host", p1, args{t1, SignSSHOptions{CertType: "host"}, pub}, nil, http.StatusOK, false, true},
 		{"fail-getIdentity", p5, args{failGetIdentityToken, SignSSHOptions{}, pub}, nil, http.StatusInternalServerError, true, false},
 		{"fail-sshCA-disabled", p6, args{"foo", SignSSHOptions{}, pub}, nil, http.StatusUnauthorized, true, false},
-		// Missing parametrs
+		// Missing parameters
 		{"fail-admin-type", p3, args{okAdmin, SignSSHOptions{KeyID: "root@example.com", Principals: []string{"root@example.com"}}, pub}, nil, http.StatusUnauthorized, false, true},
 		{"fail-admin-key-id", p3, args{okAdmin, SignSSHOptions{CertType: "user", Principals: []string{"root@example.com"}}, pub}, nil, http.StatusUnauthorized, false, true},
 		{"fail-admin-principals", p3, args{okAdmin, SignSSHOptions{CertType: "user", KeyID: "root@example.com"}, pub}, nil, http.StatusUnauthorized, false, true},
