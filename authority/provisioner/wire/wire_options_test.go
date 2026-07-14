@@ -68,7 +68,7 @@ MCowBQYDK2VwAyEA5c+4NKZSNQcR1T8qN6SjwgdPZQ0Ge12Ylx/YeGAJ35k=
 				},
 				DPOP: &DPOPOptions{},
 			},
-			expectedErr: errors.New(`failed initializing OIDC options: failed creationg OIDC provider config: failed parsing issuer URL: parse "\x00": net/url: invalid control character in URL`),
+			expectedErr: errors.New(`failed initializing OIDC options: failed creating OIDC provider config: failed parsing issuer URL: parse "\x00": net/url: invalid control character in URL`),
 		},
 		{
 			name: "fail/issuer-url-template",
