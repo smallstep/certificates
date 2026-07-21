@@ -128,53 +128,45 @@ func mustAccountAndKeyAuthorization(t *testing.T, token string) (*jose.JSONWebKe
 	return jwk, keyAuth
 }
 
-func mustAttestAndroid(t *testing.T, keyAuthorization string) ([]byte, *x509.Certificate, *x509.Certificate, *x509.Certificate) {
+func mustAttestAndroid(t *testing.T, keyAuthorization string) ([]byte, *x509.Certificate, *x509.Certificate) {
 	t.Helper()
 
 	ca, err := minica.New()
-	fatalError(t, err)
+	require.NoError(t, err)
 
 	signer, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
-	fatalError(t, err)
+	require.NoError(t, err)
 
 	keyAuthSum := sha256.Sum256([]byte(keyAuthorization))
-	fatalError(t, err)
+	require.NoError(t, err)
 
 	sig, err := signer.Sign(rand.Reader, keyAuthSum[:], crypto.SHA256)
-	fatalError(t, err)
+	require.NoError(t, err)
 
 	atts := attestation.KeyDescription{
 		AttestationVersion:       300,
 		AttestationSecurityLevel: 1,
-		AttestationChallenge:     sig,
+		AttestationChallenge:     []byte(keyAuthorization),
 		TeeEnforced: attestation.AuthorizationList{
 			AttestationIdSerial: []byte("serial-number"),
 		},
 	}
 	attestByte, err := attestation.CreateKeyDescription(&atts)
-	if err != nil {
-		fatalError(t, err)
-	}
+	require.NoError(t, err)
 
-	block, _ := pem.Decode([]byte(AndroidRootCAPubKey))
-	trustedPubKey, err := x509.ParsePKIXPublicKey(block.Bytes)
-
-	rootAndroid, err := ca.Sign(&x509.Certificate{
-		Subject:   pkix.Name{CommonName: "attestation cert"},
-		PublicKey: trustedPubKey,
-		Extensions: []pkix.Extension{
-			{Id: oidAndroidAttestation, Value: attestByte},
-		},
-	})
+	pemBlock, err := pemutil.Serialize(ca.Root.PublicKey)
+	require.NoError(t, err)
+	b := pem.EncodeToMemory(pemBlock)
+	AndroidRootCAPubKey = string(b) // TODO: fix; make this some type of test configuration?
 
 	leaf, err := ca.Sign(&x509.Certificate{
 		Subject:   pkix.Name{CommonName: "attestation cert"},
 		PublicKey: signer.Public(),
-		Extensions: []pkix.Extension{
+		ExtraExtensions: []pkix.Extension{
 			{Id: oidAndroidAttestation, Value: attestByte},
 		},
 	})
-	fatalError(t, err)
+	require.NoError(t, err)
 
 	attObj, err := cbor.Marshal(struct {
 		Format       string         `json:"fmt"`
@@ -182,19 +174,20 @@ func mustAttestAndroid(t *testing.T, keyAuthorization string) ([]byte, *x509.Cer
 	}{
 		Format: "android-key",
 		AttStatement: map[string]any{
-			"x5c": []any{leaf.Raw, ca.Intermediate.Raw, rootAndroid},
+			"x5c": []any{leaf.Raw, ca.Intermediate.Raw, ca.Root.Raw},
+			"sig": sig,
 		},
 	})
-	fatalError(t, err)
+	require.NoError(t, err)
 
 	payload, err := json.Marshal(struct {
 		AttObj string `json:"attObj"`
 	}{
 		AttObj: base64.RawURLEncoding.EncodeToString(attObj),
 	})
-	fatalError(t, err)
+	require.NoError(t, err)
 
-	return payload, leaf, ca.Root, rootAndroid
+	return payload, leaf, ca.Root
 }
 
 func mustAttestApple(t *testing.T, nonce string) ([]byte, *x509.Certificate, *x509.Certificate) {
@@ -4592,9 +4585,8 @@ func Test_deviceAttest01Validate(t *testing.T) {
 			}
 		},
 		"ok/doAndroidAttestationFormat": func(t *testing.T) test {
-
 			jwk, keyAuth := mustAccountAndKeyAuthorization(t, "token")
-			payload, _, root, _ := mustAttestAndroid(t, keyAuth)
+			payload, _, root := mustAttestAndroid(t, keyAuth)
 
 			caRoot := pem.EncodeToMemory(&pem.Block{Type: "CERTIFICATE", Bytes: root.Raw})
 			ctx := NewProvisionerContext(context.Background(), mustAttestationProvisioner(t, caRoot))
@@ -4605,7 +4597,7 @@ func Test_deviceAttest01Validate(t *testing.T) {
 					ch: &Challenge{
 						ID:              "chID",
 						AuthorizationID: "azID",
-						Token:           "nonce",
+						Token:           "token",
 						Type:            "device-attest-01",
 						Status:          StatusPending,
 						Value:           "serial-number",
@@ -4618,12 +4610,12 @@ func Test_deviceAttest01Validate(t *testing.T) {
 						},
 						MockUpdateChallenge: func(ctx context.Context, updch *Challenge) error {
 							assert.Equal(t, "chID", updch.ID)
-							assert.Equal(t, "nonce", updch.Token)
-							assert.Equal(t, StatusInvalid, updch.Status)
+							assert.Equal(t, "token", updch.Token)
+							assert.Equal(t, StatusValid, updch.Status)
 							assert.Equal(t, ChallengeType("device-attest-01"), updch.Type)
 							assert.Equal(t, "serial-number", updch.Value)
-							assert.Nil(t, updch.Payload)
-							assert.Empty(t, updch.PayloadFormat)
+							assert.NotNil(t, updch.Payload) // TODO: validate payload?
+							assert.Equal(t, "android-key", updch.PayloadFormat)
 
 							return nil
 						},
@@ -4633,12 +4625,11 @@ func Test_deviceAttest01Validate(t *testing.T) {
 			}
 		},
 		"ok/doAndroidAttestationFormat-invalid-root": func(t *testing.T) test {
-
 			jwk, keyAuth := mustAccountAndKeyAuthorization(t, "token")
-			payload, _, root, attestationRoot := mustAttestAndroid(t, keyAuth)
+			payload, _, root := mustAttestAndroid(t, keyAuth)
 
 			caRoot := pem.EncodeToMemory(&pem.Block{Type: "CERTIFICATE", Bytes: root.Raw})
-			ctx := NewProvisionerContext(context.Background(), mustNonCRLAttestationProvisioner(t, caRoot, []string{attestationRoot.SerialNumber.String()}))
+			ctx := NewProvisionerContext(context.Background(), mustNonCRLAttestationProvisioner(t, caRoot, []string{root.SerialNumber.String()}))
 			return test{
 				args: args{
 					ctx: ctx,
@@ -4663,10 +4654,10 @@ func Test_deviceAttest01Validate(t *testing.T) {
 							assert.Equal(t, StatusInvalid, updch.Status)
 							assert.Equal(t, ChallengeType("device-attest-01"), updch.Type)
 							assert.Equal(t, "serial-number", updch.Value)
-							assert.Nil(t, updch.Payload)
+							assert.NotNil(t, updch.Payload) // TODO: validate payload?
 							assert.Empty(t, updch.PayloadFormat)
 
-							err := NewDetailedError(ErrorBadAttestationStatementType, "x5c element contain a revoked certificate")
+							err := NewDetailedError(ErrorBadAttestationStatementType, "x5c element contains a revoked certificate")
 
 							assert.EqualError(t, updch.Error.Err, err.Err.Error())
 							assert.Equal(t, err.Type, updch.Error.Type)
@@ -5096,14 +5087,15 @@ func Test_deviceAttest01Validate(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			tc := run(t)
 
-			if err := deviceAttest01Validate(tc.args.ctx, tc.args.ch, tc.args.db, tc.args.jwk, tc.args.payload); err != nil {
-				if assert.Error(t, tc.wantErr) {
+			err := deviceAttest01Validate(tc.args.ctx, tc.args.ch, tc.args.db, tc.args.jwk, tc.args.payload)
+			if tc.wantErr != nil {
+				if assert.Error(t, err) {
 					assert.ErrorContains(t, err, tc.wantErr.Error())
 				}
 				return
 			}
 
-			assert.Nil(t, tc.wantErr)
+			assert.NoError(t, err)
 		})
 	}
 }
