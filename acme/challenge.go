@@ -16,7 +16,6 @@ import (
 	"encoding/base64"
 	"encoding/hex"
 	"encoding/json"
-	"encoding/pem"
 	"errors"
 	"fmt"
 	"io"
@@ -1404,22 +1403,54 @@ func doAppleAttestationFormat(_ context.Context, prov Provisioner, _ *Challenge,
 	return data, nil
 }
 
-// Android Root CA
+// Android RSA Root CA
 // https://developer.android.com/privacy-and-security/security-key-attestation#root_certificate
-var AndroidRootCAPubKey = `-----BEGIN PUBLIC KEY-----
-MIICIjANBgkqhkiG9w0BAQEFAAOCAg8AMIICCgKCAgEAr7bHgiuxpwHsK7Qui8xU
-FmOr75gvMsd/dTEDDJdSSxtf6An7xyqpRR90PL2abxM1dEqlXnf2tqw1Ne4Xwl5j
-lRfdnJLmN0pTy/4lj4/7tv0Sk3iiKkypnEUtR6WfMgH0QZfKHM1+di+y9TFRtv6y
-//0rb+T+W8a9nsNL/ggjnar86461qO0rOs2cXjp3kOG1FEJ5MVmFmBGtnrKpa73X
-pXyTqRxB/M0n1n/W9nGqC4FSYa04T6N5RIZGBN2z2MT5IKGbFlbC8UrW0DxW7AYI
-mQQcHtGl/m00QLVWutHQoVJYnFPlXTcHYvASLu+RhhsbDmxMgJJ0mcDpvsC4PjvB
-+TxywElgS70vE0XmLD+OJtvsBslHZvPBKCOdT0MS+tgSOIfga+z1Z1g7+DVagf7q
-uvmag8jfPioyKvxnK/EgsTUVi2ghzq8wm27ud/mIM7AY2qEORR8Go3TVB4HzWQgp
-Zrt3i5MIlCaY504LzSRiigHCzAPlHws+W0rB5N+er5/2pJKnfBSDiCiFAVtCLOZ7
-gLiMm0jhO2B6tUXHI/+MRPjy02i59lINMRRev56GKtcd9qO/0kUJWdZTdA2XoS82
-ixPvZtXQpUpuL12ab+9EaDK8Z4RHJYYfCT3Q5vNAXaiWQ+8PTWm2QgBR/bkwSWc+
-NpUFgNPN9PvQi8WEg5UmAGMCAwEAAQ==
------END PUBLIC KEY-----`
+var androidRSARootCA = `-----BEGIN CERTIFICATE-----
+MIIFHDCCAwSgAwIBAgIJAPHBcqaZ6vUdMA0GCSqGSIb3DQEBCwUAMBsxGTAXBgNV
+BAUTEGY5MjAwOWU4NTNiNmIwNDUwHhcNMjIwMzIwMTgwNzQ4WhcNNDIwMzE1MTgw
+NzQ4WjAbMRkwFwYDVQQFExBmOTIwMDllODUzYjZiMDQ1MIICIjANBgkqhkiG9w0B
+AQEFAAOCAg8AMIICCgKCAgEAr7bHgiuxpwHsK7Qui8xUFmOr75gvMsd/dTEDDJdS
+Sxtf6An7xyqpRR90PL2abxM1dEqlXnf2tqw1Ne4Xwl5jlRfdnJLmN0pTy/4lj4/7
+tv0Sk3iiKkypnEUtR6WfMgH0QZfKHM1+di+y9TFRtv6y//0rb+T+W8a9nsNL/ggj
+nar86461qO0rOs2cXjp3kOG1FEJ5MVmFmBGtnrKpa73XpXyTqRxB/M0n1n/W9nGq
+C4FSYa04T6N5RIZGBN2z2MT5IKGbFlbC8UrW0DxW7AYImQQcHtGl/m00QLVWutHQ
+oVJYnFPlXTcHYvASLu+RhhsbDmxMgJJ0mcDpvsC4PjvB+TxywElgS70vE0XmLD+O
+JtvsBslHZvPBKCOdT0MS+tgSOIfga+z1Z1g7+DVagf7quvmag8jfPioyKvxnK/Eg
+sTUVi2ghzq8wm27ud/mIM7AY2qEORR8Go3TVB4HzWQgpZrt3i5MIlCaY504LzSRi
+igHCzAPlHws+W0rB5N+er5/2pJKnfBSDiCiFAVtCLOZ7gLiMm0jhO2B6tUXHI/+M
+RPjy02i59lINMRRev56GKtcd9qO/0kUJWdZTdA2XoS82ixPvZtXQpUpuL12ab+9E
+aDK8Z4RHJYYfCT3Q5vNAXaiWQ+8PTWm2QgBR/bkwSWc+NpUFgNPN9PvQi8WEg5Um
+AGMCAwEAAaNjMGEwHQYDVR0OBBYEFDZh4QB8iAUJUYtEbEf/GkzJ6k8SMB8GA1Ud
+IwQYMBaAFDZh4QB8iAUJUYtEbEf/GkzJ6k8SMA8GA1UdEwEB/wQFMAMBAf8wDgYD
+VR0PAQH/BAQDAgIEMA0GCSqGSIb3DQEBCwUAA4ICAQB8cMqTllHc8U+qCrOlg3H7
+174lmaCsbo/bJ0C17JEgMLb4kvrqsXZs01U3mB/qABg/1t5Pd5AORHARs1hhqGIC
+W/nKMav574f9rZN4PC2ZlufGXb7sIdJpGiO9ctRhiLuYuly10JccUZGEHpHSYM2G
+tkgYbZba6lsCPYAAP83cyDV+1aOkTf1RCp/lM0PKvmxYN10RYsK631jrleGdcdkx
+oSK//mSQbgcWnmAEZrzHoF1/0gso1HZgIn0YLzVhLSA/iXCX4QT2h3J5z3znluKG
+1nv8NQdxei2DIIhASWfu804CA96cQKTTlaae2fweqXjdN1/v2nqOhngNyz1361mF
+mr4XmaKH/ItTwOe72NI9ZcwS1lVaCvsIkTDCEXdm9rCNPAY10iTunIHFXRh+7KPz
+lHGewCq/8TOohBRn0/NNfh7uRslOSZ/xKbN9tMBtw37Z8d2vvnXq/YWdsm1+JLVw
+n6yYD/yacNJBlwpddla8eaVMjsF6nBnIgQOf9zKSe06nSTqvgwUHosgOECZJZ1Eu
+zbH4yswbt02tKtKEFhx+v+OTge/06V+jGsqTWLsfrOCNLuA8H++z+pUENmpqnnHo
+vaI47gC+TNpkgYGkkBT6B/m/U01BuOBBTzhIlMEZq9qkDWuM2cA5kW5V3FJUcfHn
+w1IdYIg2Wxg7yHcQZemFQg==
+-----END CERTIFICATE-----`
+
+// Android ECDSA (secp384r1) Root CA
+var androidECDSARootCA = `-----BEGIN CERTIFICATE-----
+MIICIjCCAaigAwIBAgIRAISp0Cl7DrWK5/8OgN52BgUwCgYIKoZIzj0EAwMwUjEc
+MBoGA1UEAwwTS2V5IEF0dGVzdGF0aW9uIENBMTEQMA4GA1UECwwHQW5kcm9pZDET
+MBEGA1UECgwKR29vZ2xlIExMQzELMAkGA1UEBhMCVVMwHhcNMjUwNzE3MjIzMjE4
+WhcNMzUwNzE1MjIzMjE4WjBSMRwwGgYDVQQDDBNLZXkgQXR0ZXN0YXRpb24gQ0Ex
+MRAwDgYDVQQLDAdBbmRyb2lkMRMwEQYDVQQKDApHb29nbGUgTExDMQswCQYDVQQG
+EwJVUzB2MBAGByqGSM49AgEGBSuBBAAiA2IABCPaI3FO3z5bBQo8cuiEas4HjqCt
+G/mLFfRT0MsIssPBEEU5Cfbt6sH5yOAxqEi5QagpU1yX4HwnGb7OtBYpDTB57uH5
+Eczm34A5FNijV3s0/f0UPl7zbJcTx6xwqMIRq6NCMEAwDwYDVR0TAQH/BAUwAwEB
+/zAOBgNVHQ8BAf8EBAMCAQYwHQYDVR0OBBYEFFIyuyz7RkOb3NaBqQ5lZuA0QepA
+MAoGCCqGSM49BAMDA2gAMGUCMETfjPO/HwqReR2CS7p0ZWoD/LHs6hDi422opifH
+EUaYLxwGlT9SLdjkVpz0UUOR5wIxAIoGyxGKRHVTpqpGRFiJtQEOOTp/+s1GcxeY
+uR2zh/80lQyu9vAFCj6E4AXc+osmRg==
+-----END CERTIFICATE-----`
 
 // Attestion OID for Android Key Attestation
 // https://source.android.com/docs/security/features/keystore/attestation#id-attestation
@@ -1431,15 +1462,16 @@ type androidKeyAttestationData struct {
 	Attestation *attestation.KeyDescription
 }
 
-func findAndroidAttestationCert(certs []*x509.Certificate) (*x509.Certificate, error) {
+func findAndroidAttestationCert(certs []*x509.Certificate) *x509.Certificate {
 	for _, cert := range certs {
 		for _, ext := range cert.Extensions {
 			if ext.Id.Equal(oidAndroidAttestation) {
-				return cert, nil
+				return cert
 			}
 		}
 	}
-	return nil, errors.New("no attestation certificate with OID 1.3.6.1.4.1.11129.2.1.17 found in the cert chain")
+
+	return nil
 }
 
 // doAndroidKeyAttestionFormat handles ACME Device Attestation requests for
@@ -1456,6 +1488,21 @@ func findAndroidAttestationCert(certs []*x509.Certificate) (*x509.Certificate, e
 //  7. Check the extension data that you've retrieved in the previous steps for consistency and compare with the set of values that you expect the hardware-backed key to contain.
 func doAndroidKeyAttestionFormat(_ context.Context, prov Provisioner, ch *Challenge, jwk *jose.JSONWebKey, att *attestationObject) (*androidKeyAttestationData, error) {
 	acmeProv := prov.(*provisioner.ACME)
+
+	roots, ok := prov.GetAttestationRoots()
+	if !ok {
+		rsaRoot, err := pemutil.ParseCertificate([]byte(androidRSARootCA))
+		if err != nil {
+			return nil, WrapErrorISE(err, "error parsing Android RSA root CA")
+		}
+		ecdsaRoot, err := pemutil.ParseCertificate([]byte(androidECDSARootCA))
+		if err != nil {
+			return nil, WrapErrorISE(err, "error parsing Android ECDSA root CA")
+		}
+		roots = x509.NewCertPool()
+		roots.AddCert(rsaRoot)
+		roots.AddCert(ecdsaRoot)
+	}
 
 	// extract x5c and verify certificate
 	x5c, ok := att.AttStatement["x5c"].([]any)
@@ -1496,36 +1543,27 @@ func doAndroidKeyAttestionFormat(_ context.Context, prov Provisioner, ch *Challe
 		if i == len(x5c)-2 {
 			// Last cert = root
 			certs = append(certs, cert)
-			root = cert
+			root = cert // TODO: perform additional validation?
 		} else {
 			certs = append(certs, cert)
 			intermediates.AddCert(cert)
 		}
 	}
 
+	// Require a root in the chain
 	if root == nil {
 		return nil, NewDetailedError(ErrorBadAttestationStatementType, "missing root certificate in x5c chain")
 	}
 
-	block, _ := pem.Decode([]byte(AndroidRootCAPubKey))
-	trustedPubKey, err := x509.ParsePKIXPublicKey(block.Bytes)
-	switch pk := root.PublicKey.(type) {
-	case *rsa.PublicKey:
-		if !pk.Equal(trustedPubKey) {
-			return nil, NewDetailedError(ErrorBadAttestationStatementType, "root certificate not signed by Android")
-		}
-	case *ecdsa.PublicKey:
-		if !pk.Equal(trustedPubKey) {
-			return nil, NewDetailedError(ErrorBadAttestationStatementType, "root certificate not signed by Android")
-		}
-	default:
-		return nil, NewDetailedError(ErrorBadAttestationStatementType, "invalid root certificate key type")
+	// Verify the root is one of the trusted roots
+	if _, err := root.Verify(x509.VerifyOptions{
+		Roots:       roots, // TODO: ensure Verify does the right thing for this case
+		CurrentTime: time.Now().Truncate(time.Second),
+	}); err != nil {
+		return nil, NewDetailedError(ErrorBadAttestationStatementType, "root certificate in chain is not trusted")
 	}
 
 	// Validate the full chain including root as trust anchor
-	roots := x509.NewCertPool()
-	roots.AddCert(root)
-
 	if _, err := leaf.Verify(x509.VerifyOptions{
 		Intermediates: intermediates,
 		Roots:         roots,
@@ -1547,9 +1585,9 @@ func doAndroidKeyAttestionFormat(_ context.Context, prov Provisioner, ch *Challe
 	}
 
 	// Find the attestation certificate
-	attCert, err := findAndroidAttestationCert(certs)
-	if err != nil {
-		return nil, NewDetailedError(ErrorBadAttestationStatementType, "%s", err.Error())
+	attCert := findAndroidAttestationCert(certs) // TODO: Google docs describe "closest to the root"
+	if attCert == nil {
+		return nil, NewDetailedError(ErrorBadAttestationStatementType, "no attestation certificate with OID 1.3.6.1.4.1.11129.2.1.17 found in the cert chain")
 	}
 
 	switch pub := attCert.PublicKey.(type) {
@@ -1593,7 +1631,7 @@ func doAndroidKeyAttestionFormat(_ context.Context, prov Provisioner, ch *Challe
 		break
 	}
 
-	// Validate challenge
+	// Validate key authorization
 	if string(data.Attestation.AttestationChallenge) != keyAuth {
 		return nil, NewDetailedError(ErrorBadAttestationStatementType, "challenge mismatch; expected %q, got %q", keyAuth, string(data.Attestation.AttestationChallenge))
 	}

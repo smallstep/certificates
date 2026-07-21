@@ -154,11 +154,6 @@ func mustAttestAndroid(t *testing.T, keyAuthorization string) ([]byte, *x509.Cer
 	attestByte, err := attestation.CreateKeyDescription(&atts)
 	require.NoError(t, err)
 
-	pemBlock, err := pemutil.Serialize(ca.Root.PublicKey)
-	require.NoError(t, err)
-	b := pem.EncodeToMemory(pemBlock)
-	AndroidRootCAPubKey = string(b) // TODO: fix; make this some type of test configuration?
-
 	leaf, err := ca.Sign(&x509.Certificate{
 		Subject:   pkix.Name{CommonName: "attestation cert"},
 		PublicKey: signer.Public(),
