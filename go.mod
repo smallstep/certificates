@@ -4,7 +4,7 @@ go 1.25.8
 
 require (
 	cloud.google.com/go/longrunning v1.2.0
-	cloud.google.com/go/security v1.25.0
+	cloud.google.com/go/security v1.26.0
 	github.com/Masterminds/sprig/v3 v3.3.0
 	github.com/ccoveille/go-safecast/v2 v2.0.1
 	github.com/coreos/go-oidc/v3 v3.19.0
