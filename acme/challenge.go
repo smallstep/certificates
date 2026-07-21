@@ -1431,8 +1431,8 @@ type androidKeyAttestationData struct {
 	Attestation *attestation.KeyDescription
 }
 
-func findAndroidAttestationCert(intermediates []*x509.Certificate) (*x509.Certificate, error) {
-	for _, cert := range intermediates {
+func findAndroidAttestationCert(certs []*x509.Certificate) (*x509.Certificate, error) {
+	for _, cert := range certs {
 		for _, ext := range cert.Extensions {
 			if ext.Id.Equal(oidAndroidAttestation) {
 				return cert, nil
@@ -1442,15 +1442,18 @@ func findAndroidAttestationCert(intermediates []*x509.Certificate) (*x509.Certif
 	return nil, errors.New("no attestation certificate with OID 1.3.6.1.4.1.11129.2.1.17 found in the cert chain")
 }
 
-// https://developer.android.com/privacy-and-security/security-key-attestation
-// 3. Verify that the root public certificate is trustworthy and that each certificate signs the next certificate in the chain.
-// 4. Check each certificate's revocation status to ensure that none of the certificates have been revoked.
-// 5. Optionally, inspect the provisioning information certificate extension that is only present in newer certificate chains.
-//    Obtain a reference to the CBOR parser library that is most appropriate for your toolset. Find the nearest certificate to the root that contains the provisioning information certificate extension. Use the parser to extract the provisioning information certificate extension data from that certificate.
-//    See the section about the provisioning information extension for more details.
-// 6. Find the nearest certificate to the root that contains the key attestation certificate extension. If the provisioning information certificate extension was present, the key attestation certificate extension must be in the immediately subsequent certificate. Use the parser to extract the key attestation certificate extension data from that certificate.
-// 7. Check the extension data that you've retrieved in the previous steps for consistency and compare with the set of values that you expect the hardware-backed key to contain.
-
+// doAndroidKeyAttestionFormat handles ACME Device Attestation requests for
+// the "android-key" attestation format. Its verification logic is based on
+// the documentation at https://developer.android.com/privacy-and-security/security-key-attestation
+//
+// This function performs the below steps
+//  3. Verify that the root public certificate is trustworthy and that each certificate signs the next certificate in the chain.
+//  4. Check each certificate's revocation status to ensure that none of the certificates have been revoked.
+//  5. Optionally, inspect the provisioning information certificate extension that is only present in newer certificate chains.
+//     Obtain a reference to the CBOR parser library that is most appropriate for your toolset. Find the nearest certificate to the root that contains the provisioning information certificate extension. Use the parser to extract the provisioning information certificate extension data from that certificate.
+//     See the section about the provisioning information extension for more details.
+//  6. Find the nearest certificate to the root that contains the key attestation certificate extension. If the provisioning information certificate extension was present, the key attestation certificate extension must be in the immediately subsequent certificate. Use the parser to extract the key attestation certificate extension data from that certificate.
+//  7. Check the extension data that you've retrieved in the previous steps for consistency and compare with the set of values that you expect the hardware-backed key to contain.
 func doAndroidKeyAttestionFormat(_ context.Context, prov Provisioner, ch *Challenge, jwk *jose.JSONWebKey, att *attestationObject) (*androidKeyAttestationData, error) {
 	acmeProv := prov.(*provisioner.ACME)
 
@@ -1464,7 +1467,7 @@ func doAndroidKeyAttestionFormat(_ context.Context, prov Provisioner, ch *Challe
 	}
 	der, ok := x5c[0].([]byte)
 	if !ok {
-		return nil, NewDetailedError(ErrorBadAttestationStatementType, "x5c[0] is not a DER []byte")
+		return nil, NewDetailedError(ErrorBadAttestationStatementType, "x5c[0] is malformed")
 	}
 	leaf, err := x509.ParseCertificate(der)
 	if err != nil {
@@ -1480,11 +1483,11 @@ func doAndroidKeyAttestionFormat(_ context.Context, prov Provisioner, ch *Challe
 	for i, v := range x5c[1:] {
 		der, ok := v.([]byte)
 		if !ok {
-			return nil, NewDetailedError(ErrorBadAttestationStatementType, "x5c element is not a DER []byte")
+			return nil, NewDetailedError(ErrorBadAttestationStatementType, "x5c element is malformed")
 		}
 		cert, err := x509.ParseCertificate(der)
 		if err != nil {
-			return nil, WrapDetailedError(ErrorBadAttestationStatementType, err, "failed to parse intermediate/root certificate")
+			return nil, WrapDetailedError(ErrorBadAttestationStatementType, err, "failed parsing certificate at index %d", i+1)
 		}
 		// Verify CRL
 		if acmeProv.IsRootRevoked(cert.SerialNumber.String()) {
@@ -1509,14 +1512,14 @@ func doAndroidKeyAttestionFormat(_ context.Context, prov Provisioner, ch *Challe
 	switch pk := root.PublicKey.(type) {
 	case *rsa.PublicKey:
 		if !pk.Equal(trustedPubKey) {
-			return nil, NewDetailedError(ErrorBadAttestationStatementType, "Root certificate not signed by Android")
+			return nil, NewDetailedError(ErrorBadAttestationStatementType, "root certificate not signed by Android")
 		}
 	case *ecdsa.PublicKey:
 		if !pk.Equal(trustedPubKey) {
-			return nil, NewDetailedError(ErrorBadAttestationStatementType, "Root certificate not signed by Android")
+			return nil, NewDetailedError(ErrorBadAttestationStatementType, "root certificate not signed by Android")
 		}
 	default:
-		return nil, NewDetailedError(ErrorBadAttestationStatementType, "Invalid root certificate signature algorithm")
+		return nil, NewDetailedError(ErrorBadAttestationStatementType, "invalid root certificate key type")
 	}
 
 	// Validate the full chain including root as trust anchor
@@ -1527,7 +1530,7 @@ func doAndroidKeyAttestionFormat(_ context.Context, prov Provisioner, ch *Challe
 		Intermediates: intermediates,
 		Roots:         roots,
 		CurrentTime:   time.Now().Truncate(time.Second),
-		KeyUsages:     []x509.ExtKeyUsage{x509.ExtKeyUsageCodeSigning},
+		KeyUsages:     []x509.ExtKeyUsage{x509.ExtKeyUsageAny},
 	}); err != nil {
 		return nil, WrapDetailedError(ErrorBadAttestationStatementType, err, "x5c chain verification failed")
 	}
@@ -1556,16 +1559,16 @@ func doAndroidKeyAttestionFormat(_ context.Context, prov Provisioner, ch *Challe
 		}
 		sum := sha256.Sum256([]byte(keyAuth))
 		if !ecdsa.VerifyASN1(pub, sum[:], sig) {
-			return nil, NewDetailedError(ErrorBadAttestationStatementType, "failed to validate signature")
+			return nil, NewDetailedError(ErrorBadAttestationStatementType, "failed validating signature")
 		}
 	case *rsa.PublicKey:
 		sum := sha256.Sum256([]byte(keyAuth))
 		if err := rsa.VerifyPKCS1v15(pub, crypto.SHA256, sum[:], sig); err != nil {
-			return nil, NewDetailedError(ErrorBadAttestationStatementType, "failed to validate signature")
+			return nil, NewDetailedError(ErrorBadAttestationStatementType, "failed validating signature")
 		}
 	case ed25519.PublicKey:
 		if !ed25519.Verify(pub, []byte(keyAuth), sig) {
-			return nil, NewDetailedError(ErrorBadAttestationStatementType, "failed to validate signature")
+			return nil, NewDetailedError(ErrorBadAttestationStatementType, "failed validating signature")
 		}
 	default:
 		return nil, NewDetailedError(ErrorBadAttestationStatementType, "unsupported public key type %T", pub)
