@@ -516,6 +516,12 @@ func (p *ACME) IsAndroidCertificateRevoked(ctx context.Context, cert *x509.Certi
 		return revoked, nil
 	}
 
+	// No CRL check is performed using Google's CRL if custom roots
+	// are configured.
+	if p.attestationRootPool != nil {
+		return false, nil
+	}
+
 	// Fall back to the built-in CRL. A fetch error fails closed: the
 	// certificate is reported as revoked so the attestation is rejected.
 	crl, err := p.androidCRL.snapshot(ctx, p.ctl.GetHTTPClient())

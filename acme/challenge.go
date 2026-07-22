@@ -1450,7 +1450,7 @@ EUaYLxwGlT9SLdjkVpz0UUOR5wIxAIoGyxGKRHVTpqpGRFiJtQEOOTp/+s1GcxeY
 uR2zh/80lQyu9vAFCj6E4AXc+osmRg==
 -----END CERTIFICATE-----`
 
-// Attestion OID for Android Key Attestation
+// OID for Android Key Attestation
 // https://source.android.com/docs/security/features/keystore/attestation#id-attestation
 var oidAndroidAttestation = asn1.ObjectIdentifier{1, 3, 6, 1, 4, 1, 11129, 2, 1, 17}
 
