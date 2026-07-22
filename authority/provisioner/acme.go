@@ -241,9 +241,13 @@ func (p *ACME) loadAndroidCRL(ctx context.Context) error {
 			Reason string `json:"reason"`
 		} `json:"entries"`
 	}
-	res, err := p.ctl.GetHTTPClient().Get(androidAttestationStatusURL)
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, androidAttestationStatusURL, http.NoBody)
 	if err != nil {
-		return fmt.Errorf("client: error making Android CRL request: %s\n", err)
+		return fmt.Errorf("failed creating Android CRL request: %w", err)
+	}
+	res, err := p.ctl.GetHTTPClient().Do(req)
+	if err != nil {
+		return fmt.Errorf("failed performing Android CRL request: %w", err)
 	}
 	defer res.Body.Close()
 
@@ -256,7 +260,10 @@ func (p *ACME) loadAndroidCRL(ctx context.Context) error {
 		return fmt.Errorf("error decoding Android CRL JSON: %w", err)
 	}
 
-	// Extract keys into a slice
+	// Extract serials into a slice. Currently no distinction is being made
+	// based on the status of the certificate. The status can be "REVOKED"
+	// and "SUSPENDED". Both statuses will result in a certificate to be
+	// considered revoked.
 	serials := make([]string, 0, len(CRLResponse.Entries))
 	for k := range CRLResponse.Entries {
 		serials = append(serials, k)
@@ -463,7 +470,7 @@ func (p *ACME) IsAndroidCertificateRevoked(ctx context.Context, cert *x509.Certi
 	if p.androidCRLFetchedAt.IsZero() || time.Now().After(p.androidCRLFetchedAt.Add(24*time.Hour)) {
 		// reinitialize the Android CRL
 		if err := p.loadAndroidCRL(ctx); err != nil {
-			return false, err
+			return true, err
 		}
 	}
 

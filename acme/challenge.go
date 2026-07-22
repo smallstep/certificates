@@ -849,7 +849,7 @@ func deviceAttest01Validate(ctx context.Context, ch *Challenge, db DB, jwk *jose
 
 	switch format {
 	case "android-key":
-		data, err := doAndroidKeyAttestionFormat(ctx, prov, ch, jwk, &att)
+		data, err := doAndroidKeyAttestationFormat(ctx, prov, ch, jwk, &att)
 		if err != nil {
 			var acmeError *Error
 			if errors.As(err, &acmeError) {
@@ -1462,8 +1462,12 @@ type androidKeyAttestationData struct {
 	Attestation *attestation.KeyDescription
 }
 
+// findAndroidAttestationCert traverses the slice of [*x509.Certificate] from
+// end to start (root -> intermediate -> leaf) to locate the certificate closest
+// to the root carrying an Android Key Attestation extension.
 func findAndroidAttestationCert(certs []*x509.Certificate) *x509.Certificate {
-	for _, cert := range certs {
+	for i := len(certs) - 1; i >= 0; i-- {
+		cert := certs[i]
 		for _, ext := range cert.Extensions {
 			if ext.Id.Equal(oidAndroidAttestation) {
 				return cert
@@ -1474,7 +1478,7 @@ func findAndroidAttestationCert(certs []*x509.Certificate) *x509.Certificate {
 	return nil
 }
 
-// doAndroidKeyAttestionFormat handles ACME Device Attestation requests for
+// doAndroidKeyAttestationFormat handles ACME Device Attestation requests for
 // the "android-key" attestation format. Its verification logic is based on
 // the documentation at https://developer.android.com/privacy-and-security/security-key-attestation
 //
@@ -1486,8 +1490,11 @@ func findAndroidAttestationCert(certs []*x509.Certificate) *x509.Certificate {
 //     See the section about the provisioning information extension for more details.
 //  6. Find the nearest certificate to the root that contains the key attestation certificate extension. If the provisioning information certificate extension was present, the key attestation certificate extension must be in the immediately subsequent certificate. Use the parser to extract the key attestation certificate extension data from that certificate.
 //  7. Check the extension data that you've retrieved in the previous steps for consistency and compare with the set of values that you expect the hardware-backed key to contain.
-func doAndroidKeyAttestionFormat(ctx context.Context, prov Provisioner, ch *Challenge, jwk *jose.JSONWebKey, att *attestationObject) (*androidKeyAttestationData, error) {
-	acmeProv := prov.(*provisioner.ACME)
+func doAndroidKeyAttestationFormat(ctx context.Context, prov Provisioner, ch *Challenge, jwk *jose.JSONWebKey, att *attestationObject) (*androidKeyAttestationData, error) {
+	acmeProv, ok := prov.(*provisioner.ACME)
+	if !ok {
+		return nil, NewErrorISE("provisioner in context is not an ACME provisioner")
+	}
 
 	roots, ok := prov.GetAttestationRoots()
 	if !ok {
@@ -1512,29 +1519,18 @@ func doAndroidKeyAttestionFormat(ctx context.Context, prov Provisioner, ch *Chal
 	if len(x5c) == 0 {
 		return nil, NewDetailedError(ErrorRejectedIdentifierType, "x5c is empty")
 	}
-	der, ok := x5c[0].([]byte)
-	if !ok {
-		return nil, NewDetailedError(ErrorBadAttestationStatementType, "x5c[0] is malformed")
-	}
-	leaf, err := x509.ParseCertificate(der)
-	if err != nil {
-		return nil, WrapDetailedError(ErrorBadAttestationStatementType, err, "failed to parse leaf certificate")
-	}
-
-	var certs = make([]*x509.Certificate, 0, len(x5c))
-	certs = append(certs, leaf)
 
 	// Parse intermediates and root
 	intermediates := x509.NewCertPool()
-	var root *x509.Certificate
-	for i, v := range x5c[1:] {
+	var leaf, root *x509.Certificate
+	for i, v := range x5c {
 		der, ok := v.([]byte)
 		if !ok {
 			return nil, NewDetailedError(ErrorBadAttestationStatementType, "x5c element is malformed")
 		}
 		cert, err := x509.ParseCertificate(der)
 		if err != nil {
-			return nil, WrapDetailedError(ErrorBadAttestationStatementType, err, "failed parsing certificate at index %d", i+1)
+			return nil, WrapDetailedError(ErrorBadAttestationStatementType, err, "failed parsing certificate at index %d", i)
 		}
 
 		// Verify certificate serial number against CRL
@@ -1546,14 +1542,19 @@ func doAndroidKeyAttestionFormat(ctx context.Context, prov Provisioner, ch *Chal
 			return nil, NewDetailedError(ErrorBadAttestationStatementType, "x5c element contains a revoked certificate")
 		}
 
-		if i == len(x5c)-2 {
-			// Last cert = root
-			certs = append(certs, cert)
-			root = cert // TODO: perform additional validation?
-		} else {
-			certs = append(certs, cert)
+		switch i {
+		case 0: // leaf
+			leaf = cert
+		case len(x5c) - 1: // root
+			root = cert
+		default: // intermediates
 			intermediates.AddCert(cert)
 		}
+	}
+
+	// Require a leaf in the chain
+	if leaf == nil {
+		return nil, NewDetailedError(ErrorBadAttestationStatementType, "missing leaf certificate in x5c chain")
 	}
 
 	// Require a root in the chain
@@ -1562,21 +1563,31 @@ func doAndroidKeyAttestionFormat(ctx context.Context, prov Provisioner, ch *Chal
 	}
 
 	// Verify the root is one of the trusted roots
-	if _, err := root.Verify(x509.VerifyOptions{
+	_, err := root.Verify(x509.VerifyOptions{
 		Roots:       roots, // TODO: ensure Verify does the right thing for this case
 		CurrentTime: time.Now().Truncate(time.Second),
-	}); err != nil {
+	})
+	if err != nil {
 		return nil, NewDetailedError(ErrorBadAttestationStatementType, "root certificate in chain is not trusted")
 	}
 
 	// Validate the full chain including root as trust anchor
-	if _, err := leaf.Verify(x509.VerifyOptions{
+	chains, err := leaf.Verify(x509.VerifyOptions{
 		Intermediates: intermediates,
 		Roots:         roots,
 		CurrentTime:   time.Now().Truncate(time.Second),
 		KeyUsages:     []x509.ExtKeyUsage{x509.ExtKeyUsageAny},
-	}); err != nil {
+	})
+	if err != nil {
 		return nil, WrapDetailedError(ErrorBadAttestationStatementType, err, "x5c chain verification failed")
+	}
+
+	switch {
+	case len(chains) == 0:
+		return nil, NewDetailedError(ErrorBadAttestationStatementType, "x5c does not contain a valid certificate chain")
+	case len(chains) > 1:
+		// currently we strictly prohibit multiple valid signing chains
+		return nil, NewDetailedError(ErrorBadAttestationStatementType, "x5c contains multiple (%d) valid certificate chains", len(chains))
 	}
 
 	// Get signature
@@ -1591,7 +1602,7 @@ func doAndroidKeyAttestionFormat(ctx context.Context, prov Provisioner, ch *Chal
 	}
 
 	// Find the attestation certificate
-	attCert := findAndroidAttestationCert(certs) // TODO: Google docs describe "closest to the root"
+	attCert := findAndroidAttestationCert(chains[0])
 	if attCert == nil {
 		return nil, NewDetailedError(ErrorBadAttestationStatementType, "no attestation certificate with OID 1.3.6.1.4.1.11129.2.1.17 found in the cert chain")
 	}

@@ -282,9 +282,9 @@ type Config struct {
 	// WrapTransport references the function that should wrap any [http.Transport] initialized
 	// down the Config's chain.
 	WrapTransport TransportWrapper
-	// AndroidKeyCRLProvider references an implementation of [androidkey.CRLProvider]
-	// that is responsible for resolving revoked Android Key Attestation certificate
-	// numbers.
+	// AndroidKeyCRLChecker references an implementation of [androidkey.CRLChecker]
+	// that is responsible for checking revoked Android Key Attestation certificate
+	// serial numbers.
 	AndroidKeyCRLChecker androidkey.CRLChecker
 }
 
