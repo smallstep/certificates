@@ -12,6 +12,7 @@ import (
 
 	"github.com/smallstep/linkedca"
 
+	"github.com/smallstep/certificates/authority/provisioner/androidkey"
 	"github.com/smallstep/certificates/errs"
 	"github.com/smallstep/certificates/internal/cast"
 	"github.com/smallstep/certificates/internal/httptransport"
@@ -32,6 +33,7 @@ type Controller struct {
 	webhookClient         HTTPClient
 	webhooks              []*Webhook
 	wrapTransport         httptransport.Wrapper
+	androidKeyCRLChecker  androidkey.CRLChecker
 }
 
 // NewController initializes a new provisioner controller.
@@ -66,6 +68,7 @@ func NewController(p Interface, claims *Claims, config Config, options *Options)
 		webhooks:              options.GetWebhooks(),
 		httpClient:            config.HTTPClient,
 		wrapTransport:         wt,
+		androidKeyCRLChecker:  config.AndroidKeyCRLChecker,
 	}, nil
 }
 

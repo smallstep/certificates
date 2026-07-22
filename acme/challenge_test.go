@@ -25,6 +25,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"reflect"
+	"slices"
 	"strconv"
 	"strings"
 	"testing"
@@ -43,6 +44,7 @@ import (
 
 	"github.com/smallstep/certificates/authority/config"
 	"github.com/smallstep/certificates/authority/provisioner"
+	"github.com/smallstep/certificates/authority/provisioner/androidkey"
 	wireprovisioner "github.com/smallstep/certificates/authority/provisioner/wire"
 )
 
@@ -99,18 +101,25 @@ func mustAttestationProvisioner(t *testing.T, roots []byte) Provisioner {
 	return prov
 }
 
-func mustNonCRLAttestationProvisioner(t *testing.T, roots []byte, CRLs []string) Provisioner {
+type fakeAndroidKeyCRLChecker []string
+
+func (p fakeAndroidKeyCRLChecker) IsRevoked(_ context.Context, cert *x509.Certificate) (bool, error) {
+	return slices.Contains(p, cert.SerialNumber.String()), nil
+}
+
+func mustAndroidAttestationProvisioner(t *testing.T, roots []byte, androidKeyCRLChecker androidkey.CRLChecker) Provisioner {
 	t.Helper()
 
 	prov := &provisioner.ACME{
-		Type:             "ACME",
-		Name:             "acme",
-		Challenges:       []provisioner.ACMEChallenge{provisioner.DEVICE_ATTEST_01},
-		AttestationRoots: roots,
-		RootCRLs:         CRLs,
+		Type:               "ACME",
+		Name:               "acme",
+		Challenges:         []provisioner.ACMEChallenge{provisioner.DEVICE_ATTEST_01},
+		AttestationFormats: []provisioner.ACMEAttestationFormat{provisioner.ANDROID_KEY},
+		AttestationRoots:   roots,
 	}
 	if err := prov.Init(provisioner.Config{
-		Claims: config.GlobalProvisionerClaims,
+		Claims:               config.GlobalProvisionerClaims,
+		AndroidKeyCRLChecker: androidKeyCRLChecker,
 	}); err != nil {
 		t.Fatal(err)
 	}
@@ -4584,7 +4593,7 @@ func Test_deviceAttest01Validate(t *testing.T) {
 			payload, _, root := mustAttestAndroid(t, keyAuth)
 
 			caRoot := pem.EncodeToMemory(&pem.Block{Type: "CERTIFICATE", Bytes: root.Raw})
-			ctx := NewProvisionerContext(context.Background(), mustAttestationProvisioner(t, caRoot))
+			ctx := NewProvisionerContext(context.Background(), mustAndroidAttestationProvisioner(t, caRoot, nil))
 			return test{
 				args: args{
 					ctx: ctx,
@@ -4624,7 +4633,8 @@ func Test_deviceAttest01Validate(t *testing.T) {
 			payload, _, root := mustAttestAndroid(t, keyAuth)
 
 			caRoot := pem.EncodeToMemory(&pem.Block{Type: "CERTIFICATE", Bytes: root.Raw})
-			ctx := NewProvisionerContext(context.Background(), mustNonCRLAttestationProvisioner(t, caRoot, []string{root.SerialNumber.String()}))
+			androidKeyCRLChecker := fakeAndroidKeyCRLChecker([]string{root.SerialNumber.String()})
+			ctx := NewProvisionerContext(context.Background(), mustAndroidAttestationProvisioner(t, caRoot, androidKeyCRLChecker))
 			return test{
 				args: args{
 					ctx: ctx,

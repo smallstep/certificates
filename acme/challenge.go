@@ -1486,7 +1486,7 @@ func findAndroidAttestationCert(certs []*x509.Certificate) *x509.Certificate {
 //     See the section about the provisioning information extension for more details.
 //  6. Find the nearest certificate to the root that contains the key attestation certificate extension. If the provisioning information certificate extension was present, the key attestation certificate extension must be in the immediately subsequent certificate. Use the parser to extract the key attestation certificate extension data from that certificate.
 //  7. Check the extension data that you've retrieved in the previous steps for consistency and compare with the set of values that you expect the hardware-backed key to contain.
-func doAndroidKeyAttestionFormat(_ context.Context, prov Provisioner, ch *Challenge, jwk *jose.JSONWebKey, att *attestationObject) (*androidKeyAttestationData, error) {
+func doAndroidKeyAttestionFormat(ctx context.Context, prov Provisioner, ch *Challenge, jwk *jose.JSONWebKey, att *attestationObject) (*androidKeyAttestationData, error) {
 	acmeProv := prov.(*provisioner.ACME)
 
 	roots, ok := prov.GetAttestationRoots()
@@ -1536,10 +1536,16 @@ func doAndroidKeyAttestionFormat(_ context.Context, prov Provisioner, ch *Challe
 		if err != nil {
 			return nil, WrapDetailedError(ErrorBadAttestationStatementType, err, "failed parsing certificate at index %d", i+1)
 		}
-		// Verify CRL
-		if acmeProv.IsRootRevoked(cert.SerialNumber.String()) {
+
+		// Verify certificate serial number against CRL
+		revoked, err := acmeProv.IsAndroidCertificateRevoked(ctx, cert)
+		if err != nil {
+			return nil, WrapDetailedError(ErrorServerInternalType, err, "failed checking certificate revocation status")
+		}
+		if revoked {
 			return nil, NewDetailedError(ErrorBadAttestationStatementType, "x5c element contains a revoked certificate")
 		}
+
 		if i == len(x5c)-2 {
 			// Last cert = root
 			certs = append(certs, cert)

@@ -7,7 +7,6 @@ import (
 	"encoding/pem"
 	"fmt"
 	"io"
-	"log"
 	"net"
 	"net/http"
 	"slices"
@@ -125,13 +124,13 @@ type ACME struct {
 	// AttestationRoots contains a bundle of root certificates in PEM format
 	// that will be used to verify the attestation certificates. If provided,
 	// this bundle will be used even for well-known CAs like Apple and Yubico.
-	AttestationRoots    []byte   `json:"attestationRoots,omitempty"`
-	Claims              *Claims  `json:"claims,omitempty"`
-	Options             *Options `json:"options,omitempty"`
-	RootCRLs            []string `json:"rootCRLs,omitempty"`
-	androidCRLTimeout   time.Time
-	attestationRootPool *x509.CertPool
-	ctl                 *Controller
+	AttestationRoots      []byte   `json:"attestationRoots,omitempty"`
+	Claims                *Claims  `json:"claims,omitempty"`
+	Options               *Options `json:"options,omitempty"`
+	androidRevokedSerials []string
+	androidCRLFetchedAt   time.Time
+	attestationRootPool   *x509.CertPool
+	ctl                   *Controller
 }
 
 // GetID returns the provisioner unique identifier.
@@ -227,26 +226,22 @@ func (p *ACME) Init(config Config) (err error) {
 		return fmt.Errorf("failed initializing Wire options: %w", err)
 	}
 
-	if slices.Contains(p.AttestationFormats, "android-key") && len(p.RootCRLs) == 0 {
-		p.initializeAndroidCRL()
-	}
-
 	p.ctl, err = NewController(p, p.Claims, config, p.Options)
 	return
 }
 
-const ANDROID_ATTESTATION_STATUS_URL = "https://android.googleapis.com/attestation/status"
+const androidAttestationStatusURL = "https://android.googleapis.com/attestation/status" // TODO: make configurable?
 
-// fetch CRL https://android.googleapis.com/attestation/status and build a list of serial number
-func (p *ACME) initializeAndroidCRL() error {
-	log.Printf("Updating Android CRL list for %s ACME provisioner", p.Name)
+// loadAndroidCRL fetches the CRL at https://android.googleapis.com/attestation/status
+// and builds a list of serial numbers for each certificate that has been revoked.
+func (p *ACME) loadAndroidCRL(ctx context.Context) error {
 	var CRLResponse struct {
 		Entries map[string]struct {
 			Status string `json:"status"`
 			Reason string `json:"reason"`
 		} `json:"entries"`
 	}
-	res, err := http.Get(ANDROID_ATTESTATION_STATUS_URL)
+	res, err := p.ctl.GetHTTPClient().Get(androidAttestationStatusURL)
 	if err != nil {
 		return fmt.Errorf("client: error making Android CRL request: %s\n", err)
 	}
@@ -262,12 +257,14 @@ func (p *ACME) initializeAndroidCRL() error {
 	}
 
 	// Extract keys into a slice
-	keys := make([]string, 0, len(CRLResponse.Entries))
+	serials := make([]string, 0, len(CRLResponse.Entries))
 	for k := range CRLResponse.Entries {
-		keys = append(keys, k)
+		serials = append(serials, k)
 	}
-	p.RootCRLs = keys
-	p.androidCRLTimeout = time.Now().Add(24 * time.Hour)
+
+	p.androidRevokedSerials = serials
+	p.androidCRLFetchedAt = time.Now()
+
 	return nil
 }
 
@@ -444,11 +441,31 @@ func (p *ACME) GetAttestationRoots() (*x509.CertPool, bool) {
 	return p.attestationRootPool, p.attestationRootPool != nil
 }
 
-// IsRootRevoked return a true if the serialNumber is part of the list
-// It will also be in charge of updating the list periodically if no CRL list is provided at configuration.
-func (p *ACME) IsRootRevoked(serialNumber string) bool {
-	if slices.Contains(p.AttestationFormats, "android-key") && !p.androidCRLTimeout.IsZero() && time.Now().After(p.androidCRLTimeout) {
-		p.initializeAndroidCRL()
+// IsAndroidCertificateRevoked returns whether the serial number is
+// revoked or not.
+func (p *ACME) IsAndroidCertificateRevoked(ctx context.Context, cert *x509.Certificate) (bool, error) {
+	// the check only has to be performed when the "android-key" attestation
+	// format is enabled
+	if !slices.Contains(p.AttestationFormats, ANDROID_KEY) {
+		return false, nil
 	}
-	return len(p.RootCRLs) > 0 && slices.Contains(p.RootCRLs, serialNumber)
+
+	if p.ctl.androidKeyCRLChecker != nil {
+		revoked, err := p.ctl.androidKeyCRLChecker.IsRevoked(ctx, cert)
+		if err != nil {
+			return true, fmt.Errorf("failed checking certificate against Android CRL: %w", err)
+		}
+
+		return revoked, nil
+	}
+
+	// TODO(hs): refactor, so that the period between loads becomes configurable
+	if p.androidCRLFetchedAt.IsZero() || time.Now().After(p.androidCRLFetchedAt.Add(24*time.Hour)) {
+		// reinitialize the Android CRL
+		if err := p.loadAndroidCRL(ctx); err != nil {
+			return false, err
+		}
+	}
+
+	return slices.Contains(p.androidRevokedSerials, cert.SerialNumber.String()), nil
 }

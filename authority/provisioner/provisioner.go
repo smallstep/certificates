@@ -13,6 +13,7 @@ import (
 	kmsapi "go.step.sm/crypto/kms/apiv1"
 	"golang.org/x/crypto/ssh"
 
+	"github.com/smallstep/certificates/authority/provisioner/androidkey"
 	"github.com/smallstep/certificates/errs"
 )
 
@@ -281,6 +282,10 @@ type Config struct {
 	// WrapTransport references the function that should wrap any [http.Transport] initialized
 	// down the Config's chain.
 	WrapTransport TransportWrapper
+	// AndroidKeyCRLProvider references an implementation of [androidkey.CRLProvider]
+	// that is responsible for resolving revoked Android Key Attestation certificate
+	// numbers.
+	AndroidKeyCRLChecker androidkey.CRLChecker
 }
 
 type provisioner struct {
