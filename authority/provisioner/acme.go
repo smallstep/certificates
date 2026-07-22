@@ -60,8 +60,8 @@ func (c ACMEChallenge) Validate() error {
 type ACMEAttestationFormat string
 
 const (
-	// ANDROID_KEY is the format used to enable device-attest-01 on Android devices.
-	ANDROID_KEY ACMEAttestationFormat = "android-key"
+	// ANDROIDKEY is the format used to enable device-attest-01 on Android devices.
+	ANDROIDKEY ACMEAttestationFormat = "android-key"
 
 	// APPLE is the format used to enable device-attest-01 on Apple devices.
 	APPLE ACMEAttestationFormat = "apple"
@@ -84,7 +84,7 @@ func (f ACMEAttestationFormat) String() string {
 // Validate returns an error if the attestation format is not a valid one.
 func (f ACMEAttestationFormat) Validate() error {
 	switch ACMEAttestationFormat(f.String()) {
-	case APPLE, STEP, TPM, ANDROID_KEY:
+	case APPLE, STEP, TPM, ANDROIDKEY:
 		return nil
 	default:
 		return fmt.Errorf("acme attestation format %q is not supported", f)
@@ -271,8 +271,8 @@ func (c *androidCRLCache) snapshot(ctx context.Context, client HTTPClient) (*and
 			return crl, nil
 		}
 
-		// load the CRL. We choose to let all followers get a context.Cancelled when the
-		// leader's ctx is cancelled. Clients will retry after.
+		// load the CRL. We choose to let all followers get a context.Canceled when the
+		// leader's ctx is canceled. Clients will retry after.
 		return c.load(ctx, client)
 	})
 	if err != nil {
@@ -286,7 +286,7 @@ func (c *androidCRLCache) snapshot(ctx context.Context, client HTTPClient) (*and
 // builds the set of revoked serial numbers, and atomically publishes it as the
 // current snapshot.
 func (c *androidCRLCache) load(ctx context.Context, client HTTPClient) (*androidCRL, error) {
-	var CRLResponse struct {
+	var crlResponse struct {
 		Entries map[string]struct {
 			Status string `json:"status"`
 			Reason string `json:"reason"`
@@ -306,7 +306,7 @@ func (c *androidCRLCache) load(ctx context.Context, client HTTPClient) (*android
 		return nil, fmt.Errorf("unexpected Android CRL response %d", res.StatusCode)
 	}
 
-	if err := json.NewDecoder(res.Body).Decode(&CRLResponse); err != nil {
+	if err := json.NewDecoder(res.Body).Decode(&crlResponse); err != nil {
 		return nil, fmt.Errorf("error decoding Android CRL JSON: %w", err)
 	}
 
@@ -314,8 +314,8 @@ func (c *androidCRLCache) load(ctx context.Context, client HTTPClient) (*android
 	// based on the status of the certificate. The status can be "REVOKED" and
 	// "SUSPENDED"; both statuses result in a certificate being considered
 	// revoked.
-	serials := make(map[string]struct{}, len(CRLResponse.Entries))
-	for k := range CRLResponse.Entries {
+	serials := make(map[string]struct{}, len(crlResponse.Entries))
+	for k := range crlResponse.Entries {
 		serials[k] = struct{}{}
 	}
 
@@ -476,7 +476,7 @@ func (p *ACME) IsChallengeEnabled(_ context.Context, challenge ACMEChallenge) bo
 // AttestationFormat provisioner property should have at least one element.
 func (p *ACME) IsAttestationFormatEnabled(_ context.Context, format ACMEAttestationFormat) bool {
 	enabledFormats := []ACMEAttestationFormat{
-		APPLE, STEP, TPM, ANDROID_KEY,
+		APPLE, STEP, TPM, ANDROIDKEY,
 	}
 	if len(p.AttestationFormats) > 0 {
 		enabledFormats = p.AttestationFormats
@@ -503,7 +503,7 @@ func (p *ACME) GetAttestationRoots() (*x509.CertPool, bool) {
 func (p *ACME) IsAndroidCertificateRevoked(ctx context.Context, cert *x509.Certificate) (bool, error) {
 	// the check only has to be performed when the "android-key" attestation
 	// format is enabled
-	if !slices.Contains(p.AttestationFormats, ANDROID_KEY) {
+	if !slices.Contains(p.AttestationFormats, ANDROIDKEY) {
 		return false, nil
 	}
 

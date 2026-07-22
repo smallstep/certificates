@@ -114,7 +114,7 @@ func mustAndroidAttestationProvisioner(t *testing.T, roots []byte, androidKeyCRL
 		Type:               "ACME",
 		Name:               "acme",
 		Challenges:         []provisioner.ACMEChallenge{provisioner.DEVICE_ATTEST_01},
-		AttestationFormats: []provisioner.ACMEAttestationFormat{provisioner.ANDROID_KEY},
+		AttestationFormats: []provisioner.ACMEAttestationFormat{provisioner.ANDROIDKEY},
 		AttestationRoots:   roots,
 	}
 	if err := prov.Init(provisioner.Config{

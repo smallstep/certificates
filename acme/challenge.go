@@ -1527,8 +1527,8 @@ func doAndroidKeyAttestationFormat(ctx context.Context, prov Provisioner, ch *Ch
 	intermediates := x509.NewCertPool()
 	var leaf, root *x509.Certificate
 	for i, v := range x5c {
-		der, ok := v.([]byte)
-		if !ok {
+		der, dok := v.([]byte)
+		if !dok {
 			return nil, NewDetailedError(ErrorBadAttestationStatementType, "x5c element is malformed")
 		}
 		cert, err := x509.ParseCertificate(der)
