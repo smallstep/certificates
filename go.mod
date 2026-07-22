@@ -176,5 +176,5 @@ require (
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 )
 
-// patched to make tests pass; TODO: decide whether to fork it under smallstep
+// patched to make tests pass; TODO: fork under Smallstep and use that
 replace github.com/mbreban/attestation => github.com/hslatman/attestation v0.0.0-20260715144435-9a27f052f96a

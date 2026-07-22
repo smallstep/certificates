@@ -862,13 +862,11 @@ func deviceAttest01Validate(ctx context.Context, ch *Challenge, db DB, jwk *jose
 		}
 
 		// Enforce hardware security level (TrustedEnvironment or StrongBox; Software not allowed)
-		// 1. attestationSecurityLevel > 0
 		if data.Attestation.AttestationSecurityLevel < 1 {
 			return storeError(ctx, db, ch, true, NewDetailedError(ErrorBadAttestationStatementType, "insufficient security level: %d", data.Attestation.AttestationSecurityLevel))
 		}
 
 		// Enforce hardware backed device serial
-		// 2. hardwareEnforced
 		if ch.Value != string(data.Attestation.TeeEnforced.AttestationIdSerial) {
 			subproblem := NewSubproblemWithIdentifier(
 				ErrorRejectedIdentifierType,
@@ -1465,6 +1463,10 @@ type androidKeyAttestationData struct {
 // findAndroidAttestationCert traverses the slice of [*x509.Certificate] from
 // end to start (root -> intermediate -> leaf) to locate the certificate closest
 // to the root carrying an Android Key Attestation extension.
+//
+// TODO(hs): implement the optional step of locating the provisioning information
+// extension? That should immediately precede the cert with the key attestation
+// extension.
 func findAndroidAttestationCert(certs []*x509.Certificate) *x509.Certificate {
 	for i := len(certs) - 1; i >= 0; i-- {
 		cert := certs[i]
@@ -1482,14 +1484,15 @@ func findAndroidAttestationCert(certs []*x509.Certificate) *x509.Certificate {
 // the "android-key" attestation format. Its verification logic is based on
 // the documentation at https://developer.android.com/privacy-and-security/security-key-attestation
 //
-// This function performs the below steps
-//  3. Verify that the root public certificate is trustworthy and that each certificate signs the next certificate in the chain.
-//  4. Check each certificate's revocation status to ensure that none of the certificates have been revoked.
-//  5. Optionally, inspect the provisioning information certificate extension that is only present in newer certificate chains.
-//     Obtain a reference to the CBOR parser library that is most appropriate for your toolset. Find the nearest certificate to the root that contains the provisioning information certificate extension. Use the parser to extract the provisioning information certificate extension data from that certificate.
-//     See the section about the provisioning information extension for more details.
-//  6. Find the nearest certificate to the root that contains the key attestation certificate extension. If the provisioning information certificate extension was present, the key attestation certificate extension must be in the immediately subsequent certificate. Use the parser to extract the key attestation certificate extension data from that certificate.
-//  7. Check the extension data that you've retrieved in the previous steps for consistency and compare with the set of values that you expect the hardware-backed key to contain.
+// This function performs the below steps:
+//   - Verifies that the root public certificate is trustworthy and that each certificate signs
+//     the next certificate in the chain.
+//   - Checks each certificate's revocation status to ensure that none of the certificates have
+//     been revoked.
+//   - Find the nearest certificate to the root that contains the key attestation certificate
+//     extension.
+//   - Check the extension data that you've retrieved in the previous steps for consistency and
+//     compare with the set of values that you expect the hardware-backed key to contain.
 func doAndroidKeyAttestationFormat(ctx context.Context, prov Provisioner, ch *Challenge, jwk *jose.JSONWebKey, att *attestationObject) (*androidKeyAttestationData, error) {
 	acmeProv, ok := prov.(*provisioner.ACME)
 	if !ok {
@@ -1520,7 +1523,7 @@ func doAndroidKeyAttestationFormat(ctx context.Context, prov Provisioner, ch *Ch
 		return nil, NewDetailedError(ErrorRejectedIdentifierType, "x5c is empty")
 	}
 
-	// Parse intermediates and root
+	// Parse leaf, intermediates and root
 	intermediates := x509.NewCertPool()
 	var leaf, root *x509.Certificate
 	for i, v := range x5c {
@@ -1564,7 +1567,7 @@ func doAndroidKeyAttestationFormat(ctx context.Context, prov Provisioner, ch *Ch
 
 	// Verify the root is one of the trusted roots
 	_, err := root.Verify(x509.VerifyOptions{
-		Roots:       roots, // TODO: ensure Verify does the right thing for this case
+		Roots:       roots,
 		CurrentTime: time.Now().Truncate(time.Second),
 	})
 	if err != nil {
@@ -1610,7 +1613,7 @@ func doAndroidKeyAttestationFormat(ctx context.Context, prov Provisioner, ch *Ch
 	switch pub := attCert.PublicKey.(type) {
 	case *ecdsa.PublicKey:
 		if pub.Curve != elliptic.P256() {
-			return nil, WrapDetailedError(ErrorBadAttestationStatementType, err, "unsupported elliptic curve %s", pub.Curve)
+			return nil, NewDetailedError(ErrorBadAttestationStatementType, "unsupported elliptic curve %s", pub.Curve)
 		}
 		sum := sha256.Sum256([]byte(keyAuth))
 		if !ecdsa.VerifyASN1(pub, sum[:], sig) {
@@ -1790,7 +1793,7 @@ func doStepAttestationFormat(_ context.Context, prov Provisioner, ch *Challenge,
 	switch pub := leaf.PublicKey.(type) {
 	case *ecdsa.PublicKey:
 		if pub.Curve != elliptic.P256() {
-			return nil, WrapDetailedError(ErrorBadAttestationStatementType, err, "unsupported elliptic curve %s", pub.Curve)
+			return nil, NewDetailedError(ErrorBadAttestationStatementType, "unsupported elliptic curve %s", pub.Curve)
 		}
 		sum := sha256.Sum256([]byte(keyAuth))
 		if !ecdsa.VerifyASN1(pub, sum[:], sig) {

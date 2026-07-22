@@ -6,16 +6,19 @@ import (
 	"encoding/json"
 	"encoding/pem"
 	"fmt"
-	"io"
 	"net"
 	"net/http"
 	"slices"
 	"strings"
+	"sync/atomic"
 	"time"
 
 	"github.com/pkg/errors"
-	"github.com/smallstep/certificates/acme/wire"
+	"golang.org/x/sync/singleflight"
+
 	"github.com/smallstep/linkedca"
+
+	"github.com/smallstep/certificates/acme/wire"
 )
 
 // ACMEChallenge represents the supported acme challenges.
@@ -124,13 +127,26 @@ type ACME struct {
 	// AttestationRoots contains a bundle of root certificates in PEM format
 	// that will be used to verify the attestation certificates. If provided,
 	// this bundle will be used even for well-known CAs like Apple and Yubico.
-	AttestationRoots      []byte   `json:"attestationRoots,omitempty"`
-	Claims                *Claims  `json:"claims,omitempty"`
-	Options               *Options `json:"options,omitempty"`
-	androidRevokedSerials []string
-	androidCRLFetchedAt   time.Time
-	attestationRootPool   *x509.CertPool
-	ctl                   *Controller
+	AttestationRoots    []byte   `json:"attestationRoots,omitempty"`
+	Claims              *Claims  `json:"claims,omitempty"`
+	Options             *Options `json:"options,omitempty"`
+	androidCRL          *androidCRLCache
+	attestationRootPool *x509.CertPool
+	ctl                 *Controller
+}
+
+// androidCRLCache caches the Android attestation revocation list.
+type androidCRLCache struct {
+	current atomic.Pointer[androidCRL]
+	group   singleflight.Group
+}
+
+// androidCRL is an immutable snapshot of the Android attestation revocation
+// list. A new snapshot is swapped in atomically on each refresh, so readers
+// never observe a partially-updated set.
+type androidCRL struct {
+	serials   map[string]struct{} // set of revoked serial numbers
+	fetchedAt time.Time
 }
 
 // GetID returns the provisioner unique identifier.
@@ -226,15 +242,50 @@ func (p *ACME) Init(config Config) (err error) {
 		return fmt.Errorf("failed initializing Wire options: %w", err)
 	}
 
+	p.androidCRL = &androidCRLCache{}
+
 	p.ctl, err = NewController(p, p.Claims, config, p.Options)
 	return
 }
 
-const androidAttestationStatusURL = "https://android.googleapis.com/attestation/status" // TODO: make configurable?
+const (
+	androidAttestationStatusURL = "https://android.googleapis.com/attestation/status" // TODO(hs): make configurable through options?
+	androidCRLTTL               = 24 * time.Hour                                      // TODO(hs): make configurable through options and/or Cache-Control header?
+)
 
-// loadAndroidCRL fetches the CRL at https://android.googleapis.com/attestation/status
-// and builds a list of serial numbers for each certificate that has been revoked.
-func (p *ACME) loadAndroidCRL(ctx context.Context) error {
+// snapshot returns a fresh-enough snapshot of the Android revocation list,
+// fetching a new one if the cached copy is missing or older than androidCRLTTL.
+// Concurrent refreshes are coalesced into a single upstream request, so a burst
+// of validations results in at most one call to the Android status endpoint.
+func (c *androidCRLCache) snapshot(ctx context.Context, client HTTPClient) (*androidCRL, error) {
+	if crl := c.current.Load(); crl != nil && time.Since(crl.fetchedAt) < androidCRLTTL {
+		return crl, nil
+	}
+
+	// The cache is missing or stale. Coalesce concurrent refreshes so that only
+	// one upstream request is performed; all callers share its result.
+	v, err, _ := c.group.Do("android-crl", func() (any, error) {
+		// Re-check under the singleflight leader: another goroutine may have
+		// refreshed the snapshot while we were queued behind it.
+		if crl := c.current.Load(); crl != nil && time.Since(crl.fetchedAt) < androidCRLTTL {
+			return crl, nil
+		}
+
+		// load the CRL. We choose to let all followers get a context.Cancelled when the
+		// leader's ctx is cancelled. Clients will retry after.
+		return c.load(ctx, client)
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	return v.(*androidCRL), nil
+}
+
+// load fetches the CRL at https://android.googleapis.com/attestation/status,
+// builds the set of revoked serial numbers, and atomically publishes it as the
+// current snapshot.
+func (c *androidCRLCache) load(ctx context.Context, client HTTPClient) (*androidCRL, error) {
 	var CRLResponse struct {
 		Entries map[string]struct {
 			Status string `json:"status"`
@@ -243,36 +294,35 @@ func (p *ACME) loadAndroidCRL(ctx context.Context) error {
 	}
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, androidAttestationStatusURL, http.NoBody)
 	if err != nil {
-		return fmt.Errorf("failed creating Android CRL request: %w", err)
+		return nil, fmt.Errorf("failed creating Android CRL request: %w", err)
 	}
-	res, err := p.ctl.GetHTTPClient().Do(req)
+	res, err := client.Do(req)
 	if err != nil {
-		return fmt.Errorf("failed performing Android CRL request: %w", err)
+		return nil, fmt.Errorf("failed performing Android CRL request: %w", err)
 	}
 	defer res.Body.Close()
 
 	if res.StatusCode != http.StatusOK {
-		bodyBytes, _ := io.ReadAll(res.Body)
-		return fmt.Errorf("unexpected Android CRL response %d: %s", res.StatusCode, string(bodyBytes))
+		return nil, fmt.Errorf("unexpected Android CRL response %d", res.StatusCode)
 	}
 
 	if err := json.NewDecoder(res.Body).Decode(&CRLResponse); err != nil {
-		return fmt.Errorf("error decoding Android CRL JSON: %w", err)
+		return nil, fmt.Errorf("error decoding Android CRL JSON: %w", err)
 	}
 
-	// Extract serials into a slice. Currently no distinction is being made
-	// based on the status of the certificate. The status can be "REVOKED"
-	// and "SUSPENDED". Both statuses will result in a certificate to be
-	// considered revoked.
-	serials := make([]string, 0, len(CRLResponse.Entries))
+	// Build the set of revoked serials. Currently no distinction is being made
+	// based on the status of the certificate. The status can be "REVOKED" and
+	// "SUSPENDED"; both statuses result in a certificate being considered
+	// revoked.
+	serials := make(map[string]struct{}, len(CRLResponse.Entries))
 	for k := range CRLResponse.Entries {
-		serials = append(serials, k)
+		serials[k] = struct{}{}
 	}
 
-	p.androidRevokedSerials = serials
-	p.androidCRLFetchedAt = time.Now()
+	crl := &androidCRL{serials: serials, fetchedAt: time.Now()}
+	c.current.Store(crl)
 
-	return nil
+	return crl, nil
 }
 
 // initializeWireOptions initializes the options for the ACME Wire
@@ -466,13 +516,14 @@ func (p *ACME) IsAndroidCertificateRevoked(ctx context.Context, cert *x509.Certi
 		return revoked, nil
 	}
 
-	// TODO(hs): refactor, so that the period between loads becomes configurable
-	if p.androidCRLFetchedAt.IsZero() || time.Now().After(p.androidCRLFetchedAt.Add(24*time.Hour)) {
-		// reinitialize the Android CRL
-		if err := p.loadAndroidCRL(ctx); err != nil {
-			return true, err
-		}
+	// Fall back to the built-in CRL. A fetch error fails closed: the
+	// certificate is reported as revoked so the attestation is rejected.
+	crl, err := p.androidCRL.snapshot(ctx, p.ctl.GetHTTPClient())
+	if err != nil {
+		return true, err
 	}
 
-	return slices.Contains(p.androidRevokedSerials, cert.SerialNumber.String()), nil
+	_, revoked := crl.serials[cert.SerialNumber.String()]
+
+	return revoked, nil
 }

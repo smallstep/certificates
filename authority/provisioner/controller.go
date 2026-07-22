@@ -78,7 +78,10 @@ func (c *Controller) GetHTTPClient() HTTPClient {
 	if c.httpClient != nil {
 		return c.httpClient
 	}
-	return &http.Client{}
+
+	return &http.Client{
+		Timeout: 10 * time.Second,
+	}
 }
 
 // GetIdentity returns the identity for a given email.
