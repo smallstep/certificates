@@ -32,7 +32,7 @@ import (
 	"time"
 
 	"github.com/fxamacker/cbor/v2"
-	"github.com/mbreban/attestation"
+	attestation "github.com/smallstep/android-attestation"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 

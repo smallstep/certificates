@@ -22,13 +22,13 @@ require (
 	github.com/hashicorp/vault/api/auth/approle v0.12.0
 	github.com/hashicorp/vault/api/auth/aws v0.12.0
 	github.com/hashicorp/vault/api/auth/kubernetes v0.12.0
-	github.com/mbreban/attestation v0.1.0
 	github.com/newrelic/go-agent/v3 v3.44.1
 	github.com/pkg/errors v0.9.1
 	github.com/prometheus/client_golang v1.24.0
 	github.com/rs/xid v1.6.0
 	github.com/sirupsen/logrus v1.9.4
 	github.com/slackhq/nebula v1.10.3
+	github.com/smallstep/android-attestation v0.0.0-20260722204520-a51b1564ebda
 	github.com/smallstep/assert v0.0.0-20200723003110-82e2b9b3b262
 	github.com/smallstep/cli-utils v0.12.2
 	github.com/smallstep/go-attestation v0.4.4-0.20260603212853-e1a87a0b07d9
@@ -175,6 +175,3 @@ require (
 	google.golang.org/grpc/cmd/protoc-gen-go-grpc v1.6.2 // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 )
-
-// patched to make tests pass; TODO: fork under Smallstep and use that
-replace github.com/mbreban/attestation => github.com/hslatman/attestation v0.0.0-20260715144435-9a27f052f96a

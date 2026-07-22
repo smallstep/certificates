@@ -31,13 +31,13 @@ import (
 	"github.com/fxamacker/cbor/v2"
 	"github.com/google/go-tpm/legacy/tpm2"
 
+	attestation "github.com/smallstep/android-attestation"
 	"github.com/smallstep/go-attestation/attest"
 	"go.step.sm/crypto/jose"
 	"go.step.sm/crypto/keyutil"
 	"go.step.sm/crypto/pemutil"
 	"go.step.sm/crypto/x509util"
 
-	"github.com/mbreban/attestation"
 	"github.com/smallstep/certificates/acme/wire"
 	"github.com/smallstep/certificates/authority/provisioner"
 	wireprovisioner "github.com/smallstep/certificates/authority/provisioner/wire"
