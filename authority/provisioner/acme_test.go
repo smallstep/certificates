@@ -6,15 +6,22 @@ import (
 	"crypto/x509"
 	"errors"
 	"fmt"
+	"io"
+	"math/big"
 	"net/http"
 	"os"
+	"slices"
+	"strings"
+	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 
-	"github.com/smallstep/certificates/api/render"
-	"github.com/smallstep/certificates/authority/provisioner/wire"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+
+	"github.com/smallstep/certificates/api/render"
+	"github.com/smallstep/certificates/authority/provisioner/wire"
 )
 
 func TestACMEChallenge_Validate(t *testing.T) {
@@ -51,6 +58,7 @@ func TestACMEAttestationFormat_Validate(t *testing.T) {
 		f       ACMEAttestationFormat
 		wantErr bool
 	}{
+		{"android-key", ANDROIDKEY, false},
 		{"apple", APPLE, false},
 		{"step", STEP, false},
 		{"tpm", TPM, false},
@@ -201,7 +209,7 @@ MCowBQYDK2VwAyEA5c+4NKZSNQcR1T8qN6SjwgdPZQ0Ge12Ylx/YeGAJ35k=
 					Name:               "foo",
 					Type:               "ACME",
 					Challenges:         []ACMEChallenge{DNS_01, DEVICE_ATTEST_01},
-					AttestationFormats: []ACMEAttestationFormat{APPLE, STEP},
+					AttestationFormats: []ACMEAttestationFormat{APPLE, STEP, ANDROIDKEY},
 					AttestationRoots:   bytes.Join([][]byte{appleCA, yubicoCA}, []byte("\n")),
 				},
 			}
@@ -429,14 +437,16 @@ func TestACME_IsAttestationFormatEnabled(t *testing.T) {
 		args   args
 		want   bool
 	}{
-		{"ok", fields{[]ACMEAttestationFormat{APPLE, STEP, TPM}}, args{ctx, TPM}, true},
+		{"ok", fields{[]ACMEAttestationFormat{APPLE, STEP, TPM, ANDROIDKEY}}, args{ctx, TPM}, true},
 		{"ok empty apple", fields{nil}, args{ctx, APPLE}, true},
 		{"ok empty step", fields{nil}, args{ctx, STEP}, true},
 		{"ok empty tpm", fields{[]ACMEAttestationFormat{}}, args{ctx, "tpm"}, true},
+		{"ok empty android", fields{[]ACMEAttestationFormat{}}, args{ctx, "android-key"}, true},
 		{"ok uppercase", fields{[]ACMEAttestationFormat{APPLE, STEP, TPM}}, args{ctx, "STEP"}, true},
 		{"fail apple", fields{[]ACMEAttestationFormat{STEP, TPM}}, args{ctx, APPLE}, false},
 		{"fail step", fields{[]ACMEAttestationFormat{APPLE, TPM}}, args{ctx, STEP}, false},
 		{"fail step", fields{[]ACMEAttestationFormat{APPLE, STEP}}, args{ctx, TPM}, false},
+		{"fail android", fields{[]ACMEAttestationFormat{APPLE, STEP}}, args{ctx, ANDROIDKEY}, false},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -447,4 +457,178 @@ func TestACME_IsAttestationFormatEnabled(t *testing.T) {
 			assert.Equal(t, tt.want, got)
 		})
 	}
+}
+
+// countingHTTPClient is an HTTPClient that records how many upstream requests
+// it serves and returns a fixed Android CRL response after an optional delay.
+type countingHTTPClient struct {
+	calls atomic.Int64
+	body  string
+	delay time.Duration
+}
+
+func (c *countingHTTPClient) Get(string) (*http.Response, error) {
+	return c.Do(&http.Request{})
+}
+
+func (c *countingHTTPClient) Do(*http.Request) (*http.Response, error) {
+	c.calls.Add(1)
+	if c.delay > 0 {
+		time.Sleep(c.delay)
+	}
+	return &http.Response{
+		StatusCode: http.StatusOK,
+		Body:       io.NopCloser(strings.NewReader(c.body)),
+		Header:     make(http.Header),
+	}, nil
+}
+
+func certWithSerial(serial int64) *x509.Certificate {
+	return &x509.Certificate{SerialNumber: big.NewInt(serial)}
+}
+
+func TestACME_IsAndroidCertificateRevoked(t *testing.T) {
+	// The CRL reports serial number 42 as revoked. The delay ensures a burst
+	// of concurrent lookups overlaps on the initial fetch so that the
+	// singleflight coalescing is actually exercised.
+	client := &countingHTTPClient{
+		body:  `{"entries":{"42":{"status":"REVOKED"}}}`,
+		delay: 50 * time.Millisecond,
+	}
+
+	p := &ACME{
+		Type:               "ACME",
+		Name:               "acme",
+		AttestationFormats: []ACMEAttestationFormat{ANDROIDKEY},
+	}
+	require.NoError(t, p.Init(Config{
+		Claims:     globalProvisionerClaims,
+		Audiences:  testAudiences,
+		HTTPClient: client,
+	}))
+
+	ctx := t.Context()
+
+	// Fire a burst of concurrent lookups against the cold cache. This must not
+	// race (run with -race) and, thanks to singleflight, must result in a
+	// single upstream request.
+	const goroutines = 50
+	var wg sync.WaitGroup
+	wg.Add(goroutines)
+	for range goroutines {
+		go func() {
+			defer wg.Done()
+			revoked, err := p.IsAndroidCertificateRevoked(ctx, certWithSerial(42))
+			assert.NoError(t, err)
+			assert.True(t, revoked)
+		}()
+	}
+	wg.Wait()
+
+	assert.Equal(t, int64(1), client.calls.Load(), "concurrent refreshes should coalesce into a single upstream request")
+
+	// A non-revoked serial is served from the same cached snapshot without a
+	// new upstream request.
+	revoked, err := p.IsAndroidCertificateRevoked(ctx, certWithSerial(7))
+	assert.NoError(t, err)
+	assert.False(t, revoked)
+	assert.Equal(t, int64(1), client.calls.Load(), "cached snapshot should not trigger another request")
+}
+
+func TestACME_IsAndroidCertificateRevoked_controller(t *testing.T) {
+	p := &ACME{
+		Type:               "ACME",
+		Name:               "acme",
+		AttestationFormats: []ACMEAttestationFormat{ANDROIDKEY},
+	}
+	require.NoError(t, p.Init(Config{
+		Claims:               globalProvisionerClaims,
+		Audiences:            testAudiences,
+		AndroidKeyCRLChecker: fakeAndroidKeyCRLChecker([]string{"42"}),
+	}))
+
+	revoked, err := p.IsAndroidCertificateRevoked(t.Context(), certWithSerial(42))
+	assert.NoError(t, err)
+	assert.True(t, revoked)
+
+	revoked, err = p.IsAndroidCertificateRevoked(t.Context(), certWithSerial(7))
+	assert.NoError(t, err)
+	assert.False(t, revoked)
+}
+
+type fakeAndroidKeyCRLChecker []string
+
+func (p fakeAndroidKeyCRLChecker) IsRevoked(_ context.Context, cert *x509.Certificate) (bool, error) {
+	return slices.Contains(p, cert.SerialNumber.String()), nil
+}
+
+func TestACME_IsAndroidCertificateRevoked_controllerError(t *testing.T) {
+	p := &ACME{
+		Type:               "ACME",
+		Name:               "acme",
+		AttestationFormats: []ACMEAttestationFormat{ANDROIDKEY},
+	}
+	require.NoError(t, p.Init(Config{
+		Claims:               globalProvisionerClaims,
+		Audiences:            testAudiences,
+		AndroidKeyCRLChecker: fakeAndroidKeyCRLCheckerWithError{},
+	}))
+
+	revoked, err := p.IsAndroidCertificateRevoked(t.Context(), certWithSerial(42))
+	assert.Error(t, err)
+	assert.True(t, revoked)
+}
+
+type fakeAndroidKeyCRLCheckerWithError []string
+
+func (p fakeAndroidKeyCRLCheckerWithError) IsRevoked(_ context.Context, cert *x509.Certificate) (bool, error) {
+	return true, errors.New("fail!")
+}
+
+func TestACME_IsAndroidCertificateRevoked_disabled(t *testing.T) {
+	client := &countingHTTPClient{body: `{"entries":{}}`}
+	p := &ACME{
+		Type:               "ACME",
+		Name:               "acme",
+		AttestationFormats: []ACMEAttestationFormat{APPLE},
+	}
+	require.NoError(t, p.Init(Config{
+		Claims:     globalProvisionerClaims,
+		Audiences:  testAudiences,
+		HTTPClient: client,
+	}))
+
+	// android-key is not enabled, so no CRL lookup should happen at all.
+	revoked, err := p.IsAndroidCertificateRevoked(t.Context(), certWithSerial(42))
+	assert.NoError(t, err)
+	assert.False(t, revoked)
+	assert.Equal(t, int64(0), client.calls.Load())
+}
+
+func TestACME_IsAndroidCertificateRevoked_failsClosed(t *testing.T) {
+	// An upstream error must fail closed: the certificate is reported revoked
+	// and the error is surfaced.
+	p := &ACME{
+		Type:               "ACME",
+		Name:               "acme",
+		AttestationFormats: []ACMEAttestationFormat{ANDROIDKEY},
+	}
+	require.NoError(t, p.Init(Config{
+		Claims:     globalProvisionerClaims,
+		Audiences:  testAudiences,
+		HTTPClient: &erroringHTTPClient{},
+	}))
+
+	revoked, err := p.IsAndroidCertificateRevoked(t.Context(), certWithSerial(42))
+	assert.Error(t, err)
+	assert.True(t, revoked)
+}
+
+// erroringHTTPClient is an HTTPClient whose requests always fail.
+type erroringHTTPClient struct{}
+
+func (erroringHTTPClient) Get(string) (*http.Response, error) { return nil, errors.New("fail!") }
+
+func (erroringHTTPClient) Do(*http.Request) (*http.Response, error) {
+	return nil, errors.New("fail!")
 }
