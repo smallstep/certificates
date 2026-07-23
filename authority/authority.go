@@ -30,6 +30,7 @@ import (
 	"github.com/smallstep/certificates/authority/internal/constraints"
 	"github.com/smallstep/certificates/authority/policy"
 	"github.com/smallstep/certificates/authority/provisioner"
+	"github.com/smallstep/certificates/authority/provisioner/androidkey"
 	"github.com/smallstep/certificates/cas"
 	casapi "github.com/smallstep/certificates/cas/apiv1"
 	"github.com/smallstep/certificates/db"
@@ -41,17 +42,18 @@ import (
 
 // Authority implements the Certificate Authority internal interface.
 type Authority struct {
-	config        *config.Config
-	keyManager    kms.KeyManager
-	provisioners  *provisioner.Collection
-	admins        *administrator.Collection
-	db            db.AuthDB
-	adminDB       admin.DB
-	templates     *templates.Templates
-	linkedCAToken string
-	wrapTransport httptransport.Wrapper
-	webhookClient provisioner.HTTPClient
-	httpClient    provisioner.HTTPClient
+	config               *config.Config
+	keyManager           kms.KeyManager
+	provisioners         *provisioner.Collection
+	admins               *administrator.Collection
+	db                   db.AuthDB
+	adminDB              admin.DB
+	templates            *templates.Templates
+	linkedCAToken        string
+	wrapTransport        httptransport.Wrapper
+	webhookClient        provisioner.HTTPClient
+	httpClient           provisioner.HTTPClient
+	androidKeyCRLChecker androidkey.CRLChecker
 
 	// X509 CA
 	password              []byte

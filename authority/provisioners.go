@@ -205,6 +205,7 @@ func (a *Authority) generateProvisionerConfig(ctx context.Context) (provisioner.
 		HTTPClient:            a.httpClient,
 		WrapTransport:         a.wrapTransport,
 		SCEPKeyManager:        a.scepKeyManager,
+		AndroidKeyCRLChecker:  a.androidKeyCRLChecker,
 	}, nil
 }
 
