@@ -488,11 +488,11 @@ func certWithSerial(serial int64) *x509.Certificate {
 }
 
 func TestACME_IsAndroidCertificateRevoked(t *testing.T) {
-	// The CRL reports serial number 42 as revoked. The delay ensures a burst
-	// of concurrent lookups overlaps on the initial fetch so that the
-	// singleflight coalescing is actually exercised.
+	// The CRL reports serial number 42 (hex 2a) as revoked. The delay
+	// ensures a burst of concurrent lookups overlaps on the initial fetch
+	// so that the singleflight coalescing is actually exercised.
 	client := &countingHTTPClient{
-		body:  `{"entries":{"42":{"status":"REVOKED"}}}`,
+		body:  `{"entries":{"2a":{"status":"REVOKED"}}}`,
 		delay: 50 * time.Millisecond,
 	}
 
