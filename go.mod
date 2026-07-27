@@ -34,7 +34,7 @@ require (
 	github.com/smallstep/go-attestation v0.4.4-0.20260603212853-e1a87a0b07d9
 	github.com/smallstep/linkedca v0.26.0
 	github.com/smallstep/nosql v0.8.0
-	github.com/smallstep/pkcs7 v0.2.1
+	github.com/smallstep/pkcs7 v0.2.2
 	github.com/smallstep/scep v0.0.0-20250318231241-a25cabb69492
 	github.com/stretchr/testify v1.11.1
 	github.com/urfave/cli v1.22.17
