@@ -149,6 +149,15 @@ type androidCRL struct {
 	fetchedAt time.Time
 }
 
+// contains returns whether or not [*x509.Certificate]'s
+// serial number is in the map of revoked certificate serial
+// numbers. Google encodes these as lowercase hex.
+func (a *androidCRL) contains(cert *x509.Certificate) bool {
+	_, revoked := a.serials[cert.SerialNumber.Text(16)]
+
+	return revoked
+}
+
 // GetID returns the provisioner unique identifier.
 func (p ACME) GetID() string {
 	if p.ID != "" {
@@ -529,7 +538,5 @@ func (p *ACME) IsAndroidCertificateRevoked(ctx context.Context, cert *x509.Certi
 		return true, err
 	}
 
-	_, revoked := crl.serials[cert.SerialNumber.String()]
-
-	return revoked, nil
+	return crl.contains(cert), nil
 }
