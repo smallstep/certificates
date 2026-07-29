@@ -287,7 +287,7 @@ func (a *Authority) UpdateProvisioner(ctx context.Context, nu *linkedca.Provisio
 	}
 
 	if err := certProv.Init(provisionerConfig); err != nil {
-		return admin.WrapErrorISE(err, "error initializing provisioner %s", nu.Name)
+		return admin.WrapError(admin.ErrorBadRequestType, err, "error validating configuration for provisioner %q", nu.Name)
 	}
 
 	if err := a.provisioners.Update(certProv); err != nil {

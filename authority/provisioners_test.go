@@ -390,3 +390,23 @@ func Test_isRAProvisioner(t *testing.T) {
 		})
 	}
 }
+
+func TestAuthority_UpdateProvisioner_invalidConfiguration(t *testing.T) {
+	a := testAuthority(t)
+	// ClientId is empty, so provisioner.OIDC.Init fails before any I/O or
+	// DB access; the error must surface as a 400, not a 500.
+	nu := &linkedca.Provisioner{
+		Name: "bad-oidc",
+		Type: linkedca.Provisioner_OIDC,
+		Details: &linkedca.ProvisionerDetails{Data: &linkedca.ProvisionerDetails_OIDC{
+			OIDC: &linkedca.OIDCProvisioner{ConfigurationEndpoint: "https://example.com"},
+		}},
+	}
+	err := a.UpdateProvisioner(context.Background(), nu)
+	var adminErr *admin.Error
+	if !errors.As(err, &adminErr) {
+		t.Fatalf("expected *admin.Error, got %T: %v", err, err)
+	}
+	assert.Equals(t, admin.ErrorBadRequestType.String(), adminErr.Type)
+	assert.Equals(t, 400, adminErr.Status)
+}
