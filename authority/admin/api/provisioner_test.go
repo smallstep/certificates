@@ -349,11 +349,41 @@ func TestHandler_CreateProvisioner(t *testing.T) {
 		// "fail/authority.ValidateClaims": func(t *testing.T) test {
 		// 	return test{}
 		// },
+		"fail/validateProvisioner": func(t *testing.T) test {
+			prov := &linkedca.Provisioner{
+				Id:   "provID",
+				Type: linkedca.Provisioner_OIDC,
+				Name: "provName",
+				Details: &linkedca.ProvisionerDetails{Data: &linkedca.ProvisionerDetails_JWK{
+					JWK: &linkedca.JWKProvisioner{PublicKey: testJWKPublicKey(t)},
+				}},
+			}
+			body, err := protojson.Marshal(prov)
+			assert.FatalError(t, err)
+			return test{
+				ctx:        context.Background(),
+				body:       body,
+				auth:       &mockAdminAuthority{},
+				statusCode: 400,
+				err: &admin.Error{
+					Type:    "badRequest",
+					Status:  400,
+					Detail:  "bad request",
+					Message: "provisioner details (JWK) do not match provisioner type (OIDC)",
+				},
+			}
+		},
 		"fail/validateTemplates": func(t *testing.T) test {
 			prov := &linkedca.Provisioner{
 				Id:   "provID",
 				Type: linkedca.Provisioner_OIDC,
 				Name: "provName",
+				Details: &linkedca.ProvisionerDetails{Data: &linkedca.ProvisionerDetails_OIDC{
+					OIDC: &linkedca.OIDCProvisioner{
+						ClientId:              "client-id",
+						ConfigurationEndpoint: "https://example.com/.well-known/openid-configuration",
+					},
+				}},
 				X509Template: &linkedca.Template{
 					Template: []byte(`{ {{missingFunction "foo"}} }`),
 				},
@@ -377,6 +407,12 @@ func TestHandler_CreateProvisioner(t *testing.T) {
 				Id:   "provID",
 				Type: linkedca.Provisioner_OIDC,
 				Name: "provName",
+				Details: &linkedca.ProvisionerDetails{Data: &linkedca.ProvisionerDetails_OIDC{
+					OIDC: &linkedca.OIDCProvisioner{
+						ClientId:              "client-id",
+						ConfigurationEndpoint: "https://example.com/.well-known/openid-configuration",
+					},
+				}},
 			}
 			body, err := protojson.Marshal(prov)
 			assert.FatalError(t, err)
@@ -404,6 +440,12 @@ func TestHandler_CreateProvisioner(t *testing.T) {
 				Id:   "provID",
 				Type: linkedca.Provisioner_OIDC,
 				Name: "provName",
+				Details: &linkedca.ProvisionerDetails{Data: &linkedca.ProvisionerDetails_OIDC{
+					OIDC: &linkedca.OIDCProvisioner{
+						ClientId:              "client-id",
+						ConfigurationEndpoint: "https://example.com/.well-known/openid-configuration",
+					},
+				}},
 			}
 			body, err := protojson.Marshal(prov)
 			assert.FatalError(t, err)
@@ -463,7 +505,12 @@ func TestHandler_CreateProvisioner(t *testing.T) {
 
 			assert.Equals(t, []string{"application/json"}, res.Header["Content-Type"])
 
-			opts := []cmp.Option{cmpopts.IgnoreUnexported(linkedca.Provisioner{}, timestamppb.Timestamp{})}
+			opts := []cmp.Option{
+				cmpopts.IgnoreUnexported(
+					linkedca.Provisioner{}, linkedca.ProvisionerDetails{}, linkedca.ProvisionerDetails_OIDC{},
+					linkedca.OIDCProvisioner{}, timestamppb.Timestamp{},
+				),
+			}
 			if !cmp.Equal(tc.prov, prov, opts...) {
 				t.Errorf("linkedca.Admin diff =\n%s", cmp.Diff(tc.prov, prov, opts...))
 			}
@@ -959,6 +1006,61 @@ func TestHandler_UpdateProvisioner(t *testing.T) {
 		},
 		// TODO(hs): ValidateClaims can't be mocked atm
 		//"fail/ValidateClaims": func(t *testing.T) test { return test{} },
+		"fail/validateProvisioner": func(t *testing.T) test {
+			chiCtx := chi.NewRouteContext()
+			chiCtx.URLParams.Add("name", "provName")
+			ctx := context.WithValue(context.Background(), chi.RouteCtxKey, chiCtx)
+			createdAt := time.Now()
+			var deletedAt time.Time
+			prov := &linkedca.Provisioner{
+				Id:          "provID",
+				Type:        linkedca.Provisioner_OIDC,
+				Name:        "provName",
+				AuthorityId: "authorityID",
+				CreatedAt:   timestamppb.New(createdAt),
+				DeletedAt:   timestamppb.New(deletedAt),
+				Details: &linkedca.ProvisionerDetails{Data: &linkedca.ProvisionerDetails_JWK{
+					JWK: &linkedca.JWKProvisioner{PublicKey: testJWKPublicKey(t)},
+				}},
+			}
+			body, err := protojson.Marshal(prov)
+			assert.FatalError(t, err)
+			auth := &mockAdminAuthority{
+				MockLoadProvisionerByName: func(name string) (provisioner.Interface, error) {
+					assert.Equals(t, "provName", name)
+					return &provisioner.OIDC{
+						ID:   "provID",
+						Name: "provName",
+					}, nil
+				},
+			}
+			db := &admin.MockDB{
+				MockGetProvisioner: func(ctx context.Context, id string) (*linkedca.Provisioner, error) {
+					assert.Equals(t, "provID", id)
+					return &linkedca.Provisioner{
+						Id:          "provID",
+						Name:        "provName",
+						Type:        linkedca.Provisioner_OIDC,
+						AuthorityId: "authorityID",
+						CreatedAt:   timestamppb.New(createdAt),
+						DeletedAt:   timestamppb.New(deletedAt),
+					}, nil
+				},
+			}
+			return test{
+				ctx:        ctx,
+				body:       body,
+				auth:       auth,
+				adminDB:    db,
+				statusCode: 400,
+				err: &admin.Error{
+					Type:    "badRequest",
+					Status:  400,
+					Detail:  "bad request",
+					Message: "provisioner details (JWK) do not match provisioner type (OIDC)",
+				},
+			}
+		},
 		"fail/validateTemplates": func(t *testing.T) test {
 			chiCtx := chi.NewRouteContext()
 			chiCtx.URLParams.Add("name", "provName")
@@ -972,6 +1074,12 @@ func TestHandler_UpdateProvisioner(t *testing.T) {
 				AuthorityId: "authorityID",
 				CreatedAt:   timestamppb.New(createdAt),
 				DeletedAt:   timestamppb.New(deletedAt),
+				Details: &linkedca.ProvisionerDetails{Data: &linkedca.ProvisionerDetails_OIDC{
+					OIDC: &linkedca.OIDCProvisioner{
+						ClientId:              "client-id",
+						ConfigurationEndpoint: "https://example.com/.well-known/openid-configuration",
+					},
+				}},
 				X509Template: &linkedca.Template{
 					Template: []byte("{ {{ missingFunction }} }"),
 				},
@@ -1027,6 +1135,12 @@ func TestHandler_UpdateProvisioner(t *testing.T) {
 				AuthorityId: "authorityID",
 				CreatedAt:   timestamppb.New(createdAt),
 				DeletedAt:   timestamppb.New(deletedAt),
+				Details: &linkedca.ProvisionerDetails{Data: &linkedca.ProvisionerDetails_OIDC{
+					OIDC: &linkedca.OIDCProvisioner{
+						ClientId:              "client-id",
+						ConfigurationEndpoint: "https://example.com/.well-known/openid-configuration",
+					},
+				}},
 			}
 			body, err := protojson.Marshal(prov)
 			assert.FatalError(t, err)
@@ -1087,8 +1201,9 @@ func TestHandler_UpdateProvisioner(t *testing.T) {
 				Details: &linkedca.ProvisionerDetails{
 					Data: &linkedca.ProvisionerDetails_OIDC{
 						OIDC: &linkedca.OIDCProvisioner{
-							ClientId:     "new-client-id",
-							ClientSecret: "new-client-secret",
+							ClientId:              "new-client-id",
+							ClientSecret:          "new-client-secret",
+							ConfigurationEndpoint: "https://example.com/.well-known/openid-configuration",
 						},
 					},
 				},
