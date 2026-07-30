@@ -27,18 +27,10 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
 
 ## [Unreleased]
 
-### Added
-
-- Input validation on the admin API's create and update provisioner
-  endpoints: the details oneof must match the declared provisioner type, and
-  per-type required fields (e.g. `jwk.publicKey`, `oidc.clientId`,
-  `azure.tenantId`) are checked, returning structured 400 errors where
-  malformed payloads previously caused 500s or were stored broken.
-
 ### Fixed
 
-- Updating a provisioner with an invalid configuration now returns a 400
-  bad-request error instead of a 500 internal server error.
+- Reject mismatched provisioner types and details in admin API create and
+  update requests, and return bad-request errors for invalid configurations.
 - Updating a provisioner webhook now responds with `200 OK` instead of
   `201 Created`.
 
