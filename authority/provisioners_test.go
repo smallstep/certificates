@@ -340,6 +340,59 @@ func TestProvisionerWebhookToLinkedca(t *testing.T) {
 	}
 }
 
+func TestProvisionerTypeFromDetails(t *testing.T) {
+	tests := map[string]struct {
+		details *linkedca.ProvisionerDetails
+		want    linkedca.Provisioner_Type
+		wantErr bool
+	}{
+		"jwk":             {details: &linkedca.ProvisionerDetails{Data: &linkedca.ProvisionerDetails_JWK{JWK: &linkedca.JWKProvisioner{}}}, want: linkedca.Provisioner_JWK},
+		"oidc":            {details: &linkedca.ProvisionerDetails{Data: &linkedca.ProvisionerDetails_OIDC{OIDC: &linkedca.OIDCProvisioner{}}}, want: linkedca.Provisioner_OIDC},
+		"gcp":             {details: &linkedca.ProvisionerDetails{Data: &linkedca.ProvisionerDetails_GCP{GCP: &linkedca.GCPProvisioner{}}}, want: linkedca.Provisioner_GCP},
+		"aws":             {details: &linkedca.ProvisionerDetails{Data: &linkedca.ProvisionerDetails_AWS{AWS: &linkedca.AWSProvisioner{}}}, want: linkedca.Provisioner_AWS},
+		"azure":           {details: &linkedca.ProvisionerDetails{Data: &linkedca.ProvisionerDetails_Azure{Azure: &linkedca.AzureProvisioner{}}}, want: linkedca.Provisioner_AZURE},
+		"acme":            {details: &linkedca.ProvisionerDetails{Data: &linkedca.ProvisionerDetails_ACME{ACME: &linkedca.ACMEProvisioner{}}}, want: linkedca.Provisioner_ACME},
+		"x5c":             {details: &linkedca.ProvisionerDetails{Data: &linkedca.ProvisionerDetails_X5C{X5C: &linkedca.X5CProvisioner{}}}, want: linkedca.Provisioner_X5C},
+		"k8ssa":           {details: &linkedca.ProvisionerDetails{Data: &linkedca.ProvisionerDetails_K8SSA{K8SSA: &linkedca.K8SSAProvisioner{}}}, want: linkedca.Provisioner_K8SSA},
+		"sshpop":          {details: &linkedca.ProvisionerDetails{Data: &linkedca.ProvisionerDetails_SSHPOP{SSHPOP: &linkedca.SSHPOPProvisioner{}}}, want: linkedca.Provisioner_SSHPOP},
+		"scep":            {details: &linkedca.ProvisionerDetails{Data: &linkedca.ProvisionerDetails_SCEP{SCEP: &linkedca.SCEPProvisioner{}}}, want: linkedca.Provisioner_SCEP},
+		"nebula":          {details: &linkedca.ProvisionerDetails{Data: &linkedca.ProvisionerDetails_Nebula{Nebula: &linkedca.NebulaProvisioner{}}}, want: linkedca.Provisioner_NEBULA},
+		"nil details":     {wantErr: true},
+		"missing oneof":   {details: &linkedca.ProvisionerDetails{}, wantErr: true},
+		"nil oneof value": {details: &linkedca.ProvisionerDetails{Data: &linkedca.ProvisionerDetails_AWS{}}, wantErr: true},
+	}
+
+	for name, tc := range tests {
+		t.Run(name, func(t *testing.T) {
+			got, err := provisionerTypeFromDetails(tc.details)
+			if tc.wantErr {
+				if err == nil {
+					t.Fatal("provisionerTypeFromDetails() error = nil, want error")
+				}
+				return
+			}
+			if err != nil {
+				t.Fatalf("provisionerTypeFromDetails() error = %v", err)
+			}
+			assert.Equals(t, tc.want, got)
+		})
+	}
+}
+
+func TestProvisionerToCertificates_typeDetailsMismatch(t *testing.T) {
+	p := &linkedca.Provisioner{
+		Name: "mismatch",
+		Type: linkedca.Provisioner_JWK,
+		Details: &linkedca.ProvisionerDetails{Data: &linkedca.ProvisionerDetails_ACME{
+			ACME: &linkedca.ACMEProvisioner{},
+		}},
+	}
+
+	if _, err := ProvisionerToCertificates(p); err == nil {
+		t.Fatal("ProvisionerToCertificates() error = nil, want type/details mismatch")
+	}
+}
+
 func Test_wrapRAProvisioner(t *testing.T) {
 	type args struct {
 		p      provisioner.Interface
