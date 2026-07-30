@@ -215,7 +215,7 @@ func (a *Authority) StoreProvisioner(ctx context.Context, prov *linkedca.Provisi
 
 	certProv, err := ProvisionerToCertificates(prov)
 	if err != nil {
-		return admin.WrapErrorISE(err,
+		return admin.WrapError(admin.ErrorBadRequestType, err,
 			"error converting to certificates provisioner from linkedca provisioner")
 	}
 
@@ -273,7 +273,7 @@ func (a *Authority) UpdateProvisioner(ctx context.Context, nu *linkedca.Provisio
 
 	certProv, err := ProvisionerToCertificates(nu)
 	if err != nil {
-		return admin.WrapErrorISE(err,
+		return admin.WrapError(admin.ErrorBadRequestType, err,
 			"error converting to certificates provisioner from linkedca provisioner")
 	}
 

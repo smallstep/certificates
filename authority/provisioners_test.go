@@ -444,6 +444,38 @@ func Test_isRAProvisioner(t *testing.T) {
 	}
 }
 
+func TestAuthority_ProvisionerConversionErrorsAreBadRequests(t *testing.T) {
+	methods := map[string]func(*Authority, *linkedca.Provisioner) error{
+		"store": func(a *Authority, p *linkedca.Provisioner) error {
+			return a.StoreProvisioner(context.Background(), p)
+		},
+		"update": func(a *Authority, p *linkedca.Provisioner) error {
+			return a.UpdateProvisioner(context.Background(), p)
+		},
+	}
+
+	for name, method := range methods {
+		t.Run(name, func(t *testing.T) {
+			a := testAuthority(t)
+			p := &linkedca.Provisioner{
+				Name: "mismatch",
+				Type: linkedca.Provisioner_JWK,
+				Details: &linkedca.ProvisionerDetails{Data: &linkedca.ProvisionerDetails_ACME{
+					ACME: &linkedca.ACMEProvisioner{},
+				}},
+			}
+
+			err := method(a, p)
+			var adminErr *admin.Error
+			if !errors.As(err, &adminErr) {
+				t.Fatalf("expected *admin.Error, got %T: %v", err, err)
+			}
+			assert.Equals(t, admin.ErrorBadRequestType.String(), adminErr.Type)
+			assert.Equals(t, http.StatusBadRequest, adminErr.Status)
+		})
+	}
+}
+
 func TestAuthority_UpdateProvisioner_invalidConfiguration(t *testing.T) {
 	a := testAuthority(t)
 	// ClientId is empty, so provisioner.OIDC.Init fails before any I/O or
