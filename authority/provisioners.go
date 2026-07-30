@@ -213,6 +213,11 @@ func (a *Authority) StoreProvisioner(ctx context.Context, prov *linkedca.Provisi
 	a.adminMutex.Lock()
 	defer a.adminMutex.Unlock()
 
+	if err := validateProvisionerTypeAndDetails(prov); err != nil {
+		return admin.WrapError(admin.ErrorBadRequestType, err,
+			"error validating linkedca provisioner")
+	}
+
 	certProv, err := ProvisionerToCertificates(prov)
 	if err != nil {
 		return admin.WrapError(admin.ErrorBadRequestType, err,
@@ -270,6 +275,11 @@ func (a *Authority) StoreProvisioner(ctx context.Context, prov *linkedca.Provisi
 func (a *Authority) UpdateProvisioner(ctx context.Context, nu *linkedca.Provisioner) error {
 	a.adminMutex.Lock()
 	defer a.adminMutex.Unlock()
+
+	if err := validateProvisionerTypeAndDetails(nu); err != nil {
+		return admin.WrapError(admin.ErrorBadRequestType, err,
+			"error validating linkedca provisioner")
+	}
 
 	certProv, err := ProvisionerToCertificates(nu)
 	if err != nil {
@@ -876,8 +886,24 @@ func provisionerTypeFromDetails(details *linkedca.ProvisionerDetails) (linkedca.
 	return linkedca.Provisioner_NOOP, errors.New("provisioner details are required")
 }
 
+func validateProvisionerTypeAndDetails(p *linkedca.Provisioner) error {
+	detailsType, err := provisionerTypeFromDetails(p.GetDetails())
+	if err != nil {
+		return err
+	}
+	if detailsType != p.GetType() {
+		return errors.Errorf(
+			"provisioner details (%s) do not match provisioner type (%s)",
+			detailsType, p.GetType(),
+		)
+	}
+	return nil
+}
+
 // ProvisionerToCertificates converts the linkedca provisioner type to the certificates provisioner
-// interface.
+// interface. It deliberately dispatches on details instead of requiring the
+// type enum to match so that legacy records remain loadable. New writes enforce
+// the type/details invariant with validateProvisionerTypeAndDetails.
 func ProvisionerToCertificates(p *linkedca.Provisioner) (provisioner.Interface, error) {
 	claims, err := claimsToCertificates(p.Claims)
 	if err != nil {
@@ -885,15 +911,8 @@ func ProvisionerToCertificates(p *linkedca.Provisioner) (provisioner.Interface, 
 	}
 
 	details := p.GetDetails()
-	detailsType, err := provisionerTypeFromDetails(details)
-	if err != nil {
+	if _, err := provisionerTypeFromDetails(details); err != nil {
 		return nil, err
-	}
-	if detailsType != p.GetType() {
-		return nil, errors.Errorf(
-			"provisioner details (%s) do not match provisioner type (%s)",
-			detailsType, p.GetType(),
-		)
 	}
 
 	data := details.GetData()

@@ -379,7 +379,7 @@ func TestProvisionerTypeFromDetails(t *testing.T) {
 	}
 }
 
-func TestProvisionerToCertificates_typeDetailsMismatch(t *testing.T) {
+func TestProvisionerListToCertificates_legacyTypeDetailsMismatch(t *testing.T) {
 	p := &linkedca.Provisioner{
 		Name: "mismatch",
 		Type: linkedca.Provisioner_JWK,
@@ -388,8 +388,36 @@ func TestProvisionerToCertificates_typeDetailsMismatch(t *testing.T) {
 		}},
 	}
 
-	if _, err := ProvisionerToCertificates(p); err == nil {
-		t.Fatal("ProvisionerToCertificates() error = nil, want type/details mismatch")
+	got, err := provisionerListToCertificates([]*linkedca.Provisioner{p})
+	if err != nil {
+		t.Fatalf("provisionerListToCertificates() error = %v, want legacy mismatch to load", err)
+	}
+	require.Len(t, got, 1)
+	acme, ok := got[0].(*provisioner.ACME)
+	require.True(t, ok)
+	assert.Equals(t, "JWK", acme.Type)
+}
+
+func TestProvisionerToCertificates_missingDetails(t *testing.T) {
+	tests := map[string]*linkedca.ProvisionerDetails{
+		"missing details": nil,
+		"missing oneof":   {},
+		"nil oneof value": {
+			Data: &linkedca.ProvisionerDetails_AWS{},
+		},
+	}
+
+	for name, details := range tests {
+		t.Run(name, func(t *testing.T) {
+			p := &linkedca.Provisioner{
+				Name:    name,
+				Type:    linkedca.Provisioner_AWS,
+				Details: details,
+			}
+			if _, err := ProvisionerToCertificates(p); err == nil {
+				t.Fatal("ProvisionerToCertificates() error = nil, want missing details error")
+			}
+		})
 	}
 }
 
