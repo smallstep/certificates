@@ -85,6 +85,32 @@ var ErrTokenFlowNotSupported = stderrors.New("token flow is not supported")
 // ErrNotImplemented is an error returned when one method is not implemented.
 var ErrNotImplemented = stderrors.New("not implemented")
 
+// ErrRetryInit is an error that the errors returned by Init match when the
+// initialization failed for a temporary reason, e.g. an OIDC provisioner that
+// cannot reach its identity provider. Provisioners failing with this error
+// initialize themselves when they are used, so they are not disabled.
+var ErrRetryInit = stderrors.New("retry initialization")
+
+// retryInitError wraps an initialization error to mark it as temporary. It
+// keeps the message of the wrapped error and matches ErrRetryInit.
+type retryInitError struct {
+	err error
+}
+
+func (e *retryInitError) Error() string { return e.err.Error() }
+
+func (e *retryInitError) Unwrap() error { return e.err }
+
+func (*retryInitError) Is(target error) bool { return target == ErrRetryInit }
+
+// retryInit marks an initialization error as temporary.
+func retryInit(err error) error {
+	if err == nil {
+		return nil
+	}
+	return &retryInitError{err: err}
+}
+
 // Audiences stores all supported audiences by request type.
 type Audiences struct {
 	Sign      []string
