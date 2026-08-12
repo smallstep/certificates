@@ -34,13 +34,13 @@ import (
 	"github.com/smallstep/certificates/authority/config"
 	"github.com/smallstep/certificates/cas/apiv1"
 	"github.com/smallstep/certificates/db"
+	"github.com/smallstep/certificates/est"
+	estAPI "github.com/smallstep/certificates/est/api"
 	"github.com/smallstep/certificates/internal/httptransport"
 	"github.com/smallstep/certificates/internal/metrix"
 	"github.com/smallstep/certificates/logging"
 	"github.com/smallstep/certificates/middleware/requestid"
 	"github.com/smallstep/certificates/monitoring"
-	"github.com/smallstep/certificates/est"
-	estAPI "github.com/smallstep/certificates/est/api"
 	"github.com/smallstep/certificates/scep"
 	scepAPI "github.com/smallstep/certificates/scep/api"
 	"github.com/smallstep/certificates/server"
@@ -302,7 +302,6 @@ func (ca *CA) Init(cfg *config.Config) (*CA, error) {
 	}
 
 	var scepAuthority *scep.Authority
-	var estAuthority *est.Authority
 	if ca.shouldServeSCEPEndpoints() {
 		// get the SCEP authority configuration. Validation is
 		// performed within the authority instantiation process.
@@ -327,18 +326,24 @@ func (ca *CA) Init(cfg *config.Config) (*CA, error) {
 		})
 	}
 
-	// helpful routine for logging all routes
-	//dumpRoutes(mux)
-	//dumpRoutes(insecureMux)
-
 	// EST endpoints (HTTPS only)
-	estPrefix := ".well-known/est"
+	var estAuthority *est.Authority
 	if estAuth := auth.GetEST(); estAuth != nil {
+		// EST is served on /.well-known/<optional-label>/est; we use the provisioner
+		// name as label.
+		// TODO(hs): decide whether we want to go with this, or also want to support
+		// some form of default EST provisioner that can be requested at the path without
+		// a label set.
+		estPrefix := "/.well-known/{label}/est"
 		estAuthority = estAuth
-		mux.Route("/"+estPrefix, func(r chi.Router) {
+		mux.Route(estPrefix, func(r chi.Router) {
 			estAPI.Route(r)
 		})
 	}
+
+	// helpful routine for logging all routes
+	//dumpRoutes(mux)
+	//dumpRoutes(insecureMux)
 
 	// Add monitoring if configured
 	if len(cfg.Monitoring) > 0 {
