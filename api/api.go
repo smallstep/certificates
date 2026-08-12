@@ -259,9 +259,9 @@ func scepFromProvisioner(p *provisioner.SCEP) *models.SCEP {
 
 func estFromProvisioner(p *provisioner.EST) *provisioner.EST {
 	prov := *p
-	prov.ClientCertificateRoots = []byte(redacted)
-	prov.BasicAuthUsername = redacted
-	prov.BasicAuthPassword = redacted
+	// prov.ClientCertificateRoots = []byte(redacted)
+	// prov.BasicAuthUsername = redacted
+	// prov.BasicAuthPassword = redacted
 	return &prov
 }
 

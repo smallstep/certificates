@@ -3,10 +3,8 @@ package est
 import (
 	"bytes"
 	"context"
-	"crypto"
 	"crypto/x509"
 	"fmt"
-	"sync"
 
 	"github.com/smallstep/pkcs7"
 
@@ -17,13 +15,9 @@ import (
 
 // Authority handles EST interactions.
 type Authority struct {
-	signAuth            SignAuthority
-	roots               []*x509.Certificate
-	intermediates       []*x509.Certificate
-	defaultSigner       crypto.Signer
-	signerCertificate   *x509.Certificate
-	estProvisionerNames []string
-	provisionersMutex   sync.RWMutex
+	signAuth      SignAuthority
+	roots         []*x509.Certificate
+	intermediates []*x509.Certificate
 }
 
 type authorityKey struct{}
@@ -65,56 +59,10 @@ func New(signAuth SignAuthority, opts Options) (*Authority, error) {
 	}
 
 	return &Authority{
-		signAuth:            signAuth,
-		roots:               opts.Roots,
-		intermediates:       opts.Intermediates,
-		defaultSigner:       opts.Signer,
-		signerCertificate:   opts.SignerCert,
-		estProvisionerNames: opts.ESTProvisionerNames,
+		signAuth:      signAuth,
+		roots:         opts.Roots,
+		intermediates: opts.Intermediates,
 	}, nil
-}
-
-// validates if the EST Authority has a valid configuration.
-func (a *Authority) Validate() error {
-	if a == nil {
-		return nil
-	}
-
-	a.provisionersMutex.RLock()
-	defer a.provisionersMutex.RUnlock()
-
-	noDefaultSignerAvailable := a.defaultSigner == nil || a.signerCertificate == nil
-	for _, name := range a.estProvisionerNames {
-		p, err := a.LoadProvisionerByName(name)
-		if err != nil {
-			return fmt.Errorf("failed loading provisioner %q: %w", name, err)
-		}
-		if estProv, ok := p.(*provisioner.EST); ok {
-			cert, signer := estProv.GetSigner()
-			if cert == nil && noDefaultSignerAvailable {
-				return fmt.Errorf("EST provisioner %q does not have a signer certificate", name)
-			}
-			if signer == nil && noDefaultSignerAvailable {
-				return fmt.Errorf("EST provisioner %q does not have a signer", name)
-			}
-		}
-	}
-
-	return nil
-}
-
-// UpdateProvisioners updates the EST Authority with the new, and hopefully
-// current EST provisioners configured. This allows the Authority to be
-// validated with the latest data.
-func (a *Authority) UpdateProvisioners(estProvisionerNames []string) {
-	if a == nil {
-		return
-	}
-
-	a.provisionersMutex.Lock()
-	defer a.provisionersMutex.Unlock()
-
-	a.estProvisionerNames = estProvisionerNames
 }
 
 // LoadProvisionerByName calls out to the SignAuthority interface to load a
@@ -125,19 +73,7 @@ func (a *Authority) LoadProvisionerByName(name string) (provisioner.Interface, e
 
 // GetCACertificates returns the certificate chain for the CA.
 func (a *Authority) GetCACertificates(ctx context.Context) (certs []*x509.Certificate, err error) {
-	p := provisionerFromContext(ctx)
-
-	if signerCert, _ := p.GetSigner(); signerCert != nil {
-		certs = append(certs, signerCert)
-	}
-
-	if p.ShouldIncludeIntermediateInChain() || len(certs) == 0 {
-		certs = append(certs, a.intermediates...)
-	}
-
-	if p.ShouldIncludeRootInChain() {
-		certs = append(certs, a.roots...)
-	}
+	certs = append(a.intermediates, a.roots...)
 
 	return certs, nil
 }
@@ -206,6 +142,7 @@ func (a *Authority) SignCSR(ctx context.Context, csr *x509.CertificateRequest, s
 	if err != nil {
 		return nil, fmt.Errorf("error generating certificate: %w", err)
 	}
+
 	// return leaf certificate (only): https://datatracker.ietf.org/doc/html/rfc7030#section-4.2.3
 	return certChain[0], nil
 }
@@ -225,14 +162,4 @@ func (a *Authority) BuildResponse(ctx context.Context, certs []*x509.Certificate
 		return nil, err
 	}
 	return degenerate, nil
-}
-
-func (a *Authority) NotifySuccess(ctx context.Context, csr *x509.CertificateRequest, cert *x509.Certificate, transactionID string) error {
-	p := provisionerFromContext(ctx)
-	return p.NotifySuccess(ctx, csr, cert, transactionID)
-}
-
-func (a *Authority) NotifyFailure(ctx context.Context, csr *x509.CertificateRequest, transactionID string, errorCode int, errorDescription string) error {
-	p := provisionerFromContext(ctx)
-	return p.NotifyFailure(ctx, csr, transactionID, errorCode, errorDescription)
 }

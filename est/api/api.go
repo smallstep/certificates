@@ -20,6 +20,8 @@ import (
 	"github.com/smallstep/certificates/authority"
 	"github.com/smallstep/certificates/authority/provisioner"
 	"github.com/smallstep/certificates/est"
+
+	provest "github.com/smallstep/certificates/authority/provisioner/est"
 )
 
 const (
@@ -247,7 +249,7 @@ func authorizeEnrollRequest(ctx context.Context, csr *x509.CertificateRequest) (
 	prov := est.ProvisionerFromContext(ctx)
 	ca := authority.MustFromContext(ctx)
 
-	req := provisioner.ESTAuthRequest{
+	req := provest.AuthRequest{
 		CSR:             csr,
 		CARoots:         ca.GetRootCertificates(),
 		CAIntermediates: ca.GetIntermediateCertificates(),

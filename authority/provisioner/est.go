@@ -4,39 +4,60 @@ import (
 	"context"
 	"crypto"
 	"crypto/x509"
-	"fmt"
 	"time"
 
 	"github.com/pkg/errors"
 
-	"github.com/smallstep/certificates/internal/httptransport"
 	"github.com/smallstep/linkedca"
+
+	"github.com/smallstep/certificates/authority/provisioner/est"
+
+	"github.com/smallstep/certificates/internal/httptransport"
 )
 
 // EST is the EST provisioner type, an entity that can authorize the EST flow.
 type EST struct {
 	*base
-	ID                            string   `json:"-"`
-	Type                          string   `json:"type"`
-	Name                          string   `json:"name"`
-	EnableTLSClientCertificate    *bool    `json:"enableTlsClientCertificate,omitempty"`
-	ForwardedTLSClientCertHeader  string   `json:"forwardedTlsClientCertHeader,omitempty"`
-	EnableHTTPBasicAuth           *bool    `json:"enableHTTPBasicAuth,omitempty"`
-	BasicAuthUsername             string   `json:"basicAuthUsername,omitempty"`
-	BasicAuthPassword             string   `json:"basicAuthPassword,omitempty"`
-	ClientCertificateRoots        []byte   `json:"clientCertificateRoots,omitempty"`
-	ForceCN                       bool     `json:"forceCN,omitempty"`
-	IncludeRoot                   bool     `json:"includeRoot,omitempty"`
-	ExcludeIntermediate           bool     `json:"excludeIntermediate,omitempty"`
-	MinimumPublicKeyLength        int      `json:"minimumPublicKeyLength,omitempty"`
-	CSRAttrs                      []byte   `json:"csrAttrs,omitempty"`
-	Options                       *Options `json:"options,omitempty"`
-	Claims                        *Claims  `json:"claims,omitempty"`
+	ID   string `json:"-"`
+	Type string `json:"type"`
+	Name string `json:"name"`
+
+	ForceCN                bool `json:"forceCN,omitempty"`
+	MinimumPublicKeyLength int  `json:"minimumPublicKeyLength,omitempty"`
+
+	// Authentication configures accepted client authentication. At
+	// least one method is required; RFC 7030 3.2.3 permits requiring
+	// HTTP authentication in addition to TLS client authentication.
+	Authentication est.Authentication `json:"authentication"`
+
+	// Operations enables EST operations. Defaults to cacerts,
+	// csrattrs, simpleenroll and simplereenroll.
+	Operations []est.Operation `json:"operations,omitempty"`
+
+	CACerts       est.CACerts        `json:"cacerts,omitempty"`
+	CSRAttributes *est.CSRAttributes `json:"csrAttributes,omitempty"`
+
+	// ProofOfPossession controls tls-unique identity/PoP linking
+	// (RFC 7030 3.5): disabled | optional | required.
+	ProofOfPossession est.PoPMode `json:"proofOfPossession,omitempty"`
+
+	DummyBool   *bool
+	DummyString string
+
+	// EnableTLSClientCertificate   *bool  `json:"enableTlsClientCertificate,omitempty"`
+	// ForwardedTLSClientCertHeader string `json:"forwardedTlsClientCertHeader,omitempty"`
+	// EnableHTTPBasicAuth          *bool  `json:"enableHTTPBasicAuth,omitempty"`
+	// BasicAuthUsername            string `json:"basicAuthUsername,omitempty"`
+	// BasicAuthPassword            string `json:"basicAuthPassword,omitempty"`
+	// ClientCertificateRoots       []byte `json:"clientCertificateRoots,omitempty"`
+
+	Options *Options `json:"options,omitempty"`
+	Claims  *Claims  `json:"claims,omitempty"`
+
 	ctl                           *Controller
 	signer                        crypto.Signer
 	signerCertificate             *x509.Certificate
 	challengeValidationController *challengeValidationController
-	notificationController        *notificationController
 	clientCertificateRootPool     *x509.CertPool
 }
 
@@ -88,8 +109,7 @@ func (s *EST) DefaultTLSCertDuration() time.Duration {
 func newESTChallengeValidationController(client HTTPClient, tw httptransport.Wrapper, webhooks []*Webhook) *challengeValidationController {
 	estHooks := []*Webhook{}
 	for _, wh := range webhooks {
-		// if wh.Kind != linkedca.Webhook_ESTCHALLENGE.String() {
-		if wh.Kind != "ESTCHALLENGE" {
+		if wh.Kind != linkedca.Webhook_ESTCHALLENGE.String() {
 			continue
 		}
 		estHooks = append(estHooks, wh)
@@ -124,20 +144,13 @@ func (s *EST) Init(config Config) (err error) {
 		s.GetOptions().GetWebhooks(),
 	)
 
-	// Prepare the EST notification controller
-	s.notificationController = newNotificationController(
-		config.WebhookClient,
-		config.WrapTransport,
-		s.GetOptions().GetWebhooks(),
-	)
+	// if err := s.parseClientCertificateRoots(); err != nil {
+	// 	return err
+	// }
 
-	if err := s.parseClientCertificateRoots(); err != nil {
-		return err
-	}
-
-	if err := s.normalizeAuthConfig(); err != nil {
-		return err
-	}
+	// if err := s.normalizeAuthConfig(); err != nil {
+	// 	return err
+	// }
 
 	s.ctl, err = NewController(s, s.Claims, config, s.Options)
 	return err
@@ -157,36 +170,7 @@ func (s *EST) AuthorizeSign(context.Context, string) ([]SignOption, error) {
 	}, nil
 }
 
-// ShouldIncludeRootInChain indicates if the CA should return its root in the chain.
-func (s *EST) ShouldIncludeRootInChain() bool {
-	return s.IncludeRoot
-}
-
-// ShouldIncludeIntermediateInChain indicates if the CA should include the intermediate CA certificate.
-func (s *EST) ShouldIncludeIntermediateInChain() bool {
-	return !s.ExcludeIntermediate
-}
-
-// GetSigner returns the provisioner specific signer, used to sign EST responses.
-func (s *EST) GetSigner() (*x509.Certificate, crypto.Signer) {
-	return s.signerCertificate, s.signer
-}
-
 // GetCSRAttributes returns the CSR attributes to signal to clients.
 func (s *EST) GetCSRAttributes(context.Context) ([]byte, error) {
-	return s.CSRAttrs, nil
-}
-
-func (s *EST) NotifySuccess(ctx context.Context, csr *x509.CertificateRequest, cert *x509.Certificate, transactionID string) error {
-	if s.notificationController == nil {
-		return fmt.Errorf("provisioner %q wasn't initialized", s.Name)
-	}
-	return s.notificationController.Success(ctx, csr, cert, transactionID)
-}
-
-func (s *EST) NotifyFailure(ctx context.Context, csr *x509.CertificateRequest, transactionID string, errorCode int, errorDescription string) error {
-	if s.notificationController == nil {
-		return fmt.Errorf("provisioner %q wasn't initialized", s.Name)
-	}
-	return s.notificationController.Failure(ctx, csr, transactionID, errorCode, errorDescription)
+	return nil, nil // TODO(hs): refactor
 }
