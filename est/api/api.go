@@ -19,16 +19,15 @@ import (
 	"github.com/smallstep/certificates/api/log"
 	"github.com/smallstep/certificates/authority"
 	"github.com/smallstep/certificates/authority/provisioner"
-	"github.com/smallstep/certificates/est"
-
 	provest "github.com/smallstep/certificates/authority/provisioner/est"
+	"github.com/smallstep/certificates/est"
 )
 
 const (
 	maxPayloadSize = 2 << 20
 )
 
-// Util to extract bearer token from request
+// BearerToken extracts a bearer token from an [*http.Request].
 func BearerToken(r *http.Request) (string, bool) {
 	auth := r.Header.Get("Authorization")
 	const prefix = "Bearer "
@@ -39,27 +38,24 @@ func BearerToken(r *http.Request) (string, bool) {
 	return auth[len(prefix):], true
 }
 
-// Route configures the EST routes under the provided router.
+// Route configures the EST routes under the provided [api.Router].
 func Route(r api.Router) {
-	r.MethodFunc(http.MethodGet, "/{provisionerName}/cacerts", getCACerts)
-	r.MethodFunc(http.MethodGet, "/{provisionerName}/csrattrs", getCSRAttrs)
-	r.MethodFunc(http.MethodPost, "/{provisionerName}/simpleenroll", enroll)
-	r.MethodFunc(http.MethodPost, "/{provisionerName}/simplereenroll", enroll)
+	r.MethodFunc(http.MethodGet, "/cacerts", getCACerts)
+	r.MethodFunc(http.MethodGet, "/csrattrs", getCSRAttrs)
+	r.MethodFunc(http.MethodPost, "/simpleenroll", enroll)
+	r.MethodFunc(http.MethodPost, "/simplereenroll", enroll)
 }
 
 func lookupProvisioner(next http.HandlerFunc) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		name := chi.URLParam(r, "provisionerName")
-		if name == "" || name == "/" {
-			name = r.URL.Query().Get("provisioner")
-		}
+		name := chi.URLParam(r, "label")
 		if name == "" {
-			fail(w, r, errors.New("missing provisioner name"))
+			failWithStatus(w, r, http.StatusBadRequest, errors.New("missing provisioner name"))
 			return
 		}
 		provisionerName, err := url.PathUnescape(name)
 		if err != nil {
-			fail(w, r, fmt.Errorf("error url unescaping provisioner name '%s'", name))
+			failWithStatus(w, r, http.StatusBadRequest, fmt.Errorf("error url unescaping provisioner name '%s'", name))
 			return
 		}
 
@@ -67,13 +63,13 @@ func lookupProvisioner(next http.HandlerFunc) http.HandlerFunc {
 		auth := authority.MustFromContext(ctx)
 		p, err := auth.LoadProvisionerByName(provisionerName)
 		if err != nil {
-			fail(w, r, err)
+			failWithStatus(w, r, http.StatusNotFound, err)
 			return
 		}
 
 		prov, ok := p.(*provisioner.EST)
 		if !ok {
-			fail(w, r, errors.New("provisioner must be of type EST"))
+			failWithStatus(w, r, http.StatusBadRequest, errors.New("provisioner must be of type EST"))
 			return
 		}
 
@@ -173,19 +169,19 @@ func enrollHandler(w http.ResponseWriter, r *http.Request) {
 	r = r.WithContext(ctx)
 	auth := est.MustFromContext(ctx)
 
-	issued, err := auth.SignCSR(ctx, csr, opts...)
+	cert, err := auth.SignCSR(ctx, csr, opts...)
 	if err != nil {
 		failWithStatus(w, r, http.StatusInternalServerError, fmt.Errorf("failed issuing certificate: %w", err))
 		return
 	}
 
-	signed, err := auth.BuildResponse(ctx, []*x509.Certificate{issued})
+	response, err := auth.BuildResponse(ctx, []*x509.Certificate{cert})
 	if err != nil {
 		failWithStatus(w, r, http.StatusInternalServerError, fmt.Errorf("failed encoding issued certificate: %w", err))
 		return
 	}
 
-	writeResponse(w, signed, "application/pkcs7-mime; smime-type=certs-only", http.StatusOK)
+	writeResponse(w, response, "application/pkcs7-mime; smime-type=certs-only", http.StatusOK)
 }
 
 var errMissingAuth = errors.New("missing authentication material")
