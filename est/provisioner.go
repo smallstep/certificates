@@ -2,10 +2,9 @@ package est
 
 import (
 	"context"
-	"crypto"
-	"crypto/x509"
 
 	"github.com/smallstep/certificates/authority/provisioner"
+	"github.com/smallstep/certificates/authority/provisioner/est"
 )
 
 // Provisioner is an interface that embeds the generic provisioner.Interface and
@@ -14,12 +13,7 @@ type Provisioner interface {
 	provisioner.Interface
 	GetOptions() *provisioner.Options
 	GetClientCertificateConfig() *provisioner.ClientCertificateConfig
-	ShouldIncludeRootInChain() bool
-	ShouldIncludeIntermediateInChain() bool
-	GetSigner() (*x509.Certificate, crypto.Signer)
-	AuthorizeRequest(ctx context.Context, req provisioner.ESTAuthRequest) ([]provisioner.SignCSROption, error)
-	NotifySuccess(ctx context.Context, csr *x509.CertificateRequest, cert *x509.Certificate, transactionID string) error
-	NotifyFailure(ctx context.Context, csr *x509.CertificateRequest, transactionID string, errorCode int, errorDescription string) error
+	AuthorizeRequest(ctx context.Context, req est.AuthRequest) ([]provisioner.SignCSROption, error)
 	GetCSRAttributes(ctx context.Context) ([]byte, error)
 }
 

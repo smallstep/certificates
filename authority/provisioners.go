@@ -1006,23 +1006,22 @@ func ProvisionerToCertificates(p *linkedca.Provisioner) (provisioner.Interface, 
 		return s, nil
 	case *linkedca.ProvisionerDetails_EST:
 		cfg := d.EST
-		enableTLSClientCertificate := cfg.EnableTlsClientCertificate
-		enableHTTPBasicAuth := cfg.EnableHttpBasicAuth
+		// enableTLSClientCertificate := cfg.EnableTlsClientCertificate
+		// enableHTTPBasicAuth := cfg.EnableHttpBasicAuth
 		return &provisioner.EST{
-			ID:                           p.Id,
-			Type:                         p.Type.String(),
-			Name:                         p.Name,
-			EnableTLSClientCertificate:   &enableTLSClientCertificate,
-			EnableHTTPBasicAuth:          &enableHTTPBasicAuth,
-			ForwardedTLSClientCertHeader: cfg.ForwardedTlsClientCertHeader,
-			BasicAuthUsername:            cfg.BasicAuthUsername,
-			BasicAuthPassword:            cfg.BasicAuthPassword,
-			ClientCertificateRoots:       provisionerPEMToCertificates(cfg.ClientCertificateRoots),
-			ForceCN:                      cfg.ForceCn,
-			IncludeRoot:                  cfg.IncludeRoot,
-			MinimumPublicKeyLength:       int(cfg.MinimumPublicKeyLength),
-			Claims:                       claims,
-			Options:                      options,
+			ID:                     p.Id,
+			Type:                   p.Type.String(),
+			Name:                   p.Name,
+			ForceCN:                cfg.ForceCn,
+			MinimumPublicKeyLength: int(cfg.MinimumPublicKeyLength),
+			// EnableTLSClientCertificate:   &enableTLSClientCertificate,
+			// EnableHTTPBasicAuth:          &enableHTTPBasicAuth,
+			// ForwardedTLSClientCertHeader: cfg.ForwardedTlsClientCertHeader,
+			// BasicAuthUsername:            cfg.BasicAuthUsername,
+			// BasicAuthPassword:            cfg.BasicAuthPassword,
+			// ClientCertificateRoots:       provisionerPEMToCertificates(cfg.ClientCertificateRoots),
+			Claims:  claims,
+			Options: options,
 		}, nil
 	case *linkedca.ProvisionerDetails_Nebula:
 		var roots []byte
@@ -1311,15 +1310,14 @@ func ProvisionerToLinkedca(p provisioner.Interface) (*linkedca.Provisioner, erro
 			Details: &linkedca.ProvisionerDetails{
 				Data: &linkedca.ProvisionerDetails_EST{
 					EST: &linkedca.ESTProvisioner{
-						ForceCn:                      p.ForceCN,
-						EnableTlsClientCertificate:   p.EnableTLSClientCertificate != nil && *p.EnableTLSClientCertificate,
-						EnableHttpBasicAuth:          p.EnableHTTPBasicAuth != nil && *p.EnableHTTPBasicAuth,
-						MinimumPublicKeyLength:       cast.Int32(p.MinimumPublicKeyLength),
-						IncludeRoot:                  p.IncludeRoot,
-						BasicAuthUsername:            p.BasicAuthUsername,
-						BasicAuthPassword:            p.BasicAuthPassword,
-						ClientCertificateRoots:       provisionerPEMToLinkedca(p.ClientCertificateRoots),
-						ForwardedTlsClientCertHeader: p.ForwardedTLSClientCertHeader,
+						ForceCn:                p.ForceCN,
+						MinimumPublicKeyLength: cast.Int32(p.MinimumPublicKeyLength),
+						// EnableTlsClientCertificate:   p.EnableTLSClientCertificate != nil && *p.EnableTLSClientCertificate,
+						// EnableHttpBasicAuth:          p.EnableHTTPBasicAuth != nil && *p.EnableHTTPBasicAuth,
+						// BasicAuthUsername:            p.BasicAuthUsername,
+						// BasicAuthPassword:            p.BasicAuthPassword,
+						// ClientCertificateRoots:       provisionerPEMToLinkedca(p.ClientCertificateRoots),
+						// ForwardedTlsClientCertHeader: p.ForwardedTLSClientCertHeader,
 					},
 				},
 			},

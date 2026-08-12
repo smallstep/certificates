@@ -8,15 +8,10 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/smallstep/certificates/webhook"
 	"go.step.sm/crypto/x509util"
-)
 
-var (
-	ErrESTAuthMethodDisabled      = errors.New("est authentication method disabled")
-	ErrESTAuthMethodNotFound      = errors.New("no valid est authentication method found")
-	ErrESTAuthMethodMisconfigured = errors.New("est authentication method misconfigured")
-	ErrESTAuthDenied              = errors.New("est authentication denied")
+	"github.com/smallstep/certificates/authority/provisioner/est"
+	"github.com/smallstep/certificates/webhook"
 )
 
 // ClientCertificateConfig holds the EST client certificate authentication configuration.
@@ -25,28 +20,15 @@ type ClientCertificateConfig struct {
 	ForwardedTLSClientCertHeader string
 }
 
-// ESTAuthRequest contains authentication material extracted from the request.
-type ESTAuthRequest struct {
-	CSR                    *x509.CertificateRequest
-	ClientCertificate      *x509.Certificate
-	ClientCertificateChain []*x509.Certificate
-	CARoots                []*x509.Certificate
-	CAIntermediates        []*x509.Certificate
-	AuthenticationHeader   string
-	BasicAuthUsername      string
-	BasicAuthPassword      string
-	BearerToken            string
-}
-
 func (s *EST) GetClientCertificateConfig() *ClientCertificateConfig {
 	return &ClientCertificateConfig{
-		Enable:                       boolValue(s.EnableTLSClientCertificate, false),
-		ForwardedTLSClientCertHeader: s.ForwardedTLSClientCertHeader,
+		Enable:                       boolValue(s.DummyBool, false),
+		ForwardedTLSClientCertHeader: s.DummyString,
 	}
 }
 
 // AuthorizeRequest validates the request against configured EST auth methods.
-func (s *EST) AuthorizeRequest(ctx context.Context, req ESTAuthRequest) ([]SignCSROption, error) {
+func (s *EST) AuthorizeRequest(ctx context.Context, req est.AuthRequest) ([]SignCSROption, error) {
 	if s.hasAuthWebhooks() {
 		return s.authorizeWithWebhook(ctx, &req)
 	}
@@ -54,10 +36,10 @@ func (s *EST) AuthorizeRequest(ctx context.Context, req ESTAuthRequest) ([]SignC
 }
 
 // authorizeRequestLocal validates the request using provisioner configuration.
-func (s *EST) authorizeRequestLocal(req ESTAuthRequest) ([]SignCSROption, error) {
-	var lastErr error = ErrESTAuthMethodNotFound
+func (s *EST) authorizeRequestLocal(req est.AuthRequest) ([]SignCSROption, error) {
+	var lastErr error = est.ErrAuthMethodNotFound
 	if req.ClientCertificate != nil {
-		if boolValue(s.EnableTLSClientCertificate, false) {
+		if boolValue(s.DummyBool, false) { // TODO(hs): refactor
 			if s.hasClientCertificateRoots() {
 				if err := verifyCertificateWithPool(req.ClientCertificate, req.ClientCertificateChain, s.clientCertificateRootPool, nil); err == nil {
 					return []SignCSROption{}, nil
@@ -72,19 +54,19 @@ func (s *EST) authorizeRequestLocal(req ESTAuthRequest) ([]SignCSROption, error)
 				}
 			}
 		} else {
-			lastErr = ErrESTAuthMethodDisabled
+			lastErr = est.ErrAuthMethodDisabled
 		}
 	}
 
-	if req.hasBasicAuth() {
-		if boolValue(s.EnableHTTPBasicAuth, false) && s.BasicAuthPassword != "" {
+	if req.HasBasicAuth() {
+		if boolValue(s.DummyBool, false) && s.DummyString != "" {
 			if err := s.validateBasicAuthPassword(req.BasicAuthUsername, req.BasicAuthPassword); err == nil {
 				return []SignCSROption{}, nil
 			} else {
 				lastErr = err
 			}
 		} else {
-			lastErr = ErrESTAuthMethodDisabled
+			lastErr = est.ErrAuthMethodDisabled
 		}
 	}
 
@@ -93,19 +75,19 @@ func (s *EST) authorizeRequestLocal(req ESTAuthRequest) ([]SignCSROption, error)
 
 // validateBasicAuthPassword verifies the configured basic auth password.
 func (s *EST) validateBasicAuthPassword(username, password string) error {
-	if s.BasicAuthUsername != "" && username != s.BasicAuthUsername {
+	if s.DummyString != "" && username != s.DummyString {
 		return errors.New("invalid basic auth")
 	}
-	if subtleCompare(s.BasicAuthPassword, password) {
+	if subtleCompare(s.DummyString, password) {
 		return nil
 	}
 	return errors.New("invalid basic auth")
 }
 
 // authorizeWithWebhook executes configured webhooks for auth decisions.
-func (s *EST) authorizeWithWebhook(ctx context.Context, req *ESTAuthRequest) ([]SignCSROption, error) {
+func (s *EST) authorizeWithWebhook(ctx context.Context, req *est.AuthRequest) ([]SignCSROption, error) {
 	if !s.hasAuthWebhooks() {
-		return nil, ErrESTAuthMethodMisconfigured
+		return nil, est.ErrAuthMethodMisconfigured
 	}
 
 	var (
@@ -145,15 +127,10 @@ func (s *EST) authorizeWithWebhook(ctx context.Context, req *ESTAuthRequest) ([]
 	}
 
 	if len(opts) == 0 {
-		return nil, ErrESTAuthDenied
+		return nil, est.ErrAuthDenied
 	}
 
 	return opts, nil
-}
-
-// hasBasicAuth reports whether any basic auth data is present.
-func (r ESTAuthRequest) hasBasicAuth() bool {
-	return r.BasicAuthUsername != "" || r.BasicAuthPassword != ""
 }
 
 // hasAuthWebhooks reports whether auth webhooks are configured.
@@ -165,12 +142,12 @@ func (s *EST) hasAuthWebhooks() bool {
 func (s *EST) normalizeAuthConfig() error {
 	enable := true
 	if !s.authMethodsConfigured() {
-		s.EnableHTTPBasicAuth = &enable
+		s.DummyBool = &enable
 	}
-	if s.EnableHTTPBasicAuth == nil && (s.BasicAuthUsername != "" || s.BasicAuthPassword != "") {
-		s.EnableHTTPBasicAuth = &enable
+	if s.DummyBool == nil && (s.DummyString != "" || s.DummyString != "") { // TODO(hs): refactor
+		s.DummyBool = &enable
 	}
-	if boolValue(s.EnableHTTPBasicAuth, false) && s.BasicAuthPassword == "" && !s.hasAuthWebhooks() {
+	if boolValue(s.DummyBool, false) && s.DummyString == "" && !s.hasAuthWebhooks() {
 		return errors.New("basic auth password cannot be empty")
 	}
 	return nil
@@ -178,20 +155,20 @@ func (s *EST) normalizeAuthConfig() error {
 
 // authMethodsConfigured reports whether any auth method is explicitly configured.
 func (s *EST) authMethodsConfigured() bool {
-	return s.EnableTLSClientCertificate != nil ||
+	return s.DummyBool != nil ||
 		s.hasClientCertificateRoots() ||
-		s.EnableHTTPBasicAuth != nil
+		s.DummyBool != nil
 }
 
 // parseClientCertificateRoots loads external client certificate roots.
 func (s *EST) parseClientCertificateRoots() error {
-	if len(s.ClientCertificateRoots) == 0 {
+	if len(s.DummyString) == 0 {
 		return nil
 	}
 	var (
 		block   *pem.Block
 		hasCert bool
-		rest    = s.ClientCertificateRoots
+		rest    []byte
 	)
 	s.clientCertificateRootPool = x509.NewCertPool()
 	for rest != nil {
@@ -213,7 +190,7 @@ func (s *EST) parseClientCertificateRoots() error {
 }
 
 func (s *EST) hasClientCertificateRoots() bool {
-	return len(s.ClientCertificateRoots) > 0
+	return len(s.DummyString) > 0
 }
 
 // verifyCertificate validates the client certificate against CA roots.

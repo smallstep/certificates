@@ -75,7 +75,6 @@ type Authority struct {
 
 	// EST CA
 	estOptions   *est.Options
-	validateEST  bool
 	estAuthority *est.Authority
 
 	// SSH CA
@@ -141,7 +140,6 @@ func New(cfg *config.Config, opts ...Option) (*Authority, error) {
 		config:        cfg,
 		certificates:  new(sync.Map),
 		validateSCEP:  true,
-		validateEST:   true,
 		meter:         noopMeter{},
 		wrapTransport: httptransport.NoopWrapper(),
 	}
@@ -179,7 +177,6 @@ func NewEmbedded(opts ...Option) (*Authority, error) {
 		certificates:  new(sync.Map),
 		meter:         noopMeter{},
 		wrapTransport: httptransport.NoopWrapper(),
-		validateEST:   true,
 	}
 
 	// Apply options.
@@ -324,11 +321,6 @@ func (a *Authority) ReloadAdminResources(ctx context.Context) error {
 		// TODO(hs): don't remove the authority if we can't also
 		// reload it.
 		//a.scepAuthority = nil
-	case a.requiresEST() && a.GetEST() != nil:
-		a.estAuthority.UpdateProvisioners(a.getESTProvisionerNames())
-		if err := a.estAuthority.Validate(); err != nil {
-			log.Printf("failed validating EST authority: %v\n", err)
-		}
 	}
 
 	return nil
@@ -833,45 +825,22 @@ func (a *Authority) init() error {
 	switch {
 	case a.requiresEST() && a.GetEST() == nil:
 		if a.estOptions == nil {
-			options := &est.Options{
+			a.estOptions = &est.Options{
 				Roots:         a.rootX509Certs,
 				Intermediates: a.intermediateX509Certs,
 			}
-			if len(a.intermediateX509Certs) > 0 {
-				options.SignerCert = a.intermediateX509Certs[0]
-			}
-			if a.config.IntermediateKey != "" {
-				if signer, err := a.keyManager.CreateSigner(&kmsapi.CreateSignerRequest{
-					SigningKey: a.config.IntermediateKey,
-					Password:   a.password,
-				}); err == nil {
-					options.Signer = signer
-				}
-			}
-			a.estOptions = options
 		}
-
-		a.estOptions.ESTProvisionerNames = a.getESTProvisionerNames()
 
 		estAuthority, err := est.New(a, *a.estOptions)
 		if err != nil {
 			return err
 		}
 
-		if a.validateEST {
-			if err := estAuthority.Validate(); err != nil {
-				a.initLogf("failed validating EST authority: %v", err)
-			}
-		}
-
 		a.estAuthority = estAuthority
 	case !a.requiresEST() && a.GetEST() != nil:
 		a.estAuthority = nil
 	case a.requiresEST() && a.GetEST() != nil:
-		a.estAuthority.UpdateProvisioners(a.getESTProvisionerNames())
-		if err := a.estAuthority.Validate(); err != nil {
-			log.Printf("failed validating EST authority: %v\n", err)
-		}
+		// no-op
 	}
 
 	// Load X509 constraints engine.
