@@ -401,7 +401,9 @@ func TestHandler_GetOrdersByAccountID(t *testing.T) {
 				assert.Equals(t, ae.Subproblems, tc.err.Subproblems)
 				assert.Equals(t, res.Header["Content-Type"], []string{"application/problem+json"})
 			} else {
-				expB, err := json.Marshal(oidURLs)
+				expB, err := json.Marshal(struct {
+					Orders []string `json:"orders"`
+				}{Orders: oidURLs})
 				assert.FatalError(t, err)
 				assert.Equals(t, bytes.TrimSpace(body), expB)
 				assert.Equals(t, res.Header["Content-Type"], []string{"application/json"})
