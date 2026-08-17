@@ -86,7 +86,6 @@ func CreateProvisioner(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// TODO: Validate inputs
 	if err := authority.ValidateClaims(prov.Claims); err != nil {
 		render.Error(w, r, err)
 		return
@@ -182,7 +181,6 @@ func UpdateProvisioner(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// TODO: Validate inputs
 	if err := authority.ValidateClaims(nu.Claims); err != nil {
 		render.Error(w, r, err)
 		return

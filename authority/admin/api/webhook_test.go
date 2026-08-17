@@ -632,7 +632,7 @@ func TestWebhookAdminResponder_UpdateProvisionerWebhook(t *testing.T) {
 					Url:  "https://example.com",
 					Kind: linkedca.Webhook_ENRICHING,
 				},
-				statusCode: 201,
+				statusCode: 200,
 			}
 		},
 	}

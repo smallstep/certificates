@@ -214,9 +214,14 @@ func (a *Authority) StoreProvisioner(ctx context.Context, prov *linkedca.Provisi
 	a.adminMutex.Lock()
 	defer a.adminMutex.Unlock()
 
+	if err := validateProvisionerTypeAndDetails(prov); err != nil {
+		return admin.WrapError(admin.ErrorBadRequestType, err,
+			"error validating linkedca provisioner")
+	}
+
 	certProv, err := ProvisionerToCertificates(prov)
 	if err != nil {
-		return admin.WrapErrorISE(err,
+		return admin.WrapError(admin.ErrorBadRequestType, err,
 			"error converting to certificates provisioner from linkedca provisioner")
 	}
 
@@ -272,9 +277,14 @@ func (a *Authority) UpdateProvisioner(ctx context.Context, nu *linkedca.Provisio
 	a.adminMutex.Lock()
 	defer a.adminMutex.Unlock()
 
+	if err := validateProvisionerTypeAndDetails(nu); err != nil {
+		return admin.WrapError(admin.ErrorBadRequestType, err,
+			"error validating linkedca provisioner")
+	}
+
 	certProv, err := ProvisionerToCertificates(nu)
 	if err != nil {
-		return admin.WrapErrorISE(err,
+		return admin.WrapError(admin.ErrorBadRequestType, err,
 			"error converting to certificates provisioner from linkedca provisioner")
 	}
 
@@ -288,7 +298,7 @@ func (a *Authority) UpdateProvisioner(ctx context.Context, nu *linkedca.Provisio
 	}
 
 	if err := certProv.Init(provisionerConfig); err != nil {
-		return admin.WrapErrorISE(err, "error initializing provisioner %s", nu.Name)
+		return admin.WrapError(admin.ErrorBadRequestType, err, "error validating configuration for provisioner %q", nu.Name)
 	}
 
 	if err := a.provisioners.Update(certProv); err != nil {
@@ -822,22 +832,95 @@ func provisionerPEMToCertificates(bs [][]byte) []byte {
 	return roots
 }
 
+func provisionerTypeFromDetails(details *linkedca.ProvisionerDetails) (linkedca.Provisioner_Type, error) {
+	if details == nil {
+		return linkedca.Provisioner_NOOP, errors.New("provisioner details are required")
+	}
+
+	switch d := details.GetData().(type) {
+	case *linkedca.ProvisionerDetails_JWK:
+		if d.JWK != nil {
+			return linkedca.Provisioner_JWK, nil
+		}
+	case *linkedca.ProvisionerDetails_OIDC:
+		if d.OIDC != nil {
+			return linkedca.Provisioner_OIDC, nil
+		}
+	case *linkedca.ProvisionerDetails_GCP:
+		if d.GCP != nil {
+			return linkedca.Provisioner_GCP, nil
+		}
+	case *linkedca.ProvisionerDetails_AWS:
+		if d.AWS != nil {
+			return linkedca.Provisioner_AWS, nil
+		}
+	case *linkedca.ProvisionerDetails_Azure:
+		if d.Azure != nil {
+			return linkedca.Provisioner_AZURE, nil
+		}
+	case *linkedca.ProvisionerDetails_ACME:
+		if d.ACME != nil {
+			return linkedca.Provisioner_ACME, nil
+		}
+	case *linkedca.ProvisionerDetails_X5C:
+		if d.X5C != nil {
+			return linkedca.Provisioner_X5C, nil
+		}
+	case *linkedca.ProvisionerDetails_K8SSA:
+		if d.K8SSA != nil {
+			return linkedca.Provisioner_K8SSA, nil
+		}
+	case *linkedca.ProvisionerDetails_SSHPOP:
+		if d.SSHPOP != nil {
+			return linkedca.Provisioner_SSHPOP, nil
+		}
+	case *linkedca.ProvisionerDetails_SCEP:
+		if d.SCEP != nil {
+			return linkedca.Provisioner_SCEP, nil
+		}
+	case *linkedca.ProvisionerDetails_Nebula:
+		if d.Nebula != nil {
+			return linkedca.Provisioner_NEBULA, nil
+		}
+	}
+
+	return linkedca.Provisioner_NOOP, errors.New("provisioner details are required")
+}
+
+func validateProvisionerTypeAndDetails(p *linkedca.Provisioner) error {
+	detailsType, err := provisionerTypeFromDetails(p.GetDetails())
+	if err != nil {
+		return err
+	}
+	if detailsType != p.GetType() {
+		return errors.Errorf(
+			"provisioner details (%s) do not match provisioner type (%s)",
+			detailsType, p.GetType(),
+		)
+	}
+	return nil
+}
+
 // ProvisionerToCertificates converts the linkedca provisioner type to the certificates provisioner
-// interface.
+// interface. It deliberately dispatches on details instead of requiring the
+// type enum to match so that legacy records remain loadable. New writes enforce
+// the type/details invariant with validateProvisionerTypeAndDetails.
 func ProvisionerToCertificates(p *linkedca.Provisioner) (provisioner.Interface, error) {
 	claims, err := claimsToCertificates(p.Claims)
 	if err != nil {
 		return nil, err
 	}
 
-	details := p.Details.GetData()
-	if details == nil {
-		return nil, errors.New("provisioner does not have any details")
+	details := p.GetDetails()
+	if _, err := provisionerTypeFromDetails(details); err != nil {
+		return nil, err
 	}
+
+	data := details.GetData()
 
 	options := optionsToCertificates(p)
 
-	switch d := details.(type) {
+	switch d := data.(type) {
 	case *linkedca.ProvisionerDetails_JWK:
 		jwk := new(jose.JSONWebKey)
 		if err := json.Unmarshal(d.JWK.PublicKey, &jwk); err != nil {
