@@ -34,6 +34,7 @@ import (
 	"github.com/smallstep/certificates/cas"
 	casapi "github.com/smallstep/certificates/cas/apiv1"
 	"github.com/smallstep/certificates/db"
+	"github.com/smallstep/certificates/est"
 	"github.com/smallstep/certificates/internal/httptransport"
 	"github.com/smallstep/certificates/scep"
 	"github.com/smallstep/certificates/templates"
@@ -71,6 +72,10 @@ type Authority struct {
 	validateSCEP   bool
 	scepAuthority  *scep.Authority
 	scepKeyManager provisioner.SCEPKeyManager
+
+	// EST CA
+	estOptions   *est.Options
+	estAuthority *est.Authority
 
 	// SSH CA
 	sshHostPassword         []byte
@@ -816,6 +821,28 @@ func (a *Authority) init() error {
 		}
 	}
 
+	// EST functionality is provided through an instance of est.Authority.
+	switch {
+	case a.requiresEST() && a.GetEST() == nil:
+		if a.estOptions == nil {
+			a.estOptions = &est.Options{
+				Roots:         a.rootX509Certs,
+				Intermediates: a.intermediateX509Certs,
+			}
+		}
+
+		estAuthority, err := est.New(a, *a.estOptions)
+		if err != nil {
+			return err
+		}
+
+		a.estAuthority = estAuthority
+	case !a.requiresEST() && a.GetEST() != nil:
+		a.estAuthority = nil
+	case a.requiresEST() && a.GetEST() != nil:
+		// no-op
+	}
+
 	// Load X509 constraints engine.
 	//
 	// This is currently only available in CA mode.
@@ -1004,7 +1031,19 @@ func (a *Authority) GetSCEP() *scep.Authority {
 	return a.scepAuthority
 }
 
-// HasACMEProvisioner returns true if at least one ACME provisioner is configured.
+// requiresEST iterates over the configured provisioners
+// and determines if at least one of them is an EST provisioner.
+func (a *Authority) requiresEST() bool {
+	for _, p := range a.config.AuthorityConfig.Provisioners {
+		if p.GetType() == provisioner.TypeEST {
+			return true
+		}
+	}
+	return false
+}
+
+// HasACMEProvisioner iterates over the configured provisioners
+// and determines if at least one of them is an ACME provisioner.
 func (a *Authority) HasACMEProvisioner() bool {
 	for _, p := range a.config.AuthorityConfig.Provisioners {
 		if p.GetType() == provisioner.TypeACME {
@@ -1012,6 +1051,23 @@ func (a *Authority) HasACMEProvisioner() bool {
 		}
 	}
 	return false
+}
+
+// getESTProvisionerNames returns the names of the EST provisioners
+// that are currently available in the CA.
+func (a *Authority) getESTProvisionerNames() (names []string) {
+	for _, p := range a.config.AuthorityConfig.Provisioners {
+		if p.GetType() == provisioner.TypeEST {
+			names = append(names, p.GetName())
+		}
+	}
+
+	return
+}
+
+// GetEST returns the configured EST Authority
+func (a *Authority) GetEST() *est.Authority {
+	return a.estAuthority
 }
 
 func (a *Authority) startCRLGenerator() error {
