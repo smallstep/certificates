@@ -45,15 +45,15 @@ type k8sSAPayload struct {
 // entity trusted to make signature requests.
 type K8sSA struct {
 	*base
-	ID      string   `json:"-"`
-	Type    string   `json:"type"`
-	Name    string   `json:"name"`
-	PubKeys []byte   `json:"publicKeys,omitempty"`
-	Claims  *Claims  `json:"claims,omitempty"`
-	Options *Options `json:"options,omitempty"`
-	//kauthn    kauthn.AuthenticationV1Interface
-	pubKeys []interface{}
-	ctl     *Controller
+	ID            string   `json:"-"`
+	Type          string   `json:"type"`
+	Name          string   `json:"name"`
+	PubKeys       []byte   `json:"publicKeys,omitempty"`
+	Claims        *Claims  `json:"claims,omitempty"`
+	Options       *Options `json:"options,omitempty"`
+	pubKeys       []interface{}
+	tokenReviewer k8sSATokenReviewer
+	ctl           *Controller
 }
 
 // GetID returns the provisioner unique identifier. The name and credential id
@@ -101,7 +101,7 @@ func (p *K8sSA) Init(config Config) (err error) {
 		return errors.New("provisioner name cannot be empty")
 	}
 
-	if p.PubKeys != nil {
+	if len(p.PubKeys) > 0 {
 		var (
 			block *pem.Block
 			rest  = p.PubKeys
@@ -122,23 +122,12 @@ func (p *K8sSA) Init(config Config) (err error) {
 			}
 			p.pubKeys = append(p.pubKeys, key)
 		}
-	} else {
-		// TODO: Use the TokenReview API if no pub keys provided. This will need to
-		// be configured with additional attributes in the K8sSA struct for
-		// connecting to the kubernetes API server.
-		return errors.New("K8s Service Account provisioner cannot be initialized without pub keys")
-	}
-	/*
-		// NOTE: Not sure if we should be doing this initialization here ...
-		// If you have a k8sSA provisioner defined in your config, but you're not
-		// in a kubernetes pod then your CA will fail to startup. Maybe we just postpone
-		// creating the authn until token validation time?
-		if err := checkAccess(k8s.AuthorizationV1()); err != nil {
-			return errors.Wrapf(err, "error verifying access to kubernetes authz service for provisioner %s", p.GetID())
+	} else if p.tokenReviewer == nil {
+		p.tokenReviewer, err = newInClusterK8sSATokenReviewer()
+		if err != nil {
+			return errors.Wrap(err, "error initializing Kubernetes TokenReview client")
 		}
-
-		p.kauthn = k8s.AuthenticationV1()
-	*/
+	}
 
 	p.ctl, err = NewController(p, p.Claims, config, p.Options)
 	return
@@ -147,56 +136,60 @@ func (p *K8sSA) Init(config Config) (err error) {
 // authorizeToken performs common jwt authorization actions and returns the
 // claims for case specific downstream parsing.
 // e.g. a Sign request will auth/validate different fields than a Revoke request.
-func (p *K8sSA) authorizeToken(token string, audiences []string) (*k8sSAPayload, error) {
-	_ = audiences // unused input
+func (p *K8sSA) authorizeToken(ctx context.Context, token string, audiences []string) (*k8sSAPayload, error) {
 	jwt, err := jose.ParseSigned(token)
 	if err != nil {
 		return nil, errs.Wrap(http.StatusUnauthorized, err,
 			"k8ssa.authorizeToken; error parsing k8sSA token")
 	}
 
-	var (
-		valid  bool
-		claims k8sSAPayload
-	)
-	if p.pubKeys == nil {
-		return nil, errs.Unauthorized("k8ssa.authorizeToken; k8sSA TokenReview API integration not implemented")
-		/* NOTE: We plan to support the TokenReview API in a future release.
-		         Below is some code that should be useful when we prioritize
-				 this integration.
-
-			tr := kauthnApi.TokenReview{Spec: kauthnApi.TokenReviewSpec{Token: string(token)}}
-			rvw, err := p.kauthn.TokenReviews().Create(&tr)
-			if err != nil {
-				return nil, errors.Wrap(err, "error using kubernetes TokenReview API")
-			}
-			if rvw.Status.Error != "" {
-				return nil, errors.Errorf("error from kubernetes TokenReviewAPI: %s", rvw.Status.Error)
-			}
-			if !rvw.Status.Authenticated {
-				return nil, errors.New("error from kubernetes TokenReviewAPI: token could not be authenticated")
-			}
-			if err = jwt.UnsafeClaimsWithoutVerification(&claims); err != nil {
-				return nil, errors.Wrap(err, "error parsing claims")
-			}
-		*/
-	}
-	for _, pk := range p.pubKeys {
-		if err = jwt.Claims(pk, &claims); err == nil {
-			valid = true
-			break
+	var claims k8sSAPayload
+	if p.tokenReviewer != nil {
+		status, err := p.tokenReviewer.Review(ctx, token, audiences)
+		if err != nil {
+			return nil, errs.Wrap(http.StatusInternalServerError, err,
+				"k8ssa.authorizeToken; error using Kubernetes TokenReview API")
 		}
-	}
-	if !valid {
-		return nil, errs.Unauthorized("k8ssa.authorizeToken; error validating k8sSA token and extracting claims")
-	}
+		if status == nil {
+			return nil, errs.InternalServer("k8ssa.authorizeToken; Kubernetes TokenReview API returned an empty response")
+		}
+		if status.Error != "" {
+			return nil, errs.Unauthorized("k8ssa.authorizeToken; Kubernetes TokenReview API returned an error: %s", status.Error)
+		}
+		if !status.Authenticated {
+			return nil, errs.Unauthorized("k8ssa.authorizeToken; Kubernetes TokenReview API did not authenticate token")
+		}
+		if len(audiences) > 0 && !matchesK8sSAAudience(audiences, status.Audiences) {
+			return nil, errs.Unauthorized("k8ssa.authorizeToken; Kubernetes TokenReview API did not validate the expected audience")
+		}
 
-	// According to "rfc7519 JSON Web Token" acceptable skew should be no
-	// more than a few minutes.
-	if err = claims.Validate(jose.Expected{
-		Issuer: k8sSAIssuer,
-	}); err != nil {
-		return nil, errs.Wrap(http.StatusUnauthorized, err, "k8ssa.authorizeToken; invalid k8sSA token claims")
+		namespace, serviceAccount, ok := parseK8sSAUsername(status.User.Username)
+		if !ok {
+			return nil, errs.Unauthorized("k8ssa.authorizeToken; Kubernetes TokenReview API returned invalid service account username %q", status.User.Username)
+		}
+		claims.Claims.Subject = status.User.Username
+		claims.Namespace = namespace
+		claims.ServiceAccountName = serviceAccount
+		claims.ServiceAccountUID = status.User.UID
+	} else {
+		valid := false
+		for _, pk := range p.pubKeys {
+			if err = jwt.Claims(pk, &claims); err == nil {
+				valid = true
+				break
+			}
+		}
+		if !valid {
+			return nil, errs.Unauthorized("k8ssa.authorizeToken; error validating k8sSA token and extracting claims")
+		}
+
+		// According to "rfc7519 JSON Web Token" acceptable skew should be no
+		// more than a few minutes.
+		if err = claims.Validate(jose.Expected{
+			Issuer: k8sSAIssuer,
+		}); err != nil {
+			return nil, errs.Wrap(http.StatusUnauthorized, err, "k8ssa.authorizeToken; invalid k8sSA token claims")
+		}
 	}
 
 	if claims.Subject == "" {
@@ -208,14 +201,14 @@ func (p *K8sSA) authorizeToken(token string, audiences []string) (*k8sSAPayload,
 
 // AuthorizeRevoke returns an error if the provisioner does not have rights to
 // revoke the certificate with serial number in the `sub` property.
-func (p *K8sSA) AuthorizeRevoke(_ context.Context, token string) error {
-	_, err := p.authorizeToken(token, p.ctl.Audiences.Revoke)
+func (p *K8sSA) AuthorizeRevoke(ctx context.Context, token string) error {
+	_, err := p.authorizeToken(ctx, token, p.ctl.Audiences.Revoke)
 	return errs.Wrap(http.StatusInternalServerError, err, "k8ssa.AuthorizeRevoke")
 }
 
 // AuthorizeSign validates the given token.
-func (p *K8sSA) AuthorizeSign(_ context.Context, token string) ([]SignOption, error) {
-	claims, err := p.authorizeToken(token, p.ctl.Audiences.Sign)
+func (p *K8sSA) AuthorizeSign(ctx context.Context, token string) ([]SignOption, error) {
+	claims, err := p.authorizeToken(ctx, token, p.ctl.Audiences.Sign)
 	if err != nil {
 		return nil, errs.Wrap(http.StatusInternalServerError, err, "k8ssa.AuthorizeSign")
 	}
@@ -254,11 +247,11 @@ func (p *K8sSA) AuthorizeRenew(ctx context.Context, cert *x509.Certificate) erro
 }
 
 // AuthorizeSSHSign validates an request for an SSH certificate.
-func (p *K8sSA) AuthorizeSSHSign(_ context.Context, token string) ([]SignOption, error) {
+func (p *K8sSA) AuthorizeSSHSign(ctx context.Context, token string) ([]SignOption, error) {
 	if !p.ctl.Claimer.IsSSHCAEnabled() {
 		return nil, errs.Unauthorized("k8ssa.AuthorizeSSHSign; sshCA is disabled for k8sSA provisioner '%s'", p.GetName())
 	}
-	claims, err := p.authorizeToken(token, p.ctl.Audiences.SSHSign)
+	claims, err := p.authorizeToken(ctx, token, p.ctl.Audiences.SSHSign)
 	if err != nil {
 		return nil, errs.Wrap(http.StatusInternalServerError, err, "k8ssa.AuthorizeSSHSign")
 	}
@@ -294,27 +287,3 @@ func (p *K8sSA) AuthorizeSSHSign(_ context.Context, token string) ([]SignOption,
 		p.ctl.newWebhookController(data, linkedca.Webhook_SSH),
 	), nil
 }
-
-/*
-func checkAccess(authz kauthz.AuthorizationV1Interface) error {
-	r := &kauthzApi.SelfSubjectAccessReview{
-		Spec: kauthzApi.SelfSubjectAccessReviewSpec{
-			ResourceAttributes: &kauthzApi.ResourceAttributes{
-				Group:    "authentication.k8s.io",
-				Version:  "v1",
-				Resource: "tokenreviews",
-				Verb:     "create",
-			},
-		},
-	}
-	rvw, err := authz.SelfSubjectAccessReviews().Create(r)
-	if err != nil {
-		return err
-	}
-	if !rvw.Status.Allowed {
-		return fmt.Errorf("Unable to create kubernetes token reviews: %s", rvw.Status.Reason)
-	}
-
-	return nil
-}
-*/

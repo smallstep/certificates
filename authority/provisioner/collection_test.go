@@ -193,6 +193,50 @@ func TestCollection_LoadByToken(t *testing.T) {
 	}
 }
 
+func TestCollection_LoadByToken_ModernK8sSA(t *testing.T) {
+	p, err := generateK8sSA(nil)
+	require.NoError(t, err)
+	jwk, err := jose.GenerateJWK("EC", "P-256", "ES256", "sig", "", 0)
+	require.NoError(t, err)
+
+	so := new(jose.SignerOptions)
+	so.WithHeader("kid", jwk.KeyID)
+	signer, err := jose.NewSigner(jose.SigningKey{Algorithm: jose.ES256, Key: jwk.Key}, so)
+	require.NoError(t, err)
+	token, err := jose.Signed(signer).Claims(struct {
+		jose.Claims
+		Kubernetes map[string]any `json:"kubernetes.io"`
+	}{
+		Claims: jose.Claims{
+			Issuer:   "https://kubernetes.example.com",
+			Subject:  "system:serviceaccount:payments:issuer",
+			Audience: []string{testAudiences.Sign[0]},
+		},
+		Kubernetes: map[string]any{
+			"namespace": "payments",
+			"serviceaccount": map[string]any{
+				"name": "issuer",
+				"uid":  "f0e1d2c3",
+			},
+		},
+	}).CompactSerialize()
+	require.NoError(t, err)
+	parsedToken, claims, err := parseToken(token)
+	require.NoError(t, err)
+
+	byID := new(sync.Map)
+	byID.Store(p.GetID(), p)
+	c := &Collection{
+		byID:      byID,
+		byTokenID: byID,
+		audiences: testAudiences,
+	}
+
+	got, ok := c.LoadByToken(parsedToken, claims)
+	require.True(t, ok)
+	require.Same(t, p, got)
+}
+
 func TestCollection_LoadByCertificate(t *testing.T) {
 	mustExtension := func(typ Type, name, credentialID string) pkix.Extension {
 		e := Extension{
