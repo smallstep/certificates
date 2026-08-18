@@ -6,6 +6,7 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
+	"log/slog"
 	"net"
 	"net/http"
 	"strings"
@@ -481,15 +482,53 @@ func FinalizeOrder(w http.ResponseWriter, r *http.Request) {
 	}
 
 	ca := mustAuthority(ctx)
-	if err = o.Finalize(ctx, db, fr.csr, ca, prov); err != nil {
-		render.Error(w, r, acme.WrapErrorISE(err, "error finalizing order"))
+
+	// Validate the order is ready without signing yet.
+	if err = o.UpdateStatus(ctx, db); err != nil {
+		render.Error(w, r, acme.WrapErrorISE(err, "error updating order status"))
+		return
+	}
+	if o.Status != acme.StatusReady {
+		render.Error(w, r, acme.NewError(acme.ErrorOrderNotReadyType, "order %s is not ready", o.ID))
 		return
 	}
 
+	// Immediately mark as processing and return — RFC 8555 §7.4 async finalization.
+	// This prevents ACME clients with short read timeouts (e.g. certbot's hardcoded
+	// 45s DEFAULT_NETWORK_TIMEOUT) from timing out while a slow external CA signs.
+	o.Status = acme.StatusProcessing
+	if err = db.UpdateOrder(ctx, o); err != nil {
+		render.Error(w, r, acme.WrapErrorISE(err, "error setting order to processing"))
+		return
+	}
 	linker.LinkOrder(ctx, o)
-
 	w.Header().Set("Location", linker.GetLink(ctx, acme.OrderLinkType, o.ID))
+	w.Header().Set("Retry-After", "15")
 	render.JSON(w, r, o)
+
+	// Sign the certificate in the background. DB status drives client polling responses.
+	// We capture orderID and csr rather than the order pointer to avoid data races with
+	// the HTTP response still being flushed.
+	orderID, csr := o.ID, fr.csr
+	go func() {
+		bgCtx := context.Background()
+		// Re-fetch from DB to get a clean copy, then reset to ready so
+		// Finalize()'s internal switch statement can proceed normally.
+		bgOrder, err := db.GetOrder(bgCtx, orderID)
+		if err != nil {
+			slog.Error("async finalization: failed to re-fetch order", "order", orderID, "err", err)
+			return
+		}
+		bgOrder.Status = acme.StatusReady
+		if err := bgOrder.Finalize(bgCtx, db, csr, ca, prov); err != nil {
+			slog.Error("async finalization failed", "order", orderID, "err", err)
+			bgOrder.Status = acme.StatusInvalid
+			_ = db.UpdateOrder(bgCtx, bgOrder)
+			return
+		}
+		// On success, Finalize() sets StatusValid and calls db.UpdateOrder internally.
+		slog.Info("async finalization succeeded", "order", orderID)
+	}()
 }
 
 // challengeTypes determines the types of challenges that should be used
