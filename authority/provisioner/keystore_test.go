@@ -153,6 +153,67 @@ func Test_keyStore_Get(t *testing.T) {
 	}
 }
 
+func Test_keyStore_Get_unknownKeyID(t *testing.T) {
+	srv := generateJWKServer(2)
+	defer srv.Close()
+
+	ks, err := newKeyStore(srv.Client(), srv.URL+"/rotate")
+	assert.FatalError(t, err)
+	ks.RLock()
+	cached := ks.keySet
+	ks.RUnlock()
+
+	// Rotate the keys served by the endpoint. The cached key set is valid for
+	// another week, so nothing expires during this test.
+	rotated := rotateJWKServer(t, srv)
+	assert.Len(t, 1, ks.Get(cached.Keys[0].KeyID))
+
+	// The rotated keys are not in the cached key set, so they can only be
+	// found if the key store reloads on the unknown key id.
+	assert.Len(t, 1, ks.Get(rotated.Keys[0].KeyID))
+	assert.Len(t, 1, ks.Get(rotated.Keys[1].KeyID))
+}
+
+func Test_keyStore_Get_unknownKeyIDIsRateLimited(t *testing.T) {
+	srv := generateJWKServer(2)
+	defer srv.Close()
+
+	client := &countingClient{HTTPClient: srv.Client()}
+	ks, err := newKeyStore(client, srv.URL+"/rotate")
+	assert.FatalError(t, err)
+
+	rotated := rotateJWKServer(t, srv)
+	assert.Len(t, 1, ks.Get(rotated.Keys[0].KeyID))
+	assert.Equals(t, 2, client.gets) // one on init, one on the unknown key id
+
+	// A key id that no reload can resolve must not cause a request per Get.
+	for range 10 {
+		assert.Len(t, 0, ks.Get("foobar"))
+	}
+	assert.Equals(t, 2, client.gets)
+}
+
+// rotateJWKServer rotates the keys on srv and returns the new set.
+func rotateJWKServer(t *testing.T, srv *httptest.Server) jose.JSONWebKeySet {
+	t.Helper()
+	var keySet jose.JSONWebKeySet
+	resp, err := srv.Client().Get(srv.URL + "/rotate/next")
+	assert.FatalError(t, err)
+	defer resp.Body.Close()
+	assert.FatalError(t, json.NewDecoder(resp.Body).Decode(&keySet))
+	return keySet
+}
+
+type countingClient struct {
+	HTTPClient
+	gets int
+}
+
+func (c *countingClient) Get(uri string) (*http.Response, error) {
+	c.gets++
+	return c.HTTPClient.Get(uri)
+}
+
 func Test_abs(t *testing.T) {
 	maxInt64 := time.Duration(1<<63 - 1)
 	minInt64 := time.Duration(-1 << 63)

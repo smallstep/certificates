@@ -341,6 +341,9 @@ func generateOIDC() (*OIDC, error) {
 			JWKSetURI: "https://example.com/.well-known/jwks",
 		},
 		keyStore: &keyStore{
+			// keyStore reloads on a key id it does not hold, so it needs a
+			// client.
+			client: erroringHTTPClient{},
 			keySet: jose.JSONWebKeySet{Keys: []jose.JSONWebKey{*jwk}},
 			expiry: time.Now().Add(24 * time.Hour),
 		},
@@ -373,6 +376,9 @@ func generateGCP() (*GCP, error) {
 		DisableSSHCAUser: &DefaultDisableSSHCAUser,
 		config:           newGCPConfig(),
 		keyStore: &keyStore{
+			// keyStore reloads on a key id it does not hold, so it needs a
+			// client.
+			client: erroringHTTPClient{},
 			keySet: jose.JSONWebKeySet{Keys: []jose.JSONWebKey{*jwk}},
 			expiry: time.Now().Add(24 * time.Hour),
 		},
@@ -610,6 +616,9 @@ func generateAzure() (*Azure, error) {
 			JWKSetURI: "https://login.microsoftonline.com/common/discovery/keys",
 		},
 		keyStore: &keyStore{
+			// keyStore reloads on a key id it does not hold, so it needs a
+			// client.
+			client: erroringHTTPClient{},
 			keySet: jose.JSONWebKeySet{Keys: []jose.JSONWebKey{*jwk}},
 			expiry: time.Now().Add(24 * time.Hour),
 		},
@@ -1127,11 +1136,20 @@ func generateJWKServerHandler(n int, srv *httptest.Server) http.Handler {
 	}
 
 	defaultKeySet := must(generateJSONWebKeySet(n))[0].(jose.JSONWebKeySet)
+	rotatingKeySet := defaultKeySet
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		hits.Hits++
 		switch r.RequestURI {
 		case "/error":
 			http.Error(w, http.StatusText(http.StatusBadRequest), http.StatusBadRequest)
+		case "/rotate":
+			w.Header().Add("Cache-Control", "max-age=604800")
+			writeJSON(w, getPublic(rotatingKeySet))
+		case "/rotate/next":
+			// Replaces the keys served by /rotate, as an identity provider
+			// does when it rotates keys mid-cache-lifetime.
+			rotatingKeySet = must(generateJSONWebKeySet(n))[0].(jose.JSONWebKeySet)
+			writeJSON(w, getPublic(rotatingKeySet))
 		case "/hits":
 			writeJSON(w, hits)
 		case "/.well-known/openid-configuration":

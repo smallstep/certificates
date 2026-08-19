@@ -15,17 +15,21 @@ import (
 const (
 	defaultCacheAge    = 12 * time.Hour
 	defaultCacheJitter = 1 * time.Hour
+	// minReloadInterval is the minimum time between cache refreshes on cache
+	// misses.
+	minReloadInterval = 5 * time.Minute
 )
 
 var maxAgeRegex = regexp.MustCompile(`max-age=(\d+)`)
 
 type keyStore struct {
 	sync.RWMutex
-	client HTTPClient
-	uri    string
-	keySet jose.JSONWebKeySet
-	expiry time.Time
-	jitter time.Duration
+	client     HTTPClient
+	uri        string
+	keySet     jose.JSONWebKeySet
+	expiry     time.Time
+	jitter     time.Duration
+	nextReload time.Time
 }
 
 func newKeyStore(client HTTPClient, uri string) (*keyStore, error) {
@@ -52,18 +56,33 @@ func (ks *keyStore) Get(kid string) (keys []jose.JSONWebKey) {
 		ks.RLock()
 	}
 	keys = ks.keySet.Key(kid)
+	// An identity provider can start signing with a new key before the cached
+	// key set expires. Reload on an unknown key id so those tokens are not
+	// rejected for the remainder of the cache lifetime, which is dictated by
+	// the endpoint's cache-control header and can be arbitrarily long.
+	if len(keys) == 0 && time.Now().After(ks.nextReload) {
+		ks.RUnlock()
+		ks.reload()
+		ks.RLock()
+		keys = ks.keySet.Key(kid)
+	}
 	ks.RUnlock()
 	return
 }
 
 func (ks *keyStore) reload() {
-	if keys, age, err := getKeysFromJWKsURI(ks.client, ks.uri); err == nil {
-		ks.Lock()
+	keys, age, err := getKeysFromJWKsURI(ks.client, ks.uri)
+
+	ks.Lock()
+	// Rate limit the reloads triggered by an unknown key id, whether or not the
+	// request succeeded.
+	ks.nextReload = time.Now().Add(minReloadInterval)
+	if err == nil {
 		ks.keySet = keys
 		ks.jitter = getCacheJitter(age)
 		ks.expiry = getExpirationTime(age, ks.jitter)
-		ks.Unlock()
 	}
+	ks.Unlock()
 }
 
 func getKeysFromJWKsURI(client HTTPClient, uri string) (jose.JSONWebKeySet, time.Duration, error) {
