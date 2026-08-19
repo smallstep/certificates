@@ -1,9 +1,11 @@
 package authority
 
 import (
+	"crypto/sha256"
 	"crypto/x509"
 	"crypto/x509/pkix"
 	"errors"
+	"fmt"
 	"net/http"
 	"reflect"
 	"testing"
@@ -44,6 +46,86 @@ func TestRoot(t *testing.T) {
 				if assert.Nil(t, tc.err) {
 					assert.Equals(t, crt, a.rootX509Certs[0])
 				}
+			}
+		})
+	}
+}
+
+func TestAuthority_Intermediate(t *testing.T) {
+	ca, err := minica.New()
+	require.NoError(t, err)
+
+	// Create a second intermediate certificate for multi-cert testing.
+	signer, err := keyutil.GenerateDefaultSigner()
+	require.NoError(t, err)
+	secondIntermediate, err := ca.Sign(&x509.Certificate{
+		Subject:               pkix.Name{CommonName: "Second Intermediate CA"},
+		PublicKey:             signer.Public(),
+		BasicConstraintsValid: true,
+		IsCA:                  true,
+		MaxPathLen:            0,
+	})
+	require.NoError(t, err)
+
+	// Pre-compute fingerprints.
+	firstFP := fmt.Sprintf("%x", sha256.Sum256(ca.Intermediate.Raw))
+	secondFP := fmt.Sprintf("%x", sha256.Sum256(secondIntermediate.Raw))
+
+	tests := []struct {
+		name          string
+		intermediates []*x509.Certificate
+		sum           string
+		want          *x509.Certificate
+		wantErr       bool
+		errCode       int
+	}{
+		{
+			name:          "found",
+			intermediates: []*x509.Certificate{ca.Intermediate},
+			sum:           firstFP,
+			want:          ca.Intermediate,
+		},
+		{
+			name:          "not found",
+			intermediates: []*x509.Certificate{ca.Intermediate},
+			sum:           "0000000000000000000000000000000000000000000000000000000000000000",
+			wantErr:       true,
+			errCode:       http.StatusNotFound,
+		},
+		{
+			name:          "empty list",
+			intermediates: []*x509.Certificate{},
+			sum:           firstFP,
+			wantErr:       true,
+			errCode:       http.StatusNotFound,
+		},
+		{
+			name:          "multiple intermediates - select first",
+			intermediates: []*x509.Certificate{ca.Intermediate, secondIntermediate},
+			sum:           firstFP,
+			want:          ca.Intermediate,
+		},
+		{
+			name:          "multiple intermediates - select second",
+			intermediates: []*x509.Certificate{ca.Intermediate, secondIntermediate},
+			sum:           secondFP,
+			want:          secondIntermediate,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			a := &Authority{
+				intermediateX509Certs: tt.intermediates,
+			}
+			got, err := a.Intermediate(tt.sum)
+			if tt.wantErr {
+				require.Error(t, err)
+				var sc render.StatusCodedError
+				require.ErrorAs(t, err, &sc)
+				require.Equal(t, tt.errCode, sc.StatusCode())
+			} else {
+				require.NoError(t, err)
+				require.Equal(t, tt.want, got)
 			}
 		})
 	}

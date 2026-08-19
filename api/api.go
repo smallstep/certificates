@@ -43,6 +43,7 @@ type Authority interface {
 	AuthorizeRenewToken(ctx context.Context, ott string) (*x509.Certificate, error)
 	GetTLSOptions() *config.TLSOptions
 	Root(shasum string) (*x509.Certificate, error)
+	Intermediate(shasum string) (*x509.Certificate, error)
 	SignWithContext(ctx context.Context, cr *x509.CertificateRequest, opts provisioner.SignOptions, signOpts ...provisioner.SignOption) ([]*x509.Certificate, error)
 	Renew(peer *x509.Certificate) ([]*x509.Certificate, error)
 	RenewContext(ctx context.Context, peer *x509.Certificate, pk crypto.PublicKey) ([]*x509.Certificate, error)
@@ -227,6 +228,12 @@ type RootResponse struct {
 	RootPEM Certificate `json:"ca"`
 }
 
+// IntermediateResponse is the response object that returns the PEM of an
+// intermediate certificate.
+type IntermediateResponse struct {
+	IntermediatePEM Certificate `json:"ca"`
+}
+
 // ProvisionersResponse is the response object that returns the list of
 // provisioners.
 type ProvisionersResponse struct {
@@ -340,6 +347,7 @@ func Route(r Router) {
 	r.MethodFunc("GET", "/intermediates", Intermediates)
 	r.MethodFunc("GET", "/intermediates.pem", IntermediatesPEM)
 	r.MethodFunc("GET", "/federation", Federation)
+	r.MethodFunc("GET", "/intermediate/{sha}", Intermediate)
 
 	// SSH CA
 	r.MethodFunc("POST", "/ssh/sign", SSHSign)
@@ -360,6 +368,25 @@ func Route(r Router) {
 	r.MethodFunc("GET", "/ssh/get-hosts", SSHGetHosts)
 }
 
+// normalizeFingerprint lowercases the input and strips any dashes so that
+// callers can pass fingerprints in the common colon-/dash-separated form.
+func normalizeFingerprint(sha string) string {
+	return strings.ToLower(strings.ReplaceAll(sha, "-", ""))
+}
+
+// Intermediate is an HTTP handler that using the SHA256 from the URL, returns
+// the intermediate certificate for the given SHA256.
+func Intermediate(w http.ResponseWriter, r *http.Request) {
+	sum := normalizeFingerprint(chi.URLParam(r, "sha"))
+	cert, err := mustAuthority(r.Context()).Intermediate(sum)
+	if err != nil {
+		render.Error(w, r, errs.NotFoundErr(err, errs.WithMessage("intermediate certificate with fingerprint %q was not found", sum)))
+		return
+	}
+
+	render.JSON(w, r, &IntermediateResponse{IntermediatePEM: Certificate{cert}})
+}
+
 // Version is an HTTP handler that returns the version of the server.
 func Version(w http.ResponseWriter, r *http.Request) {
 	v := mustAuthority(r.Context()).Version()
@@ -377,8 +404,7 @@ func Health(w http.ResponseWriter, r *http.Request) {
 // Root is an HTTP handler that using the SHA256 from the URL, returns the root
 // certificate for the given SHA256.
 func Root(w http.ResponseWriter, r *http.Request) {
-	sha := chi.URLParam(r, "sha")
-	sum := strings.ToLower(strings.ReplaceAll(sha, "-", ""))
+	sum := normalizeFingerprint(chi.URLParam(r, "sha"))
 	// Load root certificate with the
 	cert, err := mustAuthority(r.Context()).Root(sum)
 	if err != nil {
