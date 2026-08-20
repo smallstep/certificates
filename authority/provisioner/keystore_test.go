@@ -164,8 +164,8 @@ func Test_keyStore_Get_unknownKeyID(t *testing.T) {
 	cached := ks.keySet
 	ks.RUnlock()
 
-	// Rotate the keys served by the endpoint. The cached key set is valid for
-	// another week, so nothing expires during this test.
+	// The cached key set is valid for another week, so nothing expires during
+	// this test.
 	rotated := rotateJWKServer(t, srv)
 	assert.Len(t, 1, ks.Get(cached.Keys[0].KeyID))
 
@@ -187,7 +187,6 @@ func Test_keyStore_Get_unknownKeyIDIsRateLimited(t *testing.T) {
 	assert.Len(t, 1, ks.Get(rotated.Keys[0].KeyID))
 	assert.Equals(t, 2, client.gets) // one on init, one on the unknown key id
 
-	// A key id that no reload can resolve must not cause a request per Get.
 	for range 10 {
 		assert.Len(t, 0, ks.Get("foobar"))
 	}
@@ -211,7 +210,6 @@ func Test_keyStore_Get_failedReloadKeepsCachedKeys(t *testing.T) {
 	// An unknown key id triggers a reload, and that reload fails.
 	assert.Len(t, 0, ks.Get("foobar"))
 
-	// The cached keys must survive the failed reload.
 	assert.Len(t, 1, ks.Get(cached.Keys[0].KeyID))
 	assert.Len(t, 1, ks.Get(cached.Keys[1].KeyID))
 }

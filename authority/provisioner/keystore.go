@@ -75,8 +75,8 @@ func (ks *keyStore) reload() {
 	keys, age, err := getKeysFromJWKsURI(ks.client, ks.uri)
 
 	ks.Lock()
-	// Rate limit the reloads triggered by an unknown key id, whether or not the
-	// request succeeded.
+	// Set on failure too, so that a key id no reload can resolve does not cause
+	// a request per token.
 	ks.nextReload = time.Now().Add(minReloadInterval)
 	if err == nil {
 		ks.keySet = keys

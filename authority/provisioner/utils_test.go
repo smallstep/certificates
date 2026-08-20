@@ -376,8 +376,6 @@ func generateGCP() (*GCP, error) {
 		DisableSSHCAUser: &DefaultDisableSSHCAUser,
 		config:           newGCPConfig(),
 		keyStore: &keyStore{
-			// keyStore reloads on a key id it does not hold, so it needs a
-			// client.
 			client: erroringHTTPClient{},
 			keySet: jose.JSONWebKeySet{Keys: []jose.JSONWebKey{*jwk}},
 			expiry: time.Now().Add(24 * time.Hour),
@@ -616,8 +614,6 @@ func generateAzure() (*Azure, error) {
 			JWKSetURI: "https://login.microsoftonline.com/common/discovery/keys",
 		},
 		keyStore: &keyStore{
-			// keyStore reloads on a key id it does not hold, so it needs a
-			// client.
 			client: erroringHTTPClient{},
 			keySet: jose.JSONWebKeySet{Keys: []jose.JSONWebKey{*jwk}},
 			expiry: time.Now().Add(24 * time.Hour),
@@ -1144,16 +1140,14 @@ func generateJWKServerHandler(n int, srv *httptest.Server) http.Handler {
 		case "/error":
 			http.Error(w, http.StatusText(http.StatusBadRequest), http.StatusBadRequest)
 		case "/error-json":
-			// An error carrying a JSON body, as an API gateway in front of a
-			// JWKs endpoint returns.
 			w.Header().Add("Content-Type", "application/json")
-			w.WriteHeader(http.StatusForbidden)
-			w.Write([]byte(`{"message":"Forbidden"}`))
+			w.WriteHeader(http.StatusNotFound)
+			w.Write([]byte(`{"message":"Not Found"}`))
 		case "/rotate":
 			if rotateFails {
 				w.Header().Add("Content-Type", "application/json")
-				w.WriteHeader(http.StatusForbidden)
-				w.Write([]byte(`{"message":"Forbidden"}`))
+				w.WriteHeader(http.StatusNotFound)
+				w.Write([]byte(`{"message":"Not Found"}`))
 				return
 			}
 			w.Header().Add("Cache-Control", "max-age=604800")
@@ -1164,8 +1158,6 @@ func generateJWKServerHandler(n int, srv *httptest.Server) http.Handler {
 			rotatingKeySet = must(generateJSONWebKeySet(n))[0].(jose.JSONWebKeySet)
 			writeJSON(w, getPublic(rotatingKeySet))
 		case "/rotate/fail":
-			// Makes /rotate start failing, as an endpoint that has become
-			// unreachable behind a gateway does.
 			rotateFails = true
 		case "/hits":
 			writeJSON(w, hits)
