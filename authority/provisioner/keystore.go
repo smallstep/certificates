@@ -2,6 +2,7 @@ package provisioner
 
 import (
 	"encoding/json"
+	"io"
 	"math/rand"
 	"regexp"
 	"strconv"
@@ -92,7 +93,16 @@ func getKeysFromJWKsURI(client HTTPClient, uri string) (jose.JSONWebKeySet, time
 		return keys, 0, errors.Wrapf(err, "failed to connect to %s", uri)
 	}
 	defer resp.Body.Close()
-	if err := json.NewDecoder(resp.Body).Decode(&keys); err != nil {
+	b, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return keys, 0, errors.Wrapf(err, "error reading response from %s", uri)
+	}
+	// An error response carrying a JSON body decodes into an empty key set
+	// without error, which reload would then install in place of a usable one.
+	if resp.StatusCode >= 400 {
+		return keys, 0, errors.Errorf("error reading %s: status=%d, response=%s", uri, resp.StatusCode, b)
+	}
+	if err := json.Unmarshal(b, &keys); err != nil {
 		return keys, 0, errors.Wrapf(err, "error reading %s", uri)
 	}
 	return keys, getCacheAge(resp.Header.Get("cache-control")), nil

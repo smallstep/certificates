@@ -1137,12 +1137,25 @@ func generateJWKServerHandler(n int, srv *httptest.Server) http.Handler {
 
 	defaultKeySet := must(generateJSONWebKeySet(n))[0].(jose.JSONWebKeySet)
 	rotatingKeySet := defaultKeySet
+	rotateFails := false
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		hits.Hits++
 		switch r.RequestURI {
 		case "/error":
 			http.Error(w, http.StatusText(http.StatusBadRequest), http.StatusBadRequest)
+		case "/error-json":
+			// An error carrying a JSON body, as an API gateway in front of a
+			// JWKs endpoint returns.
+			w.Header().Add("Content-Type", "application/json")
+			w.WriteHeader(http.StatusForbidden)
+			w.Write([]byte(`{"message":"Forbidden"}`))
 		case "/rotate":
+			if rotateFails {
+				w.Header().Add("Content-Type", "application/json")
+				w.WriteHeader(http.StatusForbidden)
+				w.Write([]byte(`{"message":"Forbidden"}`))
+				return
+			}
 			w.Header().Add("Cache-Control", "max-age=604800")
 			writeJSON(w, getPublic(rotatingKeySet))
 		case "/rotate/next":
@@ -1150,6 +1163,10 @@ func generateJWKServerHandler(n int, srv *httptest.Server) http.Handler {
 			// does when it rotates keys mid-cache-lifetime.
 			rotatingKeySet = must(generateJSONWebKeySet(n))[0].(jose.JSONWebKeySet)
 			writeJSON(w, getPublic(rotatingKeySet))
+		case "/rotate/fail":
+			// Makes /rotate start failing, as an endpoint that has become
+			// unreachable behind a gateway does.
+			rotateFails = true
 		case "/hits":
 			writeJSON(w, hits)
 		case "/.well-known/openid-configuration":
