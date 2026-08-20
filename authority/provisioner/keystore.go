@@ -2,6 +2,7 @@ package provisioner
 
 import (
 	"encoding/json"
+	"io"
 	"math/rand"
 	"regexp"
 	"strconv"
@@ -15,17 +16,21 @@ import (
 const (
 	defaultCacheAge    = 12 * time.Hour
 	defaultCacheJitter = 1 * time.Hour
+	// minReloadInterval is the minimum time between cache refreshes on cache
+	// misses.
+	minReloadInterval = 1 * time.Minute
 )
 
 var maxAgeRegex = regexp.MustCompile(`max-age=(\d+)`)
 
 type keyStore struct {
 	sync.RWMutex
-	client HTTPClient
-	uri    string
-	keySet jose.JSONWebKeySet
-	expiry time.Time
-	jitter time.Duration
+	client     HTTPClient
+	uri        string
+	keySet     jose.JSONWebKeySet
+	expiry     time.Time
+	jitter     time.Duration
+	nextReload time.Time
 }
 
 func newKeyStore(client HTTPClient, uri string) (*keyStore, error) {
@@ -52,18 +57,33 @@ func (ks *keyStore) Get(kid string) (keys []jose.JSONWebKey) {
 		ks.RLock()
 	}
 	keys = ks.keySet.Key(kid)
+	// An identity provider can start signing with a new key before the cached
+	// key set expires. Reload on an unknown key id so those tokens are not
+	// rejected for the remainder of the cache lifetime, which is dictated by
+	// the endpoint's cache-control header and can be arbitrarily long.
+	if len(keys) == 0 && time.Now().After(ks.nextReload) {
+		ks.RUnlock()
+		ks.reload()
+		ks.RLock()
+		keys = ks.keySet.Key(kid)
+	}
 	ks.RUnlock()
 	return
 }
 
 func (ks *keyStore) reload() {
-	if keys, age, err := getKeysFromJWKsURI(ks.client, ks.uri); err == nil {
-		ks.Lock()
+	keys, age, err := getKeysFromJWKsURI(ks.client, ks.uri)
+
+	ks.Lock()
+	// Set on failure too, so that a key id no reload can resolve does not cause
+	// a request per token.
+	ks.nextReload = time.Now().Add(minReloadInterval)
+	if err == nil {
 		ks.keySet = keys
 		ks.jitter = getCacheJitter(age)
 		ks.expiry = getExpirationTime(age, ks.jitter)
-		ks.Unlock()
 	}
+	ks.Unlock()
 }
 
 func getKeysFromJWKsURI(client HTTPClient, uri string) (jose.JSONWebKeySet, time.Duration, error) {
@@ -73,7 +93,16 @@ func getKeysFromJWKsURI(client HTTPClient, uri string) (jose.JSONWebKeySet, time
 		return keys, 0, errors.Wrapf(err, "failed to connect to %s", uri)
 	}
 	defer resp.Body.Close()
-	if err := json.NewDecoder(resp.Body).Decode(&keys); err != nil {
+	b, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return keys, 0, errors.Wrapf(err, "error reading response from %s", uri)
+	}
+	// An error response carrying a JSON body decodes into an empty key set
+	// without error, which reload would then install in place of a usable one.
+	if resp.StatusCode >= 400 {
+		return keys, 0, errors.Errorf("error reading %s: status=%d, response=%s", uri, resp.StatusCode, b)
+	}
+	if err := json.Unmarshal(b, &keys); err != nil {
 		return keys, 0, errors.Wrapf(err, "error reading %s", uri)
 	}
 	return keys, getCacheAge(resp.Header.Get("cache-control")), nil

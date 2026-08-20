@@ -35,6 +35,7 @@ func Test_newKeyStore(t *testing.T) {
 	}{
 		{"ok", args{srv.Client(), srv.URL}, ks.keySet, false},
 		{"fail", args{srv.Client(), srv.URL + "/error"}, jose.JSONWebKeySet{}, true},
+		{"fail json error body", args{srv.Client(), srv.URL + "/error-json"}, jose.JSONWebKeySet{}, true},
 		{"fail client", args{http.DefaultClient, srv.URL}, jose.JSONWebKeySet{}, true},
 	}
 	for _, tt := range tests {
@@ -151,6 +152,95 @@ func Test_keyStore_Get(t *testing.T) {
 			}
 		})
 	}
+}
+
+func Test_keyStore_Get_unknownKeyID(t *testing.T) {
+	srv := generateJWKServer(2)
+	defer srv.Close()
+
+	ks, err := newKeyStore(srv.Client(), srv.URL+"/rotate")
+	assert.FatalError(t, err)
+	ks.RLock()
+	cached := ks.keySet
+	ks.RUnlock()
+
+	// The cached key set is valid for another week, so nothing expires during
+	// this test.
+	rotated := rotateJWKServer(t, srv)
+	assert.Len(t, 1, ks.Get(cached.Keys[0].KeyID))
+
+	// The rotated keys are not in the cached key set, so they can only be
+	// found if the key store reloads on the unknown key id.
+	assert.Len(t, 1, ks.Get(rotated.Keys[0].KeyID))
+	assert.Len(t, 1, ks.Get(rotated.Keys[1].KeyID))
+}
+
+func Test_keyStore_Get_unknownKeyIDIsRateLimited(t *testing.T) {
+	srv := generateJWKServer(2)
+	defer srv.Close()
+
+	client := &countingClient{HTTPClient: srv.Client()}
+	ks, err := newKeyStore(client, srv.URL+"/rotate")
+	assert.FatalError(t, err)
+
+	rotated := rotateJWKServer(t, srv)
+	assert.Len(t, 1, ks.Get(rotated.Keys[0].KeyID))
+	assert.Equals(t, 2, client.gets) // one on init, one on the unknown key id
+
+	for range 10 {
+		assert.Len(t, 0, ks.Get("foobar"))
+	}
+	assert.Equals(t, 2, client.gets)
+}
+
+func Test_keyStore_Get_failedReloadKeepsCachedKeys(t *testing.T) {
+	srv := generateJWKServer(2)
+	defer srv.Close()
+
+	ks, err := newKeyStore(srv.Client(), srv.URL+"/rotate")
+	assert.FatalError(t, err)
+	ks.RLock()
+	cached := ks.keySet
+	ks.RUnlock()
+
+	// The endpoint starts answering with a JSON error body, which decodes into
+	// an empty key set unless the status code is checked.
+	failJWKServer(t, srv)
+
+	// An unknown key id triggers a reload, and that reload fails.
+	assert.Len(t, 0, ks.Get("foobar"))
+
+	assert.Len(t, 1, ks.Get(cached.Keys[0].KeyID))
+	assert.Len(t, 1, ks.Get(cached.Keys[1].KeyID))
+}
+
+// rotateJWKServer rotates the keys on srv and returns the new set.
+func rotateJWKServer(t *testing.T, srv *httptest.Server) jose.JSONWebKeySet {
+	t.Helper()
+	var keySet jose.JSONWebKeySet
+	resp, err := srv.Client().Get(srv.URL + "/rotate/next")
+	assert.FatalError(t, err)
+	defer resp.Body.Close()
+	assert.FatalError(t, json.NewDecoder(resp.Body).Decode(&keySet))
+	return keySet
+}
+
+// failJWKServer makes the /rotate endpoint of srv start returning an error.
+func failJWKServer(t *testing.T, srv *httptest.Server) {
+	t.Helper()
+	resp, err := srv.Client().Get(srv.URL + "/rotate/fail")
+	assert.FatalError(t, err)
+	assert.FatalError(t, resp.Body.Close())
+}
+
+type countingClient struct {
+	HTTPClient
+	gets int
+}
+
+func (c *countingClient) Get(uri string) (*http.Response, error) {
+	c.gets++
+	return c.HTTPClient.Get(uri)
 }
 
 func Test_abs(t *testing.T) {
