@@ -17,7 +17,7 @@ const (
 	defaultCacheJitter = 1 * time.Hour
 	// minReloadInterval is the minimum time between cache refreshes on cache
 	// misses.
-	minReloadInterval = 5 * time.Minute
+	minReloadInterval = 1 * time.Minute
 )
 
 var maxAgeRegex = regexp.MustCompile(`max-age=(\d+)`)
