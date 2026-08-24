@@ -8,7 +8,6 @@ import (
 	"fmt"
 	"net"
 	"net/http"
-	"slices"
 	"strings"
 	"sync/atomic"
 	"time"
@@ -512,7 +511,7 @@ func (p *ACME) GetAttestationRoots() (*x509.CertPool, bool) {
 func (p *ACME) IsAndroidCertificateRevoked(ctx context.Context, cert *x509.Certificate) (bool, error) {
 	// the check only has to be performed when the "android-key" attestation
 	// format is enabled
-	if !slices.Contains(p.AttestationFormats, ANDROIDKEY) {
+	if !p.IsAttestationFormatEnabled(ctx, ANDROIDKEY) {
 		return false, nil
 	}
 
