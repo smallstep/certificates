@@ -117,8 +117,7 @@ func main() {
 			// Options set in http.DefaultTransport
 			Proxy: http.ProxyFromEnvironment,
 			DialContext: (&net.Dialer{
-				Timeout:   30 * time.Second,
-				DualStack: true,
+				Timeout: 30 * time.Second,
 			}).DialContext,
 			MaxIdleConns:          100,
 			IdleConnTimeout:       90 * time.Second,

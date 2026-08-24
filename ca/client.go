@@ -431,9 +431,8 @@ func getTransportFromFile(filename string) (http.RoundTripper, error) {
 		return nil, errors.Errorf("error parsing %s: no certificates found", filename)
 	}
 	return getDefaultTransport(&tls.Config{
-		MinVersion:               tls.VersionTLS12,
-		PreferServerCipherSuites: true,
-		RootCAs:                  pool,
+		MinVersion: tls.VersionTLS12,
+		RootCAs:    pool,
 	}), nil
 }
 
@@ -450,9 +449,8 @@ func getTransportFromSHA256(endpoint, sum string) (http.RoundTripper, error) {
 	pool := x509.NewCertPool()
 	pool.AddCert(root.RootPEM.Certificate)
 	return getDefaultTransport(&tls.Config{
-		MinVersion:               tls.VersionTLS12,
-		PreferServerCipherSuites: true,
-		RootCAs:                  pool,
+		MinVersion: tls.VersionTLS12,
+		RootCAs:    pool,
 	}), nil
 }
 
@@ -462,9 +460,8 @@ func getTransportFromCABundle(bundle []byte) (http.RoundTripper, error) {
 		return nil, errors.New("error parsing ca bundle: no certificates found")
 	}
 	return getDefaultTransport(&tls.Config{
-		MinVersion:               tls.VersionTLS12,
-		PreferServerCipherSuites: true,
-		RootCAs:                  pool,
+		MinVersion: tls.VersionTLS12,
+		RootCAs:    pool,
 	}), nil
 }
 
