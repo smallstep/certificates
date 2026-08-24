@@ -298,10 +298,9 @@ func (i *Identity) Renew(client Renewer) error {
 
 		tr := httptransport.New()
 		tr.TLSClientConfig = &tls.Config{
-			Certificates:             []tls.Certificate{cert},
-			RootCAs:                  client.GetRootCAs(),
-			MinVersion:               tls.VersionTLS12,
-			PreferServerCipherSuites: true,
+			Certificates: []tls.Certificate{cert},
+			RootCAs:      client.GetRootCAs(),
+			MinVersion:   tls.VersionTLS12,
 		}
 
 		sign, err := client.Renew(tr)
