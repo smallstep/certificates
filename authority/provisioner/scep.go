@@ -43,6 +43,14 @@ type SCEP struct {
 	// MinimumPublicKeyLength is the minimum length for public keys in CSRs
 	MinimumPublicKeyLength int `json:"minimumPublicKeyLength,omitempty"`
 
+	// AllowUnsortedAuthenticatedAttributes permits verification of PKCS#7 messages
+	// from legacy SCEP clients that sign authenticated attributes without DER sorting.
+	AllowUnsortedAuthenticatedAttributes bool `json:"allowUnsortedAuthenticatedAttributes,omitempty"`
+
+	// LegacyRSADigestEncryptionAlgorithm makes SCEP responses use rsaEncryption as the
+	// SignerInfo digestEncryptionAlgorithm for compatibility with legacy SCEP clients.
+	LegacyRSADigestEncryptionAlgorithm bool `json:"legacyRSADigestEncryptionAlgorithm,omitempty"`
+
 	// TODO(hs): also support a separate signer configuration?
 	DecrypterCertificate []byte `json:"decrypterCertificate,omitempty"`
 	DecrypterKeyPEM      []byte `json:"decrypterKeyPEM,omitempty"`
@@ -445,6 +453,18 @@ func (s *SCEP) ShouldIncludeRootInChain() bool {
 // don't pick the right recipient.
 func (s *SCEP) ShouldIncludeIntermediateInChain() bool {
 	return !s.ExcludeIntermediate
+}
+
+// ShouldAllowUnsortedAuthenticatedAttributes indicates whether verification may
+// fall back to the authenticated attribute order used by legacy SCEP clients.
+func (s *SCEP) ShouldAllowUnsortedAuthenticatedAttributes() bool {
+	return s.AllowUnsortedAuthenticatedAttributes
+}
+
+// ShouldUseLegacyRSADigestEncryptionAlgorithm indicates whether SCEP responses
+// should use rsaEncryption as the SignerInfo digestEncryptionAlgorithm.
+func (s *SCEP) ShouldUseLegacyRSADigestEncryptionAlgorithm() bool {
+	return s.LegacyRSADigestEncryptionAlgorithm
 }
 
 // GetContentEncryptionAlgorithm returns the numeric identifier
