@@ -102,6 +102,12 @@ func NewAccount(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	if prov.TermsOfService != "" && !nar.TermsOfServiceAgreed {
+		render.Error(w, r, acme.NewError(acme.ErrorUserActionRequiredType,
+			"terms of service must be agreed to; see %s", prov.TermsOfService))
+		return
+	}
+
 	httpStatus := http.StatusCreated
 	acc, err := accountFromContext(ctx)
 	if err != nil {
