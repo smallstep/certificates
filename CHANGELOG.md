@@ -25,6 +25,15 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
 
 ---
 
+## [Unreleased]
+
+### Fixed
+
+- Reject mismatched provisioner types and details in admin API create and
+  update requests, and return bad-request errors for invalid configurations.
+- Updating a provisioner webhook now responds with `200 OK` instead of
+  `201 Created`.
+
 ## [0.30.2] - 2026-03-22
 
 - Update golang.org/grpc to patch security advisory

@@ -229,5 +229,5 @@ func (war *webhookAdminResponder) UpdateProvisionerWebhook(w http.ResponseWriter
 		Auth:                 newWebhook.Auth,
 		DisableTlsClientAuth: newWebhook.DisableTlsClientAuth,
 	}
-	render.ProtoJSONStatus(w, whResponse, http.StatusCreated)
+	render.ProtoJSONStatus(w, whResponse, http.StatusOK)
 }
