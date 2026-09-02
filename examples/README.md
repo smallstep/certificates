@@ -1,5 +1,11 @@
 # Examples
 
+## Kubernetes ServiceAccount TokenReview
+
+The [Kubernetes TokenReview example](./kubernetes-tokenreview/) shows how to
+authenticate short-lived projected ServiceAccount tokens without copying
+cluster signing keys into the `step-ca` configuration.
+
 ## Basic client usage
 
 The basic-client example shows the functionality of the `ca.Client` type. The
@@ -645,4 +651,3 @@ A complete Puppet configuration should use a service manager (like
 and a secret store (like [Hiera](https://puppet.com/docs/puppet/6.0/hiera_intro.html)).
 If you are interested in seeing a more complete example please let us know and we'll
 make one available.
-

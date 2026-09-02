@@ -15,6 +15,12 @@ import (
 	"github.com/smallstep/certificates/api/render"
 )
 
+type k8sSATokenReviewerFunc func(context.Context, string, []string) (*k8sSATokenReviewStatus, error)
+
+func (f k8sSATokenReviewerFunc) Review(ctx context.Context, token string, audiences []string) (*k8sSATokenReviewStatus, error) {
+	return f(ctx, token, audiences)
+}
+
 func TestK8sSA_Getters(t *testing.T) {
 	p, err := generateK8sSA(nil)
 	assert.FatalError(t, err)
@@ -35,6 +41,23 @@ func TestK8sSA_Getters(t *testing.T) {
 	}
 }
 
+func TestK8sSA_InitWithTokenReview(t *testing.T) {
+	reviewer := k8sSATokenReviewerFunc(func(context.Context, string, []string) (*k8sSATokenReviewStatus, error) {
+		return nil, nil
+	})
+	p := &K8sSA{
+		Name:          K8sSAName,
+		Type:          "K8sSA",
+		Claims:        &globalProvisionerClaims,
+		tokenReviewer: reviewer,
+	}
+
+	err := p.Init(Config{Audiences: testAudiences})
+	assert.Nil(t, err)
+	assert.NotNil(t, p.tokenReviewer)
+	assert.NotNil(t, p.ctl)
+}
+
 func TestK8sSA_authorizeToken(t *testing.T) {
 	type test struct {
 		p     *K8sSA
@@ -51,22 +74,6 @@ func TestK8sSA_authorizeToken(t *testing.T) {
 				token: "foo",
 				code:  http.StatusUnauthorized,
 				err:   errors.New("k8ssa.authorizeToken; error parsing k8sSA token"),
-			}
-		},
-		"fail/not-implemented": func(t *testing.T) test {
-			jwk, err := jose.GenerateJWK("EC", "P-256", "ES256", "sig", "", 0)
-			assert.FatalError(t, err)
-			p, err := generateK8sSA(nil)
-			assert.FatalError(t, err)
-			tok, err := generateToken("", p.Name, testAudiences.Sign[0], "",
-				[]string{"test.smallstep.com"}, time.Now(), jwk)
-			p.pubKeys = nil
-			assert.FatalError(t, err)
-			return test{
-				p:     p,
-				token: tok,
-				err:   errors.New("k8ssa.authorizeToken; k8sSA TokenReview API integration not implemented"),
-				code:  http.StatusUnauthorized,
 			}
 		},
 		"fail/error-validating-token": func(t *testing.T) test {
@@ -116,7 +123,7 @@ func TestK8sSA_authorizeToken(t *testing.T) {
 	for name, tt := range tests {
 		t.Run(name, func(t *testing.T) {
 			tc := tt(t)
-			if claims, err := tc.p.authorizeToken(tc.token, testAudiences.Sign); err != nil {
+			if claims, err := tc.p.authorizeToken(context.Background(), tc.token, testAudiences.Sign); err != nil {
 				if assert.NotNil(t, tc.err) {
 					var sc render.StatusCodedError
 					assert.Fatal(t, errors.As(err, &sc), "error does not implement StatusCodedError interface")
@@ -128,6 +135,96 @@ func TestK8sSA_authorizeToken(t *testing.T) {
 					assert.NotNil(t, claims)
 				}
 			}
+		})
+	}
+}
+
+func TestK8sSA_authorizeTokenWithTokenReview(t *testing.T) {
+	jwk, err := jose.GenerateJWK("EC", "P-256", "ES256", "sig", "", 0)
+	assert.FatalError(t, err)
+	token, err := generateK8sSAToken(jwk, nil)
+	assert.FatalError(t, err)
+
+	tests := map[string]struct {
+		status *k8sSATokenReviewStatus
+		err    error
+		code   int
+		prefix string
+	}{
+		"fail/reviewer-error": {
+			err:    errors.New("connection refused"),
+			code:   http.StatusInternalServerError,
+			prefix: "k8ssa.authorizeToken; error using Kubernetes TokenReview API",
+		},
+		"fail/empty-response": {
+			code:   http.StatusInternalServerError,
+			prefix: "k8ssa.authorizeToken; Kubernetes TokenReview API returned an empty response",
+		},
+		"fail/status-error": {
+			status: &k8sSATokenReviewStatus{Error: "token is expired"},
+			code:   http.StatusUnauthorized,
+			prefix: "k8ssa.authorizeToken; Kubernetes TokenReview API returned an error",
+		},
+		"fail/not-authenticated": {
+			status: &k8sSATokenReviewStatus{},
+			code:   http.StatusUnauthorized,
+			prefix: "k8ssa.authorizeToken; Kubernetes TokenReview API did not authenticate token",
+		},
+		"fail/audience": {
+			status: &k8sSATokenReviewStatus{
+				Authenticated: true,
+				Audiences:     []string{"https://kubernetes.default.svc"},
+			},
+			code:   http.StatusUnauthorized,
+			prefix: "k8ssa.authorizeToken; Kubernetes TokenReview API did not validate the expected audience",
+		},
+		"fail/username": {
+			status: &k8sSATokenReviewStatus{
+				Authenticated: true,
+				Audiences:     []string{testAudiences.Sign[0]},
+				User:          k8sSATokenReviewUser{Username: "alice"},
+			},
+			code:   http.StatusUnauthorized,
+			prefix: "k8ssa.authorizeToken; Kubernetes TokenReview API returned invalid service account username",
+		},
+		"ok": {
+			status: &k8sSATokenReviewStatus{
+				Authenticated: true,
+				Audiences:     []string{testAudiences.Sign[0]},
+				User: k8sSATokenReviewUser{
+					Username: "system:serviceaccount:payments:issuer",
+					UID:      "f0e1d2c3",
+				},
+			},
+		},
+	}
+
+	for name, tt := range tests {
+		t.Run(name, func(t *testing.T) {
+			p, err := generateK8sSA(nil)
+			assert.FatalError(t, err)
+			p.pubKeys = nil
+			p.tokenReviewer = k8sSATokenReviewerFunc(func(_ context.Context, gotToken string, gotAudiences []string) (*k8sSATokenReviewStatus, error) {
+				assert.Equals(t, gotToken, token)
+				assert.Equals(t, gotAudiences, testAudiences.Sign)
+				return tt.status, tt.err
+			})
+
+			claims, err := p.authorizeToken(context.Background(), token, testAudiences.Sign)
+			if tt.prefix != "" {
+				assert.NotNil(t, err)
+				var sc render.StatusCodedError
+				assert.Fatal(t, errors.As(err, &sc), "error does not implement StatusCodedError interface")
+				assert.Equals(t, sc.StatusCode(), tt.code)
+				assert.HasPrefix(t, err.Error(), tt.prefix)
+				return
+			}
+
+			assert.Nil(t, err)
+			assert.Equals(t, claims.Subject, "system:serviceaccount:payments:issuer")
+			assert.Equals(t, claims.Namespace, "payments")
+			assert.Equals(t, claims.ServiceAccountName, "issuer")
+			assert.Equals(t, claims.ServiceAccountUID, "f0e1d2c3")
 		})
 	}
 }
