@@ -18,6 +18,7 @@ type Authorization struct {
 	Wildcard    bool         `json:"wildcard"`
 	ExpiresAt   time.Time    `json:"expires"`
 	Error       *Error       `json:"error,omitempty"`
+	ExtraIdentifiers []string `json:"extraIdentifiers,omitempty"`
 }
 
 // ToLog enables response logging.
