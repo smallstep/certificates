@@ -9,6 +9,7 @@ import (
 	"net/url"
 	"path"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/pkg/errors"
@@ -19,6 +20,17 @@ import (
 	"go.step.sm/crypto/x509util"
 
 	"github.com/smallstep/certificates/errs"
+)
+
+const (
+	// oidcInitRetryInterval is the time to wait before the second attempt to
+	// get the OpenID configuration of a provisioner that failed to initialize.
+	// It doubles on every failure up to oidcMaxInitRetryInterval.
+	oidcInitRetryInterval = 5 * time.Second
+
+	// oidcMaxInitRetryInterval is the maximum time between two attempts to get
+	// the OpenID configuration of a provisioner that failed to initialize.
+	oidcMaxInitRetryInterval = 5 * time.Minute
 )
 
 // openIDConfiguration contains the necessary properties in the
@@ -95,9 +107,17 @@ type OIDC struct {
 	Options               *Options `json:"options,omitempty"`
 	Scopes                []string `json:"scopes,omitempty"`
 	AuthParams            []string `json:"authParams,omitempty"`
-	configuration         openIDConfiguration
-	keyStore              *keyStore
+	wellKnownEndpoint     string
 	ctl                   *Controller
+
+	// initMutex guards the fields below it, which are only read after a
+	// successful ensureInitialized.
+	initMutex         sync.Mutex
+	initError         error
+	initRetryAfter    time.Time
+	initRetryInterval time.Duration
+	configuration     openIDConfiguration
+	keyStore          *keyStore
 }
 
 func sanitizeEmail(email string) string {
@@ -156,7 +176,9 @@ func (o *OIDC) GetEncryptedKey() (kid, key string, ok bool) {
 	return "", "", false
 }
 
-// Init validates and initializes the OIDC provider.
+// Init validates and initializes the OIDC provider. If the identity provider
+// cannot be reached, the returned error matches ErrRetryInit and the
+// provisioner initializes itself the next time that it is used.
 func (o *OIDC) Init(config Config) (err error) {
 	switch {
 	case o.Type == "":
@@ -184,6 +206,7 @@ func (o *OIDC) Init(config Config) (err error) {
 	if !strings.Contains(u.Path, "/.well-known/openid-configuration") {
 		u.Path = path.Join(u.Path, "/.well-known/openid-configuration")
 	}
+	o.wellKnownEndpoint = u.String()
 
 	// Initialize the common provisioner controller
 	o.ctl, err = NewController(o, o.Claims, config, o.Options)
@@ -191,23 +214,68 @@ func (o *OIDC) Init(config Config) (err error) {
 		return err
 	}
 
-	// Decode and validate openid-configuration
+	// Get the openid-configuration and the JWK key set. Not being able to reach
+	// the identity provider is usually temporary, e.g. when step-ca starts
+	// before the network is up, so the provisioner retries when it is used.
+	o.initMutex.Lock()
+	defer o.initMutex.Unlock()
+	if o.initError = o.initialize(); o.initError != nil {
+		o.initRetryInterval = oidcInitRetryInterval
+		return retryInit(o.initError)
+	}
+	return nil
+}
+
+// initialize gets and validates the openid-configuration and the JWK key set of
+// the identity provider. Callers must hold o.initMutex.
+func (o *OIDC) initialize() error {
 	httpClient := o.ctl.GetHTTPClient()
-	if err := getAndDecode(httpClient, u.String(), &o.configuration); err != nil {
+
+	// Decode and validate openid-configuration
+	var configuration openIDConfiguration
+	if err := getAndDecode(httpClient, o.wellKnownEndpoint, &configuration); err != nil {
 		return err
 	}
-	if err := o.configuration.Validate(); err != nil {
+	if err := configuration.Validate(); err != nil {
 		return errors.Wrapf(err, "error parsing %s", o.ConfigurationEndpoint)
 	}
 
 	// Replace {tenantid} with the configured one
 	if o.TenantID != "" {
-		o.configuration.Issuer = strings.ReplaceAll(o.configuration.Issuer, "{tenantid}", o.TenantID)
+		configuration.Issuer = strings.ReplaceAll(configuration.Issuer, "{tenantid}", o.TenantID)
 	}
 
 	// Get JWK key set
-	o.keyStore, err = newKeyStore(httpClient, o.configuration.JWKSetURI)
-	return
+	keyStore, err := newKeyStore(httpClient, configuration.JWKSetURI)
+	if err != nil {
+		return err
+	}
+
+	o.configuration = configuration
+	o.keyStore = keyStore
+	return nil
+}
+
+// ensureInitialized initializes the provisioner if a previous attempt failed,
+// e.g. because the identity provider was down when step-ca started. Attempts
+// are spaced using an exponential backoff, so that requests are not blocked on
+// an identity provider that is still unavailable.
+func (o *OIDC) ensureInitialized() error {
+	o.initMutex.Lock()
+	defer o.initMutex.Unlock()
+
+	if o.initError == nil {
+		return nil
+	}
+	now := time.Now()
+	if now.Before(o.initRetryAfter) {
+		return o.initError
+	}
+	if o.initError = o.initialize(); o.initError != nil {
+		o.initRetryAfter = now.Add(o.initRetryInterval)
+		o.initRetryInterval = min(2*o.initRetryInterval, oidcMaxInitRetryInterval)
+	}
+	return o.initError
 }
 
 // ValidatePayload validates the given token payload.
@@ -264,6 +332,11 @@ func (o *OIDC) ValidatePayload(p openIDPayload) error {
 // authorizeToken applies the most common provisioner authorization claims,
 // leaving the rest to context specific methods.
 func (o *OIDC) authorizeToken(token string) (*openIDPayload, error) {
+	if err := o.ensureInitialized(); err != nil {
+		return nil, errs.Wrapf(http.StatusServiceUnavailable, err,
+			"oidc.AuthorizeToken; oidc provisioner '%s' is not initialized", o.GetName())
+	}
+
 	jwt, err := jose.ParseSigned(token)
 	if err != nil {
 		return nil, errs.Wrap(http.StatusUnauthorized, err,
