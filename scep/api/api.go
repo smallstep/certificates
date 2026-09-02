@@ -345,8 +345,10 @@ func GetCACaps(ctx context.Context) (Response, error) {
 
 // PKIOperation performs PKI operations and returns a SCEP response
 func PKIOperation(ctx context.Context, req request) (Response, error) {
+	auth := scep.MustFromContext(ctx)
+
 	// parse the message using smallscep implementation
-	microMsg, err := smallscep.ParsePKIMessage(req.Message)
+	microMsg, err := smallscep.ParsePKIMessage(req.Message, smallscep.WithUnsortedAuthenticatedAttributes(auth.ShouldAllowUnsortedAuthenticatedAttributes(ctx)))
 	if err != nil {
 		// return the error, because we can't use the msg for creating a CertRep
 		return Response{}, fmt.Errorf("failed parsing SCEP request: %w", err)
@@ -369,7 +371,6 @@ func PKIOperation(ctx context.Context, req request) (Response, error) {
 		P7:            p7,
 	}
 
-	auth := scep.MustFromContext(ctx)
 	if err := auth.DecryptPKIEnvelope(ctx, msg); err != nil {
 		return Response{}, err
 	}
