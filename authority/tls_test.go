@@ -26,7 +26,11 @@ import (
 	"go.step.sm/crypto/pemutil"
 	"go.step.sm/crypto/x509util"
 
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+
 	"github.com/smallstep/certificates/api/render"
+	authorityadmin "github.com/smallstep/certificates/authority/admin"
 	"github.com/smallstep/certificates/authority/config"
 	"github.com/smallstep/certificates/authority/policy"
 	"github.com/smallstep/certificates/authority/provisioner"
@@ -35,8 +39,6 @@ import (
 	"github.com/smallstep/certificates/db"
 	"github.com/smallstep/certificates/errs"
 	"github.com/smallstep/nosql/database"
-	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
 )
 
 var (
@@ -1499,6 +1501,157 @@ func TestAuthority_GetTLSOptions(t *testing.T) {
 			assert.Equal(t, tc.opts, opts)
 		})
 	}
+}
+
+type recordingRevokeCAS struct {
+	notImplementedCAS
+	request *apiv1.RevokeCertificateRequest
+	err     error
+}
+
+type recordingAdminRevokeDB struct {
+	*authorityadmin.MockDB
+	certificate *x509.Certificate
+	info        *db.RevokedCertificateInfo
+}
+
+func (d *recordingAdminRevokeDB) Revoke(crt *x509.Certificate, rci *db.RevokedCertificateInfo) error {
+	d.certificate = crt
+	d.info = rci
+	return nil
+}
+
+func (c *recordingRevokeCAS) RevokeCertificate(req *apiv1.RevokeCertificateRequest) (*apiv1.RevokeCertificateResponse, error) {
+	c.request = req
+	if c.err != nil {
+		return nil, c.err
+	}
+	return &apiv1.RevokeCertificateResponse{}, nil
+}
+
+func TestAuthority_RevokeAdministratively(t *testing.T) {
+	crt, err := pemutil.ReadCertificate("./testdata/certs/foo.crt")
+	require.NoError(t, err)
+
+	t.Run("ok", func(t *testing.T) {
+		const provisionerID = "provisioner-id"
+		cas := new(recordingRevokeCAS)
+		a := testAuthority(t,
+			WithDatabase(&db.MockAuthDB{
+				MGetCertificateData: func(string) (*db.CertificateData, error) {
+					return &db.CertificateData{Provisioner: &db.ProvisionerData{ID: provisionerID}}, nil
+				},
+				MRevoke: func(rci *db.RevokedCertificateInfo) error {
+					return errors.New("unexpected direct database revocation")
+				},
+			}),
+			WithX509CAService(cas),
+		)
+		adminDB := &recordingAdminRevokeDB{MockDB: new(authorityadmin.MockDB)}
+		a.adminDB = adminDB
+
+		err := a.RevokeAdministratively(context.Background(), &AdministrativeRevokeOptions{
+			Certificate: crt,
+			Reason:      "cessation of operation",
+			ReasonCode:  5,
+			PassiveOnly: true,
+		})
+		require.NoError(t, err)
+		require.NotNil(t, cas.request)
+		assert.Same(t, crt, cas.request.Certificate)
+		assert.Equal(t, crt.SerialNumber.String(), cas.request.SerialNumber)
+		assert.Equal(t, "cessation of operation", cas.request.Reason)
+		assert.Equal(t, 5, cas.request.ReasonCode)
+		assert.True(t, cas.request.PassiveOnly)
+		assert.Same(t, crt, adminDB.certificate)
+		require.NotNil(t, adminDB.info)
+		assert.Equal(t, crt.SerialNumber.String(), adminDB.info.Serial)
+		assert.Equal(t, crt.NotAfter, adminDB.info.ExpiresAt)
+		assert.Equal(t, "cessation of operation", adminDB.info.Reason)
+		assert.Equal(t, 5, adminDB.info.ReasonCode)
+		assert.Equal(t, provisionerID, adminDB.info.ProvisionerID)
+	})
+
+	t.Run("local database and CRL", func(t *testing.T) {
+		var got *db.RevokedCertificateInfo
+		var crlStore db.CertificateRevocationListInfo
+		var revokedList []db.RevokedCertificateInfo
+		liveCertificate := *crt
+		// CRLs omit expired certificates.
+		liveCertificate.NotAfter = time.Now().Add(time.Hour)
+		a := testAuthority(t,
+			WithDatabase(&db.MockAuthDB{
+				MRevoke: func(rci *db.RevokedCertificateInfo) error {
+					got = rci
+					revokedList = append(revokedList, *rci)
+					return nil
+				},
+				MGetCRL: func() (*db.CertificateRevocationListInfo, error) {
+					return nil, database.ErrNotFound
+				},
+				MStoreCRL: func(info *db.CertificateRevocationListInfo) error {
+					crlStore = *info
+					return nil
+				},
+				MGetRevokedCertificates: func() (*[]db.RevokedCertificateInfo, error) {
+					return &revokedList, nil
+				},
+			}),
+		)
+		a.config.CRL = &config.CRLConfig{Enabled: true, GenerateOnRevoke: true}
+
+		err := a.RevokeAdministratively(context.Background(), &AdministrativeRevokeOptions{
+			Certificate: &liveCertificate,
+			Reason:      "cessation of operation",
+			ReasonCode:  5,
+		})
+		require.NoError(t, err)
+		require.NotNil(t, got)
+		assert.Equal(t, liveCertificate.SerialNumber.String(), got.Serial)
+		crl, err := x509.ParseRevocationList(crlStore.DER)
+		require.NoError(t, err)
+		require.Len(t, crl.RevokedCertificateEntries, 1)
+		assert.Equal(t, liveCertificate.SerialNumber, crl.RevokedCertificateEntries[0].SerialNumber)
+		assert.Equal(t, 5, crl.RevokedCertificateEntries[0].ReasonCode)
+	})
+
+	t.Run("certificate required", func(t *testing.T) {
+		a := testAuthority(t)
+		err := a.RevokeAdministratively(context.Background(), nil)
+		require.Error(t, err)
+		var sc render.StatusCodedError
+		require.ErrorAs(t, err, &sc)
+		assert.Equal(t, http.StatusBadRequest, sc.StatusCode())
+	})
+
+	t.Run("serial number required", func(t *testing.T) {
+		a := testAuthority(t)
+		err := a.RevokeAdministratively(context.Background(), &AdministrativeRevokeOptions{
+			Certificate: new(x509.Certificate),
+		})
+		require.Error(t, err)
+		var sc render.StatusCodedError
+		require.ErrorAs(t, err, &sc)
+		assert.Equal(t, http.StatusBadRequest, sc.StatusCode())
+	})
+
+	t.Run("CAS failure does not persist", func(t *testing.T) {
+		persisted := false
+		cas := &recordingRevokeCAS{err: errors.New("CAS unavailable")}
+		a := testAuthority(t,
+			WithDatabase(&db.MockAuthDB{
+				MRevoke: func(rci *db.RevokedCertificateInfo) error {
+					persisted = true
+					return nil
+				},
+			}),
+			WithX509CAService(cas),
+		)
+
+		err := a.RevokeAdministratively(context.Background(), &AdministrativeRevokeOptions{Certificate: crt})
+		require.ErrorContains(t, err, "CAS unavailable")
+		assert.False(t, persisted)
+	})
 }
 
 func TestAuthority_Revoke(t *testing.T) {
