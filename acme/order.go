@@ -150,7 +150,11 @@ type authorizationAttestationData struct {
 // legacy formats remain unknown. Conflicting nonempty formats for duplicate
 // authorizations of that identifier are rejected instead of choosing one.
 func (o *Order) getAuthorizationAttestationData(ctx context.Context, db DB, permanentIdentifier string) (authorizationAttestationData, error) {
-	var data authorizationAttestationData
+	var (
+		data           authorizationAttestationData
+		selected       bool
+		observedFormat string
+	)
 	for _, azID := range o.AuthorizationIDs {
 		az, err := db.GetAuthorization(ctx, azID)
 		if err != nil {
@@ -159,16 +163,20 @@ func (o *Order) getAuthorizationAttestationData(ctx context.Context, db DB, perm
 		if az.Identifier.Type != PermanentIdentifier || az.Identifier.Value != permanentIdentifier {
 			continue
 		}
-		if data.fingerprint == "" {
-			data.fingerprint = az.Fingerprint
+		if !selected {
+			data = authorizationAttestationData{
+				fingerprint: az.Fingerprint,
+				format:      az.AttestationFormat,
+			}
+			selected = true
 		}
 		if az.AttestationFormat == "" {
 			continue
 		}
-		if data.format != "" && data.format != az.AttestationFormat {
-			return authorizationAttestationData{}, NewErrorISE("conflicting attestation formats %q and %q for permanent identifier %q in order %s", data.format, az.AttestationFormat, permanentIdentifier, o.ID)
+		if observedFormat != "" && observedFormat != az.AttestationFormat {
+			return authorizationAttestationData{}, NewErrorISE("conflicting attestation formats %q and %q for permanent identifier %q in order %s", observedFormat, az.AttestationFormat, permanentIdentifier, o.ID)
 		}
-		data.format = az.AttestationFormat
+		observedFormat = az.AttestationFormat
 	}
 	return data, nil
 }
