@@ -161,6 +161,28 @@ func (o *Order) getAuthorizationFingerprint(ctx context.Context, db DB) (string,
 	return "", nil
 }
 
+// getAuthorizationAttestationFormat returns the validated attestation format
+// recorded by permanent-identifier authorizations. Empty values from legacy
+// authorization records remain unknown. Conflicting nonempty values are
+// rejected instead of choosing one.
+func (o *Order) getAuthorizationAttestationFormat(ctx context.Context, db DB) (string, error) {
+	var format string
+	for _, azID := range o.AuthorizationIDs {
+		az, err := db.GetAuthorization(ctx, azID)
+		if err != nil {
+			return "", WrapErrorISE(err, "error getting authorization %q", azID)
+		}
+		if az.Identifier.Type != PermanentIdentifier || az.AttestationFormat == "" {
+			continue
+		}
+		if format != "" && format != az.AttestationFormat {
+			return "", NewErrorISE("conflicting attestation formats %q and %q for order %s", format, az.AttestationFormat, o.ID)
+		}
+		format = az.AttestationFormat
+	}
+	return format, nil
+}
+
 // Finalize signs a certificate if the necessary conditions for Order completion
 // have been met.
 //
@@ -259,6 +281,10 @@ func (o *Order) Finalize(ctx context.Context, db DB, csr *x509.CertificateReques
 
 	var defaultTemplate string
 	if permanentIdentifier != "" {
+		attestationFormat, err := o.getAuthorizationAttestationFormat(ctx, db)
+		if err != nil {
+			return err
+		}
 		defaultTemplate = x509util.DefaultAttestedLeafTemplate
 		data.SetSubjectAlternativeNames(x509util.SubjectAlternativeName{
 			Type:  x509util.PermanentIdentifierType,
@@ -266,6 +292,7 @@ func (o *Order) Finalize(ctx context.Context, db DB, csr *x509.CertificateReques
 		})
 		extraOptions = append(extraOptions, provisioner.AttestationData{
 			PermanentIdentifier: permanentIdentifier,
+			Format:              attestationFormat,
 		})
 	} else {
 		defaultTemplate = x509util.DefaultLeafTemplate

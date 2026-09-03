@@ -12,17 +12,18 @@ import (
 
 // dbAuthz is the base authz type that others build from.
 type dbAuthz struct {
-	ID           string          `json:"id"`
-	AccountID    string          `json:"accountID"`
-	Identifier   acme.Identifier `json:"identifier"`
-	Status       acme.Status     `json:"status"`
-	Token        string          `json:"token"`
-	Fingerprint  string          `json:"fingerprint,omitempty"`
-	ChallengeIDs []string        `json:"challengeIDs"`
-	Wildcard     bool            `json:"wildcard"`
-	CreatedAt    time.Time       `json:"createdAt"`
-	ExpiresAt    time.Time       `json:"expiresAt"`
-	Error        *acme.Error     `json:"error"`
+	ID                string          `json:"id"`
+	AccountID         string          `json:"accountID"`
+	Identifier        acme.Identifier `json:"identifier"`
+	Status            acme.Status     `json:"status"`
+	Token             string          `json:"token"`
+	Fingerprint       string          `json:"fingerprint,omitempty"`
+	AttestationFormat string          `json:"attestationFormat,omitempty"`
+	ChallengeIDs      []string        `json:"challengeIDs"`
+	Wildcard          bool            `json:"wildcard"`
+	CreatedAt         time.Time       `json:"createdAt"`
+	ExpiresAt         time.Time       `json:"expiresAt"`
+	Error             *acme.Error     `json:"error"`
 }
 
 func (ba *dbAuthz) clone() *dbAuthz {
@@ -62,16 +63,17 @@ func (db *DB) GetAuthorization(ctx context.Context, id string) (*acme.Authorizat
 		}
 	}
 	return &acme.Authorization{
-		ID:          dbaz.ID,
-		AccountID:   dbaz.AccountID,
-		Identifier:  dbaz.Identifier,
-		Status:      dbaz.Status,
-		Challenges:  chs,
-		Wildcard:    dbaz.Wildcard,
-		ExpiresAt:   dbaz.ExpiresAt,
-		Token:       dbaz.Token,
-		Fingerprint: dbaz.Fingerprint,
-		Error:       dbaz.Error,
+		ID:                dbaz.ID,
+		AccountID:         dbaz.AccountID,
+		Identifier:        dbaz.Identifier,
+		Status:            dbaz.Status,
+		Challenges:        chs,
+		Wildcard:          dbaz.Wildcard,
+		ExpiresAt:         dbaz.ExpiresAt,
+		Token:             dbaz.Token,
+		Fingerprint:       dbaz.Fingerprint,
+		AttestationFormat: dbaz.AttestationFormat,
+		Error:             dbaz.Error,
 	}, nil
 }
 
@@ -91,16 +93,17 @@ func (db *DB) CreateAuthorization(ctx context.Context, az *acme.Authorization) e
 
 	now := clock.Now()
 	dbaz := &dbAuthz{
-		ID:           az.ID,
-		AccountID:    az.AccountID,
-		Status:       az.Status,
-		CreatedAt:    now,
-		ExpiresAt:    az.ExpiresAt,
-		Identifier:   az.Identifier,
-		ChallengeIDs: chIDs,
-		Token:        az.Token,
-		Fingerprint:  az.Fingerprint,
-		Wildcard:     az.Wildcard,
+		ID:                az.ID,
+		AccountID:         az.AccountID,
+		Status:            az.Status,
+		CreatedAt:         now,
+		ExpiresAt:         az.ExpiresAt,
+		Identifier:        az.Identifier,
+		ChallengeIDs:      chIDs,
+		Token:             az.Token,
+		Fingerprint:       az.Fingerprint,
+		AttestationFormat: az.AttestationFormat,
+		Wildcard:          az.Wildcard,
 	}
 
 	return db.save(ctx, az.ID, dbaz, nil, "authz", authzTable)
@@ -116,6 +119,7 @@ func (db *DB) UpdateAuthorization(ctx context.Context, az *acme.Authorization) e
 	nu := old.clone()
 	nu.Status = az.Status
 	nu.Fingerprint = az.Fingerprint
+	nu.AttestationFormat = az.AttestationFormat
 	nu.Error = az.Error
 	return db.save(ctx, old.ID, nu, old, "authz", authzTable)
 }
@@ -139,16 +143,17 @@ func (db *DB) GetAuthorizationsByAccountID(_ context.Context, accountID string) 
 			continue
 		}
 		authzs = append(authzs, &acme.Authorization{
-			ID:          dbaz.ID,
-			AccountID:   dbaz.AccountID,
-			Identifier:  dbaz.Identifier,
-			Status:      dbaz.Status,
-			Challenges:  nil, // challenges not required for current use case
-			Wildcard:    dbaz.Wildcard,
-			ExpiresAt:   dbaz.ExpiresAt,
-			Token:       dbaz.Token,
-			Fingerprint: dbaz.Fingerprint,
-			Error:       dbaz.Error,
+			ID:                dbaz.ID,
+			AccountID:         dbaz.AccountID,
+			Identifier:        dbaz.Identifier,
+			Status:            dbaz.Status,
+			Challenges:        nil, // challenges not required for current use case
+			Wildcard:          dbaz.Wildcard,
+			ExpiresAt:         dbaz.ExpiresAt,
+			Token:             dbaz.Token,
+			Fingerprint:       dbaz.Fingerprint,
+			AttestationFormat: dbaz.AttestationFormat,
+			Error:             dbaz.Error,
 		})
 	}
 

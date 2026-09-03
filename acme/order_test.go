@@ -11,6 +11,7 @@ import (
 	"net"
 	"net/url"
 	"reflect"
+	"strings"
 	"testing"
 	"time"
 
@@ -2639,5 +2640,183 @@ func TestOrder_getAuthorizationFingerprint(t *testing.T) {
 				t.Errorf("Order.getAuthorizationFingerprint() = %v, want %v", got, tt.want)
 			}
 		})
+	}
+}
+
+func TestOrder_getAuthorizationAttestationFormat(t *testing.T) {
+	ctx := context.Background()
+	tests := []struct {
+		name    string
+		authzs  map[string]*Authorization
+		err     error
+		want    string
+		wantErr string
+	}{
+		{
+			name: "legacy empty format",
+			authzs: map[string]*Authorization{
+				"az1": {ID: "az1", Identifier: Identifier{Type: PermanentIdentifier}},
+			},
+		},
+		{
+			name: "format",
+			authzs: map[string]*Authorization{
+				"az1": {ID: "az1", Identifier: Identifier{Type: PermanentIdentifier}, AttestationFormat: "apple"},
+			},
+			want: "apple",
+		},
+		{
+			name: "matching repeated formats",
+			authzs: map[string]*Authorization{
+				"az1": {ID: "az1", Identifier: Identifier{Type: PermanentIdentifier}, AttestationFormat: "tpm"},
+				"az2": {ID: "az2", Identifier: Identifier{Type: PermanentIdentifier}, AttestationFormat: "tpm"},
+			},
+			want: "tpm",
+		},
+		{
+			name: "known format with legacy empty format",
+			authzs: map[string]*Authorization{
+				"az1": {ID: "az1", Identifier: Identifier{Type: PermanentIdentifier}},
+				"az2": {ID: "az2", Identifier: Identifier{Type: PermanentIdentifier}, AttestationFormat: "step"},
+			},
+			want: "step",
+		},
+		{
+			name: "ignore non-permanent identifier",
+			authzs: map[string]*Authorization{
+				"az1": {ID: "az1", Identifier: Identifier{Type: DNS}, AttestationFormat: "step"},
+				"az2": {ID: "az2", Identifier: Identifier{Type: PermanentIdentifier}, AttestationFormat: "android-key"},
+			},
+			want: "android-key",
+		},
+		{
+			name: "conflicting formats",
+			authzs: map[string]*Authorization{
+				"az1": {ID: "az1", Identifier: Identifier{Type: PermanentIdentifier}, AttestationFormat: "apple"},
+				"az2": {ID: "az2", Identifier: Identifier{Type: PermanentIdentifier}, AttestationFormat: "step"},
+			},
+			wantErr: "conflicting attestation formats",
+		},
+		{
+			name:    "database error",
+			err:     errors.New("force"),
+			wantErr: "error getting authorization \"az1\": force",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			o := &Order{AuthorizationIDs: []string{"az1", "az2"}}
+			db := &MockDB{
+				MockGetAuthorization: func(_ context.Context, id string) (*Authorization, error) {
+					if tt.err != nil {
+						return nil, tt.err
+					}
+					if az, ok := tt.authzs[id]; ok {
+						return az, nil
+					}
+					return &Authorization{ID: id, Identifier: Identifier{Type: DNS}}, nil
+				},
+			}
+
+			got, err := o.getAuthorizationAttestationFormat(ctx, db)
+			if tt.wantErr != "" {
+				if assert.Error(t, err) {
+					assert.True(t, strings.Contains(err.Error(), tt.wantErr))
+				}
+				return
+			}
+			assert.FatalError(t, err)
+			assert.Equals(t, got, tt.want)
+		})
+	}
+}
+
+func TestOrder_FinalizeAttestationData(t *testing.T) {
+	for _, format := range []string{"apple", "android-key", "step", "tpm"} {
+		t.Run(format, func(t *testing.T) {
+			signer, err := keyutil.GenerateSigner("EC", "P-256", 0)
+			assert.FatalError(t, err)
+			fingerprint, err := keyutil.Fingerprint(signer.Public())
+			assert.FatalError(t, err)
+
+			o := &Order{
+				ID:               "orderID",
+				AccountID:        "accountID",
+				Status:           StatusReady,
+				ExpiresAt:        clock.Now().Add(time.Minute),
+				AuthorizationIDs: []string{"authzID"},
+				Identifiers:      []Identifier{{Type: PermanentIdentifier, Value: "deviceID"}},
+			}
+			csr := &x509.CertificateRequest{
+				Subject:   pkix.Name{CommonName: "deviceID"},
+				PublicKey: signer.Public(),
+			}
+			db := &MockDB{
+				MockGetAuthorization: func(_ context.Context, id string) (*Authorization, error) {
+					assert.Equals(t, id, "authzID")
+					return &Authorization{
+						ID:                id,
+						Identifier:        Identifier{Type: PermanentIdentifier, Value: "deviceID"},
+						Fingerprint:       fingerprint,
+						AttestationFormat: format,
+					}, nil
+				},
+				MockCreateCertificate: func(_ context.Context, cert *Certificate) error {
+					cert.ID = "certID"
+					return nil
+				},
+				MockUpdateOrder: func(_ context.Context, _ *Order) error { return nil },
+			}
+			ca := &mockSignAuth{
+				signWithContext: func(_ context.Context, _ *x509.CertificateRequest, _ provisioner.SignOptions, opts ...provisioner.SignOption) ([]*x509.Certificate, error) {
+					var got *provisioner.AttestationData
+					for _, opt := range opts {
+						if attestationData, ok := opt.(provisioner.AttestationData); ok {
+							got = &attestationData
+						}
+					}
+					assert.Equals(t, got, &provisioner.AttestationData{
+						PermanentIdentifier: "deviceID",
+						Format:              format,
+					})
+					return []*x509.Certificate{{PublicKey: signer.Public()}}, nil
+				},
+			}
+			prov := &MockProvisioner{
+				MauthorizeSign: func(context.Context, string) ([]provisioner.SignOption, error) { return nil, nil },
+				MgetOptions:    func() *provisioner.Options { return nil },
+			}
+
+			assert.FatalError(t, o.Finalize(context.Background(), db, csr, ca, prov))
+		})
+	}
+}
+
+func TestOrder_FinalizeConflictingAttestationFormats(t *testing.T) {
+	o := &Order{
+		ID:               "orderID",
+		Status:           StatusReady,
+		ExpiresAt:        clock.Now().Add(time.Minute),
+		AuthorizationIDs: []string{"authz1", "authz2"},
+		Identifiers:      []Identifier{{Type: PermanentIdentifier, Value: "deviceID"}},
+	}
+	db := &MockDB{
+		MockGetAuthorization: func(_ context.Context, id string) (*Authorization, error) {
+			format := "apple"
+			if id == "authz2" {
+				format = "tpm"
+			}
+			return &Authorization{
+				ID:                id,
+				Identifier:        Identifier{Type: PermanentIdentifier, Value: "deviceID"},
+				AttestationFormat: format,
+			}, nil
+		},
+	}
+
+	err := o.Finalize(context.Background(), db, &x509.CertificateRequest{}, nil, nil)
+	if assert.Error(t, err) {
+		assert.True(t, strings.Contains(err.Error(), "conflicting attestation formats"))
 	}
 }
