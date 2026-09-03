@@ -20,7 +20,7 @@ func (p *PKI) getTemplates() *templates.Templates {
 	}
 	return &templates.Templates{
 		SSH:  &templates.DefaultSSHTemplates,
-		Data: map[string]interface{}{},
+		Data: map[string]any{},
 	}
 }
 

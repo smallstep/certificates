@@ -489,7 +489,7 @@ func (db *DB) Shutdown() error {
 // MockAuthDB mocks the AuthDB interface. //
 type MockAuthDB struct {
 	Err                     error
-	Ret1                    interface{}
+	Ret1                    any
 	MIsRevoked              func(string) (bool, error)
 	MIsSSHRevoked           func(string) (bool, error)
 	MRevoke                 func(rci *RevokedCertificateInfo) error
@@ -633,7 +633,7 @@ func (m *MockAuthDB) Shutdown() error {
 // MockNoSQLDB //
 type MockNoSQLDB struct {
 	Err          error
-	Ret1, Ret2   interface{}
+	Ret1, Ret2   any
 	MGet         func(bucket, key []byte) ([]byte, error)
 	MSet         func(bucket, key, value []byte) error
 	MOpen        func(dataSourceName string, opt ...database.Option) error

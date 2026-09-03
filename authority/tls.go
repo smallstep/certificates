@@ -573,7 +573,7 @@ type RevokeOptions struct {
 //
 // TODO: Add OCSP and CRL support.
 func (a *Authority) Revoke(ctx context.Context, revokeOpts *RevokeOptions) error {
-	opts := []interface{}{
+	opts := []any{
 		errs.WithKeyVal("serialNumber", revokeOpts.Serial),
 		errs.WithKeyVal("reasonCode", revokeOpts.ReasonCode),
 		errs.WithKeyVal("reason", revokeOpts.Reason),

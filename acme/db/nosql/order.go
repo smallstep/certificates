@@ -21,10 +21,10 @@ type dbOrder struct {
 	Identifiers      []acme.Identifier `json:"identifiers"`
 	AuthorizationIDs []string          `json:"authorizationIDs"`
 	Status           acme.Status       `json:"status"`
-	NotBefore        time.Time         `json:"notBefore,omitempty"`
-	NotAfter         time.Time         `json:"notAfter,omitempty"`
+	NotBefore        time.Time         `json:"notBefore"`
+	NotAfter         time.Time         `json:"notAfter"`
 	CreatedAt        time.Time         `json:"createdAt"`
-	ExpiresAt        time.Time         `json:"expiresAt,omitempty"`
+	ExpiresAt        time.Time         `json:"expiresAt"`
 	CertificateID    string            `json:"certificate,omitempty"`
 	Error            *acme.Error       `json:"error,omitempty"`
 }
@@ -159,8 +159,8 @@ func (db *DB) updateAddOrderIDs(ctx context.Context, accID string, includeReadyO
 	}
 	pendOids = append(pendOids, addOids...)
 	var (
-		_old interface{} = oldOids
-		_new interface{} = pendOids
+		_old any = oldOids
+		_new any = pendOids
 	)
 	switch {
 	case len(oldOids) == 0 && len(pendOids) == 0:

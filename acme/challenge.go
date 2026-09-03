@@ -35,6 +35,7 @@ import (
 	"github.com/smallstep/go-attestation/attest"
 	"go.step.sm/crypto/jose"
 	"go.step.sm/crypto/keyutil"
+	"go.step.sm/crypto/mldsa"
 	"go.step.sm/crypto/pemutil"
 	"go.step.sm/crypto/x509util"
 
@@ -96,7 +97,7 @@ type Challenge struct {
 }
 
 // ToLog enables response logging.
-func (ch *Challenge) ToLog() (interface{}, error) {
+func (ch *Challenge) ToLog() (any, error) {
 	b, err := json.Marshal(ch)
 	if err != nil {
 		return nil, WrapErrorISE(err, "error marshaling challenge for logging")
@@ -228,8 +229,7 @@ func dns01ChallengeHost(domain string) string {
 }
 
 func tlsAlert(err error) uint8 {
-	var opErr *net.OpError
-	if errors.As(err, &opErr) {
+	if opErr, ok := errors.AsType[*net.OpError](err); ok {
 		v := reflect.ValueOf(opErr.Err)
 		if v.Kind() == reflect.Uint8 {
 			return cast.Uint8(v.Uint())
@@ -378,11 +378,8 @@ func dns01Validate(ctx context.Context, ch *Challenge, db DB, jwk *jose.JSONWebK
 	h := sha256.Sum256([]byte(expectedKeyAuth))
 	expected := base64.RawURLEncoding.EncodeToString(h[:])
 	var found bool
-	for _, r := range txtRecords {
-		if r == expected {
-			found = true
-			break
-		}
+	if slices.Contains(txtRecords, expected) {
+		found = true
 	}
 	if !found {
 		return storeError(ctx, db, ch, false, NewError(ErrorRejectedIdentifierType,
@@ -787,8 +784,8 @@ type payloadType struct {
 }
 
 type attestationObject struct {
-	Format       string                 `json:"fmt"`
-	AttStatement map[string]interface{} `json:"attStmt,omitempty"`
+	Format       string         `json:"fmt"`
+	AttStatement map[string]any `json:"attStmt,omitempty"`
 }
 
 // TODO(bweeks): move attestation verification to a shared package.
@@ -851,8 +848,7 @@ func deviceAttest01Validate(ctx context.Context, ch *Challenge, db DB, jwk *jose
 	case "android-key":
 		data, err := doAndroidKeyAttestationFormat(ctx, prov, ch, jwk, &att)
 		if err != nil {
-			var acmeError *Error
-			if errors.As(err, &acmeError) {
+			if acmeError, ok := errors.AsType[*Error](err); ok {
 				if acmeError.Status == 500 {
 					return acmeError
 				}
@@ -881,8 +877,7 @@ func deviceAttest01Validate(ctx context.Context, ch *Challenge, db DB, jwk *jose
 	case "apple":
 		data, err := doAppleAttestationFormat(ctx, prov, ch, &att)
 		if err != nil {
-			var acmeError *Error
-			if errors.As(err, &acmeError) {
+			if acmeError, ok := errors.AsType[*Error](err); ok {
 				if acmeError.Status == 500 {
 					return acmeError
 				}
@@ -917,8 +912,7 @@ func deviceAttest01Validate(ctx context.Context, ch *Challenge, db DB, jwk *jose
 	case "step":
 		data, err := doStepAttestationFormat(ctx, prov, ch, jwk, &att)
 		if err != nil {
-			var acmeError *Error
-			if errors.As(err, &acmeError) {
+			if acmeError, ok := errors.AsType[*Error](err); ok {
 				if acmeError.Status == 500 {
 					return acmeError
 				}
@@ -946,8 +940,7 @@ func deviceAttest01Validate(ctx context.Context, ch *Challenge, db DB, jwk *jose
 	case "tpm":
 		data, err := doTPMAttestationFormat(ctx, prov, ch, jwk, &att)
 		if err != nil {
-			var acmeError *Error
-			if errors.As(err, &acmeError) {
+			if acmeError, ok := errors.AsType[*Error](err); ok {
 				if acmeError.Status == 500 {
 					return acmeError
 				}
@@ -1027,7 +1020,7 @@ func doTPMAttestationFormat(_ context.Context, prov Provisioner, ch *Challenge, 
 		return nil, NewDetailedError(ErrorBadAttestationStatementType, "version %q is not supported", ver)
 	}
 
-	x5c, ok := att.AttStatement["x5c"].([]interface{})
+	x5c, ok := att.AttStatement["x5c"].([]any)
 	if !ok {
 		return nil, NewDetailedError(ErrorBadAttestationStatementType, "x5c not present")
 	}
@@ -1340,7 +1333,7 @@ func doAppleAttestationFormat(_ context.Context, prov Provisioner, _ *Challenge,
 		roots.AddCert(root)
 	}
 
-	x5c, ok := att.AttStatement["x5c"].([]interface{})
+	x5c, ok := att.AttStatement["x5c"].([]any)
 	if !ok {
 		return nil, NewDetailedError(ErrorBadAttestationStatementType, "x5c not present")
 	}
@@ -1468,8 +1461,8 @@ type androidKeyAttestationData struct {
 // extension? That should immediately precede the cert with the key attestation
 // extension.
 func findAndroidAttestationCert(certs []*x509.Certificate) *x509.Certificate {
-	for i := len(certs) - 1; i >= 0; i-- {
-		cert := certs[i]
+	for _, cert := range slices.Backward(certs) {
+
 		for _, ext := range cert.Extensions {
 			if ext.Id.Equal(oidAndroidAttestation) {
 				return cert
@@ -1610,26 +1603,9 @@ func doAndroidKeyAttestationFormat(ctx context.Context, prov Provisioner, ch *Ch
 		return nil, NewDetailedError(ErrorBadAttestationStatementType, "no attestation certificate with OID 1.3.6.1.4.1.11129.2.1.17 found in the cert chain")
 	}
 
-	switch pub := attCert.PublicKey.(type) {
-	case *ecdsa.PublicKey:
-		if pub.Curve != elliptic.P256() {
-			return nil, NewDetailedError(ErrorBadAttestationStatementType, "unsupported elliptic curve %s", pub.Curve)
-		}
-		sum := sha256.Sum256([]byte(keyAuth))
-		if !ecdsa.VerifyASN1(pub, sum[:], sig) {
-			return nil, NewDetailedError(ErrorBadAttestationStatementType, "failed validating signature")
-		}
-	case *rsa.PublicKey:
-		sum := sha256.Sum256([]byte(keyAuth))
-		if err := rsa.VerifyPKCS1v15(pub, crypto.SHA256, sum[:], sig); err != nil {
-			return nil, NewDetailedError(ErrorBadAttestationStatementType, "failed validating signature")
-		}
-	case ed25519.PublicKey:
-		if !ed25519.Verify(pub, []byte(keyAuth), sig) {
-			return nil, NewDetailedError(ErrorBadAttestationStatementType, "failed validating signature")
-		}
-	default:
-		return nil, NewDetailedError(ErrorBadAttestationStatementType, "unsupported public key type %T", pub)
+	// Verify attestation statement sig
+	if err := validateAttestationSignature(attCert, keyAuth, sig); err != nil {
+		return nil, err
 	}
 
 	data := &androidKeyAttestationData{
@@ -1737,7 +1713,7 @@ func doStepAttestationFormat(_ context.Context, prov Provisioner, ch *Challenge,
 	}
 
 	// Extract x5c and verify certificate
-	x5c, ok := att.AttStatement["x5c"].([]interface{})
+	x5c, ok := att.AttStatement["x5c"].([]any)
 	if !ok {
 		return nil, NewDetailedError(ErrorBadAttestationStatementType, "x5c not present")
 	}
@@ -1785,31 +1761,15 @@ func doStepAttestationFormat(_ context.Context, prov Provisioner, ch *Challenge,
 	if err := cbor.Unmarshal(csig, &sig); err != nil {
 		return nil, NewDetailedError(ErrorBadAttestationStatementType, "sig is malformed")
 	}
+
 	keyAuth, err := KeyAuthorization(ch.Token, jwk)
 	if err != nil {
 		return nil, err
 	}
 
-	switch pub := leaf.PublicKey.(type) {
-	case *ecdsa.PublicKey:
-		if pub.Curve != elliptic.P256() {
-			return nil, NewDetailedError(ErrorBadAttestationStatementType, "unsupported elliptic curve %s", pub.Curve)
-		}
-		sum := sha256.Sum256([]byte(keyAuth))
-		if !ecdsa.VerifyASN1(pub, sum[:], sig) {
-			return nil, NewDetailedError(ErrorBadAttestationStatementType, "failed to validate signature")
-		}
-	case *rsa.PublicKey:
-		sum := sha256.Sum256([]byte(keyAuth))
-		if err := rsa.VerifyPKCS1v15(pub, crypto.SHA256, sum[:], sig); err != nil {
-			return nil, NewDetailedError(ErrorBadAttestationStatementType, "failed to validate signature")
-		}
-	case ed25519.PublicKey:
-		if !ed25519.Verify(pub, []byte(keyAuth), sig) {
-			return nil, NewDetailedError(ErrorBadAttestationStatementType, "failed to validate signature")
-		}
-	default:
-		return nil, NewDetailedError(ErrorBadAttestationStatementType, "unsupported public key type %T", pub)
+	// Verify attestation statement sig
+	if err := validateAttestationSignature(leaf, keyAuth, sig); err != nil {
+		return nil, err
 	}
 
 	// Parse attestation data:
@@ -1827,6 +1787,38 @@ func doStepAttestationFormat(_ context.Context, prov Provisioner, ch *Challenge,
 	}
 
 	return data, nil
+}
+
+// validateAttestationSignature verifies that sig is a signature of the key
+// authorization made with the private key of the given attestation certificate.
+func validateAttestationSignature(cert *x509.Certificate, keyAuth string, sig []byte) error {
+	switch pub := cert.PublicKey.(type) {
+	case *ecdsa.PublicKey:
+		if pub.Curve != elliptic.P256() {
+			return NewDetailedError(ErrorBadAttestationStatementType, "unsupported elliptic curve %s", pub.Curve)
+		}
+		sum := sha256.Sum256([]byte(keyAuth))
+		if !ecdsa.VerifyASN1(pub, sum[:], sig) {
+			return NewDetailedError(ErrorBadAttestationStatementType, "failed validating signature")
+		}
+	case *rsa.PublicKey:
+		sum := sha256.Sum256([]byte(keyAuth))
+		if err := rsa.VerifyPKCS1v15(pub, crypto.SHA256, sum[:], sig); err != nil {
+			return NewDetailedError(ErrorBadAttestationStatementType, "failed validating signature")
+		}
+	case ed25519.PublicKey:
+		if !ed25519.Verify(pub, []byte(keyAuth), sig) {
+			return NewDetailedError(ErrorBadAttestationStatementType, "failed validating signature")
+		}
+	case *mldsa.PublicKey:
+		if err := mldsa.Verify(pub, []byte(keyAuth), sig, nil); err != nil {
+			return NewDetailedError(ErrorBadAttestationStatementType, "failed validating signature")
+		}
+	default:
+		return NewDetailedError(ErrorBadAttestationStatementType, "unsupported public key type %T", pub)
+	}
+
+	return nil
 }
 
 // searchSerialNumber searches the certificate extensions, looking for a serial
@@ -1880,8 +1872,8 @@ func reverseAddr(ip net.IP) (arpa string) {
 	// Must be IPv6
 	buf := make([]byte, 0, len(ip)*4+len("ip6.arpa."))
 	// Add it, in reverse, to the buffer
-	for i := len(ip) - 1; i >= 0; i-- {
-		v := ip[i]
+	for _, v := range slices.Backward(ip) {
+
 		buf = append(buf, hexit[v&0xF],
 			'.',
 			hexit[v>>4],

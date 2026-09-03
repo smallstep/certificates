@@ -427,7 +427,7 @@ func (p *raProvisioner) RAInfo() *RAInfo {
 
 // MockProvisioner for testing
 type MockProvisioner struct {
-	Mret1, Mret2, Mret3 interface{}
+	Mret1, Mret2, Mret3 any
 	Merr                error
 	MgetID              func() string
 	MgetIDForToken      func() string

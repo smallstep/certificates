@@ -458,7 +458,7 @@ func TestWebhook_Do(t *testing.T) {
 			},
 			requestID: "reqID",
 			webhookResponse: webhook.ResponseBody{
-				Data: map[string]interface{}{"role": "dba"},
+				Data: map[string]any{"role": "dba"},
 			},
 		},
 		"ok/no-request-id": {
@@ -467,7 +467,7 @@ func TestWebhook_Do(t *testing.T) {
 				Secret: "c2VjcmV0Cg==",
 			},
 			webhookResponse: webhook.ResponseBody{
-				Data: map[string]interface{}{"role": "dba"},
+				Data: map[string]any{"role": "dba"},
 			},
 		},
 		"ok/bearer": {
@@ -478,7 +478,7 @@ func TestWebhook_Do(t *testing.T) {
 			},
 			requestID: "reqID",
 			webhookResponse: webhook.ResponseBody{
-				Data: map[string]interface{}{"role": "dba"},
+				Data: map[string]any{"role": "dba"},
 			},
 		},
 		"ok/basic": {
@@ -495,7 +495,7 @@ func TestWebhook_Do(t *testing.T) {
 			},
 			requestID: "reqID",
 			webhookResponse: webhook.ResponseBody{
-				Data: map[string]interface{}{"role": "dba"},
+				Data: map[string]any{"role": "dba"},
 			},
 		},
 		"ok/templated-url": {
@@ -506,9 +506,9 @@ func TestWebhook_Do(t *testing.T) {
 				Secret: "c2VjcmV0Cg==",
 			},
 			requestID: "reqID",
-			dataArg:   map[string]interface{}{"username": "areed", "region": "central"},
+			dataArg:   map[string]any{"username": "areed", "region": "central"},
 			webhookResponse: webhook.ResponseBody{
-				Data: map[string]interface{}{"role": "dba"},
+				Data: map[string]any{"role": "dba"},
 			},
 			expectPath: "/users/areed?region=central",
 		},
@@ -552,7 +552,7 @@ func TestWebhook_Do(t *testing.T) {
 				Secret: "c2VjcmV0Cg==",
 			},
 			webhookResponse: webhook.ResponseBody{
-				Data: map[string]interface{}{"role": "dba"},
+				Data: map[string]any{"role": "dba"},
 			},
 			requestID:     "reqID",
 			errStatusCode: 404,

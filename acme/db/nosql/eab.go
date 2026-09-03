@@ -4,6 +4,7 @@ import (
 	"context"
 	"crypto/rand"
 	"encoding/json"
+	"slices"
 	"sync"
 	"time"
 
@@ -289,11 +290,9 @@ func (db *DB) addEAKID(ctx context.Context, provisionerID, eakID string) error {
 		}
 	}
 
-	for _, id := range eakIDs {
-		if id == eakID {
-			// return an error when a duplicate ID is found
-			return errors.Errorf("eakID %s already exists for provisioner %s", eakID, provisionerID)
-		}
+	if slices.Contains(eakIDs, eakID) {
+		// return an error when a duplicate ID is found
+		return errors.Errorf("eakID %s already exists for provisioner %s", eakID, provisionerID)
 	}
 
 	var newEAKIDs []string
@@ -301,8 +300,8 @@ func (db *DB) addEAKID(ctx context.Context, provisionerID, eakID string) error {
 	newEAKIDs = append(newEAKIDs, eakID)
 
 	var (
-		_old interface{} = eakIDs
-		_new interface{} = newEAKIDs
+		_old any = eakIDs
+		_new any = newEAKIDs
 	)
 
 	// ensure that the DB gets the expected value when the slice is empty; otherwise
@@ -338,8 +337,8 @@ func (db *DB) deleteEAKID(ctx context.Context, provisionerID, eakID string) erro
 
 	newEAKIDs := removeElement(eakIDs, eakID)
 	var (
-		_old interface{} = eakIDs
-		_new interface{} = newEAKIDs
+		_old any = eakIDs
+		_new any = newEAKIDs
 	)
 
 	// ensure that the DB gets the expected value when the slice is empty; otherwise

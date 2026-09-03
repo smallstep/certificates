@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"net/url"
 	"path"
+	"slices"
 	"strings"
 
 	"go.step.sm/crypto/jose"
@@ -23,7 +24,7 @@ type nextHTTP = func(http.ResponseWriter, *http.Request)
 
 func logNonce(w http.ResponseWriter, nonce string) {
 	if rl, ok := w.(logging.ResponseLogger); ok {
-		m := map[string]interface{}{
+		m := map[string]any{
 			"nonce": nonce,
 		}
 		rl.WithFields(m)
@@ -82,11 +83,9 @@ func verifyContentType(next nextHTTP) nextHTTP {
 		}
 
 		ct := r.Header.Get("Content-Type")
-		for _, e := range expected {
-			if ct == e {
-				next(w, r)
-				return
-			}
+		if slices.Contains(expected, ct) {
+			next(w, r)
+			return
 		}
 		render.Error(w, r, acme.NewError(acme.ErrorMalformedType,
 			"expected content-type to be in %s, but got %s", expected, ct))

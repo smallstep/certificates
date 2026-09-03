@@ -557,7 +557,7 @@ func (p *PKI) GenerateRootCertificate(name, org, resource string, pass []byte) (
 }
 
 // WriteRootCertificate writes to the buffer the given certificate and key if given.
-func (p *PKI) WriteRootCertificate(rootCrt *x509.Certificate, rootKey interface{}, pass []byte) error {
+func (p *PKI) WriteRootCertificate(rootCrt *x509.Certificate, rootKey any, pass []byte) error {
 	p.Files[p.Root[0]] = encodeCertificate(rootCrt)
 	if rootKey != nil {
 		var err error

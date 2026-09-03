@@ -30,7 +30,7 @@ func testNext(w http.ResponseWriter, _ *http.Request) {
 	w.Write(testBody)
 }
 
-func newBaseContext(ctx context.Context, args ...interface{}) context.Context {
+func newBaseContext(ctx context.Context, args ...any) context.Context {
 	for _, a := range args {
 		switch v := a.(type) {
 		case acme.DB:
@@ -1269,7 +1269,7 @@ func TestHandler_validateJWS(t *testing.T) {
 						Protected: jose.Header{
 							Algorithm:  jose.RS256,
 							JSONWebKey: &pub,
-							ExtraHeaders: map[jose.HeaderKey]interface{}{
+							ExtraHeaders: map[jose.HeaderKey]any{
 								"url": u,
 							},
 						},
@@ -1299,7 +1299,7 @@ func TestHandler_validateJWS(t *testing.T) {
 						Protected: jose.Header{
 							Algorithm:  jose.RS256,
 							JSONWebKey: &pub,
-							ExtraHeaders: map[jose.HeaderKey]interface{}{
+							ExtraHeaders: map[jose.HeaderKey]any{
 								"url": u,
 							},
 						},
@@ -1357,7 +1357,7 @@ func TestHandler_validateJWS(t *testing.T) {
 					{
 						Protected: jose.Header{
 							Algorithm: jose.ES256,
-							ExtraHeaders: map[jose.HeaderKey]interface{}{
+							ExtraHeaders: map[jose.HeaderKey]any{
 								"url": "foo",
 							},
 						},
@@ -1386,7 +1386,7 @@ func TestHandler_validateJWS(t *testing.T) {
 							Algorithm:  jose.ES256,
 							KeyID:      "bar",
 							JSONWebKey: &pub,
-							ExtraHeaders: map[jose.HeaderKey]interface{}{
+							ExtraHeaders: map[jose.HeaderKey]any{
 								"url": u,
 							},
 						},
@@ -1410,7 +1410,7 @@ func TestHandler_validateJWS(t *testing.T) {
 					{
 						Protected: jose.Header{
 							Algorithm: jose.ES256,
-							ExtraHeaders: map[jose.HeaderKey]interface{}{
+							ExtraHeaders: map[jose.HeaderKey]any{
 								"url": u,
 							},
 						},
@@ -1435,7 +1435,7 @@ func TestHandler_validateJWS(t *testing.T) {
 						Protected: jose.Header{
 							Algorithm: jose.ES256,
 							KeyID:     "bar",
-							ExtraHeaders: map[jose.HeaderKey]interface{}{
+							ExtraHeaders: map[jose.HeaderKey]any{
 								"url": u,
 							},
 						},
@@ -1465,7 +1465,7 @@ func TestHandler_validateJWS(t *testing.T) {
 						Protected: jose.Header{
 							Algorithm:  jose.ES256,
 							JSONWebKey: &pub,
-							ExtraHeaders: map[jose.HeaderKey]interface{}{
+							ExtraHeaders: map[jose.HeaderKey]any{
 								"url": u,
 							},
 						},
@@ -1495,7 +1495,7 @@ func TestHandler_validateJWS(t *testing.T) {
 						Protected: jose.Header{
 							Algorithm:  jose.RS256,
 							JSONWebKey: &pub,
-							ExtraHeaders: map[jose.HeaderKey]interface{}{
+							ExtraHeaders: map[jose.HeaderKey]any{
 								"url": u,
 							},
 						},

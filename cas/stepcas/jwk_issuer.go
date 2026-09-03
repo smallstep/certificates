@@ -83,13 +83,13 @@ func (i *jwkIssuer) createToken(aud, sub string, sans []string, info *raInfo) (s
 	claims := defaultClaims(i.issuer, sub, aud, id)
 	builder := jose.Signed(i.signer).Claims(claims)
 	if len(sans) > 0 {
-		builder = builder.Claims(map[string]interface{}{
+		builder = builder.Claims(map[string]any{
 			"sans": sans,
 		})
 	}
 	if info != nil {
-		builder = builder.Claims(map[string]interface{}{
-			"step": map[string]interface{}{
+		builder = builder.Claims(map[string]any{
+			"step": map[string]any{
 				"ra": info,
 			},
 		})

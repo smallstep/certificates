@@ -64,7 +64,7 @@ type Order struct {
 }
 
 // ToLog enables response logging.
-func (o *Order) ToLog() (interface{}, error) {
+func (o *Order) ToLog() (any, error) {
 	b, err := json.Marshal(o)
 	if err != nil {
 		return nil, WrapErrorISE(err, "error marshaling order for logging")
@@ -307,8 +307,7 @@ func (o *Order) Finalize(ctx context.Context, db DB, csr *x509.CertificateReques
 	}, signOps...)
 	if err != nil {
 		// Add subproblem for webhook errors, others can be added later.
-		var webhookErr *webhook.Error
-		if errors.As(err, &webhookErr) {
+		if webhookErr, ok := errors.AsType[*webhook.Error](err); ok {
 			acmeError := NewDetailedError(ErrorUnauthorizedType, "%s", webhookErr.Error())
 			acmeError.AddSubproblems(Subproblem{
 				Type:   fmt.Sprintf("urn:smallstep:acme:error:%s", webhookErr.Code),

@@ -37,8 +37,10 @@ import (
 )
 
 // v is a utility function to return the pointer to an integer
+//
+//go:fix inline
 func v(v int) *int {
-	return &v
+	return new(v)
 }
 
 func generateSerial() (*big.Int, error) {
@@ -103,7 +105,7 @@ const noKeyID = keyID("")
 // If nonce is empty, it will not be encoded into the header.
 // Implementation taken from github.com/mholt/acmez, which seems to be based on
 // https://github.com/golang/crypto/blob/master/acme/jws.go.
-func jwsEncodeJSON(claimset interface{}, key crypto.Signer, kid keyID, nonce, u string) ([]byte, error) {
+func jwsEncodeJSON(claimset any, key crypto.Signer, kid keyID, nonce, u string) ([]byte, error) {
 	alg, sha := jwsHasher(key.Public())
 	if alg == "" || !sha.Available() {
 		return nil, errUnsupportedKey
@@ -331,17 +333,17 @@ func Test_validateReasonCode(t *testing.T) {
 		},
 		{
 			name:       "fail/too-low",
-			reasonCode: v(-1),
+			reasonCode: new(-1),
 			want:       acme.NewError(acme.ErrorBadRevocationReasonType, "reasonCode out of bounds"),
 		},
 		{
 			name:       "fail/too-high",
-			reasonCode: v(11),
+			reasonCode: new(11),
 			want:       acme.NewError(acme.ErrorBadRevocationReasonType, "reasonCode out of bounds"),
 		},
 		{
 			name:       "fail/missing-7",
-			reasonCode: v(7),
+			reasonCode: new(7),
 
 			want: acme.NewError(acme.ErrorBadRevocationReasonType, "reasonCode out of bounds"),
 		},
@@ -509,7 +511,7 @@ func TestHandler_RevokeCert(t *testing.T) {
 				Protected: jose.Header{
 					Algorithm: jose.ES256,
 					KeyID:     "bar",
-					ExtraHeaders: map[jose.HeaderKey]interface{}{
+					ExtraHeaders: map[jose.HeaderKey]any{
 						"url": revokeURL,
 					},
 				},
@@ -788,7 +790,7 @@ func TestHandler_RevokeCert(t *testing.T) {
 			assert.FatalError(t, err)
 			jwsPayload := &revokePayload{
 				Certificate: base64.RawURLEncoding.EncodeToString(cert.Raw),
-				ReasonCode:  v(2),
+				ReasonCode:  new(2),
 			}
 			jwsBytes, err := jwsEncodeJSON(rp, unauthorizedKey, "", "nonce", revokeURL)
 			assert.FatalError(t, err)
@@ -888,7 +890,7 @@ func TestHandler_RevokeCert(t *testing.T) {
 		"fail/invalid-reasoncode": func(t *testing.T) test {
 			invalidReasonPayload := &revokePayload{
 				Certificate: base64.RawURLEncoding.EncodeToString(cert.Raw),
-				ReasonCode:  v(7),
+				ReasonCode:  new(7),
 			}
 			invalidReasonCodePayloadBytes, err := json.Marshal(invalidReasonPayload)
 			assert.FatalError(t, err)

@@ -90,8 +90,7 @@ func signSSHCertificate(key crypto.PublicKey, opts SignSSHOptions, signOpts []Si
 	// Create certificate from template.
 	certificate, err := sshutil.NewCertificate(cr, certOptions...)
 	if err != nil {
-		var templErr *sshutil.TemplateError
-		if errors.As(err, &templErr) {
+		if templErr, ok := errors.AsType[*sshutil.TemplateError](err); ok {
 			return nil, errs.NewErr(http.StatusBadRequest, templErr,
 				errs.WithMessage("%s", templErr.Error()),
 				errs.WithKeyVal("signOptions", signOpts),

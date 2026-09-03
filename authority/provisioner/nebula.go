@@ -12,6 +12,7 @@ import (
 	"math/big"
 	"net"
 	"net/netip"
+	"slices"
 	"time"
 
 	"github.com/pkg/errors"
@@ -413,11 +414,8 @@ func (v nebulaSANsValidator) Valid(req *x509.CertificateRequest) error {
 		for _, ip := range req.IPAddresses {
 			var valid bool
 			// Check ip in name
-			for _, ipInName := range ips {
-				if ip.Equal(ipInName) {
-					valid = true
-					break
-				}
+			if slices.ContainsFunc(ips, ip.Equal) {
+				valid = true
 			}
 			// Check ip network
 			if !valid {
