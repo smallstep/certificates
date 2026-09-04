@@ -21,6 +21,7 @@ import (
 
 	"github.com/go-chi/chi/v5"
 	"github.com/pkg/errors"
+	"go.step.sm/crypto/mldsa"
 	"go.step.sm/crypto/sshutil"
 	"golang.org/x/crypto/ssh"
 
@@ -539,7 +540,7 @@ type stepProvisioner struct {
 
 func logOtt(w http.ResponseWriter, token string) {
 	if rl, ok := w.(logging.ResponseLogger); ok {
-		rl.WithFields(map[string]interface{}{
+		rl.WithFields(map[string]any{
 			"ott": token,
 		})
 	}
@@ -548,7 +549,7 @@ func logOtt(w http.ResponseWriter, token string) {
 // LogCertificate adds certificate fields to the log message.
 func LogCertificate(w http.ResponseWriter, cert *x509.Certificate) {
 	if rl, ok := w.(logging.ResponseLogger); ok {
-		m := map[string]interface{}{
+		m := map[string]any{
 			"serial":      cert.SerialNumber.String(),
 			"subject":     cert.Subject.CommonName,
 			"issuer":      cert.Issuer.CommonName,
@@ -594,7 +595,7 @@ func LogSSHCertificate(w http.ResponseWriter, cert *ssh.Certificate) {
 			userOrHost = "user"
 		}
 		certificateType := fmt.Sprintf("%s %s certificate", parts[0], userOrHost) // e.g. ecdsa-sha2-nistp256-cert-v01@openssh.com user certificate
-		m := map[string]interface{}{
+		m := map[string]any{
 			"serial":           cert.Serial,
 			"principals":       cert.ValidPrincipals,
 			"valid-from":       time.Unix(cast.Int64(cert.ValidAfter), 0).Format(time.RFC3339),
@@ -660,6 +661,8 @@ func fmtPublicKey(cert *x509.Certificate) string {
 		params = strconv.Itoa(pk.Size() * 8)
 	case ed25519.PublicKey:
 		return cert.PublicKeyAlgorithm.String()
+	case *mldsa.PublicKey:
+		return pk.Parameters().String()
 	case *dsa.PublicKey:
 		params = strconv.Itoa(pk.Q.BitLen() * 8)
 	default:

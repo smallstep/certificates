@@ -129,13 +129,11 @@ func Test_reflectRequestID(t *testing.T) {
 	require.NoError(t, err)
 
 	var wg sync.WaitGroup
-	wg.Add(1)
 
-	go func() {
-		defer wg.Done()
+	wg.Go(func() {
 		err = c.Run()
 		require.ErrorIs(t, err, http.ErrServerClosed)
-	}()
+	})
 
 	// require the CA server to be available within 10 seconds,
 	// failing the test if it doesn't.

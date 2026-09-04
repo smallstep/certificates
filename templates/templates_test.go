@@ -26,7 +26,7 @@ func TestTemplates_Validate(t *testing.T) {
 	}
 	type fields struct {
 		SSH  *SSHTemplates
-		Data map[string]interface{}
+		Data map[string]any
 	}
 	tests := []struct {
 		name    string
@@ -34,10 +34,10 @@ func TestTemplates_Validate(t *testing.T) {
 		wantErr bool
 	}{
 		{"ok", fields{sshTemplates, nil}, false},
-		{"okWithData", fields{sshTemplates, map[string]interface{}{"Foo": "Bar"}}, false},
+		{"okWithData", fields{sshTemplates, map[string]any{"Foo": "Bar"}}, false},
 		{"badSSH", fields{&SSHTemplates{User: []Template{{}}}, nil}, true},
-		{"badDataUser", fields{sshTemplates, map[string]interface{}{"User": "Bar"}}, true},
-		{"badDataStep", fields{sshTemplates, map[string]interface{}{"Step": "Bar"}}, true},
+		{"badDataUser", fields{sshTemplates, map[string]any{"User": "Bar"}}, true},
+		{"badDataStep", fields{sshTemplates, map[string]any{"Step": "Bar"}}, true},
 	}
 	var nilValue *Templates
 	assert.NoError(t, nilValue.Validate())
@@ -229,7 +229,7 @@ func TestTemplate_Render(t *testing.T) {
 	assert.FatalError(t, err)
 	hostB64 := base64.StdEncoding.EncodeToString(host.Marshal())
 
-	data := map[string]interface{}{
+	data := map[string]any{
 		"Step": &Step{
 			SSH: StepSSH{
 				UserKey: user,
@@ -251,7 +251,7 @@ func TestTemplate_Render(t *testing.T) {
 		Comment      string
 	}
 	type args struct {
-		data interface{}
+		data any
 	}
 	tests := []struct {
 		name    string
@@ -300,7 +300,7 @@ func TestTemplate_Output(t *testing.T) {
 	assert.FatalError(t, err)
 	hostB64 := base64.StdEncoding.EncodeToString(host.Marshal())
 
-	data := map[string]interface{}{
+	data := map[string]any{
 		"Step": &Step{
 			SSH: StepSSH{
 				UserKey: user,
@@ -320,7 +320,7 @@ func TestTemplate_Output(t *testing.T) {
 		Comment      string
 	}
 	type args struct {
-		data interface{}
+		data any
 	}
 	tests := []struct {
 		name    string

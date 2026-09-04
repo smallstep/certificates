@@ -139,7 +139,7 @@ func parseCertificateRequest(t *testing.T, csrPEM string) *x509.CertificateReque
 	return csr
 }
 
-func equalJSON(t *testing.T, a, b interface{}) bool {
+func equalJSON(t *testing.T, a, b any) bool {
 	t.Helper()
 	if reflect.DeepEqual(a, b) {
 		return true
@@ -159,7 +159,7 @@ func TestClient_Version(t *testing.T) {
 
 	tests := []struct {
 		name         string
-		response     interface{}
+		response     any
 		responseCode int
 		wantErr      bool
 		expectedErr  error
@@ -201,7 +201,7 @@ func TestClient_Health(t *testing.T) {
 
 	tests := []struct {
 		name         string
-		response     interface{}
+		response     any
 		responseCode int
 		wantErr      bool
 		expectedErr  error
@@ -245,7 +245,7 @@ func TestClient_Root(t *testing.T) {
 	tests := []struct {
 		name         string
 		shasum       string
-		response     interface{}
+		response     any
 		responseCode int
 		wantErr      bool
 		expectedErr  error
@@ -304,7 +304,7 @@ func TestClient_Sign(t *testing.T) {
 	tests := []struct {
 		name         string
 		request      *api.SignRequest
-		response     interface{}
+		response     any
 		responseCode int
 		wantErr      bool
 		expectedErr  error
@@ -367,7 +367,7 @@ func TestClient_Revoke(t *testing.T) {
 	tests := []struct {
 		name         string
 		request      *api.RevokeRequest
-		response     interface{}
+		response     any
 		responseCode int
 		wantErr      bool
 		expectedErr  error
@@ -431,7 +431,7 @@ func TestClient_Renew(t *testing.T) {
 
 	tests := []struct {
 		name         string
-		response     interface{}
+		response     any
 		responseCode int
 		wantErr      bool
 		err          error
@@ -485,7 +485,7 @@ func TestClient_RenewWithToken(t *testing.T) {
 
 	tests := []struct {
 		name         string
-		response     interface{}
+		response     any
 		responseCode int
 		wantErr      bool
 		err          error
@@ -548,7 +548,7 @@ func TestClient_Rekey(t *testing.T) {
 	tests := []struct {
 		name         string
 		request      *api.RekeyRequest
-		response     interface{}
+		response     any
 		responseCode int
 		wantErr      bool
 		err          error
@@ -600,7 +600,7 @@ func TestClient_Provisioners(t *testing.T) {
 		name         string
 		args         []ProvisionerOption
 		expectedURI  string
-		response     interface{}
+		response     any
 		responseCode int
 		wantErr      bool
 	}{
@@ -649,7 +649,7 @@ func TestClient_ProvisionerKey(t *testing.T) {
 	tests := []struct {
 		name         string
 		kid          string
-		response     interface{}
+		response     any
 		responseCode int
 		wantErr      bool
 		err          error
@@ -702,7 +702,7 @@ func TestClient_Roots(t *testing.T) {
 
 	tests := []struct {
 		name         string
-		response     interface{}
+		response     any
 		responseCode int
 		wantErr      bool
 		err          error
@@ -752,7 +752,7 @@ func TestClient_Federation(t *testing.T) {
 
 	tests := []struct {
 		name         string
-		response     interface{}
+		response     any
 		responseCode int
 		wantErr      bool
 		err          error
@@ -803,7 +803,7 @@ func TestClient_SSHRoots(t *testing.T) {
 
 	tests := []struct {
 		name         string
-		response     interface{}
+		response     any
 		responseCode int
 		wantErr      bool
 		err          error
@@ -896,7 +896,7 @@ func TestClient_RootFingerprint(t *testing.T) {
 	tests := []struct {
 		name         string
 		server       *httptest.Server
-		response     interface{}
+		response     any
 		responseCode int
 		want         string
 		wantErr      bool
@@ -952,7 +952,7 @@ func TestClient_SSHBastion(t *testing.T) {
 	tests := []struct {
 		name         string
 		request      *api.SSHBastionRequest
-		response     interface{}
+		response     any
 		responseCode int
 		wantErr      bool
 		err          error

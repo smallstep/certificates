@@ -2,6 +2,7 @@ package config
 
 import (
 	"encoding/json"
+	"slices"
 
 	"github.com/pkg/errors"
 )
@@ -24,12 +25,7 @@ func (s multiString) HasEmpties() bool {
 	if len(s) == 0 {
 		return true
 	}
-	for _, ss := range s {
-		if ss == "" {
-			return true
-		}
-	}
-	return false
+	return slices.Contains(s, "")
 }
 
 // MarshalJSON marshals the multistring as a string or a slice of strings . With

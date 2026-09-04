@@ -300,8 +300,7 @@ func TestACME_AuthorizeRenew(t *testing.T) {
 			err := tc.p.AuthorizeRenew(context.Background(), tc.cert)
 			if tc.err != nil {
 				if assert.Implements(t, (*render.StatusCodedError)(nil), err) {
-					var sc render.StatusCodedError
-					if errors.As(err, &sc) {
+					if sc, ok := errors.AsType[render.StatusCodedError](err); ok {
 						assert.Equal(t, tc.code, sc.StatusCode())
 					}
 				}
@@ -337,8 +336,7 @@ func TestACME_AuthorizeSign(t *testing.T) {
 			opts, err := tc.p.AuthorizeSign(context.Background(), tc.token)
 			if tc.err != nil {
 				if assert.Implements(t, (*render.StatusCodedError)(nil), err) {
-					var sc render.StatusCodedError
-					if errors.As(err, &sc) {
+					if sc, ok := errors.AsType[render.StatusCodedError](err); ok {
 						assert.Equal(t, tc.code, sc.StatusCode())
 					}
 				}

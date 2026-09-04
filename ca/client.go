@@ -366,7 +366,7 @@ func WithCertificate(cert tls.Certificate) ClientOption {
 
 // WithAdminX5C will set the given file as the X5C certificate for use
 // by the client.
-func WithAdminX5C(certs []*x509.Certificate, key interface{}, passwordFile string) ClientOption {
+func WithAdminX5C(certs []*x509.Certificate, key any, passwordFile string) ClientOption {
 	return func(o *clientOptions) error {
 		// Get private key from given key file
 		var (
@@ -1566,7 +1566,7 @@ func getRootCAPath() string {
 	return filepath.Join(step.Path(), "certs", "root_ca.crt")
 }
 
-func readJSON(r io.ReadCloser, v interface{}) error {
+func readJSON(r io.ReadCloser, v any) error {
 	defer r.Close()
 	return json.NewDecoder(r).Decode(v)
 }

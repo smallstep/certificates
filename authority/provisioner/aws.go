@@ -13,6 +13,7 @@ import (
 	"net"
 	"net/http"
 	"os"
+	"slices"
 	"strings"
 	"time"
 
@@ -169,7 +170,7 @@ type AWS struct {
 	DisableCustomSANs      bool     `json:"disableCustomSANs"`
 	DisableTrustOnFirstUse bool     `json:"disableTrustOnFirstUse"`
 	IMDSVersions           []string `json:"imdsVersions"`
-	InstanceAge            Duration `json:"instanceAge,omitempty"`
+	InstanceAge            Duration `json:"instanceAge"`
 	IIDRoots               string   `json:"iidRoots,omitempty"`
 	Claims                 *Claims  `json:"claims,omitempty"`
 	Options                *Options `json:"options,omitempty"`
@@ -590,11 +591,8 @@ func (p *AWS) authorizeToken(token string) (*awsPayload, error) {
 	// validate accounts
 	if len(p.Accounts) > 0 {
 		var found bool
-		for _, sa := range p.Accounts {
-			if sa == doc.AccountID {
-				found = true
-				break
-			}
+		if slices.Contains(p.Accounts, doc.AccountID) {
+			found = true
 		}
 		if !found {
 			return nil, errs.Unauthorized("aws.authorizeToken; invalid aws identity document - accountId is not valid")
