@@ -49,7 +49,6 @@ func generateSerial() (*big.Int, error) {
 
 // generateCertKeyPair generates fresh x509 certificate/key pairs for testing
 func generateCertKeyPair() (*x509.Certificate, crypto.Signer, error) {
-
 	pub, priv, err := keyutil.GenerateKeyPair("EC", "P-256", 0)
 	if err != nil {
 		return nil, nil, err
@@ -238,14 +237,12 @@ func jwkEncode(pub crypto.PublicKey) (string, error) {
 		if p.BitSize%8 != 0 {
 			n++
 		}
-		x := pub.X.Bytes()
-		if n > len(x) {
-			x = append(make([]byte, n-len(x)), x...)
+		b, err := pub.Bytes()
+		if err != nil {
+			return "", err
 		}
-		y := pub.Y.Bytes()
-		if n > len(y) {
-			y = append(make([]byte, n-len(y)), y...)
-		}
+		x, y := b[1:n+1], b[n+1:]
+
 		// Field order is important.
 		// See https://tools.ietf.org/html/rfc7638#section-3.3 for details.
 		return fmt.Sprintf(`{"crv":%q,"kty":"EC","x":%q,"y":%q}`,

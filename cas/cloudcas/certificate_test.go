@@ -15,6 +15,7 @@ import (
 	"testing"
 
 	pb "cloud.google.com/go/security/privateca/apiv1/privatecapb"
+	"github.com/stretchr/testify/require"
 	kmsapi "go.step.sm/crypto/kms/apiv1"
 )
 
@@ -112,8 +113,20 @@ func Test_createPublicKey(t *testing.T) {
 		t.Fatal(err)
 	}
 	ecCert := mustParseCertificate(t, testLeafCertificate)
-	ecCertPublicKey := ecCert.PublicKey.(*ecdsa.PublicKey)
 	rsaCert := mustParseCertificate(t, testRSACertificate)
+
+	badKey, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
+	require.NoError(t, err)
+	badECKey := &badKey.PublicKey
+	badECKey.Curve = &elliptic.CurveParams{
+		Name:    "FOO",
+		BitSize: 256,
+		P:       badECKey.Params().P,
+		B:       badECKey.Params().B,
+		Gx:      badECKey.Params().Gx,
+		Gy:      badECKey.Params().Gy,
+	}
+
 	type args struct {
 		key crypto.PublicKey
 	}
@@ -132,16 +145,7 @@ func Test_createPublicKey(t *testing.T) {
 			Key:    []byte(testRSAPublicKey),
 		}, false},
 		{"fail ed25519", args{edpub}, nil, true},
-		{"fail ec marshal", args{&ecdsa.PublicKey{
-			Curve: &elliptic.CurveParams{
-				Name:    "FOO",
-				BitSize: 256,
-				P:       ecCertPublicKey.Params().P,
-				B:       ecCertPublicKey.Params().B,
-			},
-			X: ecCertPublicKey.X,
-			Y: ecCertPublicKey.Y,
-		}}, nil, true},
+		{"fail ec marshal", args{badECKey}, nil, true},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {

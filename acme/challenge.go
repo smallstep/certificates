@@ -1462,7 +1462,6 @@ type androidKeyAttestationData struct {
 // extension.
 func findAndroidAttestationCert(certs []*x509.Certificate) *x509.Certificate {
 	for _, cert := range slices.Backward(certs) {
-
 		for _, ext := range cert.Extensions {
 			if ext.Id.Equal(oidAndroidAttestation) {
 				return cert
@@ -1873,7 +1872,6 @@ func reverseAddr(ip net.IP) (arpa string) {
 	buf := make([]byte, 0, len(ip)*4+len("ip6.arpa."))
 	// Add it, in reverse, to the buffer
 	for _, v := range slices.Backward(ip) {
-
 		buf = append(buf, hexit[v&0xF],
 			'.',
 			hexit[v>>4],
