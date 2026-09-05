@@ -975,6 +975,7 @@ func deviceAttest01Validate(ctx context.Context, ch *Challenge, db DB, jwk *jose
 	default:
 		return storeError(ctx, db, ch, true, NewDetailedError(ErrorBadAttestationStatementType, "unsupported attestation object format %q", format))
 	}
+	az.AttestationFormat = format
 
 	// Update and store the challenge.
 	ch.Status = StatusValid
@@ -985,7 +986,7 @@ func deviceAttest01Validate(ctx context.Context, ch *Challenge, db DB, jwk *jose
 	// Store the fingerprint in the authorization.
 	//
 	// TODO: add method to update authorization and challenge atomically.
-	if az.Fingerprint != "" {
+	if az.Fingerprint != "" || az.AttestationFormat != "" {
 		if err := db.UpdateAuthorization(ctx, az); err != nil {
 			return WrapErrorISE(err, "error updating authorization")
 		}

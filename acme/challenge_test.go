@@ -4486,6 +4486,45 @@ func Test_deviceAttest01Validate(t *testing.T) {
 				wantErr: nil,
 			}
 		},
+		"ok/doAppleAttestationFormat": func(t *testing.T) test {
+			jwk, _ := mustAccountAndKeyAuthorization(t, "nonce")
+			payload, leaf, root := mustAttestApple(t, "nonce")
+			caRoot := pem.EncodeToMemory(&pem.Block{Type: "CERTIFICATE", Bytes: root.Raw})
+			ctx := NewProvisionerContext(context.Background(), mustAttestationProvisioner(t, caRoot))
+
+			return test{
+				args: args{
+					ctx: ctx,
+					jwk: jwk,
+					ch: &Challenge{
+						ID:              "chID",
+						AuthorizationID: "azID",
+						Token:           "nonce",
+						Type:            "device-attest-01",
+						Status:          StatusPending,
+						Value:           "serial-number",
+					},
+					payload: payload,
+					db: &MockDB{
+						MockGetAuthorization: func(context.Context, string) (*Authorization, error) {
+							return &Authorization{ID: "azID"}, nil
+						},
+						MockUpdateAuthorization: func(_ context.Context, az *Authorization) error {
+							fingerprint, err := keyutil.Fingerprint(leaf.PublicKey)
+							assert.NoError(t, err)
+							assert.Equal(t, fingerprint, az.Fingerprint)
+							assert.Equal(t, "apple", az.AttestationFormat)
+							return nil
+						},
+						MockUpdateChallenge: func(_ context.Context, ch *Challenge) error {
+							assert.Equal(t, StatusValid, ch.Status)
+							assert.Equal(t, "apple", ch.PayloadFormat)
+							return nil
+						},
+					},
+				},
+			}
+		},
 		"ok/doAppleAttestationFormat-non-matching-nonce": func(t *testing.T) test {
 			jwk, _ := mustAccountAndKeyAuthorization(t, "token")
 			payload, _, root := mustAttestApple(t, "bad-nonce")
@@ -4590,7 +4629,7 @@ func Test_deviceAttest01Validate(t *testing.T) {
 		},
 		"ok/doAndroidAttestationFormat": func(t *testing.T) test {
 			jwk, keyAuth := mustAccountAndKeyAuthorization(t, "token")
-			payload, _, root := mustAttestAndroid(t, keyAuth)
+			payload, leaf, root := mustAttestAndroid(t, keyAuth)
 
 			caRoot := pem.EncodeToMemory(&pem.Block{Type: "CERTIFICATE", Bytes: root.Raw})
 			ctx := NewProvisionerContext(context.Background(), mustAndroidAttestationProvisioner(t, caRoot, nil))
@@ -4611,6 +4650,13 @@ func Test_deviceAttest01Validate(t *testing.T) {
 						MockGetAuthorization: func(ctx context.Context, id string) (*Authorization, error) {
 							assert.Equal(t, "azID", id)
 							return &Authorization{ID: "azID"}, nil
+						},
+						MockUpdateAuthorization: func(_ context.Context, az *Authorization) error {
+							fingerprint, err := keyutil.Fingerprint(leaf.PublicKey)
+							assert.NoError(t, err)
+							assert.Equal(t, fingerprint, az.Fingerprint)
+							assert.Equal(t, "android-key", az.AttestationFormat)
+							return nil
 						},
 						MockUpdateChallenge: func(ctx context.Context, updch *Challenge) error {
 							assert.Equal(t, "chID", updch.ID)
@@ -4973,6 +5019,7 @@ func Test_deviceAttest01Validate(t *testing.T) {
 							assert.NoError(t, err)
 							assert.Equal(t, "azID", az.ID)
 							assert.Equal(t, fingerprint, az.Fingerprint)
+							assert.Equal(t, "step", az.AttestationFormat)
 							return nil
 						},
 						MockUpdateChallenge: func(ctx context.Context, updch *Challenge) error {
@@ -5021,6 +5068,7 @@ func Test_deviceAttest01Validate(t *testing.T) {
 							assert.NoError(t, err)
 							assert.Equal(t, "azID", az.ID)
 							assert.Equal(t, fingerprint, az.Fingerprint)
+							assert.Equal(t, "step", az.AttestationFormat)
 							return nil
 						},
 						MockUpdateChallenge: func(ctx context.Context, updch *Challenge) error {
