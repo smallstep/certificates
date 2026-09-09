@@ -6,6 +6,7 @@ import (
 	"encoding/asn1"
 	"encoding/binary"
 	"encoding/hex"
+	"encoding/json"
 	"fmt"
 	"net/url"
 	"sort"
@@ -39,9 +40,11 @@ func (p provisionerSlice) Swap(i, j int)      { p[i], p[j] = p[j], p[i] }
 // provisioner.
 type loadByTokenPayload struct {
 	jose.Claims
-	Email           string `json:"email"` // OIDC email
-	AuthorizedParty string `json:"azp"`   // OIDC client id
-	TenantID        string `json:"tid"`   // Microsoft Azure tenant id
+	Email           string          `json:"email"` // OIDC email
+	AuthorizedParty string          `json:"azp"`   // OIDC client id
+	TenantID        string          `json:"tid"`   // Microsoft Azure tenant id
+	Kubernetes      json.RawMessage `json:"kubernetes.io,omitempty"`
+	K8sSALegacyNS   string          `json:"kubernetes.io/serviceaccount/namespace,omitempty"`
 }
 
 // Collection is a memory map of provisioners.
@@ -85,6 +88,25 @@ func (c *Collection) LoadByTokenID(tokenProvisionerID string) (Interface, bool) 
 
 // LoadByToken parses the token claims and loads the provisioner associated.
 func (c *Collection) LoadByToken(token *jose.JSONWebToken, claims *jose.Claims) (Interface, bool) {
+	var payload loadByTokenPayload
+	if err := token.UnsafeClaimsWithoutVerification(&payload); err != nil {
+		return nil, false
+	}
+
+	// Kubernetes Service Account tokens use a fixed issuer in legacy clusters,
+	// but modern clusters can configure the issuer. Use the standard service
+	// account subject and Kubernetes claims as a routing hint; the K8sSA
+	// provisioner still authenticates the token before trusting these values.
+	if payload.Issuer == k8sSAIssuer ||
+		(strings.HasPrefix(payload.Subject, "system:serviceaccount:") &&
+			(len(payload.Kubernetes) > 0 || payload.K8sSALegacyNS != "")) {
+		if p, ok := c.LoadByTokenID(K8sSAID); ok {
+			return p, ok
+		}
+		// Kubernetes service account provisioner not found
+		return nil, false
+	}
+
 	var audiences []string
 	// Get all audiences with the given fragment
 	fragment := extractFragment(claims.Audience)
@@ -104,21 +126,6 @@ func (c *Collection) LoadByToken(token *jose.JSONWebToken, claims *jose.Claims) 
 		// the id would be <issuer>:<kid>.
 		// TODO: is this ok?
 		return c.LoadByTokenID(claims.Issuer + ":" + token.Headers[0].KeyID)
-	}
-
-	// The ID will be just the clientID stored in azp, aud or tid.
-	var payload loadByTokenPayload
-	if err := token.UnsafeClaimsWithoutVerification(&payload); err != nil {
-		return nil, false
-	}
-
-	// Kubernetes Service Account tokens.
-	if payload.Issuer == k8sSAIssuer {
-		if p, ok := c.LoadByTokenID(K8sSAID); ok {
-			return p, ok
-		}
-		// Kubernetes service account provisioner not found
-		return nil, false
 	}
 
 	// Audience is required for non k8sSA tokens.
