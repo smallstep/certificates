@@ -567,6 +567,8 @@ func TestWebhook_Do(t *testing.T) {
 					assert.Equal(t, tc.requestID, r.Header.Get("X-Request-ID"))
 				}
 
+				assert.Equal(t, "application/json", r.Header.Get("Content-Type"))
+
 				assert.Equal(t, tc.webhook.ID, r.Header.Get("X-Smallstep-Webhook-ID"))
 
 				sig, err := hex.DecodeString(r.Header.Get("X-Smallstep-Signature"))
