@@ -13,7 +13,7 @@ import (
 	"github.com/smallstep/certificates/ca"
 )
 
-func printResponse(name string, v interface{}) {
+func printResponse(name string, v any) {
 	b, err := json.MarshalIndent(v, "", "  ")
 	if err != nil {
 		panic(err)

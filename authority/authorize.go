@@ -228,7 +228,7 @@ func (a *Authority) UseToken(ctx context.Context, token string, prov provisioner
 // Authorize grabs the method from the context and authorizes the request by
 // validating the one-time-token.
 func (a *Authority) Authorize(ctx context.Context, token string) ([]provisioner.SignOption, error) {
-	var opts = []interface{}{errs.WithKeyVal("token", token)}
+	var opts = []any{errs.WithKeyVal("token", token)}
 
 	switch m := provisioner.MethodFromContext(ctx); m {
 	case provisioner.SignMethod, provisioner.SignIdentityMethod:
@@ -257,7 +257,7 @@ func (a *Authority) Authorize(ctx context.Context, token string) ([]provisioner.
 		_, signOpts, err := a.authorizeSSHRekey(ctx, token)
 		return signOpts, errs.Wrap(http.StatusInternalServerError, err, "authority.Authorize", opts...)
 	default:
-		return nil, errs.InternalServer("authority.Authorize; method %d is not supported", append([]interface{}{m}, opts...)...)
+		return nil, errs.InternalServer("authority.Authorize; method %d is not supported", append([]any{m}, opts...)...)
 	}
 }
 
@@ -305,7 +305,7 @@ func (a *Authority) authorizeRevoke(ctx context.Context, token string) error {
 // TODO(mariano): should we authorize by default?
 func (a *Authority) authorizeRenew(ctx context.Context, cert *x509.Certificate) (provisioner.Interface, error) {
 	serial := cert.SerialNumber.String()
-	var opts = []interface{}{errs.WithKeyVal("serialNumber", serial)}
+	var opts = []any{errs.WithKeyVal("serialNumber", serial)}
 
 	isRevoked, err := a.IsRevoked(serial)
 	if err != nil {

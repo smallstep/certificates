@@ -123,7 +123,7 @@ type MockDB struct {
 	MockDeleteAuthorityPolicy func(ctx context.Context) error
 
 	MockError error
-	MockRet1  interface{}
+	MockRet1  any
 }
 
 // CreateProvisioner mock.

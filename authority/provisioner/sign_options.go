@@ -2,8 +2,6 @@ package provisioner
 
 import (
 	"context"
-	"crypto/ecdsa"
-	"crypto/ed25519"
 	"crypto/rsa"
 	"crypto/sha256"
 	"crypto/subtle"
@@ -14,6 +12,7 @@ import (
 	"net/http"
 	"net/url"
 	"reflect"
+	"slices"
 	"time"
 
 	"go.step.sm/crypto/keyutil"
@@ -21,6 +20,7 @@ import (
 
 	"github.com/smallstep/certificates/authority/policy"
 	"github.com/smallstep/certificates/errs"
+	"github.com/smallstep/certificates/internal/cryptoutil"
 )
 
 // DefaultCertValidity is the default validity for a certificate if none is specified.
@@ -37,7 +37,7 @@ type SignOptions struct {
 
 // SignOption is the interface used to collect all extra options used in the
 // Sign method.
-type SignOption interface{}
+type SignOption any
 
 // CertificateValidator is an interface used to validate a given X.509 certificate.
 type CertificateValidator interface {
@@ -92,17 +92,7 @@ type defaultPublicKeyValidator struct{}
 
 // Valid checks that certificate request common name matches the one configured.
 func (v defaultPublicKeyValidator) Valid(req *x509.CertificateRequest) error {
-	switch k := req.PublicKey.(type) {
-	case *rsa.PublicKey:
-		if k.Size() < keyutil.MinRSAKeyBytes {
-			return errs.Forbidden("certificate request RSA key must be at least %d bits (%d bytes)",
-				8*keyutil.MinRSAKeyBytes, keyutil.MinRSAKeyBytes)
-		}
-	case *ecdsa.PublicKey, ed25519.PublicKey:
-	default:
-		return errs.BadRequest("certificate request key of type '%T' is not supported", k)
-	}
-	return nil
+	return newPublicKeyMinimumLengthValidator(8 * keyutil.MinRSAKeyBytes).Valid(req)
 }
 
 // publicKeyMinimumLengthValidator validates the length (in bits) of the public key
@@ -122,18 +112,20 @@ func newPublicKeyMinimumLengthValidator(length int) publicKeyMinimumLengthValida
 
 // Valid checks that certificate request common name matches the one configured.
 func (v publicKeyMinimumLengthValidator) Valid(req *x509.CertificateRequest) error {
-	switch k := req.PublicKey.(type) {
-	case *rsa.PublicKey:
+	if rsaKey, ok := req.PublicKey.(*rsa.PublicKey); ok {
 		minimumLengthInBytes := v.length / 8
-		if k.Size() < minimumLengthInBytes {
+		if rsaKey.Size() < minimumLengthInBytes {
 			return errs.Forbidden("certificate request RSA key must be at least %d bits (%d bytes)",
 				v.length, minimumLengthInBytes)
 		}
-	case *ecdsa.PublicKey, ed25519.PublicKey:
-	default:
-		return errs.BadRequest("certificate request key of type '%T' is not supported", k)
+		return nil
 	}
-	return nil
+
+	if cryptoutil.IsSupportedPublicKey(req.PublicKey) {
+		return nil
+	}
+
+	return errs.BadRequest("certificate request key of type '%T' is not supported", req.PublicKey)
 }
 
 // commonNameValidator validates the common name of a certificate request.
@@ -159,10 +151,8 @@ func (v commonNameSliceValidator) Valid(req *x509.CertificateRequest) error {
 	if req.Subject.CommonName == "" {
 		return nil
 	}
-	for _, cn := range v {
-		if req.Subject.CommonName == cn {
-			return nil
-		}
+	if slices.Contains(v, req.Subject.CommonName) {
+		return nil
 	}
 	return errs.Forbidden("certificate request does not contain the valid common name - got %s, want %s", req.Subject.CommonName, v)
 }

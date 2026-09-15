@@ -25,6 +25,17 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
 
 ---
 
+## [TPB] - TBD
+
+### Added
+
+- Support for ML-DSA (FIPS 204) keys, available when built with Go 1.27 or
+  newer. JOSE-based flows (JWK, JWS and JWT tokens) do not support ML-DSA yet.
+
+### Deprecated
+
+- Go 1.25 support. Go 1.26 or newer is now required.
+
 ## [0.30.2] - 2026-03-22
 
 - Update golang.org/grpc to patch security advisory

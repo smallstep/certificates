@@ -230,7 +230,7 @@ func (c *Collection) Find(cursor string, limit int) ([]*linkedca.Admin, string) 
 	return slice, ""
 }
 
-func loadAdmin(m *sync.Map, key interface{}) (*linkedca.Admin, bool) {
+func loadAdmin(m *sync.Map, key any) (*linkedca.Admin, bool) {
 	val, ok := m.Load(key)
 	if !ok {
 		return nil, false

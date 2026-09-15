@@ -149,6 +149,6 @@ func DefaultTemplates() *Templates {
 	}
 	return &Templates{
 		SSH:  &sshTemplates,
-		Data: map[string]interface{}{},
+		Data: map[string]any{},
 	}
 }

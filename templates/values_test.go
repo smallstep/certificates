@@ -39,7 +39,7 @@ func TestDefaultTemplates(t *testing.T) {
 					{Name: "bar.tpl", Type: Snippet, Content: []byte("bar"), Path: "/tmp/bar", Comment: "#"},
 				},
 			},
-			Data: map[string]interface{}{},
+			Data: map[string]any{},
 		}},
 	}
 	for _, tt := range tests {

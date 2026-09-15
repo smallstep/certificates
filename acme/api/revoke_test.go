@@ -37,8 +37,10 @@ import (
 )
 
 // v is a utility function to return the pointer to an integer
+//
+//go:fix inline
 func v(v int) *int {
-	return &v
+	return new(v)
 }
 
 func generateSerial() (*big.Int, error) {
@@ -47,7 +49,6 @@ func generateSerial() (*big.Int, error) {
 
 // generateCertKeyPair generates fresh x509 certificate/key pairs for testing
 func generateCertKeyPair() (*x509.Certificate, crypto.Signer, error) {
-
 	pub, priv, err := keyutil.GenerateKeyPair("EC", "P-256", 0)
 	if err != nil {
 		return nil, nil, err
@@ -103,7 +104,7 @@ const noKeyID = keyID("")
 // If nonce is empty, it will not be encoded into the header.
 // Implementation taken from github.com/mholt/acmez, which seems to be based on
 // https://github.com/golang/crypto/blob/master/acme/jws.go.
-func jwsEncodeJSON(claimset interface{}, key crypto.Signer, kid keyID, nonce, u string) ([]byte, error) {
+func jwsEncodeJSON(claimset any, key crypto.Signer, kid keyID, nonce, u string) ([]byte, error) {
 	alg, sha := jwsHasher(key.Public())
 	if alg == "" || !sha.Available() {
 		return nil, errUnsupportedKey
@@ -236,14 +237,12 @@ func jwkEncode(pub crypto.PublicKey) (string, error) {
 		if p.BitSize%8 != 0 {
 			n++
 		}
-		x := pub.X.Bytes()
-		if n > len(x) {
-			x = append(make([]byte, n-len(x)), x...)
+		b, err := pub.Bytes()
+		if err != nil {
+			return "", err
 		}
-		y := pub.Y.Bytes()
-		if n > len(y) {
-			y = append(make([]byte, n-len(y)), y...)
-		}
+		x, y := b[1:n+1], b[n+1:]
+
 		// Field order is important.
 		// See https://tools.ietf.org/html/rfc7638#section-3.3 for details.
 		return fmt.Sprintf(`{"crv":%q,"kty":"EC","x":%q,"y":%q}`,
@@ -331,17 +330,17 @@ func Test_validateReasonCode(t *testing.T) {
 		},
 		{
 			name:       "fail/too-low",
-			reasonCode: v(-1),
+			reasonCode: new(-1),
 			want:       acme.NewError(acme.ErrorBadRevocationReasonType, "reasonCode out of bounds"),
 		},
 		{
 			name:       "fail/too-high",
-			reasonCode: v(11),
+			reasonCode: new(11),
 			want:       acme.NewError(acme.ErrorBadRevocationReasonType, "reasonCode out of bounds"),
 		},
 		{
 			name:       "fail/missing-7",
-			reasonCode: v(7),
+			reasonCode: new(7),
 
 			want: acme.NewError(acme.ErrorBadRevocationReasonType, "reasonCode out of bounds"),
 		},
@@ -509,7 +508,7 @@ func TestHandler_RevokeCert(t *testing.T) {
 				Protected: jose.Header{
 					Algorithm: jose.ES256,
 					KeyID:     "bar",
-					ExtraHeaders: map[jose.HeaderKey]interface{}{
+					ExtraHeaders: map[jose.HeaderKey]any{
 						"url": revokeURL,
 					},
 				},
@@ -788,7 +787,7 @@ func TestHandler_RevokeCert(t *testing.T) {
 			assert.FatalError(t, err)
 			jwsPayload := &revokePayload{
 				Certificate: base64.RawURLEncoding.EncodeToString(cert.Raw),
-				ReasonCode:  v(2),
+				ReasonCode:  new(2),
 			}
 			jwsBytes, err := jwsEncodeJSON(rp, unauthorizedKey, "", "nonce", revokeURL)
 			assert.FatalError(t, err)
@@ -888,7 +887,7 @@ func TestHandler_RevokeCert(t *testing.T) {
 		"fail/invalid-reasoncode": func(t *testing.T) test {
 			invalidReasonPayload := &revokePayload{
 				Certificate: base64.RawURLEncoding.EncodeToString(cert.Raw),
-				ReasonCode:  v(7),
+				ReasonCode:  new(7),
 			}
 			invalidReasonCodePayloadBytes, err := json.Marshal(invalidReasonPayload)
 			assert.FatalError(t, err)

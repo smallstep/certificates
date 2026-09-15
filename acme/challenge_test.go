@@ -217,12 +217,12 @@ func mustAttestApple(t *testing.T, nonce string) ([]byte, *x509.Certificate, *x5
 	fatalError(t, err)
 
 	attObj, err := cbor.Marshal(struct {
-		Format       string                 `json:"fmt"`
-		AttStatement map[string]interface{} `json:"attStmt,omitempty"`
+		Format       string         `json:"fmt"`
+		AttStatement map[string]any `json:"attStmt,omitempty"`
 	}{
 		Format: "apple",
-		AttStatement: map[string]interface{}{
-			"x5c": []interface{}{leaf.Raw, ca.Intermediate.Raw},
+		AttStatement: map[string]any{
+			"x5c": []any{leaf.Raw, ca.Intermediate.Raw},
 		},
 	})
 	fatalError(t, err)
@@ -265,12 +265,12 @@ func mustAttestYubikey(t *testing.T, _, keyAuthorization string, serial int) ([]
 	fatalError(t, err)
 
 	attObj, err := cbor.Marshal(struct {
-		Format       string                 `json:"fmt"`
-		AttStatement map[string]interface{} `json:"attStmt,omitempty"`
+		Format       string         `json:"fmt"`
+		AttStatement map[string]any `json:"attStmt,omitempty"`
 	}{
 		Format: "step",
-		AttStatement: map[string]interface{}{
-			"x5c": []interface{}{leaf.Raw, ca.Intermediate.Raw},
+		AttStatement: map[string]any{
+			"x5c": []any{leaf.Raw, ca.Intermediate.Raw},
 			"alg": -7,
 			"sig": cborSig,
 		},
@@ -319,12 +319,12 @@ func mustAttestStepManagedDeviceID(t *testing.T, _, keyAuthorization, serialNumb
 	require.NoError(t, err)
 
 	attObj, err := cbor.Marshal(struct {
-		Format       string                 `json:"fmt"`
-		AttStatement map[string]interface{} `json:"attStmt,omitempty"`
+		Format       string         `json:"fmt"`
+		AttStatement map[string]any `json:"attStmt,omitempty"`
 	}{
 		Format: "step",
-		AttStatement: map[string]interface{}{
-			"x5c": []interface{}{leaf.Raw, ca.Intermediate.Raw},
+		AttStatement: map[string]any{
+			"x5c": []any{leaf.Raw, ca.Intermediate.Raw},
 			"alg": -7,
 			"sig": cborSig,
 		},
@@ -486,8 +486,7 @@ func Test_storeError(t *testing.T) {
 			tc := run(t)
 			if err := storeError(context.Background(), tc.db, tc.ch, tc.markInvalid, err); err != nil {
 				if assert.Error(t, tc.err) {
-					var k *Error
-					if errors.As(err, &k) {
+					if k, ok := errors.AsType[*Error](err); ok {
 						assert.Equal(t, tc.err.Type, k.Type)
 						assert.Equal(t, tc.err.Detail, k.Detail)
 						assert.Equal(t, tc.err.Status, k.Status)
@@ -540,8 +539,7 @@ func TestKeyAuthorization(t *testing.T) {
 			tc := run(t)
 			if ka, err := KeyAuthorization(tc.token, tc.jwk); err != nil {
 				if assert.Error(t, tc.err) {
-					var k *Error
-					if errors.As(err, &k) {
+					if k, ok := errors.AsType[*Error](err); ok {
 						assert.Equal(t, tc.err.Type, k.Type)
 						assert.Equal(t, tc.err.Detail, k.Detail)
 						assert.Equal(t, tc.err.Status, k.Status)
@@ -1124,7 +1122,7 @@ MCowBQYDK2VwAyEA5c+4NKZSNQcR1T8qN6SjwgdPZQ0Ge12Ylx/YeGAJ35k=
 						assert.Equal(t, "accID", accountID)
 						return []string{"orderID"}, nil
 					},
-					MockCreateOidcToken: func(ctx context.Context, orderID string, idToken map[string]interface{}) error {
+					MockCreateOidcToken: func(ctx context.Context, orderID string, idToken map[string]any) error {
 						assert.Equal(t, "orderID", orderID)
 						assert.Equal(t, "Alice Smith", idToken["name"].(string))
 						assert.Equal(t, "wireapp://%40alice_wire@wire.com", idToken["preferred_username"].(string))
@@ -1369,7 +1367,7 @@ MCowBQYDK2VwAyEA5c+4NKZSNQcR1T8qN6SjwgdPZQ0Ge12Ylx/YeGAJ35k=
 						assert.Equal(t, "accID", accountID)
 						return []string{"orderID"}, nil
 					},
-					MockCreateDpopToken: func(ctx context.Context, orderID string, dpop map[string]interface{}) error {
+					MockCreateDpopToken: func(ctx context.Context, orderID string, dpop map[string]any) error {
 						assert.Equal(t, "orderID", orderID)
 						assert.Equal(t, "token", dpop["chal"].(string))
 						assert.Equal(t, "wireapp://%40alice_wire@wire.com", dpop["handle"].(string))
@@ -1530,8 +1528,7 @@ MCowBQYDK2VwAyEA5c+4NKZSNQcR1T8qN6SjwgdPZQ0Ge12Ylx/YeGAJ35k=
 			ctx = NewClientContext(ctx, tc.vc)
 			err := tc.ch.Validate(ctx, tc.db, tc.jwk, tc.payload)
 			if tc.err != nil {
-				var k *Error
-				if errors.As(err, &k) {
+				if k, ok := errors.AsType[*Error](err); ok {
 					assert.Equal(t, tc.err.Type, k.Type)
 					assert.Equal(t, tc.err.Detail, k.Detail)
 					assert.Equal(t, tc.err.Status, k.Status)
@@ -1969,8 +1966,7 @@ func TestHTTP01Validate(t *testing.T) {
 			ctx := NewClientContext(context.Background(), tc.vc)
 			if err := http01Validate(ctx, tc.ch, tc.db, tc.jwk); err != nil {
 				if assert.Error(t, tc.err) {
-					var k *Error
-					if errors.As(err, &k) {
+					if k, ok := errors.AsType[*Error](err); ok {
 						assert.Equal(t, tc.err.Type, k.Type)
 						assert.Equal(t, tc.err.Detail, k.Detail)
 						assert.Equal(t, tc.err.Status, k.Status)
@@ -2270,8 +2266,7 @@ func TestDNS01Validate(t *testing.T) {
 			ctx := NewClientContext(context.Background(), tc.vc)
 			if err := dns01Validate(ctx, tc.ch, tc.db, tc.jwk); err != nil {
 				if assert.Error(t, tc.err) {
-					var k *Error
-					if errors.As(err, &k) {
+					if k, ok := errors.AsType[*Error](err); ok {
 						assert.Equal(t, tc.err.Type, k.Type)
 						assert.Equal(t, tc.err.Detail, k.Detail)
 						assert.Equal(t, tc.err.Status, k.Status)
@@ -3367,8 +3362,7 @@ func TestTLSALPN01Validate(t *testing.T) {
 			ctx := NewClientContext(context.Background(), tc.vc)
 			if err := tlsalpn01Validate(ctx, tc.ch, tc.db, tc.jwk); err != nil {
 				if assert.Error(t, tc.err) {
-					var k *Error
-					if errors.As(err, &k) {
+					if k, ok := errors.AsType[*Error](err); ok {
 						assert.Equal(t, tc.err.Type, k.Type)
 						assert.Equal(t, tc.err.Detail, k.Detail)
 						assert.Equal(t, tc.err.Status, k.Status)
@@ -3563,8 +3557,8 @@ func Test_doAppleAttestationFormat(t *testing.T) {
 	}{
 		{"ok", args{ctx, mustAttestationProvisioner(t, caRoot), &Challenge{}, &attestationObject{
 			Format: "apple",
-			AttStatement: map[string]interface{}{
-				"x5c": []interface{}{leaf.Raw, ca.Intermediate.Raw},
+			AttStatement: map[string]any{
+				"x5c": []any{leaf.Raw, ca.Intermediate.Raw},
 			},
 		}}, &appleAttestationData{
 			Nonce:        []byte("nonce"),
@@ -3576,50 +3570,50 @@ func Test_doAppleAttestationFormat(t *testing.T) {
 		}, false},
 		{"fail apple issuer", args{ctx, mustAttestationProvisioner(t, nil), &Challenge{}, &attestationObject{
 			Format: "apple",
-			AttStatement: map[string]interface{}{
-				"x5c": []interface{}{leaf.Raw, ca.Intermediate.Raw},
+			AttStatement: map[string]any{
+				"x5c": []any{leaf.Raw, ca.Intermediate.Raw},
 			},
 		}}, nil, true},
 		{"fail missing x5c", args{ctx, mustAttestationProvisioner(t, caRoot), &Challenge{}, &attestationObject{
 			Format: "apple",
-			AttStatement: map[string]interface{}{
+			AttStatement: map[string]any{
 				"foo": "bar",
 			},
 		}}, nil, true},
 		{"fail empty issuer", args{ctx, mustAttestationProvisioner(t, caRoot), &Challenge{}, &attestationObject{
 			Format: "apple",
-			AttStatement: map[string]interface{}{
-				"x5c": []interface{}{},
+			AttStatement: map[string]any{
+				"x5c": []any{},
 			},
 		}}, nil, true},
 		{"fail leaf type", args{ctx, mustAttestationProvisioner(t, caRoot), &Challenge{}, &attestationObject{
 			Format: "apple",
-			AttStatement: map[string]interface{}{
-				"x5c": []interface{}{"leaf", ca.Intermediate.Raw},
+			AttStatement: map[string]any{
+				"x5c": []any{"leaf", ca.Intermediate.Raw},
 			},
 		}}, nil, true},
 		{"fail leaf parse", args{ctx, mustAttestationProvisioner(t, caRoot), &Challenge{}, &attestationObject{
 			Format: "apple",
-			AttStatement: map[string]interface{}{
-				"x5c": []interface{}{leaf.Raw[:100], ca.Intermediate.Raw},
+			AttStatement: map[string]any{
+				"x5c": []any{leaf.Raw[:100], ca.Intermediate.Raw},
 			},
 		}}, nil, true},
 		{"fail intermediate type", args{ctx, mustAttestationProvisioner(t, caRoot), &Challenge{}, &attestationObject{
 			Format: "apple",
-			AttStatement: map[string]interface{}{
-				"x5c": []interface{}{leaf.Raw, "intermediate"},
+			AttStatement: map[string]any{
+				"x5c": []any{leaf.Raw, "intermediate"},
 			},
 		}}, nil, true},
 		{"fail intermediate parse", args{ctx, mustAttestationProvisioner(t, caRoot), &Challenge{}, &attestationObject{
 			Format: "apple",
-			AttStatement: map[string]interface{}{
-				"x5c": []interface{}{leaf.Raw, ca.Intermediate.Raw[:100]},
+			AttStatement: map[string]any{
+				"x5c": []any{leaf.Raw, ca.Intermediate.Raw[:100]},
 			},
 		}}, nil, true},
 		{"fail verify", args{ctx, mustAttestationProvisioner(t, caRoot), &Challenge{}, &attestationObject{
 			Format: "apple",
-			AttStatement: map[string]interface{}{
-				"x5c": []interface{}{leaf.Raw},
+			AttStatement: map[string]any{
+				"x5c": []any{leaf.Raw},
 			},
 		}}, nil, true},
 	}
@@ -3725,8 +3719,8 @@ func Test_doStepAttestationFormat(t *testing.T) {
 	}{
 		{"ok", args{ctx, mustAttestationProvisioner(t, caRoot), &Challenge{Token: "token"}, jwk, &attestationObject{
 			Format: "step",
-			AttStatement: map[string]interface{}{
-				"x5c": []interface{}{leaf.Raw, ca.Intermediate.Raw},
+			AttStatement: map[string]any{
+				"x5c": []any{leaf.Raw, ca.Intermediate.Raw},
 				"alg": -7,
 				"sig": cborSig,
 			},
@@ -3737,8 +3731,8 @@ func Test_doStepAttestationFormat(t *testing.T) {
 		}, false},
 		{"ok/step-managed-device-id", args{ctx, mustAttestationProvisioner(t, caRoot), &Challenge{Token: "token"}, jwk, &attestationObject{
 			Format: "step",
-			AttStatement: map[string]interface{}{
-				"x5c": []interface{}{leafWithStepManagedDeviceID.Raw, ca.Intermediate.Raw},
+			AttStatement: map[string]any{
+				"x5c": []any{leafWithStepManagedDeviceID.Raw, ca.Intermediate.Raw},
 				"alg": -7,
 				"sig": cborSig,
 			},
@@ -3749,15 +3743,15 @@ func Test_doStepAttestationFormat(t *testing.T) {
 		}, false},
 		{"fail yubico issuer", args{ctx, mustAttestationProvisioner(t, nil), &Challenge{Token: "token"}, jwk, &attestationObject{
 			Format: "step",
-			AttStatement: map[string]interface{}{
-				"x5c": []interface{}{leaf.Raw, ca.Intermediate.Raw},
+			AttStatement: map[string]any{
+				"x5c": []any{leaf.Raw, ca.Intermediate.Raw},
 				"alg": -7,
 				"sig": cborSig,
 			},
 		}}, nil, true},
 		{"fail x5c type", args{ctx, mustAttestationProvisioner(t, caRoot), &Challenge{Token: "token"}, jwk, &attestationObject{
 			Format: "step",
-			AttStatement: map[string]interface{}{
+			AttStatement: map[string]any{
 				"x5c": [][]byte{leaf.Raw, ca.Intermediate.Raw},
 				"alg": -7,
 				"sig": cborSig,
@@ -3765,112 +3759,112 @@ func Test_doStepAttestationFormat(t *testing.T) {
 		}}, nil, true},
 		{"fail x5c empty", args{ctx, mustAttestationProvisioner(t, caRoot), &Challenge{Token: "token"}, jwk, &attestationObject{
 			Format: "step",
-			AttStatement: map[string]interface{}{
-				"x5c": []interface{}{},
+			AttStatement: map[string]any{
+				"x5c": []any{},
 				"alg": -7,
 				"sig": cborSig,
 			},
 		}}, nil, true},
 		{"fail leaf type", args{ctx, mustAttestationProvisioner(t, caRoot), &Challenge{Token: "token"}, jwk, &attestationObject{
 			Format: "step",
-			AttStatement: map[string]interface{}{
-				"x5c": []interface{}{"leaf", ca.Intermediate.Raw},
+			AttStatement: map[string]any{
+				"x5c": []any{"leaf", ca.Intermediate.Raw},
 				"alg": -7,
 				"sig": cborSig,
 			},
 		}}, nil, true},
 		{"fail leaf parse", args{ctx, mustAttestationProvisioner(t, caRoot), &Challenge{Token: "token"}, jwk, &attestationObject{
 			Format: "step",
-			AttStatement: map[string]interface{}{
-				"x5c": []interface{}{leaf.Raw[:100], ca.Intermediate.Raw},
+			AttStatement: map[string]any{
+				"x5c": []any{leaf.Raw[:100], ca.Intermediate.Raw},
 				"alg": -7,
 				"sig": cborSig,
 			},
 		}}, nil, true},
 		{"fail intermediate type", args{ctx, mustAttestationProvisioner(t, caRoot), &Challenge{Token: "token"}, jwk, &attestationObject{
 			Format: "step",
-			AttStatement: map[string]interface{}{
-				"x5c": []interface{}{leaf.Raw, "intermediate"},
+			AttStatement: map[string]any{
+				"x5c": []any{leaf.Raw, "intermediate"},
 				"alg": -7,
 				"sig": cborSig,
 			},
 		}}, nil, true},
 		{"fail intermediate parse", args{ctx, mustAttestationProvisioner(t, caRoot), &Challenge{Token: "token"}, jwk, &attestationObject{
 			Format: "step",
-			AttStatement: map[string]interface{}{
-				"x5c": []interface{}{leaf.Raw, ca.Intermediate.Raw[:100]},
+			AttStatement: map[string]any{
+				"x5c": []any{leaf.Raw, ca.Intermediate.Raw[:100]},
 				"alg": -7,
 				"sig": cborSig,
 			},
 		}}, nil, true},
 		{"fail verify", args{ctx, mustAttestationProvisioner(t, caRoot), &Challenge{Token: "token"}, jwk, &attestationObject{
 			Format: "step",
-			AttStatement: map[string]interface{}{
-				"x5c": []interface{}{leaf.Raw},
+			AttStatement: map[string]any{
+				"x5c": []any{leaf.Raw},
 				"alg": -7,
 				"sig": cborSig,
 			},
 		}}, nil, true},
 		{"fail sig type", args{ctx, mustAttestationProvisioner(t, caRoot), &Challenge{Token: "token"}, jwk, &attestationObject{
 			Format: "step",
-			AttStatement: map[string]interface{}{
-				"x5c": []interface{}{leaf.Raw, ca.Intermediate.Raw},
+			AttStatement: map[string]any{
+				"x5c": []any{leaf.Raw, ca.Intermediate.Raw},
 				"alg": -7,
 				"sig": string(cborSig),
 			},
 		}}, nil, true},
 		{"fail sig unmarshal", args{ctx, mustAttestationProvisioner(t, caRoot), &Challenge{Token: "token"}, jwk, &attestationObject{
 			Format: "step",
-			AttStatement: map[string]interface{}{
-				"x5c": []interface{}{leaf.Raw, ca.Intermediate.Raw},
+			AttStatement: map[string]any{
+				"x5c": []any{leaf.Raw, ca.Intermediate.Raw},
 				"alg": -7,
 				"sig": []byte("bad-sig"),
 			},
 		}}, nil, true},
 		{"fail keyAuthorization", args{ctx, mustAttestationProvisioner(t, caRoot), &Challenge{Token: "token"}, &jose.JSONWebKey{Key: []byte("not an asymmetric key")}, &attestationObject{
 			Format: "step",
-			AttStatement: map[string]interface{}{
-				"x5c": []interface{}{leaf.Raw, ca.Intermediate.Raw},
+			AttStatement: map[string]any{
+				"x5c": []any{leaf.Raw, ca.Intermediate.Raw},
 				"alg": -7,
 				"sig": cborSig,
 			},
 		}}, nil, true},
 		{"fail sig verify P-256", args{ctx, mustAttestationProvisioner(t, caRoot), &Challenge{Token: "token"}, jwk, &attestationObject{
 			Format: "step",
-			AttStatement: map[string]interface{}{
-				"x5c": []interface{}{leaf.Raw, ca.Intermediate.Raw},
+			AttStatement: map[string]any{
+				"x5c": []any{leaf.Raw, ca.Intermediate.Raw},
 				"alg": -7,
 				"sig": otherCBORSig,
 			},
 		}}, nil, true},
 		{"fail sig verify P-384", args{ctx, mustAttestationProvisioner(t, caRoot), &Challenge{Token: "token"}, jwk, &attestationObject{
 			Format: "step",
-			AttStatement: map[string]interface{}{
-				"x5c": []interface{}{makeLeaf(mustSigner("EC", "P-384", 0), serialNumber).Raw, ca.Intermediate.Raw},
+			AttStatement: map[string]any{
+				"x5c": []any{makeLeaf(mustSigner("EC", "P-384", 0), serialNumber).Raw, ca.Intermediate.Raw},
 				"alg": -7,
 				"sig": cborSig,
 			},
 		}}, nil, true},
 		{"fail sig verify RSA", args{ctx, mustAttestationProvisioner(t, caRoot), &Challenge{Token: "token"}, jwk, &attestationObject{
 			Format: "step",
-			AttStatement: map[string]interface{}{
-				"x5c": []interface{}{makeLeaf(mustSigner("RSA", "", 2048), serialNumber).Raw, ca.Intermediate.Raw},
+			AttStatement: map[string]any{
+				"x5c": []any{makeLeaf(mustSigner("RSA", "", 2048), serialNumber).Raw, ca.Intermediate.Raw},
 				"alg": -7,
 				"sig": cborSig,
 			},
 		}}, nil, true},
 		{"fail sig verify Ed25519", args{ctx, mustAttestationProvisioner(t, caRoot), &Challenge{Token: "token"}, jwk, &attestationObject{
 			Format: "step",
-			AttStatement: map[string]interface{}{
-				"x5c": []interface{}{makeLeaf(mustSigner("OKP", "Ed25519", 0), serialNumber).Raw, ca.Intermediate.Raw},
+			AttStatement: map[string]any{
+				"x5c": []any{makeLeaf(mustSigner("OKP", "Ed25519", 0), serialNumber).Raw, ca.Intermediate.Raw},
 				"alg": -7,
 				"sig": cborSig,
 			},
 		}}, nil, true},
 		{"fail unmarshal serial number", args{ctx, mustAttestationProvisioner(t, caRoot), &Challenge{Token: "token"}, jwk, &attestationObject{
 			Format: "step",
-			AttStatement: map[string]interface{}{
-				"x5c": []interface{}{makeLeaf(signer, []byte("bad-serial")).Raw, ca.Intermediate.Raw},
+			AttStatement: map[string]any{
+				"x5c": []any{makeLeaf(signer, []byte("bad-serial")).Raw, ca.Intermediate.Raw},
 				"alg": -7,
 				"sig": cborSig,
 			},
@@ -3963,8 +3957,8 @@ func Test_doStepAttestationFormat_noCAIntermediate(t *testing.T) {
 	}{
 		{"fail no intermediate", args{ctx, mustAttestationProvisioner(t, caRoot), &Challenge{Token: "token"}, jwk, &attestationObject{
 			Format: "step",
-			AttStatement: map[string]interface{}{
-				"x5c": []interface{}{leaf.Raw, ca.Intermediate.Raw},
+			AttStatement: map[string]any{
+				"x5c": []any{leaf.Raw, ca.Intermediate.Raw},
 				"alg": -7,
 				"sig": cborSig,
 			},
@@ -4011,11 +4005,11 @@ func Test_deviceAttest01Validate(t *testing.T) {
 	})
 	require.NoError(t, err)
 	attObj, err := cbor.Marshal(struct {
-		Format       string                 `json:"fmt"`
-		AttStatement map[string]interface{} `json:"attStmt,omitempty"`
+		Format       string         `json:"fmt"`
+		AttStatement map[string]any `json:"attStmt,omitempty"`
 	}{
 		Format: "step",
-		AttStatement: map[string]interface{}{
+		AttStatement: map[string]any{
 			"alg": -7,
 			"sig": "",
 		},
@@ -4028,11 +4022,11 @@ func Test_deviceAttest01Validate(t *testing.T) {
 	})
 	require.NoError(t, err)
 	unsupportedFormatAttObj, err := cbor.Marshal(struct {
-		Format       string                 `json:"fmt"`
-		AttStatement map[string]interface{} `json:"attStmt,omitempty"`
+		Format       string         `json:"fmt"`
+		AttStatement map[string]any `json:"attStmt,omitempty"`
 	}{
 		Format: "unsupported-format",
-		AttStatement: map[string]interface{}{
+		AttStatement: map[string]any{
 			"alg": -7,
 			"sig": "",
 		},
@@ -4432,11 +4426,11 @@ func Test_deviceAttest01Validate(t *testing.T) {
 		"ok/doAppleAttestationFormat-storeError": func(t *testing.T) test {
 			ctx := NewProvisionerContext(context.Background(), mustAttestationProvisioner(t, nil))
 			attObj, err := cbor.Marshal(struct {
-				Format       string                 `json:"fmt"`
-				AttStatement map[string]interface{} `json:"attStmt,omitempty"`
+				Format       string         `json:"fmt"`
+				AttStatement map[string]any `json:"attStmt,omitempty"`
 			}{
 				Format:       "apple",
-				AttStatement: map[string]interface{}{},
+				AttStatement: map[string]any{},
 			})
 			require.NoError(t, err)
 			payload, err := json.Marshal(struct {
@@ -4695,11 +4689,11 @@ func Test_deviceAttest01Validate(t *testing.T) {
 			require.NoError(t, err)
 			ctx := NewProvisionerContext(context.Background(), mustAttestationProvisioner(t, caRoot))
 			attObj, err := cbor.Marshal(struct {
-				Format       string                 `json:"fmt"`
-				AttStatement map[string]interface{} `json:"attStmt,omitempty"`
+				Format       string         `json:"fmt"`
+				AttStatement map[string]any `json:"attStmt,omitempty"`
 			}{
 				Format: "step",
-				AttStatement: map[string]interface{}{
+				AttStatement: map[string]any{
 					"alg": -7,
 					"sig": cborSig,
 				},
@@ -4847,12 +4841,12 @@ func Test_deviceAttest01Validate(t *testing.T) {
 			require.NoError(t, err)
 			leaf := makeLeaf(signer, serialNumber)
 			attObj, err := cbor.Marshal(struct {
-				Format       string                 `json:"fmt"`
-				AttStatement map[string]interface{} `json:"attStmt,omitempty"`
+				Format       string         `json:"fmt"`
+				AttStatement map[string]any `json:"attStmt,omitempty"`
 			}{
 				Format: "bogus-format",
-				AttStatement: map[string]interface{}{
-					"x5c": []interface{}{leaf.Raw, ca.Intermediate.Raw},
+				AttStatement: map[string]any{
+					"x5c": []any{leaf.Raw, ca.Intermediate.Raw},
 					"alg": -7,
 					"sig": cborSig,
 				},
