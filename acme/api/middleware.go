@@ -3,6 +3,7 @@ package api
 import (
 	"context"
 	"crypto/rsa"
+	"encoding/json"
 	"errors"
 	"io"
 	"net/http"
@@ -100,6 +101,11 @@ func parseJWS(next nextHTTP) nextHTTP {
 			render.Error(w, r, acme.WrapErrorISE(err, "failed to read request body"))
 			return
 		}
+		if isGeneralJWS(body) {
+			render.Error(w, r, acme.NewError(acme.ErrorMalformedType,
+				"general JWS serialization is not supported: JWS MUST be in flattened JSON serialization"))
+			return
+		}
 		jws, err := jose.ParseJWS(string(body))
 		if err != nil {
 			render.Error(w, r, acme.WrapError(acme.ErrorMalformedType, err, "failed to parse JWS from request body"))
@@ -108,6 +114,21 @@ func parseJWS(next nextHTTP) nextHTTP {
 		ctx := context.WithValue(r.Context(), jwsContextKey, jws)
 		next(w, r.WithContext(ctx))
 	}
+}
+
+// isGeneralJWS reports whether body is a JWS in General JSON Serialization
+// (RFC 7515, Section 7.2.1), which carries a "signatures" array. ACME
+// requests MUST use the Flattened JSON Serialization (RFC 8555,
+// Section 6.2), which carries a single "signature" member instead.
+// Non-JSON bodies (e.g. compact serialization) return false and are handled
+// by jose.ParseJWS as before.
+func isGeneralJWS(body []byte) bool {
+	var m map[string]json.RawMessage
+	if err := json.Unmarshal(body, &m); err != nil {
+		return false
+	}
+	_, ok := m["signatures"]
+	return ok
 }
 
 // validateJWS checks the request body for to verify that it meets ACME
