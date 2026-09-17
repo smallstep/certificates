@@ -34,6 +34,8 @@ import (
 	"github.com/smallstep/certificates/authority/config"
 	"github.com/smallstep/certificates/cas/apiv1"
 	"github.com/smallstep/certificates/db"
+	"github.com/smallstep/certificates/est"
+	estAPI "github.com/smallstep/certificates/est/api"
 	"github.com/smallstep/certificates/internal/httptransport"
 	"github.com/smallstep/certificates/internal/metrix"
 	"github.com/smallstep/certificates/logging"
@@ -324,6 +326,21 @@ func (ca *CA) Init(cfg *config.Config) (*CA, error) {
 		})
 	}
 
+	// EST endpoints (HTTPS only)
+	var estAuthority *est.Authority
+	if estAuth := auth.GetEST(); estAuth != nil {
+		// EST is served on /.well-known/<optional-label>/est; we use the provisioner
+		// name as label.
+		// TODO(hs): decide whether we want to go with this, or also want to support
+		// some form of default EST provisioner that can be requested at the path without
+		// a label set.
+		estPrefix := "/.well-known/{label}/est"
+		estAuthority = estAuth
+		mux.Route(estPrefix, func(r chi.Router) {
+			estAPI.Route(r)
+		})
+	}
+
 	// helpful routine for logging all routes
 	//dumpRoutes(mux)
 	//dumpRoutes(insecureMux)
@@ -355,7 +372,7 @@ func (ca *CA) Init(cfg *config.Config) (*CA, error) {
 	insecureHandler = requestid.New(legacyTraceHeader).Middleware(insecureHandler)
 
 	// Create context with all the necessary values.
-	baseContext := buildContext(auth, scepAuthority, acmeDB, acmeLinker)
+	baseContext := buildContext(auth, scepAuthority, estAuthority, acmeDB, acmeLinker)
 
 	ca.srv = server.New(cfg.Address, handler, tlsConfig)
 	ca.srv.BaseContext = func(net.Listener) context.Context {
@@ -403,7 +420,7 @@ func (ca *CA) shouldServeInsecureServer() bool {
 }
 
 // buildContext builds the server base context.
-func buildContext(a *authority.Authority, scepAuthority *scep.Authority, acmeDB acme.DB, acmeLinker acme.Linker) context.Context {
+func buildContext(a *authority.Authority, scepAuthority *scep.Authority, estAuthority *est.Authority, acmeDB acme.DB, acmeLinker acme.Linker) context.Context {
 	ctx := authority.NewContext(context.Background(), a)
 	if authDB := a.GetDatabase(); authDB != nil {
 		ctx = db.NewContext(ctx, authDB)
@@ -413,6 +430,9 @@ func buildContext(a *authority.Authority, scepAuthority *scep.Authority, acmeDB 
 	}
 	if scepAuthority != nil {
 		ctx = scep.NewContext(ctx, scepAuthority)
+	}
+	if estAuthority != nil {
+		ctx = est.NewContext(ctx, estAuthority)
 	}
 	if acmeDB != nil {
 		ctx = acme.NewContext(ctx, acmeDB, acme.NewClient(), acmeLinker, nil)
