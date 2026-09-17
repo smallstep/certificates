@@ -314,13 +314,6 @@ func (s *SCEP) Init(config Config) (err error) {
 		}); err != nil {
 			return fmt.Errorf("failed creating decrypter: %w", err)
 		}
-		if s.signer, err = s.keyManager.CreateSigner(&kmsapi.CreateSignerRequest{
-			SigningKeyPEM:    s.DecrypterKeyPEM, // TODO(hs): support distinct signer key in the future?
-			Password:         []byte(s.DecrypterKeyPassword),
-			PasswordPrompter: kmsapi.NonInteractivePasswordPrompter,
-		}); err != nil {
-			return fmt.Errorf("failed creating signer: %w", err)
-		}
 	}
 
 	if s.DecrypterKeyURI != "" {
@@ -350,21 +343,13 @@ func (s *SCEP) Init(config Config) (err error) {
 			s.keyManager = scepKeyManager
 		}
 
-		// Create decrypter and signer with the same key:
-		// TODO(hs): support distinct signer key in the future?
+		// Create a decrypter only; SCEP responses use the CA's default signer.
 		if s.decrypter, err = s.keyManager.CreateDecrypter(&kmsapi.CreateDecrypterRequest{
 			DecryptionKey:    s.DecrypterKeyURI,
 			Password:         []byte(s.DecrypterKeyPassword),
 			PasswordPrompter: kmsapi.NonInteractivePasswordPrompter,
 		}); err != nil {
 			return fmt.Errorf("failed creating decrypter: %w", err)
-		}
-		if s.signer, err = s.keyManager.CreateSigner(&kmsapi.CreateSignerRequest{
-			SigningKey:       s.DecrypterKeyURI,
-			Password:         []byte(s.DecrypterKeyPassword),
-			PasswordPrompter: kmsapi.NonInteractivePasswordPrompter,
-		}); err != nil {
-			return fmt.Errorf("failed creating signer: %w", err)
 		}
 	}
 
@@ -380,8 +365,6 @@ func (s *SCEP) Init(config Config) (err error) {
 		if s.decrypterCertificate, err = x509.ParseCertificate(block.Bytes); err != nil {
 			return fmt.Errorf("failed parsing decrypter certificate: %w", err)
 		}
-		// the decrypter certificate is also the signer certificate
-		s.signerCertificate = s.decrypterCertificate
 	}
 
 	// TODO(hs): alternatively, check if the KMS keyManager is a CertificateManager
