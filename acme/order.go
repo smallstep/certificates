@@ -316,6 +316,14 @@ func (o *Order) Finalize(ctx context.Context, db DB, csr *x509.CertificateReques
 			return acmeError
 		}
 
+		// A certificate template rejected the request via `fail "..."`.
+		// That is a problem with the CSR (e.g. a key that is too short),
+		// so return badCSR with the template's message instead of an opaque
+		// serverInternal, so the client can tell the user what to fix.
+		if templateErr, ok := errors.AsType[*x509util.TemplateError](err); ok {
+			return NewDetailedError(ErrorBadCSRType, "%s", templateErr.Message)
+		}
+
 		return WrapErrorISE(err, "error signing certificate for order %s", o.ID)
 	}
 
