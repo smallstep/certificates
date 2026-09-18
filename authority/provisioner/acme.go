@@ -114,6 +114,13 @@ type ACME struct {
 	// EAB will be verified. If set to false and an EAB is provided, it is
 	// not verified. Defaults to false.
 	RequireEAB bool `json:"requireEAB,omitempty"`
+	// ChallengeFailFast marks http-01 and tls-alpn-01 challenges invalid on
+	// the first connection error (unresolvable name, refused connection, HTTP
+	// status >= 400) instead of leaving them pending. Together with the
+	// authorization turning invalid, clients stop immediately rather than
+	// polling until the authorization expires. dns-01 is not affected.
+	// Defaults to false.
+	ChallengeFailFast bool `json:"challengeFailFast,omitempty"`
 	// Challenges contains the enabled challenges for this provisioner. If this
 	// value is not set the default http-01, dns-01 and tls-alpn-01 challenges
 	// will be enabled, device-attest-01, wire-oidc-01 and wire-dpop-01 will be
@@ -459,6 +466,12 @@ func (p *ACME) AuthorizeRevoke(context.Context, string) error {
 // certificate was configured to allow renewals.
 func (p *ACME) AuthorizeRenew(ctx context.Context, cert *x509.Certificate) error {
 	return p.ctl.AuthorizeRenew(ctx, cert)
+}
+
+// IsChallengeFailFast returns true if connection errors during http-01 and
+// tls-alpn-01 validation should mark the challenge invalid immediately.
+func (p *ACME) IsChallengeFailFast() bool {
+	return p != nil && p.ChallengeFailFast
 }
 
 // IsChallengeEnabled checks if the given challenge is enabled. By default
