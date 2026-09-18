@@ -248,6 +248,14 @@ func (ca *CA) Init(cfg *config.Config) (*CA, error) {
 	insecureMux.Get("/crl", api.CRL)
 	insecureMux.Get("/1.0/crl", api.CRL)
 
+	// Mount the AIA issuer endpoint to the insecure mux. For TLS subscriber
+	// certificates, CA/Browser Forum Baseline Requirements Section 7.1.2.7.7
+	// describe id-ad-caIssuers as an HTTP URL of the issuing CA certificate;
+	// this lets clients fetch the issuer before they can validate the CA's
+	// TLS certificate.
+	insecureMux.Get("/intermediate.crt", api.IntermediateCert)
+	insecureMux.Get("/1.0/intermediate.crt", api.IntermediateCert)
+
 	// Add ACME api endpoints in /acme and /1.0/acme
 	dns := cfg.DNSNames[0]
 	u, err := url.Parse("https://" + cfg.Address)
@@ -385,10 +393,9 @@ func (ca *CA) Init(cfg *config.Config) (*CA, error) {
 	return ca, nil
 }
 
-// shouldServeInsecureServer returns whether or not the insecure
-// server should also be started. This is (currently) only the case
-// if the insecure address has been configured AND when a SCEP
-// provisioner is configured or when a CRL is configured.
+// shouldServeInsecureServer returns whether the insecure server should also be
+// started. This requires an insecure address and at least one endpoint intended
+// for HTTP: SCEP, CRL, or the AIA issuer certificate.
 func (ca *CA) shouldServeInsecureServer() bool {
 	switch {
 	case ca.config.InsecureAddress == "":
@@ -397,9 +404,15 @@ func (ca *CA) shouldServeInsecureServer() bool {
 		return true
 	case ca.config.CRL.IsEnabled():
 		return true
+	case ca.shouldServeAIAIssuerEndpoint():
+		return true
 	default:
 		return false
 	}
+}
+
+func (ca *CA) shouldServeAIAIssuerEndpoint() bool {
+	return len(ca.auth.GetIntermediateCertificates()) > 0
 }
 
 // buildContext builds the server base context.

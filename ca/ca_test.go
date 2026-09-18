@@ -24,6 +24,7 @@ import (
 	"github.com/smallstep/assert"
 	"github.com/smallstep/certificates/api"
 	"github.com/smallstep/certificates/authority"
+	authorityconfig "github.com/smallstep/certificates/authority/config"
 	"github.com/smallstep/certificates/authority/provisioner"
 	"github.com/smallstep/certificates/errs"
 	"go.step.sm/crypto/jose"
@@ -74,6 +75,51 @@ func generateSubjectKeyID(pub crypto.PublicKey) ([]byte, error) {
 func TestMain(m *testing.M) {
 	DisableIdentity = true
 	os.Exit(m.Run())
+}
+
+func TestCA_shouldServeInsecureServer(t *testing.T) {
+	config, err := authority.LoadConfiguration("testdata/ca.json")
+	assert.FatalError(t, err)
+	config.InsecureAddress = ""
+
+	ca, err := New(config)
+	assert.FatalError(t, err)
+	assert.False(t, ca.shouldServeSCEPEndpoints())
+	assert.False(t, ca.config.CRL.IsEnabled())
+	assert.True(t, ca.shouldServeAIAIssuerEndpoint())
+	assert.False(t, ca.shouldServeInsecureServer())
+
+	ca.config.InsecureAddress = "127.0.0.1:8080"
+	assert.True(t, ca.shouldServeInsecureServer())
+
+	authWithoutIntermediate := newTestAuthorityWithoutIntermediate(t)
+	caWithoutPublicHTTP := &CA{
+		auth: authWithoutIntermediate,
+		config: &authorityconfig.Config{
+			InsecureAddress: "127.0.0.1:8080",
+		},
+	}
+	assert.False(t, caWithoutPublicHTTP.shouldServeAIAIssuerEndpoint())
+	assert.False(t, caWithoutPublicHTTP.shouldServeInsecureServer())
+}
+
+func newTestAuthorityWithoutIntermediate(t *testing.T) *authority.Authority {
+	t.Helper()
+
+	root, err := pemutil.ReadCertificate("testdata/secrets/root_ca.crt")
+	assert.FatalError(t, err)
+	signer, err := keyutil.GenerateDefaultSigner()
+	assert.FatalError(t, err)
+
+	auth, err := authority.NewEmbedded(
+		authority.WithX509RootCerts(root),
+		authority.WithX509SignerFunc(func() ([]*x509.Certificate, crypto.Signer, error) {
+			return nil, signer, nil
+		}),
+	)
+	assert.FatalError(t, err)
+
+	return auth
 }
 
 func TestCASign(t *testing.T) {
