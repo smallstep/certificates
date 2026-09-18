@@ -64,7 +64,7 @@ type Order struct {
 }
 
 // ToLog enables response logging.
-func (o *Order) ToLog() (interface{}, error) {
+func (o *Order) ToLog() (any, error) {
 	b, err := json.Marshal(o)
 	if err != nil {
 		return nil, WrapErrorISE(err, "error marshaling order for logging")
@@ -316,8 +316,7 @@ func (o *Order) Finalize(ctx context.Context, db DB, csr *x509.CertificateReques
 	}, signOps...)
 	if err != nil {
 		// Add subproblem for webhook errors, others can be added later.
-		var webhookErr *webhook.Error
-		if errors.As(err, &webhookErr) {
+		if webhookErr, ok := errors.AsType[*webhook.Error](err); ok {
 			acmeError := NewDetailedError(ErrorUnauthorizedType, "%s", webhookErr.Error())
 			acmeError.AddSubproblems(Subproblem{
 				Type:   fmt.Sprintf("urn:smallstep:acme:error:%s", webhookErr.Code),
@@ -372,7 +371,7 @@ func createWireSubject(o *Order, csr *x509.CertificateRequest) (subject x509util
 			}
 
 			// TODO: temporarily using a custom OIDC for carrying the display name without having it listed as a DNS SAN.
-			// reusing LDAP's OID for diplay name see http://oid-info.com/get/2.16.840.1.113730.3.1.241
+			// reusing LDAP's OID for display name see http://oid-info.com/get/2.16.840.1.113730.3.1.241
 			displayNameOid := asn1.ObjectIdentifier{2, 16, 840, 1, 113730, 3, 1, 241}
 			var foundDisplayName = false
 			for _, entry := range csr.Subject.Names {

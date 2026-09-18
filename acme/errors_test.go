@@ -8,7 +8,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func mustJSON(t *testing.T, m map[string]interface{}) string {
+func mustJSON(t *testing.T, m map[string]any) string {
 	t.Helper()
 
 	b, err := json.Marshal(m)
@@ -18,16 +18,16 @@ func mustJSON(t *testing.T, m map[string]interface{}) string {
 }
 
 func TestError_WithAdditionalErrorDetail(t *testing.T) {
-	internalJSON := mustJSON(t, map[string]interface{}{
+	internalJSON := mustJSON(t, map[string]any{
 		"detail": "The server experienced an internal error",
 		"type":   "urn:ietf:params:acme:error:serverInternal",
 	})
 	malformedErr := NewError(ErrorMalformedType, "malformed error") // will result in Err == nil behavior
-	malformedJSON := mustJSON(t, map[string]interface{}{
+	malformedJSON := mustJSON(t, map[string]any{
 		"detail": "The request message was malformed",
 		"type":   "urn:ietf:params:acme:error:malformed",
 	})
-	withDetailJSON := mustJSON(t, map[string]interface{}{
+	withDetailJSON := mustJSON(t, map[string]any{
 		"detail": "Attestation statement cannot be verified: invalid property",
 		"type":   "urn:ietf:params:acme:error:badAttestationStatement",
 	})

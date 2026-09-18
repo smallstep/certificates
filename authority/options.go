@@ -14,6 +14,7 @@ import (
 	"github.com/smallstep/certificates/authority/admin"
 	"github.com/smallstep/certificates/authority/config"
 	"github.com/smallstep/certificates/authority/provisioner"
+	"github.com/smallstep/certificates/authority/provisioner/androidkey"
 	"github.com/smallstep/certificates/cas"
 	casapi "github.com/smallstep/certificates/cas/apiv1"
 	"github.com/smallstep/certificates/db"
@@ -99,6 +100,15 @@ func WithQuietInit() Option {
 func WithWebhookClient(c provisioner.HTTPClient) Option {
 	return func(a *Authority) error {
 		a.webhookClient = c
+		return nil
+	}
+}
+
+// WithAndroidKeyCRLChecker sets the [androidkey.CRLChecker] to be
+// used to check Android Key Attestation certificate revocation status.
+func WithAndroidKeyCRLChecker(c androidkey.CRLChecker) Option {
+	return func(a *Authority) error {
+		a.androidKeyCRLChecker = c
 		return nil
 	}
 }
@@ -386,7 +396,7 @@ func WithX509Enforcers(ces ...provisioner.CertificateEnforcer) Option {
 	}
 }
 
-// WithSkipInit is an option that allows the constructor to skip initializtion
+// WithSkipInit is an option that allows the constructor to skip initialization
 // of the authority.
 func WithSkipInit() Option {
 	return func(a *Authority) error {

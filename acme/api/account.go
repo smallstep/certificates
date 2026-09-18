@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"net/http"
+	"slices"
 
 	"github.com/go-chi/chi/v5"
 
@@ -22,10 +23,8 @@ type NewAccountRequest struct {
 }
 
 func validateContacts(cs []string) error {
-	for _, c := range cs {
-		if c == "" {
-			return acme.NewError(acme.ErrorMalformedType, "contact cannot be empty string")
-		}
+	if slices.Contains(cs, "") {
+		return acme.NewError(acme.ErrorMalformedType, "contact cannot be empty string")
 	}
 	return nil
 }
@@ -218,7 +217,7 @@ func GetOrUpdateAccount(w http.ResponseWriter, r *http.Request) {
 
 func logOrdersByAccount(w http.ResponseWriter, oids []string) {
 	if rl, ok := w.(logging.ResponseLogger); ok {
-		m := map[string]interface{}{
+		m := map[string]any{
 			"orders": oids,
 		}
 		rl.WithFields(m)

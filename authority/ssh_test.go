@@ -519,7 +519,7 @@ func TestAuthority_GetSSHConfig(t *testing.T) {
 				{Name: "ca.tpl", Type: templates.File, TemplatePath: "./testdata/templates/ca.tpl", Path: "/etc/ssh/ca.pub", Comment: "#"},
 			},
 		},
-		Data: map[string]interface{}{
+		Data: map[string]any{
 			"Step": &templates.Step{
 				SSH: templates.StepSSH{
 					UserKey: user,
@@ -552,7 +552,7 @@ func TestAuthority_GetSSHConfig(t *testing.T) {
 				},
 			},
 		},
-		Data: map[string]interface{}{
+		Data: map[string]any{
 			"Step": &templates.Step{
 				SSH: templates.StepSSH{
 					UserKey: user,
@@ -575,7 +575,7 @@ func TestAuthority_GetSSHConfig(t *testing.T) {
 				{Name: "step_includes.tpl", Type: templates.PrependLine, TemplatePath: "./testdata/templates/step_includes.tpl", Path: "${STEPPATH}/ssh/includes", Comment: "#"},
 			},
 		},
-		Data: map[string]interface{}{
+		Data: map[string]any{
 			"Step": &templates.Step{
 				SSH: templates.StepSSH{
 					UserKey: user,

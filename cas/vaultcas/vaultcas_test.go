@@ -92,7 +92,7 @@ func mustParseCertificateRequest(t *testing.T, pemData string) *x509.Certificate
 func testCAHelper(t *testing.T) (*url.URL, *vault.Client) {
 	t.Helper()
 
-	writeJSON := func(w http.ResponseWriter, v interface{}) {
+	writeJSON := func(w http.ResponseWriter, v any) {
 		_ = json.NewEncoder(w).Encode(v)
 	}
 
@@ -107,22 +107,22 @@ func testCAHelper(t *testing.T) (*url.URL, *vault.Client) {
 				}`)
 		case "/v1/pki/sign/ec":
 			w.WriteHeader(http.StatusOK)
-			cert := map[string]interface{}{"data": map[string]interface{}{"certificate": testCertificateSigned + "\n" + testRootCertificate}}
+			cert := map[string]any{"data": map[string]any{"certificate": testCertificateSigned + "\n" + testRootCertificate}}
 			writeJSON(w, cert)
 			return
 		case "/v1/pki/sign/rsa":
 			w.WriteHeader(http.StatusOK)
-			cert := map[string]interface{}{"data": map[string]interface{}{"certificate": testCertificateSigned + "\n" + testRootCertificate}}
+			cert := map[string]any{"data": map[string]any{"certificate": testCertificateSigned + "\n" + testRootCertificate}}
 			writeJSON(w, cert)
 			return
 		case "/v1/pki/sign/ed25519":
 			w.WriteHeader(http.StatusOK)
-			cert := map[string]interface{}{"data": map[string]interface{}{"certificate": testCertificateSigned + "\n" + testRootCertificate}}
+			cert := map[string]any{"data": map[string]any{"certificate": testCertificateSigned + "\n" + testRootCertificate}}
 			writeJSON(w, cert)
 			return
 		case "/v1/pki/cert/ca_chain":
 			w.WriteHeader(http.StatusOK)
-			cert := map[string]interface{}{"data": map[string]interface{}{"certificate": testCertificateSigned + "\n" + testRootCertificate}}
+			cert := map[string]any{"data": map[string]any{"certificate": testCertificateSigned + "\n" + testRootCertificate}}
 			writeJSON(w, cert)
 			return
 		case "/v1/pki/revoke":

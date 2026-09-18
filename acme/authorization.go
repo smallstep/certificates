@@ -21,7 +21,7 @@ type Authorization struct {
 }
 
 // ToLog enables response logging.
-func (az *Authorization) ToLog() (interface{}, error) {
+func (az *Authorization) ToLog() (any, error) {
 	b, err := json.Marshal(az)
 	if err != nil {
 		return nil, WrapErrorISE(err, "error marshaling authz for logging")

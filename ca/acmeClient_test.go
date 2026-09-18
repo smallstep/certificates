@@ -25,7 +25,7 @@ import (
 func TestNewACMEClient(t *testing.T) {
 	type test struct {
 		ops      []ClientOption
-		r1, r2   interface{}
+		r1, r2   any
 		rc1, rc2 int
 		err      error
 	}
@@ -159,7 +159,7 @@ func TestACMEClient_GetDirectory(t *testing.T) {
 
 func TestACMEClient_GetNonce(t *testing.T) {
 	type test struct {
-		r1  interface{}
+		r1  any
 		rc1 int
 		err error
 	}
@@ -229,7 +229,7 @@ func TestACMEClient_post(t *testing.T) {
 		payload  []byte
 		Key      *jose.JSONWebKey
 		ops      []withHeaderOption
-		r1, r2   interface{}
+		r1, r2   any
 		rc1, rc2 int
 		jwkInJWS bool
 		client   *ACMEClient
@@ -361,7 +361,7 @@ func TestACMEClient_post(t *testing.T) {
 func TestACMEClient_NewOrder(t *testing.T) {
 	type test struct {
 		ops      []withHeaderOption
-		r1, r2   interface{}
+		r1, r2   any
 		rc1, rc2 int
 		err      error
 	}
@@ -497,7 +497,7 @@ func TestACMEClient_NewOrder(t *testing.T) {
 
 func TestACMEClient_GetOrder(t *testing.T) {
 	type test struct {
-		r1, r2   interface{}
+		r1, r2   any
 		rc1, rc2 int
 		err      error
 	}
@@ -619,7 +619,7 @@ func TestACMEClient_GetOrder(t *testing.T) {
 
 func TestACMEClient_GetAuthz(t *testing.T) {
 	type test struct {
-		r1, r2   interface{}
+		r1, r2   any
 		rc1, rc2 int
 		err      error
 	}
@@ -741,7 +741,7 @@ func TestACMEClient_GetAuthz(t *testing.T) {
 
 func TestACMEClient_GetChallenge(t *testing.T) {
 	type test struct {
-		r1, r2   interface{}
+		r1, r2   any
 		rc1, rc2 int
 		err      error
 	}
@@ -864,7 +864,7 @@ func TestACMEClient_GetChallenge(t *testing.T) {
 
 func TestACMEClient_ValidateChallenge(t *testing.T) {
 	type test struct {
-		r1, r2   interface{}
+		r1, r2   any
 		rc1, rc2 int
 		err      error
 	}
@@ -1077,7 +1077,7 @@ func TestACMEClient_ValidateWithPayload(t *testing.T) {
 
 func TestACMEClient_FinalizeOrder(t *testing.T) {
 	type test struct {
-		r1, r2   interface{}
+		r1, r2   any
 		rc1, rc2 int
 		err      error
 	}
@@ -1203,7 +1203,7 @@ func TestACMEClient_FinalizeOrder(t *testing.T) {
 
 func TestACMEClient_GetAccountOrders(t *testing.T) {
 	type test struct {
-		r1, r2   interface{}
+		r1, r2   any
 		rc1, rc2 int
 		err      error
 		client   *ACMEClient
@@ -1336,7 +1336,7 @@ func TestACMEClient_GetAccountOrders(t *testing.T) {
 
 func TestACMEClient_GetCertificate(t *testing.T) {
 	type test struct {
-		r1, r2    interface{}
+		r1, r2    any
 		certBytes []byte
 		rc1, rc2  int
 		err       error

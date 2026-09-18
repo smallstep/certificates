@@ -366,7 +366,7 @@ func WithCertificate(cert tls.Certificate) ClientOption {
 
 // WithAdminX5C will set the given file as the X5C certificate for use
 // by the client.
-func WithAdminX5C(certs []*x509.Certificate, key interface{}, passwordFile string) ClientOption {
+func WithAdminX5C(certs []*x509.Certificate, key any, passwordFile string) ClientOption {
 	return func(o *clientOptions) error {
 		// Get private key from given key file
 		var (
@@ -431,9 +431,8 @@ func getTransportFromFile(filename string) (http.RoundTripper, error) {
 		return nil, errors.Errorf("error parsing %s: no certificates found", filename)
 	}
 	return getDefaultTransport(&tls.Config{
-		MinVersion:               tls.VersionTLS12,
-		PreferServerCipherSuites: true,
-		RootCAs:                  pool,
+		MinVersion: tls.VersionTLS12,
+		RootCAs:    pool,
 	}), nil
 }
 
@@ -450,9 +449,8 @@ func getTransportFromSHA256(endpoint, sum string) (http.RoundTripper, error) {
 	pool := x509.NewCertPool()
 	pool.AddCert(root.RootPEM.Certificate)
 	return getDefaultTransport(&tls.Config{
-		MinVersion:               tls.VersionTLS12,
-		PreferServerCipherSuites: true,
-		RootCAs:                  pool,
+		MinVersion: tls.VersionTLS12,
+		RootCAs:    pool,
 	}), nil
 }
 
@@ -462,9 +460,8 @@ func getTransportFromCABundle(bundle []byte) (http.RoundTripper, error) {
 		return nil, errors.New("error parsing ca bundle: no certificates found")
 	}
 	return getDefaultTransport(&tls.Config{
-		MinVersion:               tls.VersionTLS12,
-		PreferServerCipherSuites: true,
-		RootCAs:                  pool,
+		MinVersion: tls.VersionTLS12,
+		RootCAs:    pool,
 	}), nil
 }
 
@@ -1569,7 +1566,7 @@ func getRootCAPath() string {
 	return filepath.Join(step.Path(), "certs", "root_ca.crt")
 }
 
-func readJSON(r io.ReadCloser, v interface{}) error {
+func readJSON(r io.ReadCloser, v any) error {
 	defer r.Close()
 	return json.NewDecoder(r).Decode(v)
 }

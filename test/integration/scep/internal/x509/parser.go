@@ -231,7 +231,7 @@ func parseExtension(der cryptobyte.String) (pkix.Extension, error) {
 	return ext, nil
 }
 
-func parsePublicKey(keyData *publicKeyInfo) (interface{}, error) {
+func parsePublicKey(keyData *publicKeyInfo) (any, error) {
 	oid := keyData.Algorithm.Algorithm
 	params := keyData.Algorithm.Parameters
 	der := cryptobyte.String(keyData.PublicKey.RightAlign())
@@ -340,7 +340,7 @@ func parseKeyUsageExtension(der cryptobyte.String) (stdx509.KeyUsage, error) {
 	}
 
 	var usage int
-	for i := 0; i < 9; i++ {
+	for i := range 9 {
 		if usageBits.At(i) != 0 {
 			usage |= 1 << uint(i)
 		}

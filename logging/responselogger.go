@@ -2,6 +2,7 @@ package logging
 
 import (
 	"bufio"
+	"maps"
 	"net"
 	"net/http"
 )
@@ -13,8 +14,8 @@ type ResponseLogger interface {
 	http.ResponseWriter
 	Size() int
 	StatusCode() int
-	Fields() map[string]interface{}
-	WithFields(map[string]interface{})
+	Fields() map[string]any
+	WithFields(map[string]any)
 }
 
 // NewResponseLogger wraps the given response writer with methods to capture
@@ -46,7 +47,7 @@ type rwDefault struct {
 	http.ResponseWriter
 	code   int
 	size   int
-	fields map[string]interface{}
+	fields map[string]any
 }
 
 func (r *rwDefault) Header() http.Header {
@@ -72,17 +73,15 @@ func (r *rwDefault) StatusCode() int {
 	return r.code
 }
 
-func (r *rwDefault) Fields() map[string]interface{} {
+func (r *rwDefault) Fields() map[string]any {
 	return r.fields
 }
 
-func (r *rwDefault) WithFields(fields map[string]interface{}) {
+func (r *rwDefault) WithFields(fields map[string]any) {
 	if r.fields == nil {
-		r.fields = make(map[string]interface{}, len(fields))
+		r.fields = make(map[string]any, len(fields))
 	}
-	for k, v := range fields {
-		r.fields[k] = v
-	}
+	maps.Copy(r.fields, fields)
 }
 
 type rwFlusher struct {

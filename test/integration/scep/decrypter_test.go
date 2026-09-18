@@ -113,13 +113,11 @@ func TestIssuesCertificateUsingSCEPWithDecrypter(t *testing.T) {
 	require.NoError(t, err)
 
 	var wg sync.WaitGroup
-	wg.Add(1)
 
-	go func() {
-		defer wg.Done()
+	wg.Go(func() {
 		err = c.Run()
 		require.ErrorIs(t, err, http.ErrServerClosed)
-	}()
+	})
 
 	// instantiate a client for the CA running at the random address
 	caClient := newCAClient(t, fmt.Sprintf("https://localhost:%s", port), rootFilepath)

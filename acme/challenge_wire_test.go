@@ -276,8 +276,7 @@ MCowBQYDK2VwAyEA5c+4NKZSNQcR1T8qN6SjwgdPZQ0Ge12Ylx/YeGAJ35k=
 							assert.Equal(t, StatusInvalid, ch.Status)
 							assert.Equal(t, string(valueBytes), ch.Value)
 							if assert.NotNil(t, ch.Error) {
-								var k *Error // NOTE: the error is not returned up, but stored with the challenge instead
-								if errors.As(ch.Error, &k) {
+								if k, ok := errors.AsType[*Error](ch.Error); ok {
 									assert.Equal(t, "urn:ietf:params:acme:error:rejectedIdentifier", k.Type)
 									assert.Equal(t, "The server will not issue certificates for the identifier", k.Detail)
 									assert.Equal(t, 400, k.Status)
@@ -885,7 +884,7 @@ MCowBQYDK2VwAyEA5c+4NKZSNQcR1T8qN6SjwgdPZQ0Ge12Ylx/YeGAJ35k=
 						assert.Equal(t, "accID", accountID)
 						return []string{"orderID"}, nil
 					},
-					MockCreateDpopToken: func(ctx context.Context, orderID string, dpop map[string]interface{}) error {
+					MockCreateDpopToken: func(ctx context.Context, orderID string, dpop map[string]any) error {
 						assert.Equal(t, "orderID", orderID)
 						assert.Equal(t, "token", dpop["chal"].(string))
 						assert.Equal(t, "wireapp://%40alice_wire@wire.com", dpop["handle"].(string))
@@ -2646,7 +2645,7 @@ MCowBQYDK2VwAyEA5c+4NKZSNQcR1T8qN6SjwgdPZQ0Ge12Ylx/YeGAJ35k=
 						assert.Equal(t, "accID", accountID)
 						return []string{"orderID"}, nil
 					},
-					MockCreateDpopToken: func(ctx context.Context, orderID string, dpop map[string]interface{}) error {
+					MockCreateDpopToken: func(ctx context.Context, orderID string, dpop map[string]any) error {
 						assert.Equal(t, "orderID", orderID)
 						assert.Equal(t, "token", dpop["chal"].(string))
 						assert.Equal(t, "wireapp://%40alice_wire@wire.com", dpop["handle"].(string))
@@ -2662,8 +2661,7 @@ MCowBQYDK2VwAyEA5c+4NKZSNQcR1T8qN6SjwgdPZQ0Ge12Ylx/YeGAJ35k=
 			tc := run(t)
 			err := wireDPOP01Validate(tc.ctx, tc.ch, tc.db, tc.jwk, tc.payload)
 			if tc.expectedErr != nil {
-				var k *Error
-				if errors.As(err, &k) {
+				if k, ok := errors.AsType[*Error](err); ok {
 					assert.Equal(t, tc.expectedErr.Type, k.Type)
 					assert.Equal(t, tc.expectedErr.Detail, k.Detail)
 					assert.Equal(t, tc.expectedErr.Status, k.Status)
@@ -2923,8 +2921,7 @@ MCowBQYDK2VwAyEA5c+4NKZSNQcR1T8qN6SjwgdPZQ0Ge12Ylx/YeGAJ35k=
 							assert.Equal(t, ChallengeType("wire-oidc-01"), updch.Type)
 							assert.Equal(t, string(valueBytes), updch.Value)
 							if assert.NotNil(t, updch.Error) {
-								var k *Error // NOTE: the error is not returned up, but stored with the challenge instead
-								if errors.As(updch.Error, &k) {
+								if k, ok := errors.AsType[*Error](updch.Error); ok {
 									assert.Equal(t, "urn:ietf:params:acme:error:rejectedIdentifier", k.Type)
 									assert.Equal(t, "The server will not issue certificates for the identifier", k.Detail)
 									assert.Equal(t, 400, k.Status)
@@ -3031,8 +3028,7 @@ MCowBQYDK2VwAyEA5c+4NKZSNQcR1T8qN6SjwgdPZQ0Ge12Ylx/YeGAJ35k=
 							assert.Equal(t, ChallengeType("wire-oidc-01"), updch.Type)
 							assert.Equal(t, string(valueBytes), updch.Value)
 							if assert.NotNil(t, updch.Error) {
-								var k *Error // NOTE: the error is not returned up, but stored with the challenge instead
-								if errors.As(updch.Error, &k) {
+								if k, ok := errors.AsType[*Error](updch.Error); ok {
 									assert.Equal(t, "urn:ietf:params:acme:error:rejectedIdentifier", k.Type)
 									assert.Equal(t, "The server will not issue certificates for the identifier", k.Detail)
 									assert.Equal(t, 400, k.Status)
@@ -3242,8 +3238,7 @@ MCowBQYDK2VwAyEA5c+4NKZSNQcR1T8qN6SjwgdPZQ0Ge12Ylx/YeGAJ35k=
 							assert.Equal(t, ChallengeType("wire-oidc-01"), updch.Type)
 							assert.Equal(t, string(valueBytes), updch.Value)
 							if assert.NotNil(t, updch.Error) {
-								var k *Error // NOTE: the error is not returned up, but stored with the challenge instead
-								if errors.As(updch.Error, &k) {
+								if k, ok := errors.AsType[*Error](updch.Error); ok {
 									assert.Equal(t, "urn:ietf:params:acme:error:rejectedIdentifier", k.Type)
 									assert.Equal(t, "The server will not issue certificates for the identifier", k.Detail)
 									assert.Equal(t, 400, k.Status)
@@ -3679,7 +3674,7 @@ MCowBQYDK2VwAyEA5c+4NKZSNQcR1T8qN6SjwgdPZQ0Ge12Ylx/YeGAJ35k=
 						assert.Equal(t, "accID", accountID)
 						return []string{"orderID"}, nil
 					},
-					MockCreateOidcToken: func(ctx context.Context, orderID string, idToken map[string]interface{}) error {
+					MockCreateOidcToken: func(ctx context.Context, orderID string, idToken map[string]any) error {
 						assert.Equal(t, "orderID", orderID)
 						assert.Equal(t, "Alice Smith", idToken["name"].(string))
 						assert.Equal(t, "wireapp://%40alice_wire@wire.com", idToken["preferred_username"].(string))
@@ -3899,7 +3894,7 @@ MCowBQYDK2VwAyEA5c+4NKZSNQcR1T8qN6SjwgdPZQ0Ge12Ylx/YeGAJ35k=
 						assert.Equal(t, "accID", accountID)
 						return []string{"orderID"}, nil
 					},
-					MockCreateOidcToken: func(ctx context.Context, orderID string, idToken map[string]interface{}) error {
+					MockCreateOidcToken: func(ctx context.Context, orderID string, idToken map[string]any) error {
 						assert.Equal(t, "orderID", orderID)
 						assert.Equal(t, "Alice Smith", idToken["name"].(string))
 						assert.Equal(t, "wireapp://%40alice_wire@wire.com", idToken["preferred_username"].(string))
@@ -3917,8 +3912,7 @@ MCowBQYDK2VwAyEA5c+4NKZSNQcR1T8qN6SjwgdPZQ0Ge12Ylx/YeGAJ35k=
 			}
 			err := wireOIDC01Validate(tc.ctx, tc.ch, tc.db, tc.jwk, tc.payload)
 			if tc.expectedErr != nil {
-				var k *Error
-				if errors.As(err, &k) {
+				if k, ok := errors.AsType[*Error](err); ok {
 					assert.Equal(t, tc.expectedErr.Type, k.Type)
 					assert.Equal(t, tc.expectedErr.Detail, k.Detail)
 					assert.Equal(t, tc.expectedErr.Status, k.Status)

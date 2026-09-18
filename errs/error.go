@@ -30,7 +30,7 @@ func withDefaultMessage(message string) Option {
 
 // withFormattedMessage returns an Option that modifies the error by overwriting
 // the formatted message only if it is empty.
-func withFormattedMessage(format string, args ...interface{}) Option {
+func withFormattedMessage(format string, args ...any) Option {
 	return func(e *Error) error {
 		if e.Msg != "" {
 			return e
@@ -42,7 +42,7 @@ func withFormattedMessage(format string, args ...interface{}) Option {
 
 // WithMessage returns an Option that modifies the error by overwriting the
 // message with the formatted string.
-func WithMessage(format string, args ...interface{}) Option {
+func WithMessage(format string, args ...any) Option {
 	return func(e *Error) error {
 		e.Msg = fmt.Sprintf(format, args...)
 		return e
@@ -60,10 +60,10 @@ func WithErrorMessage() Option {
 
 // WithKeyVal returns an Option that adds the given key-value pair to the
 // Error details. This is helpful for debugging errors.
-func WithKeyVal(key string, val interface{}) Option {
+func WithKeyVal(key string, val any) Option {
 	return func(e *Error) error {
 		if e.Details == nil {
-			e.Details = make(map[string]interface{})
+			e.Details = make(map[string]any)
 		}
 		e.Details[key] = val
 		return e
@@ -75,7 +75,7 @@ type Error struct {
 	Status    int
 	Err       error
 	Msg       string
-	Details   map[string]interface{}
+	Details   map[string]any
 	RequestID string `json:"-"`
 }
 
@@ -116,7 +116,7 @@ func (e *Error) Message() string {
 
 // Wrap returns an error annotating err with a stack trace at the point Wrap is
 // called, and the supplied message. If err is nil, Wrap returns nil.
-func Wrap(status int, e error, m string, args ...interface{}) error {
+func Wrap(status int, e error, m string, args ...any) error {
 	if e == nil {
 		return nil
 	}
@@ -133,7 +133,7 @@ func Wrap(status int, e error, m string, args ...interface{}) error {
 
 // Wrapf returns an error annotating err with a stack trace at the point Wrap is
 // called, and the supplied message. If err is nil, Wrap returns nil.
-func Wrapf(status int, e error, format string, args ...interface{}) error {
+func Wrapf(status int, e error, format string, args ...any) error {
 	if e == nil {
 		return nil
 	}
@@ -264,7 +264,7 @@ func formatMessage(status int, msg string) string {
 
 // splitOptionArgs splits the variadic length args into string formatting args
 // and Option(s) to apply to an Error.
-func splitOptionArgs(args []interface{}) ([]interface{}, []Option) {
+func splitOptionArgs(args []any) ([]any, []Option) {
 	indexOptionStart := -1
 	for i, a := range args {
 		if _, ok := a.(Option); ok {
@@ -287,7 +287,7 @@ func splitOptionArgs(args []interface{}) ([]interface{}, []Option) {
 }
 
 // New creates a new http error with the given status and message.
-func New(status int, format string, args ...interface{}) error {
+func New(status int, format string, args ...any) error {
 	msg := fmt.Sprintf(format, args...)
 	return &Error{
 		Status: status,
@@ -297,7 +297,7 @@ func New(status int, format string, args ...interface{}) error {
 }
 
 // NewError creates a new http error with the given error and message.
-func NewError(status int, err error, format string, args ...interface{}) error {
+func NewError(status int, err error, format string, args ...any) error {
 	var e *Error
 	if errors.As(err, &e) {
 		return err
@@ -333,7 +333,7 @@ func NewErr(status int, err error, opts ...Option) error {
 }
 
 // Errorf creates a new error using the given format and status code.
-func Errorf(code int, format string, args ...interface{}) error {
+func Errorf(code int, format string, args ...any) error {
 	as, opts := splitOptionArgs(args)
 	opts = append(opts, withDefaultMessage(defaultMessage(code)))
 	e := &Error{Status: code, Err: fmt.Errorf(format, as...)}
@@ -345,7 +345,7 @@ func Errorf(code int, format string, args ...interface{}) error {
 
 // ApplyOptions applies the given options to the error if is the type *Error.
 // TODO(mariano): try to get rid of this.
-func ApplyOptions(err error, opts ...interface{}) error {
+func ApplyOptions(err error, opts ...any) error {
 	var e *Error
 	if errors.As(err, &e) {
 		_, o := splitOptionArgs(opts)
@@ -357,7 +357,7 @@ func ApplyOptions(err error, opts ...interface{}) error {
 }
 
 // InternalServer creates a 500 error with the given format and arguments.
-func InternalServer(format string, args ...interface{}) error {
+func InternalServer(format string, args ...any) error {
 	args = append(args, withDefaultMessage(InternalServerErrorDefaultMsg))
 	return Errorf(http.StatusInternalServerError, format, args...)
 }
@@ -369,7 +369,7 @@ func InternalServerErr(err error, opts ...Option) error {
 }
 
 // NotImplemented creates a 501 error with the given format and arguments.
-func NotImplemented(format string, args ...interface{}) error {
+func NotImplemented(format string, args ...any) error {
 	args = append(args, withDefaultMessage(NotImplementedDefaultMsg))
 	return Errorf(http.StatusNotImplemented, format, args...)
 }
@@ -381,17 +381,17 @@ func NotImplementedErr(err error, opts ...Option) error {
 }
 
 // BadRequest creates a 400 error with the given format and arguments.
-func BadRequest(format string, args ...interface{}) error {
+func BadRequest(format string, args ...any) error {
 	return New(http.StatusBadRequest, format, args...)
 }
 
 // BadRequestErr returns an 400 error with the given error.
-func BadRequestErr(err error, format string, args ...interface{}) error {
+func BadRequestErr(err error, format string, args ...any) error {
 	return NewError(http.StatusBadRequest, err, format, args...)
 }
 
 // Unauthorized creates a 401 error with the given format and arguments.
-func Unauthorized(format string, args ...interface{}) error {
+func Unauthorized(format string, args ...any) error {
 	args = append(args, withDefaultMessage(UnauthorizedDefaultMsg))
 	return Errorf(http.StatusUnauthorized, format, args...)
 }
@@ -403,17 +403,17 @@ func UnauthorizedErr(err error, opts ...Option) error {
 }
 
 // Forbidden creates a 403 error with the given format and arguments.
-func Forbidden(format string, args ...interface{}) error {
+func Forbidden(format string, args ...any) error {
 	return New(http.StatusForbidden, format, args...)
 }
 
 // ForbiddenErr returns an 403 error with the given error.
-func ForbiddenErr(err error, format string, args ...interface{}) error {
+func ForbiddenErr(err error, format string, args ...any) error {
 	return NewError(http.StatusForbidden, err, format, args...)
 }
 
 // NotFound creates a 404 error with the given format and arguments.
-func NotFound(format string, args ...interface{}) error {
+func NotFound(format string, args ...any) error {
 	args = append(args, withDefaultMessage(NotFoundDefaultMsg))
 	return Errorf(http.StatusNotFound, format, args...)
 }

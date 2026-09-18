@@ -1,6 +1,7 @@
 package logging
 
 import (
+	"maps"
 	"net"
 	"net/http"
 	"os"
@@ -121,9 +122,7 @@ func (l *LoggerHandler) writeEntry(w ResponseLogger, r *http.Request, t time.Tim
 		"user-agent":     sanitizeLogEntry(r.UserAgent()),
 	}
 
-	for k, v := range w.Fields() {
-		fields[k] = v
-	}
+	maps.Copy(fields, w.Fields())
 
 	switch {
 	case status < http.StatusBadRequest:

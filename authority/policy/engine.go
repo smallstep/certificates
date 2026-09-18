@@ -106,6 +106,6 @@ func (e *Engine) IsSSHCertificateAllowed(cert *ssh.Certificate) error {
 		// return result of SSH user policy evaluation
 		return e.sshUserPolicy.IsSSHCertificateAllowed(cert)
 	default:
-		return fmt.Errorf("unexpected SSH certificate type %q", cert.CertType)
+		return fmt.Errorf("unexpected SSH certificate type %d", cert.CertType)
 	}
 }

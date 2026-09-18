@@ -3,12 +3,8 @@ package ca
 import (
 	"context"
 	"crypto"
-	"crypto/ecdsa"
-	"crypto/ed25519"
-	"crypto/rsa"
 	"crypto/tls"
 	"crypto/x509"
-	"encoding/pem"
 	"net"
 	"net/http"
 	"os"
@@ -18,6 +14,7 @@ import (
 	"github.com/pkg/errors"
 	"github.com/smallstep/certificates/api"
 	"github.com/smallstep/certificates/ca/identity"
+	"github.com/smallstep/certificates/internal/cryptoutil"
 )
 
 // mTLSDialContext will hold the dial context function to use in
@@ -264,15 +261,15 @@ func RootCertificate(sign *api.SignResponse) (*x509.Certificate, error) {
 // TLSCertificate creates a new TLS certificate from the sign response and the
 // private key used.
 func TLSCertificate(sign *api.SignResponse, pk crypto.PrivateKey) (*tls.Certificate, error) {
-	certPEM, err := getPEM(sign.ServerPEM)
+	certPEM, err := cryptoutil.PEMEncode(sign.ServerPEM.Certificate)
 	if err != nil {
 		return nil, err
 	}
-	caPEM, err := getPEM(sign.CaPEM)
+	caPEM, err := cryptoutil.PEMEncode(sign.CaPEM.Certificate)
 	if err != nil {
 		return nil, err
 	}
-	keyPEM, err := getPEM(pk)
+	keyPEM, err := cryptoutil.PEMEncode(pk)
 	if err != nil {
 		return nil, err
 	}
@@ -340,38 +337,6 @@ func getDefaultTransport(tlsConfig *tls.Config) *http.Transport {
 		ExpectContinueTimeout: 1 * time.Second,
 		TLSClientConfig:       tlsConfig,
 	}
-}
-
-func getPEM(i interface{}) ([]byte, error) {
-	block := new(pem.Block)
-	switch i := i.(type) {
-	case api.Certificate:
-		block.Type = "CERTIFICATE"
-		block.Bytes = i.Raw
-	case *x509.Certificate:
-		block.Type = "CERTIFICATE"
-		block.Bytes = i.Raw
-	case *rsa.PrivateKey:
-		block.Type = "RSA PRIVATE KEY"
-		block.Bytes = x509.MarshalPKCS1PrivateKey(i)
-	case *ecdsa.PrivateKey:
-		var err error
-		block.Type = "EC PRIVATE KEY"
-		block.Bytes, err = x509.MarshalECPrivateKey(i)
-		if err != nil {
-			return nil, errors.Wrap(err, "error marshaling private key")
-		}
-	case ed25519.PrivateKey:
-		var err error
-		block.Type = "PRIVATE KEY"
-		block.Bytes, err = x509.MarshalPKCS8PrivateKey(i)
-		if err != nil {
-			return nil, errors.Wrap(err, "error marshaling private key")
-		}
-	default:
-		return nil, errors.Errorf("unsupported key type %T", i)
-	}
-	return pem.EncodeToMemory(block), nil
 }
 
 func getRenewFunc(ctx *TLSOptionCtx, client *Client, tr http.RoundTripper, pk crypto.PrivateKey) RenewFunc {
