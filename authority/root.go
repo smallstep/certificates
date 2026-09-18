@@ -1,7 +1,10 @@
 package authority
 
 import (
+	"crypto/sha256"
 	"crypto/x509"
+	"fmt"
+	"strings"
 
 	"github.com/smallstep/certificates/errs"
 )
@@ -18,6 +21,17 @@ func (a *Authority) Root(sum string) (*x509.Certificate, error) {
 		return nil, errs.InternalServer("stored value is not a *x509.Certificate")
 	}
 	return crt, nil
+}
+
+// Intermediate returns the certificate corresponding to the given SHA sum
+// argument, from the list of intermediate certificates configured in the CA.
+func (a *Authority) Intermediate(sum string) (*x509.Certificate, error) {
+	for _, crt := range a.intermediateX509Certs {
+		if strings.EqualFold(fmt.Sprintf("%x", sha256.Sum256(crt.Raw)), sum) {
+			return crt, nil
+		}
+	}
+	return nil, errs.NotFound("certificate with fingerprint %s was not found", sum)
 }
 
 // GetRootCertificate returns the server root certificate.
