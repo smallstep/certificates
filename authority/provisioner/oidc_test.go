@@ -9,8 +9,11 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
+	"net/http/httptest"
 	"net/url"
 	"strings"
+	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -154,6 +157,140 @@ func TestOIDC_Init(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestOIDC_Init_unreachableProvider(t *testing.T) {
+	var reachable atomic.Bool
+
+	srv := httptest.NewUnstartedServer(nil)
+	handler := generateJWKServerHandler(2, srv)
+	srv.Config.Handler = http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		// Drop the connection to simulate an identity provider that cannot be
+		// reached, e.g. one behind a network that is not up yet.
+		if !reachable.Load() {
+			if conn, _, err := w.(http.Hijacker).Hijack(); err == nil {
+				conn.Close()
+			}
+			return
+		}
+		handler.ServeHTTP(w, r)
+	})
+	srv.Start()
+	defer srv.Close()
+
+	p := &OIDC{
+		Type:                  "oidc",
+		Name:                  "name",
+		ClientID:              "client-id",
+		ConfigurationEndpoint: srv.URL + "/.well-known/openid-configuration",
+	}
+
+	// The provisioner cannot be initialized, but the failure is temporary, so
+	// it is not disabled.
+	err := p.Init(Config{Claims: globalProvisionerClaims, HTTPClient: srv.Client()})
+	require.Error(t, err)
+	require.ErrorIs(t, err, ErrRetryInit)
+
+	// Tokens cannot be authorized while the identity provider is down. This
+	// also consumes the first retry.
+	_, err = p.authorizeToken("token")
+	require.ErrorContains(t, err, "oidc provisioner 'name' is not initialized")
+	assert.Equals(t, 2*oidcInitRetryInterval, p.initRetryInterval)
+
+	// The next retries are delayed by the backoff.
+	reachable.Store(true)
+	require.Error(t, p.ensureInitialized())
+
+	// The provisioner initializes itself once the backoff expires.
+	p.initRetryAfter = time.Now()
+	require.NoError(t, p.ensureInitialized())
+	assert.Len(t, 2, p.keyStore.keySet.Keys)
+	assert.Equals(t, openIDConfiguration{
+		Issuer:    "the-issuer",
+		JWKSetURI: srv.URL + "/jwks_uri",
+	}, p.configuration)
+
+	// An initialized provisioner does not contact the identity provider again.
+	reachable.Store(false)
+	require.NoError(t, p.ensureInitialized())
+}
+
+func TestOIDC_ensureInitialized_backoff(t *testing.T) {
+	p := &OIDC{
+		Type:     "oidc",
+		Name:     "name",
+		ClientID: "client-id",
+		// Nothing listens on port 1, so every attempt fails.
+		ConfigurationEndpoint: "http://127.0.0.1:1/.well-known/openid-configuration",
+	}
+	require.ErrorIs(t, p.Init(Config{Claims: globalProvisionerClaims}), ErrRetryInit)
+
+	want := oidcInitRetryInterval
+	for range 10 {
+		require.Error(t, p.ensureInitialized())
+		want = min(2*want, oidcMaxInitRetryInterval)
+		assert.Equals(t, want, p.initRetryInterval)
+		p.initRetryAfter = time.Now()
+	}
+	assert.Equals(t, oidcMaxInitRetryInterval, p.initRetryInterval)
+}
+
+func TestOIDC_authorizeToken_concurrentInit(t *testing.T) {
+	reachable := atomic.Bool{}
+	reachable.Store(true)
+
+	srv := httptest.NewUnstartedServer(nil)
+	handler := generateJWKServerHandler(1, srv)
+	srv.Config.Handler = http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if !reachable.Load() {
+			if conn, _, err := w.(http.Hijacker).Hijack(); err == nil {
+				conn.Close()
+			}
+			return
+		}
+		handler.ServeHTTP(w, r)
+	})
+	srv.Start()
+	defer srv.Close()
+
+	var keys jose.JSONWebKeySet
+	assert.FatalError(t, getAndDecode(srv.Client(), srv.URL+"/private", &keys))
+
+	p := &OIDC{
+		Type:                  "oidc",
+		Name:                  "name",
+		ClientID:              "client-id",
+		ConfigurationEndpoint: srv.URL + "/.well-known/openid-configuration",
+	}
+	token, err := generateSimpleToken("the-issuer", p.ClientID, &keys.Keys[0])
+	assert.FatalError(t, err)
+
+	// The identity provider is down when the provisioner is initialized.
+	reachable.Store(false)
+	require.ErrorIs(t, p.Init(Config{Claims: globalProvisionerClaims, HTTPClient: srv.Client()}), ErrRetryInit)
+
+	// Authorize tokens while the identity provider comes back, to check that
+	// the initialization does not race with the requests using its results.
+	var wg sync.WaitGroup
+	for range 10 {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			for range 20 {
+				// Skip the backoff, so that every request retries.
+				p.initMutex.Lock()
+				p.initRetryAfter = time.Time{}
+				p.initMutex.Unlock()
+				_, _ = p.authorizeToken(token)
+			}
+		}()
+	}
+	time.Sleep(10 * time.Millisecond)
+	reachable.Store(true)
+	wg.Wait()
+
+	_, err = p.authorizeToken(token)
+	require.NoError(t, err)
 }
 
 func TestOIDC_authorizeToken(t *testing.T) {

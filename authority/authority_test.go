@@ -200,6 +200,48 @@ func TestAuthorityNew(t *testing.T) {
 	}
 }
 
+func TestAuthorityNew_retryInit(t *testing.T) {
+	c := &Config{
+		Address:          "127.0.0.1:443",
+		Root:             []string{"testdata/certs/root_ca.crt"},
+		IntermediateCert: "testdata/certs/intermediate_ca.crt",
+		IntermediateKey:  "testdata/secrets/intermediate_ca_key",
+		DNSNames:         []string{"example.com"},
+		Password:         "pass",
+		AuthorityConfig: &AuthConfig{
+			Provisioners: provisioner.List{
+				// Nothing listens on port 1, so the identity provider cannot be
+				// reached and the initialization is retried.
+				&provisioner.OIDC{
+					Name:                  "oidc",
+					Type:                  "OIDC",
+					ClientID:              "client-id",
+					ConfigurationEndpoint: "http://127.0.0.1:1/.well-known/openid-configuration",
+				},
+				// A provisioner without a client ID can never be initialized.
+				&provisioner.OIDC{
+					Name:                  "uninitialized",
+					Type:                  "OIDC",
+					ConfigurationEndpoint: "http://127.0.0.1:1/.well-known/openid-configuration",
+				},
+			},
+		},
+	}
+
+	auth, err := New(c)
+	assert.FatalError(t, err)
+
+	p, ok := auth.provisioners.LoadByName("oidc")
+	assert.True(t, ok)
+	_, isUninitialized := p.(provisioner.Uninitialized)
+	assert.False(t, isUninitialized)
+
+	p, ok = auth.provisioners.LoadByName("uninitialized")
+	assert.True(t, ok)
+	_, isUninitialized = p.(provisioner.Uninitialized)
+	assert.True(t, isUninitialized)
+}
+
 func TestAuthorityNew_bundles(t *testing.T) {
 	ca0, err := minica.New()
 	if err != nil {
