@@ -43,19 +43,18 @@ func TestRevokeRequestValidate(t *testing.T) {
 			},
 			err: &errs.Error{Err: errors.New("reasonCode out of bounds"), Status: http.StatusBadRequest},
 		},
-		"error/non-passive not implemented": {
-			rr: &RevokeRequest{
-				Serial:     "10",
-				ReasonCode: 8,
-				Passive:    false,
-			},
-			err: &errs.Error{Err: errors.New("non-passive revocation not implemented"), Status: http.StatusNotImplemented},
-		},
-		"ok": {
+		"ok/passive": {
 			rr: &RevokeRequest{
 				Serial:     "10",
 				ReasonCode: 9,
 				Passive:    true,
+			},
+		},
+		"ok/active": {
+			rr: &RevokeRequest{
+				Serial:     "10",
+				ReasonCode: 9,
+				Passive:    false,
 			},
 		},
 	}
