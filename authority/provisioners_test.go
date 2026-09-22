@@ -4,6 +4,7 @@ import (
 	"context"
 	"crypto/x509"
 	"errors"
+	"fmt"
 	"net/http"
 	"reflect"
 	"testing"
@@ -386,6 +387,545 @@ func Test_isRAProvisioner(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			if got := isRAProvisioner(tt.args.p); got != tt.want {
 				t.Errorf("isRAProvisioner() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
+func TestAuthority_StoreProvisioner(t *testing.T) {
+	type test struct {
+		auth *Authority
+		prov *linkedca.Provisioner
+		err  error
+	}
+	tests := map[string]func(t *testing.T) test{
+		"fail/conversion-error": func(t *testing.T) test {
+			auth := testAuthority(t)
+			// Create a provisioner with invalid details that will fail conversion
+			prov := &linkedca.Provisioner{
+				Type: linkedca.Provisioner_JWK,
+				Name: "test-provisioner",
+				Details: &linkedca.ProvisionerDetails{
+					Data: &linkedca.ProvisionerDetails_JWK{
+						JWK: &linkedca.JWKProvisioner{
+							PublicKey: []byte("invalid-key"), // This will cause conversion to fail
+						},
+					},
+				},
+			}
+			return test{
+				auth: auth,
+				prov: prov,
+				err:  errors.New("error converting to certificates provisioner"),
+			}
+		},
+		"fail/duplicate-name": func(t *testing.T) test {
+			auth := testAuthority(t)
+			// Create a valid provisioner first
+			key, err := jose.GenerateJWK("EC", "P-256", "ES256", "sig", "", 0)
+			assert.FatalError(t, err)
+			existingProv := &provisioner.JWK{
+				Name: "existing-provisioner",
+				Type: "JWK",
+				Key:  key,
+			}
+			auth.provisioners.Store(existingProv)
+
+			// Try to store another provisioner with the same name
+			prov := &linkedca.Provisioner{
+				Type: linkedca.Provisioner_JWK,
+				Name: "existing-provisioner", // Same name as existing
+				Details: &linkedca.ProvisionerDetails{
+					Data: &linkedca.ProvisionerDetails_JWK{
+						JWK: &linkedca.JWKProvisioner{
+							PublicKey:           []byte(`{"kty":"EC","crv":"P-256","x":"MKBCTNIcKUSDii11ySs3526iDZ8AiTo7Tu6KPAqv7D4","y":"4Etl6SRW2YiLUrN5vfvVHuhp7x8PxltmWWlbbM4IFyM","use":"sig","kid":"1"}`),
+							EncryptedPrivateKey: []byte("encrypted-key"),
+						},
+					},
+				},
+			}
+			return test{
+				auth: auth,
+				prov: prov,
+				err:  admin.NewError(admin.ErrorBadRequestType, "provisioner with name existing-provisioner already exists"),
+			}
+		},
+		"fail/duplicate-token-id": func(t *testing.T) test {
+			auth := testAuthority(t)
+			auth.adminDB = &admin.MockDB{
+				MockCreateProvisioner: func(ctx context.Context, prov *linkedca.Provisioner) error {
+					return admin.NewError(admin.ErrorBadRequestType, "provisioner with token ID already exists")
+				},
+			}
+			// Create a JWK provisioner that will have a specific token ID
+			key, err := jose.GenerateJWK("EC", "P-256", "ES256", "sig", "", 0)
+			assert.FatalError(t, err)
+			keyBytes, err := key.MarshalJSON()
+			assert.FatalError(t, err)
+
+			existingProv := &provisioner.JWK{
+				Name: "existing-provisioner",
+				Type: "JWK",
+				Key:  key,
+			}
+			// Create a proper config with valid claims for initialization
+			config := provisioner.Config{
+				Claims: provisioner.Claims{
+					MinTLSDur:     &provisioner.Duration{Duration: 5 * time.Minute},
+					MaxTLSDur:     &provisioner.Duration{Duration: 24 * time.Hour},
+					DefaultTLSDur: &provisioner.Duration{Duration: 24 * time.Hour},
+				},
+			}
+			existingProv.Init(config)
+			auth.provisioners.Store(existingProv)
+
+			// Try to store another provisioner with the same key (same token ID)
+			prov := &linkedca.Provisioner{
+				Type: linkedca.Provisioner_JWK,
+				Name: "different-name",
+				Details: &linkedca.ProvisionerDetails{
+					Data: &linkedca.ProvisionerDetails_JWK{
+						JWK: &linkedca.JWKProvisioner{
+							PublicKey:           keyBytes,
+							EncryptedPrivateKey: []byte("encrypted-key"),
+						},
+					},
+				},
+			}
+			return test{
+				auth: auth,
+				prov: prov,
+				err:  admin.NewError(admin.ErrorBadRequestType, "provisioner with token ID"),
+			}
+		},
+		"fail/config-generation-error": func(t *testing.T) test {
+			auth := testAuthority(t)
+			auth.adminDB = &admin.MockDB{
+				MockCreateProvisioner: func(ctx context.Context, prov *linkedca.Provisioner) error {
+					prov.Id = "new-provisioner-id"
+					return nil
+				},
+			}
+			// Simulate config generation failure by setting invalid claims that will fail validation
+			auth.config.AuthorityConfig.Claims = &provisioner.Claims{
+				// Invalid configuration: MinTLSDur > MaxTLSDur
+				MinTLSDur: &provisioner.Duration{Duration: 24 * time.Hour},
+				MaxTLSDur: &provisioner.Duration{Duration: 5 * time.Minute},
+			}
+
+			prov := &linkedca.Provisioner{
+				Type: linkedca.Provisioner_JWK,
+				Name: "test-provisioner",
+				Details: &linkedca.ProvisionerDetails{
+					Data: &linkedca.ProvisionerDetails_JWK{
+						JWK: &linkedca.JWKProvisioner{
+							PublicKey:           []byte(`{"kty":"EC","crv":"P-256","x":"MKBCTNIcKUSDii11ySs3526iDZ8AiTo7Tu6KPAqv7D4","y":"4Etl6SRW2YiLUrN5vfvVHuhp7x8PxltmWWlbbM4IFyM","use":"sig","kid":"1"}`),
+							EncryptedPrivateKey: []byte("encrypted-key"),
+						},
+					},
+				},
+			}
+			return test{
+				auth: auth,
+				prov: prov,
+				err:  admin.WrapErrorISE(errors.New("claims: MaxCertDuration cannot be less than MinCertDuration"), "error generating provisioner config"),
+			}
+		},
+		"fail/policy-validation-error": func(t *testing.T) test {
+			auth := testAuthority(t)
+			auth.adminDB = &admin.MockDB{
+				MockCreateProvisioner: func(ctx context.Context, prov *linkedca.Provisioner) error {
+					prov.Id = "new-provisioner-id"
+					return nil
+				},
+			}
+			// Create a provisioner with invalid policy
+			prov := &linkedca.Provisioner{
+				Type: linkedca.Provisioner_JWK,
+				Name: "test-provisioner",
+				Policy: &linkedca.Policy{
+					X509: &linkedca.X509Policy{
+						Allow: &linkedca.X509Names{
+							Dns: []string{"*.invalid..domain"}, // Invalid DNS pattern
+						},
+					},
+				},
+				Details: &linkedca.ProvisionerDetails{
+					Data: &linkedca.ProvisionerDetails_JWK{
+						JWK: &linkedca.JWKProvisioner{
+							PublicKey:           []byte(`{"kty":"EC","crv":"P-256","x":"MKBCTNIcKUSDii11ySs3526iDZ8AiTo7Tu6KPAqv7D4","y":"4Etl6SRW2YiLUrN5vfvVHuhp7x8PxltmWWlbbM4IFyM","use":"sig","kid":"1"}`),
+							EncryptedPrivateKey: []byte("encrypted-key"),
+						},
+					},
+				},
+			}
+			return test{
+				auth: auth,
+				prov: prov,
+				err:  errors.New("cannot parse permitted domain constraint"),
+			}
+		},
+		"fail/provisioner-init-error": func(t *testing.T) test {
+			auth := testAuthority(t)
+			auth.adminDB = &admin.MockDB{
+				MockCreateProvisioner: func(ctx context.Context, prov *linkedca.Provisioner) error {
+					prov.Id = "new-provisioner-id"
+					return nil
+				},
+			}
+			// Create a provisioner with invalid configuration that will fail Init
+			prov := &linkedca.Provisioner{
+				Type: linkedca.Provisioner_JWK,
+				Name: "test-provisioner",
+				Details: &linkedca.ProvisionerDetails{
+					Data: &linkedca.ProvisionerDetails_JWK{
+						JWK: &linkedca.JWKProvisioner{
+							PublicKey:           []byte(`{"kty":"invalid"}`), // Invalid key
+							EncryptedPrivateKey: []byte("encrypted-key"),
+						},
+					},
+				},
+			}
+			return test{
+				auth: auth,
+				prov: prov,
+				err:  admin.WrapError(admin.ErrorBadRequestType, errors.New("validation"), "error validating configuration for provisioner"),
+			}
+		},
+		"fail/db-create-error": func(t *testing.T) test {
+			auth := testAuthority(t)
+			auth.adminDB = &admin.MockDB{
+				MockCreateProvisioner: func(ctx context.Context, prov *linkedca.Provisioner) error {
+					return errors.New("database error")
+				},
+			}
+
+			prov := &linkedca.Provisioner{
+				Type: linkedca.Provisioner_JWK,
+				Name: "test-provisioner",
+				Details: &linkedca.ProvisionerDetails{
+					Data: &linkedca.ProvisionerDetails_JWK{
+						JWK: &linkedca.JWKProvisioner{
+							PublicKey:           []byte(`{"kty":"EC","crv":"P-256","x":"MKBCTNIcKUSDii11ySs3526iDZ8AiTo7Tu6KPAqv7D4","y":"4Etl6SRW2YiLUrN5vfvVHuhp7x8PxltmWWlbbM4IFyM","use":"sig","kid":"1"}`),
+							EncryptedPrivateKey: []byte("encrypted-key"),
+						},
+					},
+				},
+			}
+			return test{
+				auth: auth,
+				prov: prov,
+				err:  admin.WrapErrorISE(errors.New("database error"), "error creating provisioner"),
+			}
+		},
+		"fail/second-conversion-error": func(t *testing.T) test {
+			auth := testAuthority(t)
+			auth.adminDB = &admin.MockDB{
+				MockCreateProvisioner: func(ctx context.Context, prov *linkedca.Provisioner) error {
+					// Corrupt the provisioner data after first conversion succeeds
+					prov.Details = &linkedca.ProvisionerDetails{
+						Data: &linkedca.ProvisionerDetails_JWK{
+							JWK: &linkedca.JWKProvisioner{
+								PublicKey: []byte("corrupted-after-db-save"),
+							},
+						},
+					}
+					return nil
+				},
+			}
+
+			prov := &linkedca.Provisioner{
+				Type: linkedca.Provisioner_JWK,
+				Name: "test-provisioner",
+				Details: &linkedca.ProvisionerDetails{
+					Data: &linkedca.ProvisionerDetails_JWK{
+						JWK: &linkedca.JWKProvisioner{
+							PublicKey:           []byte(`{"kty":"EC","crv":"P-256","x":"MKBCTNIcKUSDii11ySs3526iDZ8AiTo7Tu6KPAqv7D4","y":"4Etl6SRW2YiLUrN5vfvVHuhp7x8PxltmWWlbbM4IFyM","use":"sig","kid":"1"}`),
+							EncryptedPrivateKey: []byte("encrypted-key"),
+						},
+					},
+				},
+			}
+			return test{
+				auth: auth,
+				prov: prov,
+				err:  admin.WrapErrorISE(errors.New("conversion error"), "error converting to certificates provisioner from linkedca provisioner"),
+			}
+		},
+		"fail/second-init-error": func(t *testing.T) test {
+			auth := testAuthority(t)
+			auth.adminDB = &admin.MockDB{
+				MockCreateProvisioner: func(ctx context.Context, prov *linkedca.Provisioner) error {
+					prov.Id = "new-id"
+					// Corrupt the key to make second init fail
+					if jwkProv := prov.Details.GetJWK(); jwkProv != nil {
+						jwkProv.PublicKey = []byte("corrupted-key")
+					}
+					return nil
+				},
+			}
+
+			prov := &linkedca.Provisioner{
+				Type: linkedca.Provisioner_JWK,
+				Name: "test-provisioner",
+				Details: &linkedca.ProvisionerDetails{
+					Data: &linkedca.ProvisionerDetails_JWK{
+						JWK: &linkedca.JWKProvisioner{
+							PublicKey:           []byte(`{"kty":"EC","crv":"P-256","x":"MKBCTNIcKUSDii11ySs3526iDZ8AiTo7Tu6KPAqv7D4","y":"4Etl6SRW2YiLUrN5vfvVHuhp7x8PxltmWWlbbM4IFyM","use":"sig","kid":"1"}`),
+							EncryptedPrivateKey: []byte("encrypted-key"),
+						},
+					},
+				},
+			}
+			return test{
+				auth: auth,
+				prov: prov,
+				err:  admin.WrapErrorISE(errors.New("init error"), "error initializing provisioner test-provisioner"),
+			}
+		},
+		"fail/provisioner-store-error": func(t *testing.T) test {
+			auth := testAuthority(t)
+			auth.adminDB = &admin.MockDB{
+				MockCreateProvisioner: func(ctx context.Context, prov *linkedca.Provisioner) error {
+					prov.Id = "new-id"
+					return nil
+				},
+			}
+
+			// Create a conflicting provisioner in the cache to cause store error
+			key, err := jose.GenerateJWK("EC", "P-256", "ES256", "sig", "", 0)
+			assert.FatalError(t, err)
+			conflictingProv := &provisioner.JWK{
+				Name: "test-provisioner", // Same name as the one we'll try to store
+				Type: "JWK",
+				Key:  key,
+			}
+			// Create a proper config with valid claims for initialization
+			config := provisioner.Config{
+				Claims: provisioner.Claims{
+					MinTLSDur:     &provisioner.Duration{Duration: 5 * time.Minute},
+					MaxTLSDur:     &provisioner.Duration{Duration: 24 * time.Hour},
+					DefaultTLSDur: &provisioner.Duration{Duration: 24 * time.Hour},
+				},
+			}
+			conflictingProv.Init(config)
+			auth.provisioners.Store(conflictingProv)
+
+			prov := &linkedca.Provisioner{
+				Type: linkedca.Provisioner_JWK,
+				Name: "test-provisioner",
+				Details: &linkedca.ProvisionerDetails{
+					Data: &linkedca.ProvisionerDetails_JWK{
+						JWK: &linkedca.JWKProvisioner{
+							PublicKey:           []byte(`{"kty":"EC","crv":"P-256","x":"MKBCTNIcKUSDii11ySs3526iDZ8AiTo7Tu6KPAqv7D4","y":"4Etl6SRW2YiLUrN5vfvVHuhp7x8PxltmWWlbbM4IFyM","use":"sig","kid":"1"}`),
+							EncryptedPrivateKey: []byte("encrypted-key"),
+						},
+					},
+				},
+			}
+			return test{
+				auth: auth,
+				prov: prov,
+				err:  admin.WrapErrorISE(errors.New("store error"), "error storing provisioner in authority cache"),
+			}
+		},
+		"ok/jwk-provisioner": func(t *testing.T) test {
+			auth := testAuthority(t)
+			auth.adminDB = &admin.MockDB{
+				MockCreateProvisioner: func(ctx context.Context, prov *linkedca.Provisioner) error {
+					prov.Id = "new-provisioner-id"
+					return nil
+				},
+			}
+
+			prov := &linkedca.Provisioner{
+				Type: linkedca.Provisioner_JWK,
+				Name: "test-jwk-provisioner",
+				Details: &linkedca.ProvisionerDetails{
+					Data: &linkedca.ProvisionerDetails_JWK{
+						JWK: &linkedca.JWKProvisioner{
+							PublicKey:           []byte(`{"kty":"EC","crv":"P-256","x":"MKBCTNIcKUSDii11ySs3526iDZ8AiTo7Tu6KPAqv7D4","y":"4Etl6SRW2YiLUrN5vfvVHuhp7x8PxltmWWlbbM4IFyM","use":"sig","kid":"1"}`),
+							EncryptedPrivateKey: []byte("encrypted-key"),
+						},
+					},
+				},
+				Claims: &linkedca.Claims{
+					X509: &linkedca.X509Claims{
+						Enabled: true,
+						Durations: &linkedca.Durations{
+							Default: "24h",
+							Min:     "1h",
+							Max:     "720h",
+						},
+					},
+				},
+			}
+			return test{
+				auth: auth,
+				prov: prov,
+				err:  nil,
+			}
+		},
+		"ok/acme-provisioner": func(t *testing.T) test {
+			auth := testAuthority(t)
+			auth.adminDB = &admin.MockDB{
+				MockCreateProvisioner: func(ctx context.Context, prov *linkedca.Provisioner) error {
+					prov.Id = "acme-provisioner-id"
+					return nil
+				},
+			}
+
+			prov := &linkedca.Provisioner{
+				Type: linkedca.Provisioner_ACME,
+				Name: "test-acme-provisioner",
+				Details: &linkedca.ProvisionerDetails{
+					Data: &linkedca.ProvisionerDetails_ACME{
+						ACME: &linkedca.ACMEProvisioner{
+							ForceCn: true,
+						},
+					},
+				},
+			}
+			return test{
+				auth: auth,
+				prov: prov,
+				err:  nil,
+			}
+		},
+		"ok/with-policy": func(t *testing.T) test {
+			auth := testAuthority(t)
+			auth.adminDB = &admin.MockDB{
+				MockCreateProvisioner: func(ctx context.Context, prov *linkedca.Provisioner) error {
+					prov.Id = "policy-provisioner-id"
+					return nil
+				},
+			}
+
+			prov := &linkedca.Provisioner{
+				Type: linkedca.Provisioner_JWK,
+				Name: "test-policy-provisioner",
+				Details: &linkedca.ProvisionerDetails{
+					Data: &linkedca.ProvisionerDetails_JWK{
+						JWK: &linkedca.JWKProvisioner{
+							PublicKey:           []byte(`{"kty":"EC","crv":"P-256","x":"MKBCTNIcKUSDii11ySs3526iDZ8AiTo7Tu6KPAqv7D4","y":"4Etl6SRW2YiLUrN5vfvVHuhp7x8PxltmWWlbbM4IFyM","use":"sig","kid":"1"}`),
+							EncryptedPrivateKey: []byte("encrypted-key"),
+						},
+					},
+				},
+				Policy: &linkedca.Policy{
+					X509: &linkedca.X509Policy{
+						Allow: &linkedca.X509Names{
+							Dns: []string{"*.example.com"},
+						},
+						Deny: &linkedca.X509Names{
+							Dns: []string{"*.internal.example.com"},
+						},
+					},
+				},
+			}
+			return test{
+				auth: auth,
+				prov: prov,
+				err:  nil,
+			}
+		},
+		"ok/with-templates": func(t *testing.T) test {
+			auth := testAuthority(t)
+			auth.adminDB = &admin.MockDB{
+				MockCreateProvisioner: func(ctx context.Context, prov *linkedca.Provisioner) error {
+					prov.Id = "template-provisioner-id"
+					return nil
+				},
+			}
+
+			prov := &linkedca.Provisioner{
+				Type: linkedca.Provisioner_JWK,
+				Name: "test-template-provisioner",
+				Details: &linkedca.ProvisionerDetails{
+					Data: &linkedca.ProvisionerDetails_JWK{
+						JWK: &linkedca.JWKProvisioner{
+							PublicKey:           []byte(`{"kty":"EC","crv":"P-256","x":"MKBCTNIcKUSDii11ySs3526iDZ8AiTo7Tu6KPAqv7D4","y":"4Etl6SRW2YiLUrN5vfvVHuhp7x8PxltmWWlbbM4IFyM","use":"sig","kid":"1"}`),
+							EncryptedPrivateKey: []byte("encrypted-key"),
+						},
+					},
+				},
+				X509Template: &linkedca.Template{
+					Template: []byte(`{"subject": "{{.Subject}}"}`),
+					Data:     []byte(`{"customField": "value"}`),
+				},
+				SshTemplate: &linkedca.Template{
+					Template: []byte(`{"user": "{{.User}}"}`),
+					Data:     []byte(`{"sshCustom": "sshValue"}`),
+				},
+			}
+			return test{
+				auth: auth,
+				prov: prov,
+				err:  nil,
+			}
+		},
+		"ok/with-webhooks": func(t *testing.T) test {
+			auth := testAuthority(t)
+			auth.adminDB = &admin.MockDB{
+				MockCreateProvisioner: func(ctx context.Context, prov *linkedca.Provisioner) error {
+					prov.Id = "webhook-provisioner-id"
+					return nil
+				},
+			}
+
+			prov := &linkedca.Provisioner{
+				Type: linkedca.Provisioner_JWK,
+				Name: "test-webhook-provisioner",
+				Details: &linkedca.ProvisionerDetails{
+					Data: &linkedca.ProvisionerDetails_JWK{
+						JWK: &linkedca.JWKProvisioner{
+							PublicKey:           []byte(`{"kty":"EC","crv":"P-256","x":"MKBCTNIcKUSDii11ySs3526iDZ8AiTo7Tu6KPAqv7D4","y":"4Etl6SRW2YiLUrN5vfvVHuhp7x8PxltmWWlbbM4IFyM","use":"sig","kid":"1"}`),
+							EncryptedPrivateKey: []byte("encrypted-key"),
+						},
+					},
+				},
+				Webhooks: []*linkedca.Webhook{
+					{
+						Name: "test-webhook",
+						Url:  "https://example.com/webhook",
+						Kind: linkedca.Webhook_ENRICHING,
+					},
+				},
+			}
+			return test{
+				auth: auth,
+				prov: prov,
+				err:  nil,
+			}
+		},
+	}
+
+	for name, run := range tests {
+		tc := run(t)
+		t.Run(name, func(t *testing.T) {
+			err := tc.auth.StoreProvisioner(context.Background(), tc.prov)
+			if err != nil {
+				if assert.NotNil(t, tc.err, fmt.Sprintf("unexpected error: %s", err)) {
+					var adminErr *admin.Error
+					if errors.As(err, &adminErr) && errors.As(tc.err, &adminErr) {
+						assert.Equals(t, adminErr.Type, tc.err.(*admin.Error).Type)
+					} else {
+						assert.HasPrefix(t, err.Error(), tc.err.Error())
+					}
+				}
+			} else {
+				assert.Nil(t, tc.err)
+
+				// Verify provisioner was stored correctly
+				if tc.err == nil {
+					// Check that provisioner exists in cache by name
+					storedProv, ok := tc.auth.provisioners.LoadByName(tc.prov.Name)
+					assert.True(t, ok, "provisioner should be stored in cache")
+					assert.Equals(t, tc.prov.Name, storedProv.GetName())
+
+					// Verify the provisioner ID was set by the database
+					assert.NotEquals(t, "", tc.prov.Id, "provisioner ID should be set after storage")
+				}
 			}
 		})
 	}
