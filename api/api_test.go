@@ -10,6 +10,7 @@ import (
 	"crypto/elliptic"
 	"crypto/rand"
 	"crypto/rsa"
+	"crypto/sha256"
 	"crypto/tls"
 	"crypto/x509"
 	"crypto/x509/pkix"
@@ -197,6 +198,7 @@ type mockAuthority struct {
 	authorizeRenewToken          func(ctx context.Context, ott string) (*x509.Certificate, error)
 	getTLSOptions                func() *authority.TLSOptions
 	root                         func(shasum string) (*x509.Certificate, error)
+	intermediate                 func(shasum string) (*x509.Certificate, error)
 	signWithContext              func(ctx context.Context, cr *x509.CertificateRequest, opts provisioner.SignOptions, signOpts ...provisioner.SignOption) ([]*x509.Certificate, error)
 	renew                        func(cert *x509.Certificate) ([]*x509.Certificate, error)
 	rekey                        func(oldCert *x509.Certificate, pk crypto.PublicKey) ([]*x509.Certificate, error)
@@ -256,6 +258,13 @@ func (m *mockAuthority) GetTLSOptions() *authority.TLSOptions {
 func (m *mockAuthority) Root(shasum string) (*x509.Certificate, error) {
 	if m.root != nil {
 		return m.root(shasum)
+	}
+	return m.ret1.(*x509.Certificate), m.err
+}
+
+func (m *mockAuthority) Intermediate(shasum string) (*x509.Certificate, error) {
+	if m.intermediate != nil {
+		return m.intermediate(shasum)
 	}
 	return m.ret1.(*x509.Certificate), m.err
 }
@@ -1755,6 +1764,64 @@ func TestIntermediatesPEM(t *testing.T) {
 			IntermediatesPEM(w, r)
 			assert.Equal(t, tt.wantStatusCode, w.Result().StatusCode)
 			assert.Equal(t, tt.wantBody, w.Body.Bytes())
+		})
+	}
+}
+
+func TestIntermediate(t *testing.T) {
+	ca, err := minica.New()
+	require.NoError(t, err)
+
+	intermediateFP := fmt.Sprintf("%x", sha256.Sum256(ca.Intermediate.Raw))
+
+	tests := []struct {
+		name           string
+		sha            string
+		mockAuth       *mockAuthority
+		wantStatusCode int
+		wantBody       []byte
+	}{
+		{
+			name: "ok",
+			sha:  intermediateFP,
+			mockAuth: &mockAuthority{
+				intermediate: func(sum string) (*x509.Certificate, error) {
+					if sum == intermediateFP {
+						return ca.Intermediate, nil
+					}
+					return nil, errs.NotFound("certificate with fingerprint %s was not found", sum)
+				},
+			},
+			wantStatusCode: http.StatusOK,
+			wantBody:       mustJSON(t, IntermediateResponse{IntermediatePEM: Certificate{ca.Intermediate}}),
+		},
+		{
+			name: "not found",
+			sha:  "0000000000000000000000000000000000000000000000000000000000000000",
+			mockAuth: &mockAuthority{
+				intermediate: func(sum string) (*x509.Certificate, error) {
+					return nil, errs.NotFound("certificate with fingerprint %s was not found", sum)
+				},
+			},
+			wantStatusCode: http.StatusNotFound,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			mockMustAuthority(t, tt.mockAuth)
+
+			w := httptest.NewRecorder()
+			r := httptest.NewRequest("GET", "/intermediate/"+tt.sha, http.NoBody)
+
+			// Use a chi router so that URLParam works correctly.
+			router := chi.NewRouter()
+			router.Get("/intermediate/{sha}", Intermediate)
+			router.ServeHTTP(w, r)
+
+			assert.Equal(t, tt.wantStatusCode, w.Result().StatusCode)
+			if tt.wantBody != nil {
+				assert.Equal(t, tt.wantBody, w.Body.Bytes())
+			}
 		})
 	}
 }
