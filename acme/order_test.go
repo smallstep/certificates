@@ -11,6 +11,7 @@ import (
 	"net"
 	"net/url"
 	"reflect"
+	"strings"
 	"testing"
 	"time"
 
@@ -834,6 +835,7 @@ func TestOrder_Finalize(t *testing.T) {
 					MockGetAuthorization: func(ctx context.Context, id string) (*Authorization, error) {
 						return &Authorization{
 							ID:          id,
+							Identifier:  Identifier{Type: PermanentIdentifier, Value: "a-permanent-identifier"},
 							Fingerprint: "other-fingerprint",
 							Status:      StatusValid,
 						}, nil
@@ -2590,54 +2592,290 @@ func TestOrder_sans(t *testing.T) {
 	}
 }
 
-func TestOrder_getAuthorizationFingerprint(t *testing.T) {
+func TestOrder_getAuthorizationAttestationDataMatchesIdentifier(t *testing.T) {
 	ctx := context.Background()
-	type fields struct {
-		AuthorizationIDs []string
-	}
-	type args struct {
-		ctx context.Context
-		db  DB
-	}
 	tests := []struct {
-		name    string
-		fields  fields
-		args    args
-		want    string
-		wantErr bool
+		name                string
+		permanentIdentifier string
+		authzs              map[string]*Authorization
+		dbErr               error
+		want                authorizationAttestationData
+		wantErr             string
 	}{
-		{"ok", fields{[]string{"az1", "az2"}}, args{ctx, &MockDB{
-			MockGetAuthorization: func(ctx context.Context, id string) (*Authorization, error) {
-				return &Authorization{ID: id, Status: StatusValid}, nil
+		{
+			name:                "matching identifier",
+			permanentIdentifier: "PID-A",
+			authzs: map[string]*Authorization{
+				"az1": {ID: "az1", Identifier: Identifier{Type: PermanentIdentifier, Value: "PID-A"}, Fingerprint: "fingerprint-a", AttestationFormat: "apple"},
+				"az2": {ID: "az2", Identifier: Identifier{Type: PermanentIdentifier, Value: "PID-B"}, Fingerprint: "fingerprint-b", AttestationFormat: "tpm"},
 			},
-		}}, "", false},
-		{"ok fingerprint", fields{[]string{"az1", "az2"}}, args{ctx, &MockDB{
-			MockGetAuthorization: func(ctx context.Context, id string) (*Authorization, error) {
-				if id == "az1" {
-					return &Authorization{ID: id, Status: StatusValid}, nil
-				}
-				return &Authorization{ID: id, Fingerprint: "fingerprint", Status: StatusValid}, nil
+			want: authorizationAttestationData{fingerprint: "fingerprint-a", format: "apple"},
+		},
+		{
+			name:                "legacy selected identifier ignores later format",
+			permanentIdentifier: "PID-A",
+			authzs: map[string]*Authorization{
+				"az1": {ID: "az1", Identifier: Identifier{Type: PermanentIdentifier, Value: "PID-A"}, Fingerprint: "fingerprint-a"},
+				"az2": {ID: "az2", Identifier: Identifier{Type: PermanentIdentifier, Value: "PID-B"}, Fingerprint: "fingerprint-b", AttestationFormat: "tpm"},
 			},
-		}}, "fingerprint", false},
-		{"fail", fields{[]string{"az1", "az2"}}, args{ctx, &MockDB{
-			MockGetAuthorization: func(ctx context.Context, id string) (*Authorization, error) {
-				return nil, errors.New("force")
+			want: authorizationAttestationData{fingerprint: "fingerprint-a"},
+		},
+		{
+			name:                "matching repeated format",
+			permanentIdentifier: "PID-A",
+			authzs: map[string]*Authorization{
+				"az1": {ID: "az1", Identifier: Identifier{Type: PermanentIdentifier, Value: "PID-A"}, Fingerprint: "fingerprint-a", AttestationFormat: "step"},
+				"az2": {ID: "az2", Identifier: Identifier{Type: PermanentIdentifier, Value: "PID-A"}, AttestationFormat: "step"},
 			},
-		}}, "", true},
+			want: authorizationAttestationData{fingerprint: "fingerprint-a", format: "step"},
+		},
+		{
+			name:                "duplicate identifier preserves first tuple",
+			permanentIdentifier: "PID-A",
+			authzs: map[string]*Authorization{
+				"az1": {ID: "az1", Identifier: Identifier{Type: PermanentIdentifier, Value: "PID-A"}, Fingerprint: "fingerprint-a"},
+				"az2": {ID: "az2", Identifier: Identifier{Type: PermanentIdentifier, Value: "PID-A"}, Fingerprint: "fingerprint-b", AttestationFormat: "tpm"},
+			},
+			want: authorizationAttestationData{fingerprint: "fingerprint-a"},
+		},
+		{
+			name:                "conflicting formats for selected identifier",
+			permanentIdentifier: "PID-A",
+			authzs: map[string]*Authorization{
+				"az1": {ID: "az1", Identifier: Identifier{Type: PermanentIdentifier, Value: "PID-A"}, AttestationFormat: "apple"},
+				"az2": {ID: "az2", Identifier: Identifier{Type: PermanentIdentifier, Value: "PID-A"}, AttestationFormat: "tpm"},
+			},
+			wantErr: "conflicting attestation formats",
+		},
+		{
+			name:                "database error",
+			permanentIdentifier: "PID-A",
+			dbErr:               errors.New("force"),
+			wantErr:             "error getting authorization \"az1\": force",
+		},
 	}
+
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			o := &Order{
-				AuthorizationIDs: tt.fields.AuthorizationIDs,
-			}
-			got, err := o.getAuthorizationFingerprint(tt.args.ctx, tt.args.db)
-			if (err != nil) != tt.wantErr {
-				t.Errorf("Order.getAuthorizationFingerprint() error = %v, wantErr %v", err, tt.wantErr)
+			o := &Order{ID: "orderID", AuthorizationIDs: []string{"az1", "az2"}}
+			db := &MockDB{MockGetAuthorization: func(_ context.Context, id string) (*Authorization, error) {
+				if tt.dbErr != nil {
+					return nil, tt.dbErr
+				}
+				return tt.authzs[id], nil
+			}}
+
+			got, err := o.getAuthorizationAttestationData(ctx, db, tt.permanentIdentifier)
+			if tt.wantErr != "" {
+				if assert.Error(t, err) {
+					assert.True(t, strings.Contains(err.Error(), tt.wantErr))
+				}
 				return
 			}
-			if got != tt.want {
-				t.Errorf("Order.getAuthorizationFingerprint() = %v, want %v", got, tt.want)
-			}
+			assert.FatalError(t, err)
+			assert.Equals(t, got, tt.want)
 		})
+	}
+}
+
+func TestOrder_FinalizeAttestationData(t *testing.T) {
+	for _, format := range []string{"apple", "android-key", "step", "tpm"} {
+		t.Run(format, func(t *testing.T) {
+			signer, err := keyutil.GenerateSigner("EC", "P-256", 0)
+			assert.FatalError(t, err)
+			fingerprint, err := keyutil.Fingerprint(signer.Public())
+			assert.FatalError(t, err)
+
+			o := &Order{
+				ID:               "orderID",
+				AccountID:        "accountID",
+				Status:           StatusReady,
+				ExpiresAt:        clock.Now().Add(time.Minute),
+				AuthorizationIDs: []string{"authzID"},
+				Identifiers:      []Identifier{{Type: PermanentIdentifier, Value: "deviceID"}},
+			}
+			csr := &x509.CertificateRequest{
+				Subject:   pkix.Name{CommonName: "deviceID"},
+				PublicKey: signer.Public(),
+			}
+			db := &MockDB{
+				MockGetAuthorization: func(_ context.Context, id string) (*Authorization, error) {
+					assert.Equals(t, id, "authzID")
+					return &Authorization{
+						ID:                id,
+						Identifier:        Identifier{Type: PermanentIdentifier, Value: "deviceID"},
+						Fingerprint:       fingerprint,
+						AttestationFormat: format,
+					}, nil
+				},
+				MockCreateCertificate: func(_ context.Context, cert *Certificate) error {
+					cert.ID = "certID"
+					return nil
+				},
+				MockUpdateOrder: func(_ context.Context, _ *Order) error { return nil },
+			}
+			ca := &mockSignAuth{
+				signWithContext: func(_ context.Context, _ *x509.CertificateRequest, _ provisioner.SignOptions, opts ...provisioner.SignOption) ([]*x509.Certificate, error) {
+					var got *provisioner.AttestationData
+					for _, opt := range opts {
+						if attestationData, ok := opt.(provisioner.AttestationData); ok {
+							got = &attestationData
+						}
+					}
+					assert.Equals(t, got, &provisioner.AttestationData{
+						PermanentIdentifier: "deviceID",
+						Format:              format,
+					})
+					return []*x509.Certificate{{PublicKey: signer.Public()}}, nil
+				},
+			}
+			prov := &MockProvisioner{
+				MauthorizeSign: func(context.Context, string) ([]provisioner.SignOption, error) { return nil, nil },
+				MgetOptions:    func() *provisioner.Options { return nil },
+			}
+
+			assert.FatalError(t, o.Finalize(context.Background(), db, csr, ca, prov))
+		})
+	}
+}
+
+func TestOrder_FinalizeUsesAttestationDataForSelectedPermanentIdentifier(t *testing.T) {
+	signer, err := keyutil.GenerateSigner("EC", "P-256", 0)
+	assert.FatalError(t, err)
+	fingerprint, err := keyutil.Fingerprint(signer.Public())
+	assert.FatalError(t, err)
+
+	o := &Order{
+		ID:               "orderID",
+		AccountID:        "accountID",
+		Status:           StatusReady,
+		ExpiresAt:        clock.Now().Add(time.Minute),
+		AuthorizationIDs: []string{"authz-a", "authz-b"},
+		Identifiers: []Identifier{
+			{Type: PermanentIdentifier, Value: "PID-A"},
+			{Type: PermanentIdentifier, Value: "PID-B"},
+		},
+	}
+	csr := &x509.CertificateRequest{Subject: pkix.Name{CommonName: "PID-A"}, PublicKey: signer.Public()}
+	db := &MockDB{
+		MockGetAuthorization: func(_ context.Context, id string) (*Authorization, error) {
+			if id == "authz-a" {
+				return &Authorization{
+					ID:          id,
+					Identifier:  Identifier{Type: PermanentIdentifier, Value: "PID-A"},
+					Fingerprint: fingerprint,
+				}, nil
+			}
+			return &Authorization{
+				ID:                id,
+				Identifier:        Identifier{Type: PermanentIdentifier, Value: "PID-B"},
+				Fingerprint:       "different-fingerprint",
+				AttestationFormat: "tpm",
+			}, nil
+		},
+		MockCreateCertificate: func(_ context.Context, cert *Certificate) error {
+			cert.ID = "certID"
+			return nil
+		},
+		MockUpdateOrder: func(_ context.Context, _ *Order) error { return nil },
+	}
+	ca := &mockSignAuth{signWithContext: func(_ context.Context, _ *x509.CertificateRequest, _ provisioner.SignOptions, opts ...provisioner.SignOption) ([]*x509.Certificate, error) {
+		var got provisioner.AttestationData
+		for _, opt := range opts {
+			if data, ok := opt.(provisioner.AttestationData); ok {
+				got = data
+			}
+		}
+		assert.Equals(t, got, provisioner.AttestationData{PermanentIdentifier: "PID-A"})
+		return []*x509.Certificate{{PublicKey: signer.Public()}}, nil
+	}}
+	prov := &MockProvisioner{
+		MauthorizeSign: func(context.Context, string) ([]provisioner.SignOption, error) { return nil, nil },
+		MgetOptions:    func() *provisioner.Options { return nil },
+	}
+
+	assert.FatalError(t, o.Finalize(context.Background(), db, csr, ca, prov))
+}
+
+func TestOrder_FinalizePreservesFirstAuthorizationAttestationTuple(t *testing.T) {
+	signer, err := keyutil.GenerateSigner("EC", "P-256", 0)
+	assert.FatalError(t, err)
+	fingerprint, err := keyutil.Fingerprint(signer.Public())
+	assert.FatalError(t, err)
+
+	o := &Order{
+		ID:               "orderID",
+		AccountID:        "accountID",
+		Status:           StatusReady,
+		ExpiresAt:        clock.Now().Add(time.Minute),
+		AuthorizationIDs: []string{"authz-first", "authz-later"},
+		Identifiers:      []Identifier{{Type: PermanentIdentifier, Value: "PID-A"}},
+	}
+	csr := &x509.CertificateRequest{Subject: pkix.Name{CommonName: "PID-A"}, PublicKey: signer.Public()}
+	db := &MockDB{
+		MockGetAuthorization: func(_ context.Context, id string) (*Authorization, error) {
+			if id == "authz-first" {
+				return &Authorization{
+					ID:          id,
+					Identifier:  Identifier{Type: PermanentIdentifier, Value: "PID-A"},
+					Fingerprint: fingerprint,
+				}, nil
+			}
+			return &Authorization{
+				ID:                id,
+				Identifier:        Identifier{Type: PermanentIdentifier, Value: "PID-A"},
+				Fingerprint:       "different-fingerprint",
+				AttestationFormat: "tpm",
+			}, nil
+		},
+		MockCreateCertificate: func(_ context.Context, cert *Certificate) error {
+			cert.ID = "certID"
+			return nil
+		},
+		MockUpdateOrder: func(_ context.Context, _ *Order) error { return nil },
+	}
+	ca := &mockSignAuth{signWithContext: func(_ context.Context, _ *x509.CertificateRequest, _ provisioner.SignOptions, opts ...provisioner.SignOption) ([]*x509.Certificate, error) {
+		var got provisioner.AttestationData
+		for _, opt := range opts {
+			if data, ok := opt.(provisioner.AttestationData); ok {
+				got = data
+			}
+		}
+		assert.Equals(t, got, provisioner.AttestationData{PermanentIdentifier: "PID-A"})
+		return []*x509.Certificate{{PublicKey: signer.Public()}}, nil
+	}}
+	prov := &MockProvisioner{
+		MauthorizeSign: func(context.Context, string) ([]provisioner.SignOption, error) { return nil, nil },
+		MgetOptions:    func() *provisioner.Options { return nil },
+	}
+
+	assert.FatalError(t, o.Finalize(context.Background(), db, csr, ca, prov))
+}
+
+func TestOrder_FinalizeConflictingAttestationFormats(t *testing.T) {
+	o := &Order{
+		ID:               "orderID",
+		Status:           StatusReady,
+		ExpiresAt:        clock.Now().Add(time.Minute),
+		AuthorizationIDs: []string{"authz1", "authz2"},
+		Identifiers:      []Identifier{{Type: PermanentIdentifier, Value: "deviceID"}},
+	}
+	db := &MockDB{
+		MockGetAuthorization: func(_ context.Context, id string) (*Authorization, error) {
+			format := "apple"
+			if id == "authz2" {
+				format = "tpm"
+			}
+			return &Authorization{
+				ID:                id,
+				Identifier:        Identifier{Type: PermanentIdentifier, Value: "deviceID"},
+				AttestationFormat: format,
+			}, nil
+		},
+	}
+
+	err := o.Finalize(context.Background(), db, &x509.CertificateRequest{}, nil, nil)
+	if assert.Error(t, err) {
+		assert.True(t, strings.Contains(err.Error(), "conflicting attestation formats"))
 	}
 }
