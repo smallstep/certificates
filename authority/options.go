@@ -18,6 +18,7 @@ import (
 	"github.com/smallstep/certificates/cas"
 	casapi "github.com/smallstep/certificates/cas/apiv1"
 	"github.com/smallstep/certificates/db"
+	"github.com/smallstep/certificates/est"
 	"github.com/smallstep/certificates/internal/httptransport"
 	"github.com/smallstep/certificates/scep"
 )
@@ -248,6 +249,16 @@ func WithFullSCEPOptions(options *scep.Options) Option {
 	return func(a *Authority) error {
 		a.scepOptions = options
 		a.validateSCEP = false
+		return nil
+	}
+}
+
+// WithFullESTOptions defines the options used for EST support.
+//
+// This feature is EXPERIMENTAL and might change at any time.
+func WithFullESTOptions(options *est.Options) Option {
+	return func(a *Authority) error {
+		a.estOptions = options
 		return nil
 	}
 }
