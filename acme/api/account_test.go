@@ -480,6 +480,23 @@ func TestHandler_NewAccount(t *testing.T) {
 				err:        acme.NewError(acme.ErrorAccountDoesNotExistType, "account does not exist"),
 			}
 		},
+		"fail/terms-of-service-not-agreed": func(t *testing.T) test {
+			nar := &NewAccountRequest{
+				Contact: []string{"foo", "bar"},
+			}
+			b, err := json.Marshal(nar)
+			assert.FatalError(t, err)
+			p := newACMEProv(t)
+			p.TermsOfService = "https://terms.ca.local/"
+			ctx := context.WithValue(context.Background(), payloadContextKey, &payloadInfo{value: b})
+			ctx = acme.NewProvisionerContext(ctx, p)
+			return test{
+				db:         &acme.MockDB{},
+				ctx:        ctx,
+				statusCode: 400,
+				err:        acme.NewError(acme.ErrorUserActionRequiredType, "terms of service must be agreed to: https://terms.ca.local/"),
+			}
+		},
 		"fail/no-jwk": func(t *testing.T) test {
 			nar := &NewAccountRequest{
 				Contact: []string{"foo", "bar"},
