@@ -78,7 +78,7 @@ func startCATestServer(t *testing.T) *httptest.Server {
 	ca, err := New(config)
 	require.NoError(t, err)
 	// Use a httptest.Server instead
-	baseContext := buildContext(ca.auth, nil, nil, nil)
+	baseContext := buildContext(ca.auth, nil, nil, nil, nil)
 	srv := startTestServer(baseContext, ca.srv.TLSConfig, ca.srv.Handler)
 	return srv
 }
