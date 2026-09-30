@@ -2,6 +2,8 @@ package provisioner
 
 import (
 	"encoding/json"
+	"io"
+	"log"
 	"math/rand"
 	"regexp"
 	"strconv"
@@ -10,22 +12,28 @@ import (
 
 	"github.com/pkg/errors"
 	"go.step.sm/crypto/jose"
+	"golang.org/x/sync/singleflight"
 )
 
 const (
 	defaultCacheAge    = 12 * time.Hour
 	defaultCacheJitter = 1 * time.Hour
+	// minReloadInterval is the minimum time between cache refreshes on cache
+	// misses.
+	minReloadInterval = 1 * time.Minute
 )
 
 var maxAgeRegex = regexp.MustCompile(`max-age=(\d+)`)
 
 type keyStore struct {
 	sync.RWMutex
-	client HTTPClient
-	uri    string
-	keySet jose.JSONWebKeySet
-	expiry time.Time
-	jitter time.Duration
+	client     HTTPClient
+	uri        string
+	keySet     jose.JSONWebKeySet
+	expiry     time.Time
+	jitter     time.Duration
+	nextReload time.Time
+	group      singleflight.Group
 }
 
 func newKeyStore(client HTTPClient, uri string) (*keyStore, error) {
@@ -46,24 +54,44 @@ func newKeyStore(client HTTPClient, uri string) (*keyStore, error) {
 func (ks *keyStore) Get(kid string) (keys []jose.JSONWebKey) {
 	ks.RLock()
 	// Force reload if expiration has passed
-	if time.Now().After(ks.expiry) {
+	if time.Now().After(ks.expiry) && time.Now().After(ks.nextReload) {
 		ks.RUnlock()
 		ks.reload()
 		ks.RLock()
 	}
 	keys = ks.keySet.Key(kid)
+	// Reload on unknown kid in case the provider has rotated their keys without
+	// us knowing about it.
+	if len(keys) == 0 && time.Now().After(ks.nextReload) {
+		ks.RUnlock()
+		ks.reload()
+		ks.RLock()
+		keys = ks.keySet.Key(kid)
+	}
 	ks.RUnlock()
 	return
 }
 
 func (ks *keyStore) reload() {
-	if keys, age, err := getKeysFromJWKsURI(ks.client, ks.uri); err == nil {
+	// Coalesce concurrent reloads into a single request, so that a burst of
+	// unknown key ids will only result in one fetch.
+	_, _, _ = ks.group.Do(ks.uri, func() (any, error) {
+		keys, age, err := getKeysFromJWKsURI(ks.client, ks.uri)
+
 		ks.Lock()
-		ks.keySet = keys
-		ks.jitter = getCacheJitter(age)
-		ks.expiry = getExpirationTime(age, ks.jitter)
+		ks.nextReload = time.Now().Add(minReloadInterval)
+		if err == nil {
+			ks.keySet = keys
+			ks.jitter = getCacheJitter(age)
+			ks.expiry = getExpirationTime(age, ks.jitter)
+		}
 		ks.Unlock()
-	}
+
+		if err != nil {
+			log.Printf("Failed to reload the JWK Set from %s: %v", ks.uri, err)
+		}
+		return nil, nil
+	})
 }
 
 func getKeysFromJWKsURI(client HTTPClient, uri string) (jose.JSONWebKeySet, time.Duration, error) {
@@ -73,6 +101,10 @@ func getKeysFromJWKsURI(client HTTPClient, uri string) (jose.JSONWebKeySet, time
 		return keys, 0, errors.Wrapf(err, "failed to connect to %s", uri)
 	}
 	defer resp.Body.Close()
+	if resp.StatusCode >= 400 {
+		b, _ := io.ReadAll(io.LimitReader(resp.Body, 1024))
+		return keys, 0, errors.Errorf("error reading %s: status=%d, response=%s", uri, resp.StatusCode, b)
+	}
 	if err := json.NewDecoder(resp.Body).Decode(&keys); err != nil {
 		return keys, 0, errors.Wrapf(err, "error reading %s", uri)
 	}

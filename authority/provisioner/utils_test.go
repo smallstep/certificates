@@ -341,6 +341,7 @@ func generateOIDC() (*OIDC, error) {
 			JWKSetURI: "https://example.com/.well-known/jwks",
 		},
 		keyStore: &keyStore{
+			client: erroringHTTPClient{},
 			keySet: jose.JSONWebKeySet{Keys: []jose.JSONWebKey{*jwk}},
 			expiry: time.Now().Add(24 * time.Hour),
 		},
@@ -373,6 +374,7 @@ func generateGCP() (*GCP, error) {
 		DisableSSHCAUser: &DefaultDisableSSHCAUser,
 		config:           newGCPConfig(),
 		keyStore: &keyStore{
+			client: erroringHTTPClient{},
 			keySet: jose.JSONWebKeySet{Keys: []jose.JSONWebKey{*jwk}},
 			expiry: time.Now().Add(24 * time.Hour),
 		},
@@ -610,6 +612,7 @@ func generateAzure() (*Azure, error) {
 			JWKSetURI: "https://login.microsoftonline.com/common/discovery/keys",
 		},
 		keyStore: &keyStore{
+			client: erroringHTTPClient{},
 			keySet: jose.JSONWebKeySet{Keys: []jose.JSONWebKey{*jwk}},
 			expiry: time.Now().Add(24 * time.Hour),
 		},
@@ -1127,11 +1130,31 @@ func generateJWKServerHandler(n int, srv *httptest.Server) http.Handler {
 	}
 
 	defaultKeySet := must(generateJSONWebKeySet(n))[0].(jose.JSONWebKeySet)
+	rotatingKeySet := defaultKeySet
+	rotateFails := false
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		hits.Hits++
 		switch r.RequestURI {
 		case "/error":
 			http.Error(w, http.StatusText(http.StatusBadRequest), http.StatusBadRequest)
+		case "/error-json":
+			w.Header().Add("Content-Type", "application/json")
+			w.WriteHeader(http.StatusNotFound)
+			w.Write([]byte(`{"message":"Not Found"}`))
+		case "/rotate":
+			if rotateFails {
+				w.Header().Add("Content-Type", "application/json")
+				w.WriteHeader(http.StatusNotFound)
+				w.Write([]byte(`{"message":"Not Found"}`))
+				return
+			}
+			w.Header().Add("Cache-Control", "max-age=604800")
+			writeJSON(w, getPublic(rotatingKeySet))
+		case "/rotate/next":
+			rotatingKeySet = must(generateJSONWebKeySet(n))[0].(jose.JSONWebKeySet)
+			writeJSON(w, getPublic(rotatingKeySet))
+		case "/rotate/fail":
+			rotateFails = true
 		case "/hits":
 			writeJSON(w, hits)
 		case "/.well-known/openid-configuration":
