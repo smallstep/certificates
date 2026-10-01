@@ -10,6 +10,10 @@ import (
 
 type RequestBodyOption func(*RequestBody) error
 
+type Provisioner interface {
+	GetName() string
+}
+
 func NewRequestBody(options ...RequestBodyOption) (*RequestBody, error) {
 	rb := &RequestBody{}
 
@@ -20,6 +24,18 @@ func NewRequestBody(options ...RequestBodyOption) (*RequestBody, error) {
 	}
 
 	return rb, nil
+}
+
+// WithProvisionerName sets the provisioner name in the webhook request body
+// using the name from the given provisioner. If p is nil, the provisioner name
+// is left unchanged.
+func WithProvisionerName(p Provisioner) RequestBodyOption {
+	return func(rb *RequestBody) error {
+		if p != nil {
+			rb.ProvisionerName = p.GetName()
+		}
+		return nil
+	}
 }
 
 func WithX509CertificateRequest(cr *x509.CertificateRequest) RequestBodyOption {

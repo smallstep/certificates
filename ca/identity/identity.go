@@ -273,7 +273,7 @@ func (i *Identity) GetCertPool() (*x509.CertPool, error) {
 	}
 	pool := x509.NewCertPool()
 	if !pool.AppendCertsFromPEM(b) {
-		return nil, errors.Errorf("error pasing identity root: %s does not contain any certificate", i.Root)
+		return nil, errors.Errorf("error parsing identity root: %s does not contain any certificate", i.Root)
 	}
 	return pool, nil
 }
@@ -298,10 +298,9 @@ func (i *Identity) Renew(client Renewer) error {
 
 		tr := httptransport.New()
 		tr.TLSClientConfig = &tls.Config{
-			Certificates:             []tls.Certificate{cert},
-			RootCAs:                  client.GetRootCAs(),
-			MinVersion:               tls.VersionTLS12,
-			PreferServerCipherSuites: true,
+			Certificates: []tls.Certificate{cert},
+			RootCAs:      client.GetRootCAs(),
+			MinVersion:   tls.VersionTLS12,
 		}
 
 		sign, err := client.Renew(tr)

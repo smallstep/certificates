@@ -17,6 +17,7 @@ jobs:
   actionci:
     permissions:
       contents: read
+      actions: read
       security-events: write
     uses: smallstep/workflows/.github/workflows/actionci.yml@main
     with:

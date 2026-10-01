@@ -26,7 +26,7 @@ import (
 type mockAdminAuthority struct {
 	MockLoadProvisionerByName func(name string) (provisioner.Interface, error)
 	MockGetProvisioners       func(nextCursor string, limit int) (provisioner.List, string, error)
-	MockRet1, MockRet2        interface{} // TODO: refactor the ret1/ret2 into those two
+	MockRet1, MockRet2        any // TODO: refactor the ret1/ret2 into those two
 	MockErr                   error
 	MockIsAdminAPIEnabled     func() bool
 	MockLoadAdminByID         func(id string) (*linkedca.Admin, bool)

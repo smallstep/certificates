@@ -123,10 +123,10 @@ func mustEncryptKey(filename string, key crypto.Signer) {
 func testCAHelper(t *testing.T) (*url.URL, *ca.Client) {
 	t.Helper()
 
-	writeJSON := func(w http.ResponseWriter, v interface{}) {
+	writeJSON := func(w http.ResponseWriter, v any) {
 		_ = json.NewEncoder(w).Encode(v)
 	}
-	parseJSON := func(r *http.Request, v interface{}) {
+	parseJSON := func(r *http.Request, v any) {
 		_ = json.NewDecoder(r.Body).Decode(v)
 	}
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {

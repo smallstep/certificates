@@ -19,7 +19,7 @@ type Account struct {
 	Contact                []string         `json:"contact,omitempty"`
 	Status                 Status           `json:"status"`
 	OrdersURL              string           `json:"orders"`
-	ExternalAccountBinding interface{}      `json:"externalAccountBinding,omitempty"`
+	ExternalAccountBinding any              `json:"externalAccountBinding,omitempty"`
 	LocationPrefix         string           `json:"-"`
 	ProvisionerID          string           `json:"-"`
 	ProvisionerName        string           `json:"-"`
@@ -34,7 +34,7 @@ func (a *Account) GetLocation() string {
 }
 
 // ToLog enables response logging.
-func (a *Account) ToLog() (interface{}, error) {
+func (a *Account) ToLog() (any, error) {
 	b, err := json.Marshal(a)
 	if err != nil {
 		return nil, WrapErrorISE(err, "error marshaling account for logging")
@@ -112,7 +112,7 @@ type ExternalAccountKey struct {
 	AccountID     string    `json:"-"`
 	HmacKey       []byte    `json:"-"`
 	CreatedAt     time.Time `json:"createdAt"`
-	BoundAt       time.Time `json:"boundAt,omitempty"`
+	BoundAt       time.Time `json:"boundAt,omitzero"`
 	Policy        *Policy   `json:"policy,omitempty"`
 }
 

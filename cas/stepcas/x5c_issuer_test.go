@@ -229,7 +229,7 @@ func Test_x5cIssuer_Lifetime(t *testing.T) {
 }
 
 func Test_newJoseSigner(t *testing.T) {
-	mustSigner := func(args ...interface{}) crypto.Signer {
+	mustSigner := func(args ...any) crypto.Signer {
 		if err := args[len(args)-1]; err != nil {
 			t.Fatal(err)
 		}
@@ -260,7 +260,7 @@ func Test_newJoseSigner(t *testing.T) {
 		wantErr bool
 	}{
 		{"p256", args{p256, nil}, []jose.Header{{Algorithm: "ES256"}}, false},
-		{"p384", args{p384, new(jose.SignerOptions).WithType("JWT")}, []jose.Header{{Algorithm: "ES384", ExtraHeaders: map[jose.HeaderKey]interface{}{"typ": "JWT"}}}, false},
+		{"p384", args{p384, new(jose.SignerOptions).WithType("JWT")}, []jose.Header{{Algorithm: "ES384", ExtraHeaders: map[jose.HeaderKey]any{"typ": "JWT"}}}, false},
 		{"p521", args{p521, new(jose.SignerOptions).WithHeader("kid", "the-kid")}, []jose.Header{{Algorithm: "ES512", KeyID: "the-kid"}}, false},
 		{"ed25519", args{edKey, nil}, []jose.Header{{Algorithm: "EdDSA"}}, false},
 		{"rsa", args{rsaKey, nil}, []jose.Header{{Algorithm: "RS256"}}, false},

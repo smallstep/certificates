@@ -101,7 +101,7 @@ func (o *OIDCOptions) validateAndInitialize() (err error) {
 	if o.Provider.DiscoveryBaseURL == "" {
 		o.oidcProviderConfig, err = toOIDCProviderConfig(o.Provider)
 		if err != nil {
-			return fmt.Errorf("failed creationg OIDC provider config: %w", err)
+			return fmt.Errorf("failed creating OIDC provider config: %w", err)
 		}
 	}
 

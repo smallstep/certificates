@@ -190,7 +190,7 @@ func TestErrorf(t *testing.T) {
 			Status:  500,
 			Err:     errors.New("test error string"),
 			Msg:     InternalServerErrorDefaultMsg,
-			Details: map[string]interface{}{"foo": 1, "bar": "zar"},
+			Details: map[string]any{"foo": 1, "bar": "zar"},
 		}},
 		{"withDefaultMessage", 501, "test error string", []any{withDefaultMessage("some message")}, &Error{
 			Status: 501,

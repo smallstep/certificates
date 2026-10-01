@@ -120,7 +120,7 @@ func createEABJWS(jwk *jose.JSONWebKey, hmacKey []byte, keyID, u string) (*jose.
 			Key:       hmacKey,
 		},
 		&jose.SignerOptions{
-			ExtraHeaders: map[jose.HeaderKey]interface{}{
+			ExtraHeaders: map[jose.HeaderKey]any{
 				"kid": keyID,
 				"url": u,
 			},

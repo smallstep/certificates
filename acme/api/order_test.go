@@ -12,6 +12,7 @@ import (
 	"net/http/httptest"
 	"net/url"
 	"reflect"
+	"strings"
 	"testing"
 	"time"
 
@@ -2746,4 +2747,19 @@ func TestTrimIfWildcard(t *testing.T) {
 			assert.Equals(t, ok, tt.wantBool)
 		})
 	}
+}
+
+func TestNewOrderRequest_SkipSerialization(t *testing.T) {
+	order := NewOrderRequest{
+		Identifiers: []acme.Identifier{
+			{Type: "dns", Value: "example.com"},
+		},
+	}
+	assert.NoError(t, order.Validate())
+
+	data, err := json.Marshal(order)
+	assert.NoError(t, err)
+
+	assert.False(t, strings.Contains(string(data), "not_before"))
+	assert.False(t, strings.Contains(string(data), "not_after"))
 }

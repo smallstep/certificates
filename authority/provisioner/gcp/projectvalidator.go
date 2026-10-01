@@ -3,6 +3,7 @@ package gcp
 import (
 	"context"
 	"net/http"
+	"slices"
 
 	"google.golang.org/api/cloudresourcemanager/v1"
 
@@ -18,10 +19,8 @@ func (p *ProjectValidator) ValidateProject(_ context.Context, projectID string) 
 		return nil
 	}
 
-	for _, pi := range p.ProjectIDs {
-		if pi == projectID {
-			return nil
-		}
+	if slices.Contains(p.ProjectIDs, projectID) {
+		return nil
 	}
 
 	return errs.Unauthorized("gcp.authorizeToken; invalid gcp token - invalid project id")

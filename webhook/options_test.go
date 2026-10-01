@@ -13,6 +13,12 @@ import (
 	"golang.org/x/crypto/ssh"
 )
 
+type fakeProvisioner string
+
+func (f fakeProvisioner) GetName() string {
+	return string(f)
+}
+
 func TestNewRequestBody(t *testing.T) {
 	t1 := time.Now()
 	t2 := t1.Add(time.Hour)
@@ -43,6 +49,7 @@ func TestNewRequestBody(t *testing.T) {
 		},
 		"X509 Certificate Request": {
 			options: []RequestBodyOption{
+				WithProvisionerName(fakeProvisioner("test@example.com")),
 				WithX509CertificateRequest(&x509.CertificateRequest{
 					PublicKeyAlgorithm: x509.ECDSA,
 					Subject:            pkix.Name{CommonName: "foo"},
@@ -50,6 +57,7 @@ func TestNewRequestBody(t *testing.T) {
 				}),
 			},
 			want: &RequestBody{
+				ProvisionerName: "test@example.com",
 				X509CertificateRequest: &X509CertificateRequest{
 					CertificateRequest: &x509util.CertificateRequest{
 						PublicKeyAlgorithm: x509.ECDSA,
@@ -63,6 +71,7 @@ func TestNewRequestBody(t *testing.T) {
 		},
 		"X509 Certificate": {
 			options: []RequestBodyOption{
+				WithProvisionerName(nil),
 				WithX509Certificate(&x509util.Certificate{}, &x509.Certificate{
 					NotBefore:          t1,
 					NotAfter:           t2,

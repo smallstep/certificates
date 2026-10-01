@@ -55,8 +55,8 @@ func (et errorThrower) MarshalJSON() ([]byte, error) {
 func TestDB_save(t *testing.T) {
 	type test struct {
 		db  nosql.DB
-		nu  interface{}
-		old interface{}
+		nu  any
+		old any
 		err error
 	}
 	var tests = map[string]test{

@@ -211,8 +211,7 @@ func decodeMessage(message string, r *http.Request) ([]byte, error) {
 
 	// only interested in corrupt input errors below this. This type of error is the
 	// most likely to return, but better safe than sorry.
-	var cie base64.CorruptInputError
-	if !errors.As(err, &cie) {
+	if _, ok := errors.AsType[base64.CorruptInputError](err); !ok {
 		return nil, fmt.Errorf("failed base64 decoding message: %w", err)
 	}
 

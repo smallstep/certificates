@@ -13,6 +13,7 @@ import (
 	kmsapi "go.step.sm/crypto/kms/apiv1"
 	"golang.org/x/crypto/ssh"
 
+	"github.com/smallstep/certificates/authority/provisioner/androidkey"
 	"github.com/smallstep/certificates/errs"
 )
 
@@ -281,6 +282,10 @@ type Config struct {
 	// WrapTransport references the function that should wrap any [http.Transport] initialized
 	// down the Config's chain.
 	WrapTransport TransportWrapper
+	// AndroidKeyCRLChecker references an implementation of [androidkey.CRLChecker]
+	// that is responsible for checking revoked Android Key Attestation certificate
+	// serial numbers.
+	AndroidKeyCRLChecker androidkey.CRLChecker
 }
 
 type provisioner struct {
@@ -422,7 +427,7 @@ func (p *raProvisioner) RAInfo() *RAInfo {
 
 // MockProvisioner for testing
 type MockProvisioner struct {
-	Mret1, Mret2, Mret3 interface{}
+	Mret1, Mret2, Mret3 any
 	Merr                error
 	MgetID              func() string
 	MgetIDForToken      func() string

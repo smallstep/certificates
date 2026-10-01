@@ -45,10 +45,10 @@ type SSHSignRequest struct {
 	CertType         string             `json:"certType,omitempty"`
 	KeyID            string             `json:"keyID,omitempty"`
 	Principals       []string           `json:"principals,omitempty"`
-	ValidAfter       TimeDuration       `json:"validAfter,omitempty"`
-	ValidBefore      TimeDuration       `json:"validBefore,omitempty"`
+	ValidAfter       TimeDuration       `json:"validAfter"`
+	ValidBefore      TimeDuration       `json:"validBefore"`
 	AddUserPublicKey []byte             `json:"addUserPublicKey,omitempty"`
-	IdentityCSR      CertificateRequest `json:"identityCSR,omitempty"`
+	IdentityCSR      CertificateRequest `json:"identityCSR"`
 	TemplateData     json.RawMessage    `json:"templateData,omitempty"`
 }
 

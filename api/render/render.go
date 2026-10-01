@@ -13,7 +13,7 @@ import (
 )
 
 // JSON is shorthand for JSONStatus(w, v, http.StatusOK).
-func JSON(w http.ResponseWriter, r *http.Request, v interface{}) {
+func JSON(w http.ResponseWriter, r *http.Request, v any) {
 	JSONStatus(w, r, v, http.StatusOK)
 }
 
@@ -22,23 +22,20 @@ func JSON(w http.ResponseWriter, r *http.Request, v interface{}) {
 //
 // JSONStatus sets the Content-Type of w to application/json unless one is
 // specified.
-func JSONStatus(w http.ResponseWriter, r *http.Request, v interface{}, status int) {
+func JSONStatus(w http.ResponseWriter, r *http.Request, v any, status int) {
 	setContentTypeUnlessPresent(w, "application/json")
 	w.WriteHeader(status)
 
 	if err := json.NewEncoder(w).Encode(v); err != nil {
-		var errUnsupportedType *json.UnsupportedTypeError
-		if errors.As(err, &errUnsupportedType) {
+		if _, ok := errors.AsType[*json.UnsupportedTypeError](err); ok {
 			panic(err)
 		}
 
-		var errUnsupportedValue *json.UnsupportedValueError
-		if errors.As(err, &errUnsupportedValue) {
+		if _, ok := errors.AsType[*json.UnsupportedValueError](err); ok {
 			panic(err)
 		}
 
-		var errMarshalError *json.MarshalerError
-		if errors.As(err, &errMarshalError) {
+		if _, ok := errors.AsType[*json.MarshalerError](err); ok {
 			panic(err)
 		}
 	}
@@ -88,8 +85,7 @@ type RenderableError interface {
 func Error(rw http.ResponseWriter, r *http.Request, err error) {
 	log.Error(rw, r, err)
 
-	var re RenderableError
-	if errors.As(err, &re) {
+	if re, ok := errors.AsType[RenderableError](err); ok {
 		re.Render(rw, r)
 
 		return
@@ -117,8 +113,7 @@ func statusCodeFromError(err error) (code int) {
 	}
 
 	for err != nil {
-		var sc StatusCodedError
-		if errors.As(err, &sc) {
+		if sc, ok := errors.AsType[StatusCodedError](err); ok {
 			code = sc.StatusCode()
 
 			break

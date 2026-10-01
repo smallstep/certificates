@@ -131,14 +131,15 @@ func (m *Meter) X509WebhookEnriched(p provisioner.Interface, err error) {
 }
 
 func sshCertValues(cert *ssh.Certificate) []string {
-	switch cert.CertType {
-	case ssh.UserCert:
-		return []string{"user"}
-	case ssh.HostCert:
-		return []string{"host"}
-	default:
-		return []string{"unknown"}
+	if cert != nil {
+		switch cert.CertType {
+		case ssh.UserCert:
+			return []string{"user"}
+		case ssh.HostCert:
+			return []string{"host"}
+		}
 	}
+	return []string{"unknown"}
 }
 
 func incrProvisionerCounter(cv *prometheus.CounterVec, p provisioner.Interface, err error, extraValues ...string) {

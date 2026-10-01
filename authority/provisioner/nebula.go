@@ -2,16 +2,15 @@ package provisioner
 
 import (
 	"context"
-	"crypto/ecdh"
 	"crypto/ecdsa"
 	"crypto/ed25519"
 	"crypto/elliptic"
 	"crypto/x509"
 	"encoding/base64"
 	"encoding/pem"
-	"math/big"
 	"net"
 	"net/netip"
+	"slices"
 	"time"
 
 	"github.com/pkg/errors"
@@ -343,15 +342,9 @@ func (p *Nebula) authorizeToken(token string, audiences []string) (nebula.Certif
 	switch {
 	case c.Curve() == nebula.Curve_P256:
 		// When Nebula is used with ECDSA P-256 keys, both CAs and clients use the same type.
-		ecdhPub, err := ecdh.P256().NewPublicKey(c.PublicKey())
+		pub, err = ecdsa.ParseUncompressedPublicKey(elliptic.P256(), c.PublicKey())
 		if err != nil {
 			return nil, nil, errs.UnauthorizedErr(err, errs.WithMessage("failed to parse nebula public key"))
-		}
-		publicKeyBytes := ecdhPub.Bytes()
-		pub = &ecdsa.PublicKey{ // convert back to *ecdsa.PublicKey, because our jose package nor go-jose supports *ecdh.PublicKey
-			Curve: elliptic.P256(),
-			X:     big.NewInt(0).SetBytes(publicKeyBytes[1:33]),
-			Y:     big.NewInt(0).SetBytes(publicKeyBytes[33:]),
 		}
 	case c.IsCA():
 		pub = ed25519.PublicKey(c.PublicKey())
@@ -413,11 +406,8 @@ func (v nebulaSANsValidator) Valid(req *x509.CertificateRequest) error {
 		for _, ip := range req.IPAddresses {
 			var valid bool
 			// Check ip in name
-			for _, ipInName := range ips {
-				if ip.Equal(ipInName) {
-					valid = true
-					break
-				}
+			if slices.ContainsFunc(ips, ip.Equal) {
+				valid = true
 			}
 			// Check ip network
 			if !valid {

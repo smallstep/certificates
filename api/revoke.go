@@ -117,7 +117,7 @@ func Revoke(w http.ResponseWriter, r *http.Request) {
 
 func logRevoke(w http.ResponseWriter, ri *authority.RevokeOptions) {
 	if rl, ok := w.(logging.ResponseLogger); ok {
-		rl.WithFields(map[string]interface{}{
+		rl.WithFields(map[string]any{
 			"serial":      ri.Serial,
 			"reasonCode":  ri.ReasonCode,
 			"reason":      ri.Reason,
