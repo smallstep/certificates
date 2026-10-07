@@ -329,6 +329,7 @@ func Test_deviceAttest01ValidateWithTPMSimulator(t *testing.T) {
 							assert.NoError(t, err)
 							assert.Equal(t, "azID", az.ID)
 							assert.Equal(t, fingerprint, az.Fingerprint)
+							assert.Equal(t, "tpm", az.AttestationFormat)
 							return nil
 						},
 						MockUpdateChallenge: func(ctx context.Context, updch *Challenge) error {
@@ -372,6 +373,7 @@ func Test_deviceAttest01ValidateWithTPMSimulator(t *testing.T) {
 							assert.NoError(t, err)
 							assert.Equal(t, "azID", az.ID)
 							assert.Equal(t, fingerprint, az.Fingerprint)
+							assert.Equal(t, "tpm", az.AttestationFormat)
 							return nil
 						},
 						MockUpdateChallenge: func(ctx context.Context, updch *Challenge) error {
