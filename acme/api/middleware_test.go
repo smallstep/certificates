@@ -360,6 +360,35 @@ func TestHandler_parseJWS(t *testing.T) {
 				err:        acme.NewError(acme.ErrorMalformedType, "failed to parse JWS from request body: go-jose/go-jose: compact JWS format must have three parts"),
 			}
 		},
+		"fail/general-jws-serialization": func(t *testing.T) test {
+			jwk, err := jose.GenerateJWK("EC", "P-256", "ES256", "sig", "", 0)
+			assert.FatalError(t, err)
+			signer, err := jose.NewSigner(jose.SigningKey{
+				Algorithm: jose.SignatureAlgorithm(jwk.Algorithm),
+				Key:       jwk.Key,
+			}, new(jose.SignerOptions))
+			assert.FatalError(t, err)
+			signed, err := signer.Sign([]byte("baz"))
+			assert.FatalError(t, err)
+			var parts map[string]string
+			assert.FatalError(t, json.Unmarshal([]byte(signed.FullSerialize()), &parts))
+			general, err := json.Marshal(map[string]any{
+				"payload": parts["payload"],
+				"signatures": []any{
+					map[string]string{
+						"protected": parts["protected"],
+						"signature": parts["signature"],
+					},
+				},
+			})
+			assert.FatalError(t, err)
+
+			return test{
+				body:       strings.NewReader(string(general)),
+				statusCode: 400,
+				err:        acme.NewError(acme.ErrorMalformedType, "general JWS serialization is not supported: JWS MUST be in flattened JSON serialization"),
+			}
+		},
 		"ok": func(t *testing.T) test {
 			jwk, err := jose.GenerateJWK("EC", "P-256", "ES256", "sig", "", 0)
 			assert.FatalError(t, err)
