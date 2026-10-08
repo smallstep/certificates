@@ -32,6 +32,12 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
 - Support for ML-DSA (FIPS 204) keys, available when built with Go 1.27 or
   newer. JOSE-based flows (JWK, JWS and JWT tokens) do not support ML-DSA yet.
 
+### Changed
+
+- `--resolver` now accepts an address without a port and uses port 53. Before,
+  an address without a port caused all DNS queries to fail with
+  `missing port in address`.
+
 ### Deprecated
 
 - Go 1.25 support. Go 1.26 or newer is now required.

@@ -58,7 +58,7 @@ certificate issuer private key used in the RA mode.`,
 		},
 		cli.StringFlag{
 			Name:  "resolver",
-			Usage: "address of a DNS resolver to be used instead of the default.",
+			Usage: "address of a DNS resolver to be used instead of the default. The port defaults to 53.",
 		},
 		cli.StringFlag{
 			Name:   "token",
@@ -101,6 +101,16 @@ Requires **--insecure** flag.`,
 }
 
 var pidfile string
+
+// resolverAddress returns the given DNS resolver address with the default DNS
+// port (53) added when no port is present. Bare and bracketed IPv6 addresses
+// are supported.
+func resolverAddress(addr string) string {
+	if _, _, err := net.SplitHostPort(addr); err == nil {
+		return addr
+	}
+	return net.JoinHostPort(strings.Trim(addr, "[]"), "53")
+}
 
 // AppAction is the action used when the top command runs.
 func appAction(ctx *cli.Context) error {
@@ -247,6 +257,7 @@ To get a linked authority token:
 
 	// replace resolver if requested
 	if resolver != "" {
+		resolver = resolverAddress(resolver)
 		net.DefaultResolver.PreferGo = true
 		net.DefaultResolver.Dial = func(_ context.Context, network, _ string) (net.Conn, error) {
 			return net.Dial(network, resolver)
