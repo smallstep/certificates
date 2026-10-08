@@ -58,7 +58,7 @@ certificate issuer private key used in the RA mode.`,
 		},
 		cli.StringFlag{
 			Name:  "resolver",
-			Usage: "address of a DNS resolver to be used instead of the default. The port defaults to 53.",
+			Usage: "address of a DNS resolver to be used instead of the default.",
 		},
 		cli.StringFlag{
 			Name:   "token",
