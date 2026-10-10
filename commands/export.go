@@ -29,6 +29,9 @@ func init() {
 Note that neither the PKI password nor the certificate issuer password will be
 included in the export file.
 
+For linked CAs, use the **--token** flag to authenticate with the linked CA
+service and export provisioners and admins stored in the cloud.
+
 ## POSITIONAL ARGUMENTS
 
 <config>
@@ -39,6 +42,11 @@ included in the export file.
 Export the current configuration:
 '''
 $ step-ca export $(step path)/config/ca.json
+'''
+
+Export the configuration of a linked CA:
+'''
+$ step-ca export $(step path)/config/ca.json --token $STEP_CA_TOKEN
 '''`,
 		Flags: []cli.Flag{
 			cli.StringFlag{
@@ -50,6 +58,11 @@ intermediate private key.`,
 				Name: "issuer-password-file",
 				Usage: `path to the <file> containing the password to decrypt the
 certificate issuer private key used in the RA mode.`,
+			},
+			cli.StringFlag{
+				Name:   "token",
+				Usage:  "token used to enable the linked CA.",
+				EnvVar: "STEP_CA_TOKEN",
 			},
 		},
 	})
@@ -63,6 +76,7 @@ func exportAction(ctx *cli.Context) error {
 	configFile := ctx.Args().Get(0)
 	passwordFile := ctx.String("password-file")
 	issuerPasswordFile := ctx.String("issuer-password-file")
+	token := ctx.String("token")
 
 	cfg, err := config.LoadConfiguration(configFile)
 	if err != nil {
@@ -89,7 +103,7 @@ func exportAction(ctx *cli.Context) error {
 		}
 	}
 
-	auth, err := authority.New(cfg)
+	auth, err := authority.New(cfg, authority.WithLinkedCAToken(token))
 	if err != nil {
 		return err
 	}
