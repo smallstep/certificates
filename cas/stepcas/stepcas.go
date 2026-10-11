@@ -94,15 +94,7 @@ func (s *StepCAS) CreateCertificate(req *apiv1.CreateCertificateRequest) (*apiv1
 		info.ProvisionerName = p.Name
 	}
 
-	cert, chain, err := s.createCertificate(req.CSR, req.Template, req.Lifetime, info)
-	if err != nil {
-		return nil, err
-	}
-
-	return &apiv1.CreateCertificateResponse{
-		Certificate:      cert,
-		CertificateChain: chain,
-	}, nil
+	return s.createCertificate(req.CSR, req.Template, req.Lifetime, info)
 }
 
 // RenewCertificate will always return a non-implemented error as mTLS renewals
@@ -126,6 +118,7 @@ func (s *StepCAS) RenewCertificate(req *apiv1.RenewCertificateRequest) (*apiv1.R
 	return &apiv1.RenewCertificateResponse{
 		Certificate:      cert,
 		CertificateChain: chain,
+		Warnings:         resp.Warnings,
 	}, nil
 }
 
@@ -174,7 +167,7 @@ func (s *StepCAS) GetCertificateAuthority(*apiv1.GetCertificateAuthorityRequest)
 	}, nil
 }
 
-func (s *StepCAS) createCertificate(cr *x509.CertificateRequest, template *x509.Certificate, lifetime time.Duration, raInfo *raInfo) (*x509.Certificate, []*x509.Certificate, error) {
+func (s *StepCAS) createCertificate(cr *x509.CertificateRequest, template *x509.Certificate, lifetime time.Duration, raInfo *raInfo) (*apiv1.CreateCertificateResponse, error) {
 	sans := make([]string, 0, len(template.DNSNames)+len(template.EmailAddresses)+len(template.IPAddresses)+len(template.URIs))
 	sans = append(sans, template.DNSNames...)
 	sans = append(sans, template.EmailAddresses...)
@@ -192,7 +185,7 @@ func (s *StepCAS) createCertificate(cr *x509.CertificateRequest, template *x509.
 
 	token, err := s.iss.SignToken(commonName, sans, raInfo)
 	if err != nil {
-		return nil, nil, err
+		return nil, err
 	}
 
 	resp, err := s.client.Sign(&api.SignRequest{
@@ -201,7 +194,7 @@ func (s *StepCAS) createCertificate(cr *x509.CertificateRequest, template *x509.
 		NotAfter: s.lifetime(lifetime),
 	})
 	if err != nil {
-		return nil, nil, err
+		return nil, err
 	}
 
 	var chain []*x509.Certificate
@@ -210,7 +203,11 @@ func (s *StepCAS) createCertificate(cr *x509.CertificateRequest, template *x509.
 		chain = append(chain, c.Certificate)
 	}
 
-	return cert, chain, nil
+	return &apiv1.CreateCertificateResponse{
+		Certificate:      cert,
+		CertificateChain: chain,
+		Warnings:         resp.Warnings,
+	}, nil
 }
 
 func (s *StepCAS) lifetime(d time.Duration) api.TimeDuration {
