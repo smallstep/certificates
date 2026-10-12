@@ -327,6 +327,11 @@ func (p *GCP) AuthorizeRenew(ctx context.Context, cert *x509.Certificate) error 
 	return p.ctl.AuthorizeRenew(ctx, cert)
 }
 
+// NotifyX509Issued sends an issued certificate to the notifying webhooks.
+func (p *GCP) NotifyX509Issued(ctx context.Context, csr *x509.CertificateRequest, cert *x509.Certificate) error {
+	return p.ctl.NotifyX509Issued(ctx, csr, cert)
+}
+
 // assertConfig initializes the config if it has not been initialized.
 func (p *GCP) assertConfig() {
 	if p.config == nil {
