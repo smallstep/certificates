@@ -566,6 +566,68 @@ type RevokeOptions struct {
 	OTT         string
 }
 
+// AdministrativeRevokeOptions contains options for RevokeAdministratively.
+type AdministrativeRevokeOptions struct {
+	Certificate *x509.Certificate
+	Reason      string
+	ReasonCode  int
+	PassiveOnly bool
+}
+
+// RevokeAdministratively revokes an X.509 certificate without performing
+// provisioner authorization. Callers must authorize the operation before
+// invoking this method. Revocation is propagated to the configured CAS and
+// persistence layers, and a CRL is generated when configured.
+func (a *Authority) RevokeAdministratively(_ context.Context, revokeOpts *AdministrativeRevokeOptions) error {
+	if revokeOpts == nil || revokeOpts.Certificate == nil {
+		return errs.BadRequest("authority.RevokeAdministratively; certificate is required")
+	}
+
+	crt := revokeOpts.Certificate
+	if crt.SerialNumber == nil {
+		return errs.BadRequest("authority.RevokeAdministratively; certificate serial number is required")
+	}
+	serial := crt.SerialNumber.String()
+	opts := []interface{}{
+		errs.WithKeyVal("serialNumber", serial),
+		errs.WithKeyVal("reasonCode", revokeOpts.ReasonCode),
+		errs.WithKeyVal("reason", revokeOpts.Reason),
+		errs.WithKeyVal("passiveOnly", revokeOpts.PassiveOnly),
+	}
+	rci := &db.RevokedCertificateInfo{
+		Serial:     serial,
+		ReasonCode: revokeOpts.ReasonCode,
+		Reason:     revokeOpts.Reason,
+		RevokedAt:  time.Now().UTC(),
+		ExpiresAt:  crt.NotAfter,
+	}
+	var provisionerID string
+	if certificateDataDB, ok := a.db.(interface {
+		GetCertificateData(string) (*db.CertificateData, error)
+	}); ok {
+		if data, err := certificateDataDB.GetCertificateData(serial); err == nil && data != nil && data.Provisioner != nil {
+			provisionerID = data.Provisioner.ID
+		}
+	}
+	if provisionerID == "" {
+		if p, err := a.LoadProvisionerByCertificate(crt); err == nil {
+			provisionerID = p.GetID()
+		}
+	}
+	if provisionerID != "" {
+		rci.ProvisionerID = provisionerID
+		opts = append(opts, errs.WithKeyVal("provisionerID", rci.ProvisionerID))
+	}
+
+	return a.revokeX509(&RevokeOptions{
+		Serial:      serial,
+		Reason:      revokeOpts.Reason,
+		ReasonCode:  revokeOpts.ReasonCode,
+		PassiveOnly: revokeOpts.PassiveOnly,
+		Crt:         crt,
+	}, rci, "authority.RevokeAdministratively", opts...)
+}
+
 // Revoke revokes a certificate.
 //
 // NOTE: Only supports passive revocation - prevent existing certificates from
@@ -652,64 +714,68 @@ func (a *Authority) Revoke(ctx context.Context, revokeOpts *RevokeOptions) error
 		opts = append(opts, errs.WithKeyVal("provisionerID", rci.ProvisionerID))
 	}
 
-	failRevoke := func(err error) error {
-		switch {
-		case errors.Is(err, db.ErrNotImplemented):
-			return errs.NotImplemented("authority.Revoke; no persistence layer configured", opts...)
-		case errors.Is(err, db.ErrAlreadyExists):
-			return errs.ApplyOptions(
-				errs.BadRequest("certificate with serial number '%s' is already revoked", rci.Serial),
-				opts...,
-			)
-		default:
-			return errs.Wrap(http.StatusInternalServerError, err, "authority.Revoke", opts...)
-		}
-	}
-
 	if provisioner.MethodFromContext(ctx) == provisioner.SSHRevokeMethod {
 		if err := a.revokeSSH(nil, rci); err != nil {
-			return failRevoke(err)
+			return revokeError(err, rci.Serial, "authority.Revoke", opts...)
 		}
 	} else {
-		// Revoke an X.509 certificate using CAS. If the certificate is not
-		// provided we will try to read it from the db. If the read fails we
-		// won't throw an error as it will be responsibility of the CAS
-		// implementation to require a certificate.
-		var revokedCert *x509.Certificate
-		if revokeOpts.Crt != nil {
-			revokedCert = revokeOpts.Crt
-		} else if rci.Serial != "" {
-			revokedCert, _ = a.db.GetCertificate(rci.Serial)
-		}
+		return a.revokeX509(revokeOpts, rci, "authority.Revoke", opts...)
+	}
 
-		// CAS operation, note that SoftCAS (default) is a noop.
-		// The revoke happens when this is stored in the db.
-		_, err := a.x509CAService.RevokeCertificate(&casapi.RevokeCertificateRequest{
-			Certificate:  revokedCert,
-			SerialNumber: rci.Serial,
-			Reason:       rci.Reason,
-			ReasonCode:   rci.ReasonCode,
-			PassiveOnly:  revokeOpts.PassiveOnly,
-		})
-		if err != nil {
-			return errs.Wrap(http.StatusInternalServerError, err, "authority.Revoke", opts...)
-		}
+	return nil
+}
 
-		// Save as revoked in the Db.
-		if err := a.revoke(revokedCert, rci); err != nil {
-			return failRevoke(err)
-		}
+func (a *Authority) revokeX509(revokeOpts *RevokeOptions, rci *db.RevokedCertificateInfo, operation string, opts ...interface{}) error {
+	// Revoke an X.509 certificate using CAS. If the certificate is not provided,
+	// try to read it from the database. If the lookup fails, the CAS decides
+	// whether a certificate is required.
+	var revokedCert *x509.Certificate
+	if revokeOpts.Crt != nil {
+		revokedCert = revokeOpts.Crt
+	} else if rci.Serial != "" {
+		revokedCert, _ = a.db.GetCertificate(rci.Serial)
+	}
 
-		// Generate a new CRL so CRL requesters will always get an up-to-date
-		// CRL whenever they request it.
-		if a.config.CRL.IsEnabled() && a.config.CRL.GenerateOnRevoke {
-			if err := a.GenerateCertificateRevocationList(); err != nil {
-				return errs.Wrap(http.StatusInternalServerError, err, "authority.Revoke", opts...)
-			}
+	// SoftCAS is a no-op; persistence below records the revocation.
+	_, err := a.x509CAService.RevokeCertificate(&casapi.RevokeCertificateRequest{
+		Certificate:  revokedCert,
+		SerialNumber: rci.Serial,
+		Reason:       rci.Reason,
+		ReasonCode:   rci.ReasonCode,
+		PassiveOnly:  revokeOpts.PassiveOnly,
+	})
+	if err != nil {
+		return errs.Wrap(http.StatusInternalServerError, err, operation, opts...)
+	}
+
+	// Persist the revocation.
+	if err := a.revoke(revokedCert, rci); err != nil {
+		return revokeError(err, rci.Serial, operation, opts...)
+	}
+
+	// Generate a new CRL so CRL requesters will always get an up-to-date
+	// CRL whenever they request it.
+	if a.config.CRL.IsEnabled() && a.config.CRL.GenerateOnRevoke {
+		if err := a.GenerateCertificateRevocationList(); err != nil {
+			return errs.Wrap(http.StatusInternalServerError, err, operation, opts...)
 		}
 	}
 
 	return nil
+}
+
+func revokeError(err error, serial, operation string, opts ...interface{}) error {
+	switch {
+	case errors.Is(err, db.ErrNotImplemented):
+		return errs.NotImplemented(operation+"; no persistence layer configured", opts...)
+	case errors.Is(err, db.ErrAlreadyExists):
+		return errs.ApplyOptions(
+			errs.BadRequest("certificate with serial number '%s' is already revoked", serial),
+			opts...,
+		)
+	default:
+		return errs.Wrap(http.StatusInternalServerError, err, operation, opts...)
+	}
 }
 
 func (a *Authority) revoke(crt *x509.Certificate, rci *db.RevokedCertificateInfo) error {
