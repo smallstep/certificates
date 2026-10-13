@@ -59,6 +59,8 @@ type CreateCertificateRequest struct {
 	RequestID      string
 	Provisioner    *ProvisionerInfo
 	IsCAServerCert bool
+	ClientIdentifier  string // any identifier token (can be any arbitrary token/blob interpretable by the CA)
+	ExtraIdentifiers []string // any additional identifier ( interpretable by the CA such as serial, UDID of device)
 }
 
 // ProvisionerInfo contains information of the provisioner used to authorize a
