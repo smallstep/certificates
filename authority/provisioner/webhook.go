@@ -120,6 +120,38 @@ func (wc *WebhookController) Authorize(ctx context.Context, req *webhook.Request
 	return nil
 }
 
+// Notify sends the request body to all notifying webhooks. A notification
+// cannot deny the request, so the allow field of the response is ignored.
+func (wc *WebhookController) Notify(ctx context.Context, req *webhook.RequestBody) error {
+	if wc == nil {
+		return nil
+	}
+
+	// Apply extra options in the webhook controller
+	for _, fn := range wc.options {
+		if err := fn(req); err != nil {
+			return err
+		}
+	}
+
+	for _, wh := range wc.webhooks {
+		if wh.Kind != linkedca.Webhook_NOTIFYING.String() {
+			continue
+		}
+		if !wc.isCertTypeOK(wh) {
+			continue
+		}
+
+		whCtx, cancel := context.WithTimeout(ctx, time.Second*10)
+		defer cancel() //nolint:gocritic // every request canceled with its own timeout
+
+		if _, err := wh.DoWithContext(whCtx, wc.client, wc.wrapTransport, req, wc.TemplateData); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
 func (wc *WebhookController) isCertTypeOK(wh *Webhook) bool {
 	if wc.certType == linkedca.Webhook_ALL {
 		return true

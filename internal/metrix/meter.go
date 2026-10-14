@@ -53,6 +53,7 @@ func New() (m *Meter) {
 		m.x509.signed,
 		m.x509.webhookAuthorized,
 		m.x509.webhookEnriched,
+		m.x509.webhookNotified,
 		m.kms.signed,
 		m.kms.errors,
 	)
@@ -130,6 +131,11 @@ func (m *Meter) X509WebhookEnriched(p provisioner.Interface, err error) {
 	incrProvisionerCounter(m.x509.webhookEnriched, p, err)
 }
 
+// X509WebhookNotified implements [authority.Meter] for [Meter].
+func (m *Meter) X509WebhookNotified(p provisioner.Interface, err error) {
+	incrProvisionerCounter(m.x509.webhookNotified, p, err)
+}
+
 func sshCertValues(cert *ssh.Certificate) []string {
 	if cert != nil {
 		switch cert.CertType {
@@ -171,6 +177,7 @@ type provisionerInstruments struct {
 
 	webhookAuthorized *prometheus.CounterVec
 	webhookEnriched   *prometheus.CounterVec
+	webhookNotified   *prometheus.CounterVec
 }
 
 func newProvisionerInstruments(subsystem string, signLabels, webhookLabels []string) *provisionerInstruments {
@@ -180,6 +187,7 @@ func newProvisionerInstruments(subsystem string, signLabels, webhookLabels []str
 		signed:            newCounterVec(subsystem, "signed_total", "Number of certificates signed", signLabels...),
 		webhookAuthorized: newCounterVec(subsystem, "webhook_authorized_total", "Number of authorizing webhooks called", webhookLabels...),
 		webhookEnriched:   newCounterVec(subsystem, "webhook_enriched_total", "Number of enriching webhooks called", webhookLabels...),
+		webhookNotified:   newCounterVec(subsystem, "webhook_notified_total", "Number of notifying webhooks called", webhookLabels...),
 	}
 }
 
