@@ -73,6 +73,7 @@ type ProvisionerInfo struct {
 type CreateCertificateResponse struct {
 	Certificate      *x509.Certificate
 	CertificateChain []*x509.Certificate
+	Warnings         []CertificateWarning
 }
 
 // RenewCertificateRequest is the request used to re-sign a certificate.
@@ -89,6 +90,7 @@ type RenewCertificateRequest struct {
 type RenewCertificateResponse struct {
 	Certificate      *x509.Certificate
 	CertificateChain []*x509.Certificate
+	Warnings         []CertificateWarning
 }
 
 // RevokeCertificateRequest is the request used to revoke a certificate.
@@ -155,6 +157,7 @@ type CreateCertificateAuthorityResponse struct {
 	PublicKey        crypto.PublicKey
 	PrivateKey       crypto.PrivateKey
 	Signer           crypto.Signer
+	Warnings         []CertificateWarning
 }
 
 // CreateCRLRequest is the request to create a Certificate Revocation List.

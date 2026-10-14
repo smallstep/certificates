@@ -2,6 +2,7 @@ package pki
 
 import (
 	"context"
+	"encoding/json"
 	"path/filepath"
 	"testing"
 
@@ -312,4 +313,47 @@ func TestPKI_GenerateConfig(t *testing.T) {
 			}
 		})
 	}
+
+	t.Run("issuer validity policy", func(t *testing.T) {
+		for _, tc := range []struct {
+			name   string
+			policy apiv1.IssuerValidityLimit
+		}{
+			{name: "reject", policy: apiv1.IssuerValidityLimitReject},
+			{name: "omitted"},
+		} {
+			t.Run(tc.name, func(t *testing.T) {
+				pki, err := New(apiv1.Options{
+					Type:                apiv1.SoftCAS,
+					IsCreator:           true,
+					IssuerValidityLimit: tc.policy,
+				})
+				require.NoError(t, err)
+				setKeyPair(t, pki)
+
+				cfg, err := pki.GenerateConfig()
+				require.NoError(t, err)
+
+				serialized, err := json.Marshal(cfg)
+				require.NoError(t, err)
+
+				var document struct {
+					Authority map[string]json.RawMessage `json:"authority"`
+				}
+				require.NoError(t, json.Unmarshal(serialized, &document))
+
+				var reloaded authconfig.Config
+				require.NoError(t, json.Unmarshal(serialized, &reloaded))
+				if tc.policy == "" {
+					assert.NotContains(t, document.Authority, "issuerValidityLimit")
+					return
+				}
+
+				require.Contains(t, document.Authority, "issuerValidityLimit")
+				assert.JSONEq(t, `"reject"`, string(document.Authority["issuerValidityLimit"]))
+				require.NotNil(t, reloaded.AuthorityConfig.Options)
+				assert.Equal(t, tc.policy, reloaded.AuthorityConfig.IssuerValidityLimit)
+			})
+		}
+	})
 }

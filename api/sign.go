@@ -9,6 +9,7 @@ import (
 	"github.com/smallstep/certificates/api/render"
 	"github.com/smallstep/certificates/authority/config"
 	"github.com/smallstep/certificates/authority/provisioner"
+	"github.com/smallstep/certificates/cas/apiv1"
 	"github.com/smallstep/certificates/errs"
 )
 
@@ -39,11 +40,12 @@ func (s *SignRequest) Validate() error {
 
 // SignResponse is the response object of the certificate signature request.
 type SignResponse struct {
-	ServerPEM    Certificate          `json:"crt"`
-	CaPEM        Certificate          `json:"ca"`
-	CertChainPEM []Certificate        `json:"certChain"`
-	TLSOptions   *config.TLSOptions   `json:"tlsOptions,omitempty"`
-	TLS          *tls.ConnectionState `json:"-"`
+	ServerPEM    Certificate                `json:"crt"`
+	CaPEM        Certificate                `json:"ca"`
+	CertChainPEM []Certificate              `json:"certChain"`
+	TLSOptions   *config.TLSOptions         `json:"tlsOptions,omitempty"`
+	TLS          *tls.ConnectionState       `json:"-"`
+	Warnings     []apiv1.CertificateWarning `json:"warnings,omitempty"`
 }
 
 // Sign is an HTTP handler that reads a certificate request and an
@@ -68,7 +70,7 @@ func Sign(w http.ResponseWriter, r *http.Request) {
 		TemplateData: body.TemplateData,
 	}
 
-	ctx := r.Context()
+	ctx, warnings := collectCertificateWarnings(r.Context())
 	a := mustAuthority(ctx)
 
 	ctx = provisioner.NewContextWithMethod(ctx, provisioner.SignMethod)
@@ -95,5 +97,6 @@ func Sign(w http.ResponseWriter, r *http.Request) {
 		CaPEM:        caPEM,
 		CertChainPEM: certChainPEM,
 		TLSOptions:   a.GetTLSOptions(),
+		Warnings:     *warnings,
 	}, http.StatusCreated)
 }

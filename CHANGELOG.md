@@ -31,6 +31,17 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
 
 - Support for ML-DSA (FIPS 204) keys, available when built with Go 1.27 or
   newer. JOSE-based flows (JWK, JWS and JWT tokens) do not support ML-DSA yet.
+- Add configurable `authority.issuerValidityLimit` truncation/rejection for
+  local X.509 issuance ([smallstep/certificates#381](https://github.com/smallstep/certificates/issues/381))
+- Return structured native issuance warnings and log successful truncation at
+  warning level, including SSH X.509 identities and StepCAS delegation
+  ([smallstep/certificates#381](https://github.com/smallstep/certificates/issues/381))
+
+### Changed
+
+- Bound local X.509 expiry by the selected issuing CA path and matching root by
+  default, including renewal/rekey and subordinate CA creation
+  ([smallstep/certificates#381](https://github.com/smallstep/certificates/issues/381))
 
 ### Changed
 
@@ -41,6 +52,14 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
 ### Deprecated
 
 - Go 1.25 support. Go 1.26 or newer is now required.
+
+### Fixed
+
+- Present issuer-validity policy rejections as ACME `badCSR` and SCEP failure
+  CertRep responses with safe diagnostics, rather than generic internal errors
+  ([smallstep/certificates#381](https://github.com/smallstep/certificates/issues/381))
+- Preserve explicit issuer-validity policies in generated SoftCAS configurations
+  ([smallstep/certificates#560](https://github.com/smallstep/certificates/issues/560)).
 
 ## [0.30.2] - 2026-03-22
 
