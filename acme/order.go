@@ -161,6 +161,26 @@ func (o *Order) getAuthorizationFingerprint(ctx context.Context, db DB) (string,
 	return "", nil
 }
 
+// checkPersistentAuthorizations returns an error if an authorization validated
+// with a dns-persist-01 challenge has expired. These authorizations can expire
+// before the order does, because their expiration is limited by the
+// persistUntil parameter of the validation record.
+func (o *Order) checkPersistentAuthorizations(ctx context.Context, db DB) error {
+	now := clock.Now()
+	for _, azID := range o.AuthorizationIDs {
+		az, err := db.GetAuthorization(ctx, azID)
+		if err != nil {
+			return WrapErrorISE(err, "error getting authorization %q", azID)
+		}
+		for _, ch := range az.Challenges {
+			if ch.Type == DNSPERSIST01 && ch.Status == StatusValid && now.After(az.ExpiresAt) {
+				return NewError(ErrorUnauthorizedType, "order %s authorization %s has expired", o.ID, az.ID)
+			}
+		}
+	}
+	return nil
+}
+
 // Finalize signs a certificate if the necessary conditions for Order completion
 // have been met.
 //
@@ -184,6 +204,11 @@ func (o *Order) Finalize(ctx context.Context, db DB, csr *x509.CertificateReques
 		break
 	default:
 		return NewErrorISE("unexpected status %s for order %s", o.Status, o.ID)
+	}
+
+	// Do not issue certificates using expired dns-persist-01 validations.
+	if err := o.checkPersistentAuthorizations(ctx, db); err != nil {
+		return err
 	}
 
 	// Get key fingerprint if any. And then compare it with the CSR fingerprint.

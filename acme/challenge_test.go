@@ -788,6 +788,57 @@ MCowBQYDK2VwAyEA5c+4NKZSNQcR1T8qN6SjwgdPZQ0Ge12Ylx/YeGAJ35k=
 				},
 			}
 		},
+		"ok/dns-persist-01": func(t *testing.T) test {
+			ch := &Challenge{
+				ID:                "chID",
+				AccountID:         "accID",
+				AuthorizationID:   "azID",
+				Type:              "dns-persist-01",
+				Status:            StatusPending,
+				Value:             "zap.internal",
+				IssuerDomainNames: []string{"ca.example.com"},
+			}
+
+			return test{
+				ch:  ch,
+				jwk: dnsPersist01TestJWK(t),
+				ctx: NewProvisionerContext(context.Background(), &MockProvisioner{
+					MgetAccountHashPrefix: func() string { return "https://ca.example.com/account-hash/" },
+				}),
+				vc: &mockClient{
+					lookupTxt: func(name string) ([]string, error) {
+						assert.Equal(t, "_validation-persist.zap.internal", name)
+						return nil, errors.New("force")
+					},
+				},
+				db: &MockDB{
+					MockGetAuthorization: func(ctx context.Context, id string) (*Authorization, error) {
+						assert.Equal(t, "azID", id)
+						return &Authorization{ID: id, Status: StatusPending}, nil
+					},
+					MockGetAccount: func(ctx context.Context, id string) (*Account, error) {
+						assert.Equal(t, "accID", id)
+						return &Account{ID: id, Status: StatusValid, LocationPrefix: "https://ca.example.com/acme/acme/account/"}, nil
+					},
+					MockUpdateChallenge: func(ctx context.Context, updch *Challenge) error {
+						assert.Equal(t, "chID", updch.ID)
+						assert.Equal(t, ChallengeType("dns-persist-01"), updch.Type)
+						assert.Equal(t, "zap.internal", updch.Value)
+						assert.Equal(t, StatusPending, updch.Status)
+
+						err := NewError(ErrorDNSType, "error looking up TXT records for domain %s: force", ch.Value)
+
+						assert.EqualError(t, updch.Error.Err, err.Err.Error())
+						assert.Equal(t, err.Type, updch.Error.Type)
+						assert.Equal(t, err.Detail, updch.Error.Detail)
+						assert.Equal(t, err.Status, updch.Error.Status)
+						assert.Equal(t, err.Subproblems, updch.Error.Subproblems)
+
+						return nil
+					},
+				},
+			}
+		},
 		"fail/tls-alpn-01": func(t *testing.T) test {
 			ch := &Challenge{
 				ID:     "chID",
@@ -5449,6 +5500,441 @@ func Test_dns01ChallengeHost(t *testing.T) {
 			})
 			StrictFQDN = tt.strictFQDN
 			assert.Equal(t, tt.want, dns01ChallengeHost(tt.args.domain))
+		})
+	}
+}
+
+func Test_dnsPersist01ChallengeHost(t *testing.T) {
+	tests := []struct {
+		name       string
+		strictFQDN bool
+		domain     string
+		want       string
+	}{
+		{"dns", false, "smallstep.com", "_validation-persist.smallstep.com"},
+		{"dns strict", true, "smallstep.com", "_validation-persist.smallstep.com."},
+		{"rooted dns", false, "smallstep.com.", "_validation-persist.smallstep.com."},
+		{"rooted dns strict", true, "smallstep.com.", "_validation-persist.smallstep.com."},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			tmp := StrictFQDN
+			t.Cleanup(func() {
+				StrictFQDN = tmp
+			})
+			StrictFQDN = tt.strictFQDN
+			assert.Equal(t, tt.want, dnsPersist01ChallengeHost(tt.domain))
+		})
+	}
+}
+
+// dnsPersist01TestJWK returns the example key from RFC 7638, section 3.1. It
+// is the key used in the examples of draft-ietf-acme-dns-persist-02.
+func dnsPersist01TestJWK(t *testing.T) *jose.JSONWebKey {
+	t.Helper()
+	jwk := new(jose.JSONWebKey)
+	require.NoError(t, json.Unmarshal([]byte(`{
+		"kty": "RSA",
+		"n": "0vx7agoebGcQSuuPiLJXZptN9nndrQmbXEps2aiAFbWhM78LhWx4cbbfAAtVT86zwu1RK7aPFFxuhDR1L6tSoc_BJECPebWKRXjBZCiFV4n3oknjhMstn64tZ_2W-5JsGY4Hc5n9yBXArwl93lqt7_RN5w6Cf0h4QyQ5v-65YGjQR0_FDW2QvzqY368QQMicAtaSqzs8KJZgnYb9c7d0zgdAZHzu6qMQvRL5hajrn1n91CbOpbISD08qNLyrdkt-bFTWhAI4vMQFh6WeZu0fM4lFd2NcRwr3XPksINHaQ-G_xBniIqbw0Ls1jF44-csFCur-kEgU8awapJzKnqDKgw",
+		"e": "AQAB",
+		"alg": "RS256",
+		"kid": "2011-04-29"
+	}`), jwk))
+	return jwk
+}
+
+func Test_dnsPersist01AccountURI(t *testing.T) {
+	// Test vectors from draft-ietf-acme-dns-persist-02, section 10.2.
+	thumbprint, err := KeyToID(dnsPersist01TestJWK(t))
+	require.NoError(t, err)
+	require.Equal(t, "NzbLsXh8uDCcd-6MNwXF4W_7noWXFZAfHkxZsRGC9Xs", thumbprint)
+
+	const (
+		prefix     = "https://ca.example/account-hash/"
+		accountURL = "https://ca.example/acct/123"
+	)
+	tests := []struct {
+		name   string
+		domain string
+		want   string
+	}{
+		{"domain", "example.com", "https://ca.example/account-hash/sha-256/5SQm7n6tPh2-PlLbCKGnViTXX5z19SCN4cPGQHSk-kw"},
+		{"any domain", "*", "https://ca.example/account-hash/sha-256/NpDnSwUthQK8zCgFdefYxAdAVPnygMLbs9US6oO-5ug"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			assert.Equal(t, tt.want, dnsPersist01AccountURI(prefix, tt.domain, thumbprint, accountURL))
+		})
+	}
+}
+
+func TestDNSPersist01Validate(t *testing.T) {
+	// The key, account URL and hashed account URIs are the ones in
+	// draft-ietf-acme-dns-persist-02, section 10.2.
+	const (
+		prefix           = "https://ca.example/account-hash/"
+		accountURI       = prefix + "sha-256/5SQm7n6tPh2-PlLbCKGnViTXX5z19SCN4cPGQHSk-kw"
+		anyDomainURI     = prefix + "sha-256/NpDnSwUthQK8zCgFdefYxAdAVPnygMLbs9US6oO-5ug"
+		otherAccountURI  = prefix + "sha-256/Mpngr2LZCN9gPArggXqEu4pKtYZvLL5IxMStzyWrrXc"
+		validationDomain = "_validation-persist.example.com"
+	)
+	jwk := dnsPersist01TestJWK(t)
+	issuerDomainNames := []string{"authority.example", "ca.example.net"}
+	now := clock.Now()
+	expiresAt := now.Add(24 * time.Hour)
+	persistUntil := now.Add(time.Hour)
+	validAccount := &Account{ID: "123", Status: StatusValid, LocationPrefix: "https://ca.example/acct/"}
+	wwwAccountURI := dnsPersist01AccountURI(prefix, "www.example.com", "NzbLsXh8uDCcd-6MNwXF4W_7noWXFZAfHkxZsRGC9Xs", "https://ca.example/acct/123")
+
+	tests := []struct {
+		name        string
+		value       string
+		wildcard    bool
+		account     *Account
+		accountErr  error
+		authzErr    error
+		txtRecords  []string
+		lookupErr   error
+		updChErr    error
+		updAzErr    error
+		wantStatus  Status
+		wantChErr   *Error
+		wantExpires time.Time
+		err         *Error
+	}{
+		{
+			name:       "ok",
+			value:      "example.com",
+			txtRecords: []string{"authority.example; accounturi=" + accountURI},
+			wantStatus: StatusValid,
+		},
+		{
+			name:       "ok/any-domain",
+			value:      "example.com",
+			txtRecords: []string{"ca.example.net; accounturi=" + anyDomainURI},
+			wantStatus: StatusValid,
+		},
+		{
+			name:       "ok/normalized-identifier",
+			value:      "Example.COM",
+			txtRecords: []string{"authority.example; accounturi=" + accountURI},
+			wantStatus: StatusValid,
+		},
+		{
+			name:       "ok/case-insensitive",
+			value:      "example.com",
+			wildcard:   true,
+			txtRecords: []string{"Authority.Example.;AccountURI=" + accountURI + " ;\tPolicy=WILDCARD"},
+			wantStatus: StatusValid,
+		},
+		{
+			name:       "ok/wildcard",
+			value:      "example.com",
+			wildcard:   true,
+			txtRecords: []string{"authority.example; accounturi=" + accountURI + "; policy=wildcard"},
+			wantStatus: StatusValid,
+		},
+		{
+			name:       "ok/unknown-parameters",
+			value:      "example.com",
+			txtRecords: []string{"authority.example; foo=bar; accounturi=" + accountURI + "; policy=other; empty="},
+			wantStatus: StatusValid,
+		},
+		{
+			name:  "ok/multiple-records",
+			value: "example.com",
+			txtRecords: []string{
+				"ca1.example; accounturi=https://ca1.example/account-hash/sha-256/wjZNvLpIgf7zrr9KQo7zCLaG2Ea67KS4o4cAwSepsls; policy=wildcard",
+				"ca2.example; invalid record",
+				"authority.example; accounturi=" + otherAccountURI,
+				"ca.example.net; accounturi=" + accountURI,
+			},
+			wantStatus: StatusValid,
+		},
+		{
+			name:        "ok/persist-until",
+			value:       "example.com",
+			txtRecords:  []string{fmt.Sprintf("authority.example; accounturi=%s; persistUntil=%d", accountURI, persistUntil.Unix())},
+			wantStatus:  StatusValid,
+			wantExpires: persistUntil,
+		},
+		{
+			name:       "ok/persist-until-after-expiration",
+			value:      "example.com",
+			txtRecords: []string{fmt.Sprintf("authority.example; accounturi=%s; persistUntil=%d", accountURI, expiresAt.Add(time.Hour).Unix())},
+			wantStatus: StatusValid,
+		},
+		{
+			name:       "fail/get-authorization-error",
+			value:      "example.com",
+			authzErr:   errors.New("force"),
+			wantStatus: StatusPending,
+			err:        NewErrorISE("error loading authorization: force"),
+		},
+		{
+			name:       "fail/get-account-error",
+			value:      "example.com",
+			accountErr: errors.New("force"),
+			wantStatus: StatusPending,
+			err:        NewErrorISE("error loading account: force"),
+		},
+		{
+			name:       "fail/account-deactivated",
+			value:      "example.com",
+			account:    &Account{ID: "123", Status: StatusDeactivated, LocationPrefix: "https://ca.example/acct/"},
+			wantStatus: StatusInvalid,
+			wantChErr:  NewError(ErrorUnauthorizedType, "account 123 is not valid"),
+		},
+		{
+			name:       "fail/account-without-location",
+			value:      "example.com",
+			account:    &Account{ID: "123", Status: StatusValid},
+			wantStatus: StatusInvalid,
+			wantChErr:  NewError(ErrorUnauthorizedType, "account 123 does not have the stored location required by dns-persist-01 challenges"),
+		},
+		{
+			name:       "fail/invalid-domain",
+			value:      "exa mple.com",
+			wantStatus: StatusInvalid,
+			wantChErr:  NewError(ErrorMalformedType, "invalid DNS name exa mple.com"),
+		},
+		{
+			name:       "fail/lookup-error",
+			value:      "example.com",
+			lookupErr:  errors.New("force"),
+			wantStatus: StatusPending,
+			wantChErr:  NewError(ErrorDNSType, "error looking up TXT records for domain example.com: force"),
+		},
+		{
+			name:       "fail/no-records",
+			value:      "example.com",
+			txtRecords: []string{"ca1.example; accounturi=" + accountURI},
+			wantStatus: StatusPending,
+			wantChErr:  NewError(ErrorUnauthorizedType, "no TXT record found at _validation-persist.example.com for issuer domain names authority.example, ca.example.net"),
+		},
+		{
+			name:       "fail/missing-account-uri",
+			value:      "example.com",
+			txtRecords: []string{"authority.example; policy=wildcard"},
+			wantStatus: StatusPending,
+			wantChErr:  NewError(ErrorMalformedType, `TXT record "authority.example; policy=wildcard" is missing the accounturi parameter`),
+		},
+		{
+			name:       "fail/missing-parameters",
+			value:      "example.com",
+			txtRecords: []string{"authority.example;"},
+			wantStatus: StatusPending,
+			wantChErr:  NewError(ErrorMalformedType, `TXT record "authority.example;" is missing the accounturi parameter`),
+		},
+		{
+			name:       "fail/duplicate-parameter",
+			value:      "example.com",
+			txtRecords: []string{"authority.example; accounturi=" + accountURI + "; persistUntil=1; persistuntil=2"},
+			wantStatus: StatusPending,
+			wantChErr:  NewError(ErrorMalformedType, `TXT record "authority.example; accounturi=%s; persistUntil=1; persistuntil=2" has a duplicate parameter "persistuntil"`, accountURI),
+		},
+		{
+			name:       "fail/parameter-without-value",
+			value:      "example.com",
+			txtRecords: []string{"authority.example; accounturi=" + accountURI + "; policy"},
+			wantStatus: StatusPending,
+			wantChErr:  NewError(ErrorMalformedType, `TXT record "authority.example; accounturi=%s; policy" has an invalid parameter " policy"`, accountURI),
+		},
+		{
+			name:       "fail/empty-parameter",
+			value:      "example.com",
+			txtRecords: []string{"authority.example; accounturi=" + accountURI + ";"},
+			wantStatus: StatusPending,
+			wantChErr:  NewError(ErrorMalformedType, `TXT record "authority.example; accounturi=%s;" has an invalid parameter ""`, accountURI),
+		},
+		{
+			name:       "fail/invalid-tag",
+			value:      "example.com",
+			txtRecords: []string{"authority.example; accounturi=" + accountURI + "; -policy=wildcard"},
+			wantStatus: StatusPending,
+			wantChErr:  NewError(ErrorMalformedType, `TXT record "authority.example; accounturi=%s; -policy=wildcard" has an invalid parameter " -policy=wildcard"`, accountURI),
+		},
+		{
+			name:       "fail/invalid-value",
+			value:      "example.com",
+			txtRecords: []string{"authority.example; accounturi=" + accountURI + "; policy=wild card"},
+			wantStatus: StatusPending,
+			wantChErr:  NewError(ErrorMalformedType, `TXT record "authority.example; accounturi=%s; policy=wild card" has an invalid parameter " policy=wild card"`, accountURI),
+		},
+		{
+			name:       "fail/account-uri-prefix",
+			value:      "example.com",
+			txtRecords: []string{"authority.example; accounturi=https://ca.example/acct/123"},
+			wantStatus: StatusPending,
+			wantChErr:  NewError(ErrorMalformedType, `accounturi "https://ca.example/acct/123" does not start with "https://ca.example/account-hash/"`),
+		},
+		{
+			name:       "fail/account-uri-algorithm",
+			value:      "example.com",
+			txtRecords: []string{"authority.example; accounturi=" + prefix + "sha-512/5SQm7n6tPh2-PlLbCKGnViTXX5z19SCN4cPGQHSk-kw"},
+			wantStatus: StatusPending,
+			wantChErr:  NewError(ErrorMalformedType, `accounturi "https://ca.example/account-hash/sha-512/5SQm7n6tPh2-PlLbCKGnViTXX5z19SCN4cPGQHSk-kw" does not use the sha-256 hash algorithm`),
+		},
+		{
+			name:       "fail/account-uri-hash",
+			value:      "example.com",
+			txtRecords: []string{"authority.example; accounturi=" + prefix + "sha-256/5SQm7n6tPh2-PlLbCKGnViTXX5z19SCN4cPGQHSk"},
+			wantStatus: StatusPending,
+			wantChErr:  NewError(ErrorMalformedType, `accounturi "https://ca.example/account-hash/sha-256/5SQm7n6tPh2-PlLbCKGnViTXX5z19SCN4cPGQHSk" does not contain a valid sha-256 hash value`),
+		},
+		{
+			name:       "fail/account-uri-mismatch",
+			value:      "example.com",
+			txtRecords: []string{"authority.example; accounturi=" + otherAccountURI},
+			wantStatus: StatusPending,
+			wantChErr:  NewError(ErrorUnauthorizedType, "accounturi does not match; expected %s, but got %s", accountURI, otherAccountURI),
+		},
+		{
+			name:       "fail/account-uri-other-domain",
+			value:      "www.example.com",
+			txtRecords: []string{"authority.example; accounturi=" + accountURI},
+			wantStatus: StatusPending,
+			wantChErr:  NewError(ErrorUnauthorizedType, "accounturi does not match; expected %s, but got %s", wwwAccountURI, accountURI),
+		},
+		{
+			name:       "fail/persist-until-invalid",
+			value:      "example.com",
+			txtRecords: []string{"authority.example; accounturi=" + accountURI + "; persistUntil=+1767225600"},
+			wantStatus: StatusPending,
+			wantChErr:  NewError(ErrorMalformedType, `TXT record "authority.example; accounturi=%s; persistUntil=+1767225600" has an invalid persistUntil value "+1767225600"`, accountURI),
+		},
+		{
+			name:       "fail/persist-until-expired",
+			value:      "example.com",
+			txtRecords: []string{"authority.example; accounturi=" + accountURI + "; persistUntil=1721952000"},
+			wantStatus: StatusPending,
+			wantChErr:  NewError(ErrorUnauthorizedType, "TXT record expired at 2024-07-26T00:00:00Z"),
+		},
+		{
+			name:       "fail/wildcard-without-policy",
+			value:      "example.com",
+			wildcard:   true,
+			txtRecords: []string{"authority.example; accounturi=" + accountURI + "; policy=other"},
+			wantStatus: StatusPending,
+			wantChErr:  NewError(ErrorUnauthorizedType, "TXT record does not have the policy=wildcard parameter required for *.example.com"),
+		},
+		{
+			name:  "fail/first-error",
+			value: "example.com",
+			txtRecords: []string{
+				"authority.example; accounturi=" + otherAccountURI,
+				"ca.example.net; policy=wildcard",
+			},
+			wantStatus: StatusPending,
+			wantChErr:  NewError(ErrorUnauthorizedType, "accounturi does not match; expected %s, but got %s", accountURI, otherAccountURI),
+		},
+		{
+			name:        "fail/update-authorization-error",
+			value:       "example.com",
+			txtRecords:  []string{fmt.Sprintf("authority.example; accounturi=%s; persistUntil=%d", accountURI, persistUntil.Unix())},
+			updAzErr:    errors.New("force"),
+			wantStatus:  StatusPending,
+			wantExpires: persistUntil,
+			err:         NewErrorISE("error updating authorization: force"),
+		},
+		{
+			name:       "fail/update-challenge-error",
+			value:      "example.com",
+			txtRecords: []string{"authority.example; accounturi=" + accountURI},
+			updChErr:   errors.New("force"),
+			wantStatus: StatusValid,
+			err:        NewErrorISE("error updating challenge: force"),
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			ch := &Challenge{
+				ID:                "chID",
+				AccountID:         "123",
+				AuthorizationID:   "azID",
+				Type:              DNSPERSIST01,
+				Value:             tt.value,
+				Status:            StatusPending,
+				IssuerDomainNames: issuerDomainNames,
+			}
+			account := validAccount
+			if tt.account != nil {
+				account = tt.account
+			}
+
+			var (
+				updatedCh *Challenge
+				updatedAz *Authorization
+			)
+			db := &MockDB{
+				MockGetAuthorization: func(ctx context.Context, id string) (*Authorization, error) {
+					assert.Equal(t, "azID", id)
+					if tt.authzErr != nil {
+						return nil, tt.authzErr
+					}
+					return &Authorization{ID: id, Wildcard: tt.wildcard, ExpiresAt: expiresAt, Status: StatusPending}, nil
+				},
+				MockGetAccount: func(ctx context.Context, id string) (*Account, error) {
+					assert.Equal(t, "123", id)
+					if tt.accountErr != nil {
+						return nil, tt.accountErr
+					}
+					return account, nil
+				},
+				MockUpdateAuthorization: func(ctx context.Context, az *Authorization) error {
+					updatedAz = az
+					return tt.updAzErr
+				},
+				MockUpdateChallenge: func(ctx context.Context, updch *Challenge) error {
+					updatedCh = updch
+					return tt.updChErr
+				},
+			}
+			vc := &mockClient{
+				lookupTxt: func(name string) ([]string, error) {
+					assert.Equal(t, strings.Replace(validationDomain, "example.com", strings.ToLower(tt.value), 1), name)
+					return tt.txtRecords, tt.lookupErr
+				},
+			}
+			ctx := NewClientContext(context.Background(), vc)
+			ctx = NewProvisionerContext(ctx, &MockProvisioner{
+				MgetAccountHashPrefix: func() string { return prefix },
+			})
+
+			err := dnsPersist01Validate(ctx, ch, db, jwk)
+			if tt.err != nil {
+				var k *Error
+				if assert.ErrorAs(t, err, &k) {
+					assert.Equal(t, tt.err.Type, k.Type)
+					assert.Equal(t, tt.err.Status, k.Status)
+					assert.Equal(t, tt.err.Err.Error(), k.Err.Error())
+				}
+			} else {
+				assert.NoError(t, err)
+			}
+
+			assert.Equal(t, tt.wantStatus, ch.Status)
+			if tt.err == nil {
+				require.NotNil(t, updatedCh)
+			}
+			if tt.wantChErr != nil {
+				if assert.NotNil(t, ch.Error) {
+					assert.Equal(t, tt.wantChErr.Type, ch.Error.Type)
+					assert.Equal(t, tt.wantChErr.Status, ch.Error.Status)
+					assert.Equal(t, tt.wantChErr.Err.Error(), ch.Error.Err.Error())
+				}
+			} else {
+				assert.Nil(t, ch.Error)
+			}
+			if tt.wantStatus == StatusValid {
+				assert.NotEmpty(t, ch.ValidatedAt)
+			}
+
+			if tt.wantExpires.IsZero() {
+				assert.Nil(t, updatedAz)
+			} else if assert.NotNil(t, updatedAz) {
+				assert.True(t, tt.wantExpires.Equal(updatedAz.ExpiresAt))
+			}
 		})
 	}
 }

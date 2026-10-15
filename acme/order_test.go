@@ -404,6 +404,67 @@ func TestOrder_Finalize(t *testing.T) {
 				err: NewErrorISE("unrecognized order status: %s", o.Status),
 			}
 		},
+		"fail/get-authorization-error": func(t *testing.T) test {
+			now := clock.Now()
+			o := &Order{
+				ID:               "oID",
+				AccountID:        "accID",
+				Status:           StatusReady,
+				ExpiresAt:        now.Add(5 * time.Minute),
+				AuthorizationIDs: []string{"a"},
+			}
+			return test{
+				o: o,
+				db: &MockDB{
+					MockGetAuthorization: func(ctx context.Context, id string) (*Authorization, error) {
+						return nil, errors.New("force")
+					},
+				},
+				err: NewErrorISE(`error getting authorization "a": force`),
+			}
+		},
+		"fail/expired-dns-persist-01-authorization": func(t *testing.T) test {
+			now := clock.Now()
+			o := &Order{
+				ID:               "oID",
+				AccountID:        "accID",
+				Status:           StatusReady,
+				ExpiresAt:        now.Add(5 * time.Minute),
+				AuthorizationIDs: []string{"a", "b"},
+			}
+			return test{
+				o: o,
+				db: &MockDB{
+					MockGetAuthorization: func(ctx context.Context, id string) (*Authorization, error) {
+						switch id {
+						case "a":
+							return &Authorization{
+								ID:        id,
+								Status:    StatusValid,
+								ExpiresAt: o.ExpiresAt,
+								Challenges: []*Challenge{
+									{Type: DNS01, Status: StatusValid},
+								},
+							}, nil
+						case "b":
+							return &Authorization{
+								ID:        id,
+								Status:    StatusValid,
+								ExpiresAt: now.Add(-time.Minute),
+								Challenges: []*Challenge{
+									{Type: DNS01, Status: StatusPending},
+									{Type: DNSPERSIST01, Status: StatusValid},
+								},
+							}, nil
+						default:
+							assert.FatalError(t, errors.Errorf("unexpected authorization %s", id))
+							return nil, errors.New("force")
+						}
+					},
+				},
+				err: NewError(ErrorUnauthorizedType, "order oID authorization b has expired"),
+			}
+		},
 		"fail/non-matching-permanent-identifier-common-name": func(t *testing.T) test {
 			now := clock.Now()
 			o := &Order{
