@@ -462,7 +462,7 @@ func TestOrder_Finalize(t *testing.T) {
 						}
 					},
 				},
-				err: NewError(ErrorUnauthorizedType, "order oID authorization b has expired"),
+				err: NewDetailedError(ErrorUnauthorizedType, "order oID authorization b has expired"),
 			}
 		},
 		"fail/non-matching-permanent-identifier-common-name": func(t *testing.T) test {

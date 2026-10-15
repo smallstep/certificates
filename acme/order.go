@@ -174,7 +174,7 @@ func (o *Order) checkPersistentAuthorizations(ctx context.Context, db DB) error 
 		}
 		for _, ch := range az.Challenges {
 			if ch.Type == DNSPERSIST01 && ch.Status == StatusValid && now.After(az.ExpiresAt) {
-				return NewError(ErrorUnauthorizedType, "order %s authorization %s has expired", o.ID, az.ID)
+				return NewDetailedError(ErrorUnauthorizedType, "order %s authorization %s has expired", o.ID, az.ID)
 			}
 		}
 	}

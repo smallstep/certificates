@@ -439,7 +439,7 @@ func dnsPersist01Validate(ctx context.Context, ch *Challenge, db DB, jwk *jose.J
 		return WrapErrorISE(err, "error loading account")
 	}
 	if !acc.IsValid() {
-		return storeError(ctx, db, ch, true, NewError(ErrorUnauthorizedType,
+		return storeError(ctx, db, ch, true, NewDetailedError(ErrorUnauthorizedType,
 			"account %s is not valid", acc.ID))
 	}
 
@@ -448,7 +448,7 @@ func dnsPersist01Validate(ctx context.Context, ch *Challenge, db DB, jwk *jose.J
 	// current request.
 	accountURL := acc.GetLocation()
 	if accountURL == "" {
-		return storeError(ctx, db, ch, true, NewError(ErrorUnauthorizedType,
+		return storeError(ctx, db, ch, true, NewDetailedError(ErrorUnauthorizedType,
 			"account %s does not have the stored location required by %s challenges", acc.ID, ch.Type))
 	}
 
@@ -456,7 +456,7 @@ func dnsPersist01Validate(ctx context.Context, ch *Challenge, db DB, jwk *jose.J
 	// at the base domain.
 	domain, err := x509util.SanitizeName(strings.TrimSuffix(strings.TrimPrefix(ch.Value, "*."), "."))
 	if err != nil || len(domain) > 253 {
-		return storeError(ctx, db, ch, true, NewError(ErrorMalformedType,
+		return storeError(ctx, db, ch, true, NewDetailedError(ErrorMalformedType,
 			"invalid DNS name %s", ch.Value))
 	}
 
@@ -507,7 +507,7 @@ func dnsPersist01Validate(ctx context.Context, ch *Challenge, db DB, jwk *jose.J
 	}
 	if record == nil {
 		if recordErr == nil {
-			recordErr = NewError(ErrorUnauthorizedType,
+			recordErr = NewDetailedError(ErrorUnauthorizedType,
 				"no TXT record found at %s for issuer domain names %s", host, strings.Join(ch.IssuerDomainNames, ", "))
 		}
 		return storeError(ctx, db, ch, false, recordErr)
@@ -566,7 +566,7 @@ func parseDNSPersist01Record(txt string, issuerDomainNames []string, accountHash
 			tag, value, ok := strings.Cut(param, "=")
 			tag, value = strings.Trim(tag, " \t"), strings.Trim(value, " \t")
 			if !ok || !isDNSPersist01Tag(tag) || !isDNSPersist01Value(value) {
-				return nil, true, NewError(ErrorMalformedType,
+				return nil, true, NewDetailedError(ErrorMalformedType,
 					"TXT record %q has an invalid parameter %q", txt, param)
 			}
 
@@ -574,7 +574,7 @@ func parseDNSPersist01Record(txt string, issuerDomainNames []string, accountHash
 			// persistUntil is never ignored because of its case.
 			tag = strings.ToLower(tag)
 			if seen[tag] {
-				return nil, true, NewError(ErrorMalformedType,
+				return nil, true, NewDetailedError(ErrorMalformedType,
 					"TXT record %q has a duplicate parameter %q", txt, tag)
 			}
 			seen[tag] = true
@@ -590,7 +590,7 @@ func parseDNSPersist01Record(txt string, issuerDomainNames []string, accountHash
 			case "persistuntil":
 				ts, err := strconv.ParseInt(value, 10, 64)
 				if err != nil || strings.Trim(value, "0123456789") != "" {
-					return nil, true, NewError(ErrorMalformedType,
+					return nil, true, NewDetailedError(ErrorMalformedType,
 						"TXT record %q has an invalid persistUntil value %q", txt, value)
 				}
 				rec.persistUntil = time.Unix(ts, 0).UTC()
@@ -599,7 +599,7 @@ func parseDNSPersist01Record(txt string, issuerDomainNames []string, accountHash
 	}
 
 	if rec.accountURI == "" {
-		return nil, true, NewError(ErrorMalformedType,
+		return nil, true, NewDetailedError(ErrorMalformedType,
 			"TXT record %q is missing the accounturi parameter", txt)
 	}
 	return rec, true, nil
@@ -610,16 +610,16 @@ func parseDNSPersist01Record(txt string, issuerDomainNames []string, accountHash
 func validateDNSPersist01AccountURI(value, accountHashPrefix string) *Error {
 	rest, ok := strings.CutPrefix(value, accountHashPrefix)
 	if !ok {
-		return NewError(ErrorMalformedType,
+		return NewDetailedError(ErrorMalformedType,
 			"accounturi %q does not start with %q", value, accountHashPrefix)
 	}
 	alg, hash, _ := strings.Cut(rest, "/")
 	if alg != dnsPersist01HashAlgorithm {
-		return NewError(ErrorMalformedType,
+		return NewDetailedError(ErrorMalformedType,
 			"accounturi %q does not use the %s hash algorithm", value, dnsPersist01HashAlgorithm)
 	}
 	if b, err := base64.RawURLEncoding.Strict().DecodeString(hash); err != nil || len(b) != sha256.Size {
-		return NewError(ErrorMalformedType,
+		return NewDetailedError(ErrorMalformedType,
 			"accounturi %q does not contain a valid %s hash value", value, dnsPersist01HashAlgorithm)
 	}
 	return nil
@@ -630,13 +630,13 @@ func validateDNSPersist01AccountURI(value, accountHashPrefix string) *Error {
 func verifyDNSPersist01Record(rec *dnsPersist01Record, now time.Time, expected []string, wildcard bool, domain string) *Error {
 	switch {
 	case !slices.Contains(expected, rec.accountURI):
-		return NewError(ErrorUnauthorizedType,
+		return NewDetailedError(ErrorUnauthorizedType,
 			"accounturi does not match; expected %s, but got %s", expected[0], rec.accountURI)
 	case !rec.persistUntil.IsZero() && now.After(rec.persistUntil):
-		return NewError(ErrorUnauthorizedType,
+		return NewDetailedError(ErrorUnauthorizedType,
 			"TXT record expired at %s", rec.persistUntil.Format(time.RFC3339))
 	case wildcard && !rec.wildcard:
-		return NewError(ErrorUnauthorizedType,
+		return NewDetailedError(ErrorUnauthorizedType,
 			"TXT record does not have the policy=wildcard parameter required for *.%s", domain)
 	default:
 		return nil
