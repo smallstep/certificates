@@ -51,6 +51,8 @@ func (*fakeProvisioner) IsAttestationFormatEnabled(context.Context, provisioner.
 	return true
 }
 func (*fakeProvisioner) GetAttestationRoots() (*x509.CertPool, bool)   { return nil, false }
+func (*fakeProvisioner) GetIssuerDomainNames() []string                { return nil }
+func (*fakeProvisioner) GetAccountHashPrefix() string                  { return "" }
 func (*fakeProvisioner) AuthorizeRevoke(context.Context, string) error { return nil }
 func (*fakeProvisioner) GetID() string                                 { return "" }
 func (*fakeProvisioner) GetName() string                               { return "" }

@@ -378,6 +378,12 @@ func newAuthorization(ctx context.Context, az *acme.Authorization) error {
 			Status:    acme.StatusPending,
 			Target:    target,
 		}
+		// The dns-persist-01 challenge does not use a token, the validation
+		// record must contain one of the issuer domain names instead.
+		if typ == acme.DNSPERSIST01 {
+			ch.Token = ""
+			ch.IssuerDomainNames = prov.GetIssuerDomainNames()
+		}
 		if err := db.CreateChallenge(ctx, ch); err != nil {
 			return acme.WrapErrorISE(err, "error creating challenge")
 		}
@@ -506,6 +512,7 @@ func challengeTypes(az *acme.Authorization) []acme.ChallengeType {
 		if !az.Wildcard {
 			chTypes = append(chTypes, []acme.ChallengeType{acme.HTTP01, acme.TLSALPN01}...)
 		}
+		chTypes = append(chTypes, acme.DNSPERSIST01)
 	case acme.PermanentIdentifier:
 		chTypes = []acme.ChallengeType{acme.DEVICEATTEST01}
 	case acme.WireUser:
