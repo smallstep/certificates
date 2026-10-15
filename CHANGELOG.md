@@ -31,6 +31,11 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
 
 - Support for ML-DSA (FIPS 204) keys, available when built with Go 1.27 or
   newer. JOSE-based flows (JWK, JWS and JWT tokens) do not support ML-DSA yet.
+- Support for the ACME `dns-persist-01` challenge defined in
+  [draft-ietf-acme-dns-persist-02](https://datatracker.ietf.org/doc/html/draft-ietf-acme-dns-persist-02).
+  It is disabled by default. To enable it, add `dns-persist-01` to the
+  `challenges` of an ACME provisioner and set its new `issuerDomainNames` and
+  `accountHashPrefix` properties.
 
 ### Changed
 
