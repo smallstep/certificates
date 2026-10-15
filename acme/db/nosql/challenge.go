@@ -13,16 +13,17 @@ import (
 )
 
 type dbChallenge struct {
-	ID          string             `json:"id"`
-	AccountID   string             `json:"accountID"`
-	Type        acme.ChallengeType `json:"type"`
-	Status      acme.Status        `json:"status"`
-	Token       string             `json:"token"`
-	Value       string             `json:"value"`
-	Target      string             `json:"target,omitempty"`
-	ValidatedAt string             `json:"validatedAt"`
-	CreatedAt   time.Time          `json:"createdAt"`
-	Error       *acme.Error        `json:"error"` // TODO(hs): a bit dangerous; should become db-specific type
+	ID                string             `json:"id"`
+	AccountID         string             `json:"accountID"`
+	Type              acme.ChallengeType `json:"type"`
+	Status            acme.Status        `json:"status"`
+	Token             string             `json:"token"`
+	Value             string             `json:"value"`
+	Target            string             `json:"target,omitempty"`
+	IssuerDomainNames []string           `json:"issuerDomainNames,omitempty"`
+	ValidatedAt       string             `json:"validatedAt"`
+	CreatedAt         time.Time          `json:"createdAt"`
+	Error             *acme.Error        `json:"error"` // TODO(hs): a bit dangerous; should become db-specific type
 }
 
 func (dbc *dbChallenge) clone() *dbChallenge {
@@ -55,14 +56,15 @@ func (db *DB) CreateChallenge(ctx context.Context, ch *acme.Challenge) error {
 	}
 
 	dbch := &dbChallenge{
-		ID:        ch.ID,
-		AccountID: ch.AccountID,
-		Value:     ch.Value,
-		Status:    acme.StatusPending,
-		Token:     ch.Token,
-		CreatedAt: clock.Now(),
-		Type:      ch.Type,
-		Target:    ch.Target,
+		ID:                ch.ID,
+		AccountID:         ch.AccountID,
+		Value:             ch.Value,
+		Status:            acme.StatusPending,
+		Token:             ch.Token,
+		CreatedAt:         clock.Now(),
+		Type:              ch.Type,
+		Target:            ch.Target,
+		IssuerDomainNames: ch.IssuerDomainNames,
 	}
 
 	return db.save(ctx, ch.ID, dbch, nil, "challenge", challengeTable)
@@ -78,15 +80,16 @@ func (db *DB) GetChallenge(ctx context.Context, id, authzID string) (*acme.Chall
 	}
 
 	ch := &acme.Challenge{
-		ID:          dbch.ID,
-		AccountID:   dbch.AccountID,
-		Type:        dbch.Type,
-		Value:       dbch.Value,
-		Status:      dbch.Status,
-		Token:       dbch.Token,
-		Error:       dbch.Error,
-		ValidatedAt: dbch.ValidatedAt,
-		Target:      dbch.Target,
+		ID:                dbch.ID,
+		AccountID:         dbch.AccountID,
+		Type:              dbch.Type,
+		Value:             dbch.Value,
+		Status:            dbch.Status,
+		Token:             dbch.Token,
+		Error:             dbch.Error,
+		ValidatedAt:       dbch.ValidatedAt,
+		Target:            dbch.Target,
+		IssuerDomainNames: dbch.IssuerDomainNames,
 	}
 	return ch, nil
 }
