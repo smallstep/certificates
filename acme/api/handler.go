@@ -196,6 +196,8 @@ type Meta struct {
 	Website                 string   `json:"website,omitempty"`
 	CaaIdentities           []string `json:"caaIdentities,omitempty"`
 	ExternalAccountRequired bool     `json:"externalAccountRequired,omitempty"`
+	AccountHashPrefix       string   `json:"accountHashPrefix,omitempty"`
+	IssuerDomainNames       []string `json:"issuerDomainNames,omitempty"`
 }
 
 // Directory represents an ACME directory for configuring clients.
@@ -235,28 +237,35 @@ func GetDirectory(w http.ResponseWriter, r *http.Request) {
 		NewOrder:   linker.GetLink(ctx, acme.NewOrderLinkType),
 		RevokeCert: linker.GetLink(ctx, acme.RevokeCertLinkType),
 		KeyChange:  linker.GetLink(ctx, acme.KeyChangeLinkType),
-		Meta:       createMetaObject(acmeProv),
+		Meta:       createMetaObject(ctx, acmeProv),
 	})
 }
 
 // createMetaObject creates a Meta object if the ACME provisioner
 // has one or more properties that are written in the ACME directory output.
 // It returns nil if none of the properties are set.
-func createMetaObject(p *provisioner.ACME) *Meta {
-	if shouldAddMetaObject(p) {
-		return &Meta{
+func createMetaObject(ctx context.Context, p *provisioner.ACME) *Meta {
+	if shouldAddMetaObject(ctx, p) {
+		m := &Meta{
 			TermsOfService:          p.TermsOfService,
 			Website:                 p.Website,
 			CaaIdentities:           p.CaaIdentities,
 			ExternalAccountRequired: p.RequireEAB,
 		}
+		// The properties used to provision dns-persist-01 validation records
+		// are only advertised if the challenge is enabled.
+		if p.IsChallengeEnabled(ctx, provisioner.DNS_PERSIST_01) {
+			m.AccountHashPrefix = p.AccountHashPrefix
+			m.IssuerDomainNames = p.IssuerDomainNames
+		}
+		return m
 	}
 	return nil
 }
 
 // shouldAddMetaObject returns whether or not the ACME provisioner
 // has properties configured that must be added to the ACME directory object.
-func shouldAddMetaObject(p *provisioner.ACME) bool {
+func shouldAddMetaObject(ctx context.Context, p *provisioner.ACME) bool {
 	switch {
 	case p.TermsOfService != "":
 		return true
@@ -265,6 +274,8 @@ func shouldAddMetaObject(p *provisioner.ACME) bool {
 	case len(p.CaaIdentities) > 0:
 		return true
 	case p.RequireEAB:
+		return true
+	case p.IsChallengeEnabled(ctx, provisioner.DNS_PERSIST_01):
 		return true
 	default:
 		return false

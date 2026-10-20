@@ -838,26 +838,56 @@ func Test_createMetaObject(t *testing.T) {
 			},
 		},
 		{
+			name: "dns-persist-01",
+			p: &provisioner.ACME{
+				Type:              "ACME",
+				Name:              "acme",
+				Challenges:        []provisioner.ACMEChallenge{provisioner.DNS_PERSIST_01},
+				IssuerDomainNames: []string{"ca.local"},
+				AccountHashPrefix: "https://ca.local/acme/acme/account-hash/",
+			},
+			want: &Meta{
+				AccountHashPrefix: "https://ca.local/acme/acme/account-hash/",
+				IssuerDomainNames: []string{"ca.local"},
+			},
+		},
+		{
+			name: "dns-persist-01-disabled",
+			p: &provisioner.ACME{
+				Type:              "ACME",
+				Name:              "acme",
+				Challenges:        []provisioner.ACMEChallenge{provisioner.DNS_01},
+				IssuerDomainNames: []string{"ca.local"},
+				AccountHashPrefix: "https://ca.local/acme/acme/account-hash/",
+			},
+			want: nil,
+		},
+		{
 			name: "full-meta",
 			p: &provisioner.ACME{
-				Type:           "ACME",
-				Name:           "acme",
-				TermsOfService: "https://terms.ca.local",
-				Website:        "https://ca.local",
-				CaaIdentities:  []string{"ca.local", "ca.remote"},
-				RequireEAB:     true,
+				Type:              "ACME",
+				Name:              "acme",
+				TermsOfService:    "https://terms.ca.local",
+				Website:           "https://ca.local",
+				CaaIdentities:     []string{"ca.local", "ca.remote"},
+				RequireEAB:        true,
+				Challenges:        []provisioner.ACMEChallenge{provisioner.DNS_01, provisioner.DNS_PERSIST_01},
+				IssuerDomainNames: []string{"ca.local"},
+				AccountHashPrefix: "https://ca.local/acme/acme/account-hash/",
 			},
 			want: &Meta{
 				TermsOfService:          "https://terms.ca.local",
 				Website:                 "https://ca.local",
 				CaaIdentities:           []string{"ca.local", "ca.remote"},
 				ExternalAccountRequired: true,
+				AccountHashPrefix:       "https://ca.local/acme/acme/account-hash/",
+				IssuerDomainNames:       []string{"ca.local"},
 			},
 		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got := createMetaObject(tt.p)
+			got := createMetaObject(context.Background(), tt.p)
 			if !cmp.Equal(tt.want, got) {
 				t.Errorf("createMetaObject() diff =\n%s", cmp.Diff(tt.want, got))
 			}

@@ -60,6 +60,8 @@ const (
 	WIREOIDC01 ChallengeType = "wire-oidc-01"
 	// WIREDPOP01 is the Wire DPoP challenge type
 	WIREDPOP01 ChallengeType = "wire-dpop-01"
+	// DNSPERSIST01 is the dns-persist-01 ACME challenge type
+	DNSPERSIST01 ChallengeType = "dns-persist-01"
 )
 
 var (
@@ -81,19 +83,20 @@ var (
 
 // Challenge represents an ACME response Challenge type.
 type Challenge struct {
-	ID              string        `json:"-"`
-	AccountID       string        `json:"-"`
-	AuthorizationID string        `json:"-"`
-	Value           string        `json:"-"`
-	Type            ChallengeType `json:"type"`
-	Status          Status        `json:"status"`
-	Token           string        `json:"token"`
-	ValidatedAt     string        `json:"validated,omitempty"`
-	URL             string        `json:"url"`
-	Target          string        `json:"target,omitempty"`
-	Error           *Error        `json:"error,omitempty"`
-	Payload         []byte        `json:"-"`
-	PayloadFormat   string        `json:"-"`
+	ID                string        `json:"-"`
+	AccountID         string        `json:"-"`
+	AuthorizationID   string        `json:"-"`
+	Value             string        `json:"-"`
+	Type              ChallengeType `json:"type"`
+	Status            Status        `json:"status"`
+	Token             string        `json:"token,omitempty"`
+	ValidatedAt       string        `json:"validated,omitempty"`
+	URL               string        `json:"url"`
+	Target            string        `json:"target,omitempty"`
+	IssuerDomainNames []string      `json:"issuerDomainNames,omitempty"`
+	Error             *Error        `json:"error,omitempty"`
+	Payload           []byte        `json:"-"`
+	PayloadFormat     string        `json:"-"`
 }
 
 // ToLog enables response logging.
@@ -118,6 +121,8 @@ func (ch *Challenge) Validate(ctx context.Context, db DB, jwk *jose.JSONWebKey, 
 		return http01Validate(ctx, ch, db, jwk)
 	case DNS01:
 		return dns01Validate(ctx, ch, db, jwk)
+	case DNSPERSIST01:
+		return dnsPersist01Validate(ctx, ch, db, jwk)
 	case TLSALPN01:
 		return tlsalpn01Validate(ctx, ch, db, jwk)
 	case DEVICEATTEST01:
@@ -226,6 +231,12 @@ func tlsAlpn01ChallengeHost(name string) string {
 // dns01ChallengeHost returns the TXT record used in DNS-01 validations.
 func dns01ChallengeHost(domain string) string {
 	return "_acme-challenge." + rootedName(domain)
+}
+
+// dnsPersist01ChallengeHost returns the TXT record used in DNS-PERSIST-01
+// validations.
+func dnsPersist01ChallengeHost(domain string) string {
+	return "_validation-persist." + rootedName(domain)
 }
 
 func tlsAlert(err error) uint8 {
@@ -395,6 +406,269 @@ func dns01Validate(ctx context.Context, ch *Challenge, db DB, jwk *jose.JSONWebK
 		return WrapErrorISE(err, "error updating challenge")
 	}
 	return nil
+}
+
+// dnsPersist01HashAlgorithm is the hash algorithm used in the hashed account
+// URIs of dns-persist-01 validation records. It is the only one supported.
+const dnsPersist01HashAlgorithm = "sha-256"
+
+// dnsPersist01Record contains the parameters of a dns-persist-01 validation
+// record.
+type dnsPersist01Record struct {
+	accountURI   string
+	wildcard     bool
+	persistUntil time.Time
+}
+
+// dnsPersist01Validate validates a dns-persist-01 challenge as defined in
+// draft-ietf-acme-dns-persist-02. Validation succeeds if one of the TXT
+// records at _validation-persist.<domain> contains one of the challenge issuer
+// domain names and a hashed account URI that binds the record to the account.
+func dnsPersist01Validate(ctx context.Context, ch *Challenge, db DB, jwk *jose.JSONWebKey) error {
+	// Load the authorization to check if it's for a wildcard identifier, and
+	// to limit its expiration to the persistUntil parameter of the record.
+	az, err := db.GetAuthorization(ctx, ch.AuthorizationID)
+	if err != nil {
+		return WrapErrorISE(err, "error loading authorization")
+	}
+
+	// The account status is checked on every request, but the draft requires
+	// to check it on every validation attempt too.
+	acc, err := db.GetAccount(ctx, ch.AccountID)
+	if err != nil {
+		return WrapErrorISE(err, "error loading account")
+	}
+	if !acc.IsValid() {
+		return storeError(ctx, db, ch, true, NewDetailedError(ErrorUnauthorizedType,
+			"account %s is not valid", acc.ID))
+	}
+
+	// The hashed account URI is computed over the account URL returned to the
+	// client, so use the stored location instead of one derived from the
+	// current request.
+	accountURL := acc.GetLocation()
+	if accountURL == "" {
+		return storeError(ctx, db, ch, true, NewDetailedError(ErrorUnauthorizedType,
+			"account %s does not have the stored location required by %s challenges", acc.ID, ch.Type))
+	}
+
+	// Normalize domain for wildcard DNS names, the validation record is always
+	// at the base domain.
+	domain, err := x509util.SanitizeName(strings.TrimSuffix(strings.TrimPrefix(ch.Value, "*."), "."))
+	if err != nil || len(domain) > 253 {
+		return storeError(ctx, db, ch, true, NewDetailedError(ErrorMalformedType,
+			"invalid DNS name %s", ch.Value))
+	}
+
+	// Key rollover is not supported, so the current account key is the only
+	// one that has been used by the account.
+	thumbprint, err := KeyToID(jwk)
+	if err != nil {
+		return err
+	}
+	prefix := MustProvisionerFromContext(ctx).GetAccountHashPrefix()
+	expected := []string{
+		dnsPersist01AccountURI(prefix, domain, thumbprint, accountURL),
+		dnsPersist01AccountURI(prefix, "*", thumbprint, accountURL),
+	}
+
+	host := dnsPersist01ChallengeHost(domain)
+	vc := MustClientFromContext(ctx)
+	txtRecords, err := vc.LookupTxt(host)
+	if err != nil {
+		return storeError(ctx, db, ch, false, WrapError(ErrorDNSType, err,
+			"error looking up TXT records for domain %s", domain))
+	}
+
+	// Validation succeeds if any of the records for the issuer domain names in
+	// the challenge is valid. Records for other CAs are ignored. If no record
+	// is valid, the error from the first one is reported.
+	var (
+		record    *dnsPersist01Record
+		recordErr *Error
+	)
+	now := clock.Now()
+	for _, txt := range txtRecords {
+		rec, ok, acmeErr := parseDNSPersist01Record(txt, ch.IssuerDomainNames, prefix)
+		if !ok {
+			continue
+		}
+		if acmeErr == nil {
+			acmeErr = verifyDNSPersist01Record(rec, now, expected, az.Wildcard, domain)
+		}
+		if acmeErr != nil {
+			if recordErr == nil {
+				recordErr = acmeErr
+			}
+			continue
+		}
+		record = rec
+		break
+	}
+	if record == nil {
+		if recordErr == nil {
+			recordErr = NewDetailedError(ErrorUnauthorizedType,
+				"no TXT record found at %s for issuer domain names %s", host, strings.Join(ch.IssuerDomainNames, ", "))
+		}
+		return storeError(ctx, db, ch, false, recordErr)
+	}
+
+	// The authorization cannot expire after the persistUntil timestamp.
+	//
+	// TODO: add method to update authorization and challenge atomically.
+	if !record.persistUntil.IsZero() && record.persistUntil.Before(az.ExpiresAt) {
+		az.ExpiresAt = record.persistUntil
+		if err := db.UpdateAuthorization(ctx, az); err != nil {
+			return WrapErrorISE(err, "error updating authorization")
+		}
+	}
+
+	// Update and store the challenge.
+	ch.Status = StatusValid
+	ch.Error = nil
+	ch.ValidatedAt = clock.Now().Format(time.RFC3339)
+
+	if err := db.UpdateChallenge(ctx, ch); err != nil {
+		return WrapErrorISE(err, "error updating challenge")
+	}
+	return nil
+}
+
+// dnsPersist01AccountURI returns the hashed account URI that binds a
+// dns-persist-01 validation record for the given domain to an account. The
+// domain can be "*" for records that are not bound to a domain. The domain must
+// not be longer than 255 octets.
+func dnsPersist01AccountURI(prefix, domain, thumbprint, accountURL string) string {
+	b := make([]byte, 0, 1+len(domain)+len(thumbprint)+len(accountURL))
+	b = append(b, cast.Uint8(len(domain)))
+	b = append(b, domain...)
+	b = append(b, thumbprint...)
+	b = append(b, accountURL...)
+	sum := sha256.Sum256(b)
+	return prefix + dnsPersist01HashAlgorithm + "/" + base64.RawURLEncoding.EncodeToString(sum[:])
+}
+
+// parseDNSPersist01Record parses a dns-persist-01 validation record, using the
+// issue-value syntax defined in RFC 8659, section 4.2. It returns false if the
+// issuer domain name of the record is not one of the given ones. Unknown
+// parameters are ignored.
+func parseDNSPersist01Record(txt string, issuerDomainNames []string, accountHashPrefix string) (*dnsPersist01Record, bool, *Error) {
+	issuer, params, _ := strings.Cut(txt, ";")
+	issuer = strings.ToLower(strings.TrimSuffix(strings.Trim(issuer, " \t"), "."))
+	if !slices.Contains(issuerDomainNames, issuer) {
+		return nil, false, nil
+	}
+
+	rec := new(dnsPersist01Record)
+	if strings.Trim(params, " \t") != "" {
+		seen := make(map[string]bool)
+		for param := range strings.SplitSeq(params, ";") {
+			tag, value, ok := strings.Cut(param, "=")
+			tag, value = strings.Trim(tag, " \t"), strings.Trim(value, " \t")
+			if !ok || !isDNSPersist01Tag(tag) || !isDNSPersist01Value(value) {
+				return nil, true, NewDetailedError(ErrorMalformedType,
+					"TXT record %q has an invalid parameter %q", txt, param)
+			}
+
+			// Tags are compared case-insensitively, so a constraint like
+			// persistUntil is never ignored because of its case.
+			tag = strings.ToLower(tag)
+			if seen[tag] {
+				return nil, true, NewDetailedError(ErrorMalformedType,
+					"TXT record %q has a duplicate parameter %q", txt, tag)
+			}
+			seen[tag] = true
+
+			switch tag {
+			case "accounturi":
+				if err := validateDNSPersist01AccountURI(value, accountHashPrefix); err != nil {
+					return nil, true, err
+				}
+				rec.accountURI = value
+			case "policy":
+				rec.wildcard = strings.EqualFold(value, "wildcard")
+			case "persistuntil":
+				ts, err := strconv.ParseInt(value, 10, 64)
+				if err != nil || strings.Trim(value, "0123456789") != "" {
+					return nil, true, NewDetailedError(ErrorMalformedType,
+						"TXT record %q has an invalid persistUntil value %q", txt, value)
+				}
+				rec.persistUntil = time.Unix(ts, 0).UTC()
+			}
+		}
+	}
+
+	if rec.accountURI == "" {
+		return nil, true, NewDetailedError(ErrorMalformedType,
+			"TXT record %q is missing the accounturi parameter", txt)
+	}
+	return rec, true, nil
+}
+
+// validateDNSPersist01AccountURI checks that the given value is a hashed
+// account URI with the format <accountHashPrefix>sha-256/<base64url hash>.
+func validateDNSPersist01AccountURI(value, accountHashPrefix string) *Error {
+	rest, ok := strings.CutPrefix(value, accountHashPrefix)
+	if !ok {
+		return NewDetailedError(ErrorMalformedType,
+			"accounturi %q does not start with %q", value, accountHashPrefix)
+	}
+	alg, hash, _ := strings.Cut(rest, "/")
+	if alg != dnsPersist01HashAlgorithm {
+		return NewDetailedError(ErrorMalformedType,
+			"accounturi %q does not use the %s hash algorithm", value, dnsPersist01HashAlgorithm)
+	}
+	if b, err := base64.RawURLEncoding.Strict().DecodeString(hash); err != nil || len(b) != sha256.Size {
+		return NewDetailedError(ErrorMalformedType,
+			"accounturi %q does not contain a valid %s hash value", value, dnsPersist01HashAlgorithm)
+	}
+	return nil
+}
+
+// verifyDNSPersist01Record checks that a dns-persist-01 validation record for
+// the given domain authorizes the account and has not expired.
+func verifyDNSPersist01Record(rec *dnsPersist01Record, now time.Time, expected []string, wildcard bool, domain string) *Error {
+	switch {
+	case !slices.Contains(expected, rec.accountURI):
+		return NewDetailedError(ErrorUnauthorizedType,
+			"accounturi does not match; expected %s, but got %s", expected[0], rec.accountURI)
+	case !rec.persistUntil.IsZero() && now.After(rec.persistUntil):
+		return NewDetailedError(ErrorUnauthorizedType,
+			"TXT record expired at %s", rec.persistUntil.Format(time.RFC3339))
+	case wildcard && !rec.wildcard:
+		return NewDetailedError(ErrorUnauthorizedType,
+			"TXT record does not have the policy=wildcard parameter required for *.%s", domain)
+	default:
+		return nil
+	}
+}
+
+// isDNSPersist01Tag returns true if the given string matches the tag syntax:
+//
+//	tag = (ALPHA / DIGIT) *( *("-") (ALPHA / DIGIT))
+func isDNSPersist01Tag(s string) bool {
+	if s == "" || s[0] == '-' || s[len(s)-1] == '-' {
+		return false
+	}
+	for _, c := range []byte(s) {
+		if c != '-' && (c < '0' || c > '9') && (c < 'a' || c > 'z') && (c < 'A' || c > 'Z') {
+			return false
+		}
+	}
+	return true
+}
+
+// isDNSPersist01Value returns true if the given string matches the value
+// syntax:
+//
+//	value = *(%x21-3A / %x3C-7E)
+func isDNSPersist01Value(s string) bool {
+	for _, c := range []byte(s) {
+		if c < 0x21 || c > 0x7e || c == ';' {
+			return false
+		}
+	}
+	return true
 }
 
 type wireOidcPayload struct {
