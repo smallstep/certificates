@@ -475,6 +475,13 @@ func TestSCEP_ValidateChallenge(t *testing.T) {
 			Options:           &Options{},
 			ChallengePassword: "",
 		}, nil, args{"a-challenge-value", "static-transaction-1"}, nil, errors.New("invalid challenge password provided")},
+		{"ok/disabled-challenge-validation", &SCEP{
+			Name:                     "SCEP",
+			Type:                     "SCEP",
+			Options:                  &Options{},
+			ChallengePassword:        "secret-static-challenge",
+			DisableChallengePassword: true,
+		}, nil, args{"the-wrong-challenge-secret", "static-transaction-1"}, x509util.TemplateData{}, nil},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
