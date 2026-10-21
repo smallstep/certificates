@@ -63,10 +63,10 @@ type DB interface {
 type WireDB interface {
 	DB
 	GetAllOrdersByAccountID(ctx context.Context, accountID string) ([]string, error)
-	CreateDpopToken(ctx context.Context, orderID string, dpop map[string]interface{}) error
-	GetDpopToken(ctx context.Context, orderID string) (map[string]interface{}, error)
-	CreateOidcToken(ctx context.Context, orderID string, idToken map[string]interface{}) error
-	GetOidcToken(ctx context.Context, orderID string) (map[string]interface{}, error)
+	CreateDpopToken(ctx context.Context, orderID string, dpop map[string]any) error
+	GetDpopToken(ctx context.Context, orderID string) (map[string]any, error)
+	CreateOidcToken(ctx context.Context, orderID string, idToken map[string]any) error
+	GetOidcToken(ctx context.Context, orderID string) (map[string]any, error)
 }
 
 type dbKey struct{}
@@ -132,7 +132,7 @@ type MockDB struct {
 	MockGetOrdersByAccountID func(ctx context.Context, accountID string) ([]string, error)
 	MockUpdateOrder          func(ctx context.Context, o *Order) error
 
-	MockRet1  interface{}
+	MockRet1  any
 	MockError error
 }
 
@@ -142,10 +142,10 @@ type MockDB struct {
 type MockWireDB struct {
 	MockDB
 	MockGetAllOrdersByAccountID func(ctx context.Context, accountID string) ([]string, error)
-	MockGetDpopToken            func(ctx context.Context, orderID string) (map[string]interface{}, error)
-	MockCreateDpopToken         func(ctx context.Context, orderID string, dpop map[string]interface{}) error
-	MockGetOidcToken            func(ctx context.Context, orderID string) (map[string]interface{}, error)
-	MockCreateOidcToken         func(ctx context.Context, orderID string, idToken map[string]interface{}) error
+	MockGetDpopToken            func(ctx context.Context, orderID string) (map[string]any, error)
+	MockCreateDpopToken         func(ctx context.Context, orderID string, dpop map[string]any) error
+	MockGetOidcToken            func(ctx context.Context, orderID string) (map[string]any, error)
+	MockCreateOidcToken         func(ctx context.Context, orderID string, idToken map[string]any) error
 }
 
 // CreateAccount mock.

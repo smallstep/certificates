@@ -26,8 +26,8 @@ import (
 // NewOrderRequest represents the body for a NewOrder request.
 type NewOrderRequest struct {
 	Identifiers []acme.Identifier `json:"identifiers"`
-	NotBefore   time.Time         `json:"notBefore,omitempty,omitzero"`
-	NotAfter    time.Time         `json:"notAfter,omitempty,omitzero"`
+	NotBefore   time.Time         `json:"notBefore,omitzero"`
+	NotAfter    time.Time         `json:"notAfter,omitzero"`
 }
 
 // Validate validates a new-order request body.
@@ -310,8 +310,8 @@ func newACMEPolicyEngine(eak *acme.ExternalAccountKey) (policy.X509Policy, error
 }
 
 func trimIfWildcard(value string) (string, bool) {
-	if strings.HasPrefix(value, "*.") {
-		return strings.TrimPrefix(value, "*."), true
+	if after, ok := strings.CutPrefix(value, "*."); ok {
+		return after, true
 	}
 	return value, false
 }

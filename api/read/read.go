@@ -17,7 +17,7 @@ import (
 
 // JSON reads JSON from the request body and stores it in the value
 // pointed to by v.
-func JSON(r io.Reader, v interface{}) error {
+func JSON(r io.Reader, v any) error {
 	if err := json.NewDecoder(r).Decode(v); err != nil {
 		return errs.BadRequestErr(err, "error decoding json")
 	}

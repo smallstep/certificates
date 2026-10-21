@@ -23,15 +23,15 @@ import (
 func TestJSON(t *testing.T) {
 	type args struct {
 		r io.Reader
-		v interface{}
+		v any
 	}
 	tests := []struct {
 		name    string
 		args    args
 		wantErr bool
 	}{
-		{"ok", args{strings.NewReader(`{"foo":"bar"}`), make(map[string]interface{})}, false},
-		{"fail", args{strings.NewReader(`{"foo"}`), make(map[string]interface{})}, true},
+		{"ok", args{strings.NewReader(`{"foo":"bar"}`), make(map[string]any)}, false},
+		{"fail", args{strings.NewReader(`{"foo"}`), make(map[string]any)}, true},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -41,16 +41,15 @@ func TestJSON(t *testing.T) {
 			}
 
 			if tt.wantErr {
-				var e *errs.Error
-				if errors.As(err, &e) {
+				if e, ok := errors.AsType[*errs.Error](err); ok {
 					if code := e.StatusCode(); code != 400 {
 						t.Errorf("error.StatusCode() = %v, wants 400", code)
 					}
 				} else {
 					t.Errorf("error type = %T, wants *Error", err)
 				}
-			} else if !reflect.DeepEqual(tt.args.v, map[string]interface{}{"foo": "bar"}) {
-				t.Errorf("JSON value = %v, wants %v", tt.args.v, map[string]interface{}{"foo": "bar"})
+			} else if !reflect.DeepEqual(tt.args.v, map[string]any{"foo": "bar"}) {
+				t.Errorf("JSON value = %v, wants %v", tt.args.v, map[string]any{"foo": "bar"})
 			}
 		})
 	}

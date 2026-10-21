@@ -212,7 +212,7 @@ func wrapUnauthorizedError(cert *x509.Certificate, unauthorizedIdentifiers []acm
 // logRevoke logs successful revocation of certificate
 func logRevoke(w http.ResponseWriter, ri *authority.RevokeOptions) {
 	if rl, ok := w.(logging.ResponseLogger); ok {
-		rl.WithFields(map[string]interface{}{
+		rl.WithFields(map[string]any{
 			"serial":      ri.Serial,
 			"reasonCode":  ri.ReasonCode,
 			"reason":      ri.Reason,

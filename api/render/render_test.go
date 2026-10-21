@@ -19,7 +19,7 @@ func TestJSON(t *testing.T) {
 	rec := httptest.NewRecorder()
 	rw := logging.NewResponseLogger(rec)
 	r := httptest.NewRequest("POST", "/test", http.NoBody)
-	JSON(rw, r, map[string]interface{}{"foo": "bar"})
+	JSON(rw, r, map[string]any{"foo": "bar"})
 
 	assert.Equal(t, http.StatusOK, rec.Result().StatusCode)
 	assert.Equal(t, "application/json", rec.Header().Get("Content-Type"))

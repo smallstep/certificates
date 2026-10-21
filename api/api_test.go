@@ -191,7 +191,7 @@ func mockMustAuthority(t *testing.T, a Authority) {
 }
 
 type mockAuthority struct {
-	ret1, ret2                   interface{}
+	ret1, ret2                   any
 	err                          error
 	authorize                    func(ctx context.Context, ott string) ([]provisioner.SignOption, error)
 	authorizeRenewToken          func(ctx context.Context, ott string) (*x509.Certificate, error)
@@ -681,7 +681,7 @@ func TestSignRequest_Validate(t *testing.T) {
 }
 
 type mockProvisioner struct {
-	ret1, ret2, ret3   interface{}
+	ret1, ret2, ret3   any
 	err                error
 	getID              func() string
 	getIDForToken      func() string
@@ -1487,7 +1487,7 @@ func Test_fmtPublicKey(t *testing.T) {
 	}
 
 	type args struct {
-		pub, priv interface{}
+		pub, priv any
 		cert      *x509.Certificate
 	}
 	tests := []struct {
@@ -1516,7 +1516,7 @@ func Test_fmtPublicKey(t *testing.T) {
 	}
 }
 
-func mustCertificate(t *testing.T, pub, priv interface{}) *x509.Certificate {
+func mustCertificate(t *testing.T, pub, priv any) *x509.Certificate {
 	template := x509.Certificate{
 		SerialNumber: big.NewInt(1),
 		Subject: pkix.Name{

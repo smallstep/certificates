@@ -74,7 +74,7 @@ func (e *NamePolicyEngine) validateNames(dnsNames []string, ips []net.IP, emailA
 			}
 		}
 		if err := checkNameConstraints(DNSNameType, dns, parsedDNS,
-			func(parsedName, constraint interface{}) (bool, error) {
+			func(parsedName, constraint any) (bool, error) {
 				return e.matchDomainConstraint(parsedName.(string), constraint.(string))
 			}, e.permittedDNSDomains, e.excludedDNSDomains); err != nil {
 			return err
@@ -91,7 +91,7 @@ func (e *NamePolicyEngine) validateNames(dnsNames []string, ips []net.IP, emailA
 			}
 		}
 		if err := checkNameConstraints(IPNameType, ip.String(), ip,
-			func(parsedName, constraint interface{}) (bool, error) {
+			func(parsedName, constraint any) (bool, error) {
 				return matchIPConstraint(parsedName.(net.IP), constraint.(*net.IPNet))
 			}, e.permittedIPRanges, e.excludedIPRanges); err != nil {
 			return err
@@ -130,7 +130,7 @@ func (e *NamePolicyEngine) validateNames(dnsNames []string, ips []net.IP, emailA
 		}
 		mailbox.domain = domainASCII
 		if err := checkNameConstraints(EmailNameType, email, mailbox,
-			func(parsedName, constraint interface{}) (bool, error) {
+			func(parsedName, constraint any) (bool, error) {
 				return e.matchEmailConstraint(parsedName.(rfc2821Mailbox), constraint.(string))
 			}, e.permittedEmailAddresses, e.excludedEmailAddresses); err != nil {
 			return err
@@ -151,7 +151,7 @@ func (e *NamePolicyEngine) validateNames(dnsNames []string, ips []net.IP, emailA
 		// TODO(hs): ideally we'd like the uri.String() to be the original contents; now
 		// it's transformed into ASCII. Prevent that here?
 		if err := checkNameConstraints(URINameType, uri.String(), uri,
-			func(parsedName, constraint interface{}) (bool, error) {
+			func(parsedName, constraint any) (bool, error) {
 				return e.matchURIConstraint(parsedName.(*url.URL), constraint.(string))
 			}, e.permittedURIDomains, e.excludedURIDomains); err != nil {
 			return err
@@ -169,7 +169,7 @@ func (e *NamePolicyEngine) validateNames(dnsNames []string, ips []net.IP, emailA
 		}
 		// TODO: some validation? I.e. allowed characters?
 		if err := checkNameConstraints(PrincipalNameType, principal, principal,
-			func(parsedName, constraint interface{}) (bool, error) {
+			func(parsedName, constraint any) (bool, error) {
 				return matchPrincipalConstraint(parsedName.(string), constraint.(string))
 			}, e.permittedPrincipals, e.excludedPrincipals); err != nil {
 			return err
@@ -197,7 +197,7 @@ func (e *NamePolicyEngine) validateCommonName(commonName string) error {
 		// configured. If no error is returned from matching, the Common Name was
 		// explicitly allowed and nil is returned immediately.
 		if err := checkNameConstraints(CNNameType, commonName, commonName,
-			func(parsedName, constraint interface{}) (bool, error) {
+			func(parsedName, constraint any) (bool, error) {
 				return matchCommonNameConstraint(parsedName.(string), constraint.(string))
 			}, e.permittedCommonNames, e.excludedCommonNames); err == nil {
 			return nil
@@ -211,8 +211,7 @@ func (e *NamePolicyEngine) validateCommonName(commonName string) error {
 
 	err := e.validateNames(dnsNames, ips, emails, uris, []string{})
 
-	var pe *NamePolicyError
-	if errors.As(err, &pe) {
+	if pe, ok := errors.AsType[*NamePolicyError](err); ok {
 		// override the name type with CN
 		pe.NameType = CNNameType
 	}
@@ -226,9 +225,9 @@ func (e *NamePolicyEngine) validateCommonName(commonName string) error {
 func checkNameConstraints(
 	nameType NameType,
 	name string,
-	parsedName interface{},
-	match func(parsedName, constraint interface{}) (match bool, err error),
-	permitted, excluded interface{}) error {
+	parsedName any,
+	match func(parsedName, constraint any) (match bool, err error),
+	permitted, excluded any) error {
 	excludedValue := reflect.ValueOf(excluded)
 
 	for i := 0; i < excludedValue.Len(); i++ {

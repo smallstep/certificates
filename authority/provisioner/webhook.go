@@ -227,6 +227,8 @@ retry:
 		return nil, err
 	}
 
+	req.Header.Set("Content-Type", "application/json")
+
 	if requestID, ok := requestid.FromContext(ctx); ok {
 		req.Header.Set("X-Request-Id", requestID)
 	}

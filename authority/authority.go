@@ -843,7 +843,7 @@ func (a *Authority) init() error {
 			a.templates = templates.DefaultTemplates()
 		}
 		if a.templates.Data == nil {
-			a.templates.Data = make(map[string]interface{})
+			a.templates.Data = make(map[string]any)
 		}
 		a.templates.Data["Step"] = tmplVars
 	}

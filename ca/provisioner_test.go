@@ -213,7 +213,7 @@ func TestProvisioner_Token(t *testing.T) {
 				if lifetime != tt.fields.tokenLifetime {
 					t.Errorf("Claims token life time = %s, want %s", lifetime, tt.fields.tokenLifetime)
 				}
-				allClaims := make(map[string]interface{})
+				allClaims := make(map[string]any)
 				if err := jwt.Claims(tt.fields.jwk.Public(), &allClaims); err != nil {
 					t.Error(err)
 					return
@@ -222,15 +222,15 @@ func TestProvisioner_Token(t *testing.T) {
 					t.Errorf("Claim sha = %s, want %s", v, sha)
 				}
 				if len(tt.args.sans) == 0 {
-					if v, ok := allClaims["sans"].([]interface{}); !ok || !reflect.DeepEqual(v, []interface{}{tt.args.subject}) {
-						t.Errorf("Claim sans = %s, want %s", v, []interface{}{tt.args.subject})
+					if v, ok := allClaims["sans"].([]any); !ok || !reflect.DeepEqual(v, []any{tt.args.subject}) {
+						t.Errorf("Claim sans = %s, want %s", v, []any{tt.args.subject})
 					}
 				} else {
-					want := []interface{}{}
+					want := []any{}
 					for _, s := range tt.args.sans {
 						want = append(want, s)
 					}
-					if v, ok := allClaims["sans"].([]interface{}); !ok || !reflect.DeepEqual(v, want) {
+					if v, ok := allClaims["sans"].([]any); !ok || !reflect.DeepEqual(v, want) {
 						t.Errorf("Claim sans = %s, want %s", v, want)
 					}
 				}
@@ -309,7 +309,7 @@ func TestProvisioner_IPv6Token(t *testing.T) {
 				if lifetime != tt.fields.tokenLifetime {
 					t.Errorf("Claims token life time = %s, want %s", lifetime, tt.fields.tokenLifetime)
 				}
-				allClaims := make(map[string]interface{})
+				allClaims := make(map[string]any)
 				if err := jwt.Claims(tt.fields.jwk.Public(), &allClaims); err != nil {
 					t.Error(err)
 					return
@@ -318,15 +318,15 @@ func TestProvisioner_IPv6Token(t *testing.T) {
 					t.Errorf("Claim sha = %s, want %s", v, sha)
 				}
 				if len(tt.args.sans) == 0 {
-					if v, ok := allClaims["sans"].([]interface{}); !ok || !reflect.DeepEqual(v, []interface{}{tt.args.subject}) {
-						t.Errorf("Claim sans = %s, want %s", v, []interface{}{tt.args.subject})
+					if v, ok := allClaims["sans"].([]any); !ok || !reflect.DeepEqual(v, []any{tt.args.subject}) {
+						t.Errorf("Claim sans = %s, want %s", v, []any{tt.args.subject})
 					}
 				} else {
-					want := []interface{}{}
+					want := []any{}
 					for _, s := range tt.args.sans {
 						want = append(want, s)
 					}
-					if v, ok := allClaims["sans"].([]interface{}); !ok || !reflect.DeepEqual(v, want) {
+					if v, ok := allClaims["sans"].([]any); !ok || !reflect.DeepEqual(v, want) {
 						t.Errorf("Claim sans = %s, want %s", v, want)
 					}
 				}
@@ -407,7 +407,7 @@ func TestProvisioner_SSHToken(t *testing.T) {
 				if lifetime != tt.fields.tokenLifetime {
 					t.Errorf("Claims token life time = %s, want %s", lifetime, tt.fields.tokenLifetime)
 				}
-				allClaims := make(map[string]interface{})
+				allClaims := make(map[string]any)
 				if err := jwt.Claims(tt.fields.jwk.Public(), &allClaims); err != nil {
 					t.Error(err)
 					return
@@ -416,12 +416,12 @@ func TestProvisioner_SSHToken(t *testing.T) {
 					t.Errorf("Claim sha = %s, want %s", v, sha)
 				}
 
-				principals := make([]interface{}, len(tt.args.principals))
+				principals := make([]any, len(tt.args.principals))
 				for i, p := range tt.args.principals {
 					principals[i] = p
 				}
-				want := map[string]interface{}{
-					"ssh": map[string]interface{}{
+				want := map[string]any{
+					"ssh": map[string]any{
 						"certType":    tt.args.certType,
 						"keyID":       tt.args.keyID,
 						"principals":  principals,

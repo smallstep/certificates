@@ -224,7 +224,7 @@ func onboardPKI(cfg onboardingConfiguration) (*config.Config, string, error) {
 	return caConfig, p.GetRootFingerprint(), nil
 }
 
-func readJSON(r io.ReadCloser, v interface{}) error {
+func readJSON(r io.ReadCloser, v any) error {
 	defer r.Close()
 	return json.NewDecoder(r).Decode(v)
 }

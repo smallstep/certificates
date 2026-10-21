@@ -72,8 +72,7 @@ func TestDB_getDBAuthorityPolicyBytes(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			d := DB{db: tc.db}
 			if b, err := d.getDBAuthorityPolicyBytes(tc.ctx, tc.authorityID); err != nil {
-				var ae *admin.Error
-				if errors.As(err, &ae) {
+				if ae, ok := errors.AsType[*admin.Error](err); ok {
 					if assert.NotNil(t, tc.adminErr) {
 						assert.Equals(t, ae.Type, tc.adminErr.Type)
 						assert.Equals(t, ae.Detail, tc.adminErr.Detail)
@@ -208,8 +207,7 @@ func TestDB_getDBAuthorityPolicy(t *testing.T) {
 			dbp, err := d.getDBAuthorityPolicy(tc.ctx, tc.authorityID)
 			switch {
 			case err != nil:
-				var ae *admin.Error
-				if errors.As(err, &ae) {
+				if ae, ok := errors.AsType[*admin.Error](err); ok {
 					if assert.NotNil(t, tc.adminErr) {
 						assert.Equals(t, ae.Type, tc.adminErr.Type)
 						assert.Equals(t, ae.Detail, tc.adminErr.Detail)
@@ -309,8 +307,7 @@ func TestDB_CreateAuthorityPolicy(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			d := DB{db: tc.db, authorityID: tc.authorityID}
 			if err := d.CreateAuthorityPolicy(tc.ctx, tc.policy); err != nil {
-				var ae *admin.Error
-				if errors.As(err, &ae) {
+				if ae, ok := errors.AsType[*admin.Error](err); ok {
 					if assert.NotNil(t, tc.adminErr) {
 						assert.Equals(t, ae.Type, tc.adminErr.Type)
 						assert.Equals(t, ae.Detail, tc.adminErr.Detail)
@@ -406,8 +403,7 @@ func TestDB_GetAuthorityPolicy(t *testing.T) {
 			d := DB{db: tc.db, authorityID: tc.authorityID}
 			got, err := d.GetAuthorityPolicy(tc.ctx)
 			if err != nil {
-				var ae *admin.Error
-				if errors.As(err, &ae) {
+				if ae, ok := errors.AsType[*admin.Error](err); ok {
 					if assert.NotNil(t, tc.adminErr) {
 						assert.Equals(t, ae.Type, tc.adminErr.Type)
 						assert.Equals(t, ae.Detail, tc.adminErr.Detail)
@@ -578,8 +574,7 @@ func TestDB_UpdateAuthorityPolicy(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			d := DB{db: tc.db, authorityID: tc.authorityID}
 			if err := d.UpdateAuthorityPolicy(tc.ctx, tc.policy); err != nil {
-				var ae *admin.Error
-				if errors.As(err, &ae) {
+				if ae, ok := errors.AsType[*admin.Error](err); ok {
 					if assert.NotNil(t, tc.adminErr) {
 						assert.Equals(t, ae.Type, tc.adminErr.Type)
 						assert.Equals(t, ae.Detail, tc.adminErr.Detail)
@@ -718,8 +713,7 @@ func TestDB_DeleteAuthorityPolicy(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			d := DB{db: tc.db, authorityID: tc.authorityID}
 			if err := d.DeleteAuthorityPolicy(tc.ctx); err != nil {
-				var ae *admin.Error
-				if errors.As(err, &ae) {
+				if ae, ok := errors.AsType[*admin.Error](err); ok {
 					if assert.NotNil(t, tc.adminErr) {
 						assert.Equals(t, ae.Type, tc.adminErr.Type)
 						assert.Equals(t, ae.Detail, tc.adminErr.Detail)

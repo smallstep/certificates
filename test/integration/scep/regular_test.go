@@ -15,13 +15,11 @@ func TestIssuesCertificateUsingRegularSCEPConfiguration(t *testing.T) {
 	c := newTestCA(t, "Step E2E | SCEP Regular")
 
 	var wg sync.WaitGroup
-	wg.Add(1)
 
-	go func() {
-		defer wg.Done()
+	wg.Go(func() {
 		err := c.run()
 		require.ErrorIs(t, err, http.ErrServerClosed)
-	}()
+	})
 
 	// instantiate a client for the CA running at the random address
 	caClient := newCAClient(t, c.caURL, c.rootFilepath)
@@ -46,13 +44,11 @@ func TestBlocksCertificateRequestUsingInvalidChallenge(t *testing.T) {
 	c := newTestCA(t, "Step E2E | SCEP Regular w/ invalid challenge")
 
 	var wg sync.WaitGroup
-	wg.Add(1)
 
-	go func() {
-		defer wg.Done()
+	wg.Go(func() {
 		err := c.run()
 		require.ErrorIs(t, err, http.ErrServerClosed)
-	}()
+	})
 
 	// instantiate a client for the CA running at the random address
 	caClient := newCAClient(t, c.caURL, c.rootFilepath)
@@ -74,13 +70,11 @@ func TestBlocksUnsupportedMessageType(t *testing.T) {
 	c := newTestCA(t, "Step E2E | SCEP Regular w/ unsupported message type")
 
 	var wg sync.WaitGroup
-	wg.Add(1)
 
-	go func() {
-		defer wg.Done()
+	wg.Go(func() {
 		err := c.run()
 		require.ErrorIs(t, err, http.ErrServerClosed)
-	}()
+	})
 
 	// instantiate a client for the CA running at the random address
 	caClient := newCAClient(t, c.caURL, c.rootFilepath)
