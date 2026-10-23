@@ -374,6 +374,11 @@ func (o *OIDC) AuthorizeRenew(ctx context.Context, cert *x509.Certificate) error
 	return o.ctl.AuthorizeRenew(ctx, cert)
 }
 
+// NotifyX509Issued sends an issued certificate to the notifying webhooks.
+func (o *OIDC) NotifyX509Issued(ctx context.Context, csr *x509.CertificateRequest, cert *x509.Certificate) error {
+	return o.ctl.NotifyX509Issued(ctx, csr, cert)
+}
+
 // AuthorizeSSHSign returns the list of SignOption for a SignSSH request.
 func (o *OIDC) AuthorizeSSHSign(ctx context.Context, token string) ([]SignOption, error) {
 	if !o.ctl.Claimer.IsSSHCAEnabled() {
