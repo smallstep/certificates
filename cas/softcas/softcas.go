@@ -28,15 +28,22 @@ var now = time.Now
 // SoftCAS implements a Certificate Authority Service using Golang or KMS
 // crypto. This is the default CAS used in step-ca.
 type SoftCAS struct {
-	CertificateChain  []*x509.Certificate
-	Signer            crypto.Signer
-	CertificateSigner func() ([]*x509.Certificate, crypto.Signer, error)
-	KeyManager        kms.KeyManager
+	CertificateChain    []*x509.Certificate
+	Signer              crypto.Signer
+	CertificateSigner   func() ([]*x509.Certificate, crypto.Signer, error)
+	KeyManager          kms.KeyManager
+	IssuerValidityLimit apiv1.IssuerValidityLimit
+	RootCertificates    []*x509.Certificate
+
+	issuerValidityCache issuerValidityCache
 }
 
 // New creates a new CertificateAuthorityService implementation using Golang or KMS
 // crypto.
 func New(_ context.Context, opts apiv1.Options) (*SoftCAS, error) {
+	if err := opts.IssuerValidityLimit.Validate(); err != nil {
+		return nil, err
+	}
 	if !opts.IsCreator {
 		switch {
 		case len(opts.CertificateChain) == 0 && opts.CertificateSigner == nil:
@@ -46,10 +53,12 @@ func New(_ context.Context, opts apiv1.Options) (*SoftCAS, error) {
 		}
 	}
 	return &SoftCAS{
-		CertificateChain:  opts.CertificateChain,
-		Signer:            opts.Signer,
-		CertificateSigner: opts.CertificateSigner,
-		KeyManager:        opts.KeyManager,
+		CertificateChain:    opts.CertificateChain,
+		Signer:              opts.Signer,
+		CertificateSigner:   opts.CertificateSigner,
+		KeyManager:          opts.KeyManager,
+		IssuerValidityLimit: opts.IssuerValidityLimit,
+		RootCertificates:    append([]*x509.Certificate(nil), opts.RootCertificates...),
 	}, nil
 }
 
@@ -88,6 +97,10 @@ func (c *SoftCAS) CreateCertificate(req *apiv1.CreateCertificateRequest) (*apiv1
 	if err != nil {
 		return nil, err
 	}
+	warnings, err := c.limitCertificateValidity(req.Template, chain, c.RootCertificates, t)
+	if err != nil {
+		return nil, err
+	}
 	req.Template.Issuer = chain[0].Subject
 
 	cert, err := createCertificate(req.Template, chain[0], req.Template.PublicKey, signer)
@@ -98,6 +111,7 @@ func (c *SoftCAS) CreateCertificate(req *apiv1.CreateCertificateRequest) (*apiv1
 	return &apiv1.CreateCertificateResponse{
 		Certificate:      cert,
 		CertificateChain: chain,
+		Warnings:         warnings,
 	}, nil
 }
 
@@ -118,6 +132,10 @@ func (c *SoftCAS) RenewCertificate(req *apiv1.RenewCertificateRequest) (*apiv1.R
 	if err != nil {
 		return nil, err
 	}
+	warnings, err := c.limitCertificateValidity(req.Template, chain, c.RootCertificates, t)
+	if err != nil {
+		return nil, err
+	}
 	req.Template.Issuer = chain[0].Subject
 
 	cert, err := createCertificate(req.Template, chain[0], req.Template.PublicKey, signer)
@@ -128,6 +146,7 @@ func (c *SoftCAS) RenewCertificate(req *apiv1.RenewCertificateRequest) (*apiv1.R
 	return &apiv1.RenewCertificateResponse{
 		Certificate:      cert,
 		CertificateChain: chain,
+		Warnings:         warnings,
 	}, nil
 }
 
@@ -174,6 +193,29 @@ func (c *SoftCAS) CreateCertificateAuthority(req *apiv1.CreateCertificateAuthori
 		return nil, errors.New("createCertificateAuthorityRequest `parent.signer` cannot be nil")
 	}
 
+	t := now()
+	if req.Template.NotBefore.IsZero() {
+		req.Template.NotBefore = t.Add(-1 * req.Backdate)
+	}
+	if req.Template.NotAfter.IsZero() {
+		req.Template.NotAfter = t.Add(req.Lifetime)
+	}
+
+	// A subordinate CA's explicit parent path is independent of leaf roots.
+	var chain []*x509.Certificate
+	var warnings []apiv1.CertificateWarning
+	if req.Parent != nil {
+		chain = append(chain, req.Parent.Certificate)
+		chain = append(chain, req.Parent.CertificateChain...)
+	}
+	if req.Type == apiv1.IntermediateCA {
+		var err error
+		warnings, err = c.limitCertificateValidity(req.Template, chain, nil, t)
+		if err != nil {
+			return nil, err
+		}
+	}
+
 	key, err := c.createKey(req.CreateKey)
 	if err != nil {
 		return nil, err
@@ -182,14 +224,6 @@ func (c *SoftCAS) CreateCertificateAuthority(req *apiv1.CreateCertificateAuthori
 	signer, err := c.createSigner(&key.CreateSignerRequest)
 	if err != nil {
 		return nil, err
-	}
-
-	t := now()
-	if req.Template.NotBefore.IsZero() {
-		req.Template.NotBefore = t.Add(-1 * req.Backdate)
-	}
-	if req.Template.NotAfter.IsZero() {
-		req.Template.NotAfter = t.Add(req.Lifetime)
 	}
 
 	var cert *x509.Certificate
@@ -208,13 +242,6 @@ func (c *SoftCAS) CreateCertificateAuthority(req *apiv1.CreateCertificateAuthori
 		return nil, errors.Errorf("createCertificateAuthorityRequest `type=%d' is invalid or not supported", req.Type)
 	}
 
-	// Add the parent
-	var chain []*x509.Certificate
-	if req.Parent != nil {
-		chain = append(chain, req.Parent.Certificate)
-		chain = append(chain, req.Parent.CertificateChain...)
-	}
-
 	return &apiv1.CreateCertificateAuthorityResponse{
 		Name:             cert.Subject.CommonName,
 		Certificate:      cert,
@@ -223,6 +250,7 @@ func (c *SoftCAS) CreateCertificateAuthority(req *apiv1.CreateCertificateAuthori
 		PublicKey:        key.PublicKey,
 		PrivateKey:       key.PrivateKey,
 		Signer:           signer,
+		Warnings:         warnings,
 	}, nil
 }
 

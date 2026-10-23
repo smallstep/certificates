@@ -44,8 +44,9 @@ func Rekey(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	a := mustAuthority(r.Context())
-	certChain, err := a.Rekey(r.TLS.PeerCertificates[0], body.CsrPEM.CertificateRequest.PublicKey)
+	ctx, warnings := collectCertificateWarnings(r.Context())
+	a := mustAuthority(ctx)
+	certChain, err := a.RenewContext(ctx, r.TLS.PeerCertificates[0], body.CsrPEM.CertificateRequest.PublicKey)
 	if err != nil {
 		render.Error(w, r, errs.Wrap(http.StatusInternalServerError, err, "cahandler.Rekey"))
 		return
@@ -62,5 +63,6 @@ func Rekey(w http.ResponseWriter, r *http.Request) {
 		CaPEM:        caPEM,
 		CertChainPEM: certChainPEM,
 		TLSOptions:   a.GetTLSOptions(),
+		Warnings:     *warnings,
 	}, http.StatusCreated)
 }

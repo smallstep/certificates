@@ -482,6 +482,23 @@ func (a *Authority) init() error {
 			a.rootX509Certs = append(a.rootX509Certs, crts...)
 		}
 	}
+
+	// Configure local issuer limits only after the actual roots are available.
+	// Injected signers bypass CAS construction, so this must also run for them.
+	var issuerLimit casapi.IssuerValidityLimit
+	if options := a.config.AuthorityConfig.Options; options != nil {
+		issuerLimit = options.IssuerValidityLimit
+	}
+	if err := issuerLimit.Validate(); err != nil {
+		return err
+	}
+	if limiter, ok := a.x509CAService.(casapi.IssuerValidityLimiter); ok {
+		if err := limiter.SetIssuerValidityLimit(issuerLimit, a.rootX509Certs); err != nil {
+			return err
+		}
+	} else if issuerLimit != "" {
+		return errors.New("issuerValidityLimit is not supported by the configured certificate authority service; configure the issuing CA instead")
+	}
 	for _, crt := range a.rootX509Certs {
 		sum := sha256.Sum256(crt.Raw)
 		a.certificates.Store(hex.EncodeToString(sum[:]), crt)

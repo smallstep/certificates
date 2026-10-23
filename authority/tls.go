@@ -30,6 +30,7 @@ import (
 	casapi "github.com/smallstep/certificates/cas/apiv1"
 	"github.com/smallstep/certificates/db"
 	"github.com/smallstep/certificates/errs"
+	"github.com/smallstep/certificates/logging"
 	"github.com/smallstep/certificates/webhook"
 	"github.com/smallstep/nosql/database"
 )
@@ -307,6 +308,10 @@ func (a *Authority) signX509(ctx context.Context, csr *x509.CertificateRequest, 
 		Provisioner: pInfo,
 	})
 	if err != nil {
+		var policyErr *casapi.IssuerValidityError
+		if errors.As(err, &policyErr) {
+			err = errs.NewError(policyErr.StatusCode(), err, "%s", policyErr.Error())
+		}
 		return nil, prov, errs.Wrap(http.StatusInternalServerError, err, "authority.Sign; error creating certificate", opts...)
 	}
 
@@ -320,6 +325,9 @@ func (a *Authority) signX509(ctx context.Context, csr *x509.CertificateRequest, 
 	// Store certificate in the db.
 	if err := a.storeCertificate(prov, chain); err != nil && !errors.Is(err, db.ErrNotImplemented) {
 		return nil, prov, errs.Wrap(http.StatusInternalServerError, err, "authority.Sign; error storing certificate in db", opts...)
+	}
+	for _, warning := range resp.Warnings {
+		logging.LogCertificateWarning(ctx, warning)
 	}
 
 	return chain, prov, nil
@@ -482,6 +490,10 @@ func (a *Authority) renewContext(ctx context.Context, oldCert *x509.Certificate,
 		Token:    token,
 	})
 	if err != nil {
+		var policyErr *casapi.IssuerValidityError
+		if errors.As(err, &policyErr) {
+			err = errs.NewError(policyErr.StatusCode(), err, "%s", policyErr.Error())
+		}
 		return nil, prov, errs.StatusCodeError(http.StatusInternalServerError, err, opts...)
 	}
 
@@ -489,6 +501,9 @@ func (a *Authority) renewContext(ctx context.Context, oldCert *x509.Certificate,
 
 	if err = a.storeRenewedCertificate(oldCert, chain); err != nil && !errors.Is(err, db.ErrNotImplemented) {
 		return nil, prov, errs.StatusCodeError(http.StatusInternalServerError, err, opts...)
+	}
+	for _, warning := range resp.Warnings {
+		logging.LogCertificateWarning(ctx, warning)
 	}
 
 	return chain, prov, nil
@@ -955,6 +970,10 @@ func (a *Authority) GetTLSCertificate() (*tls.Certificate, error) {
 		IsCAServerCert: true,
 	})
 	if err != nil {
+		var policyErr *casapi.IssuerValidityError
+		if errors.As(err, &policyErr) {
+			err = errs.NewError(policyErr.StatusCode(), err, "%s", policyErr.Error())
+		}
 		return fatal(err)
 	}
 
@@ -980,6 +999,9 @@ func (a *Authority) GetTLSCertificate() (*tls.Certificate, error) {
 	}
 	// Set leaf certificate
 	tlsCrt.Leaf = resp.Certificate
+	for _, warning := range resp.Warnings {
+		logging.LogCertificateWarning(context.Background(), warning)
+	}
 	return &tlsCrt, nil
 }
 

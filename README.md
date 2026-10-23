@@ -125,6 +125,79 @@ ACME is the protocol used by Let's Encrypt to automate the issuance of HTTPS cer
 - [Install root certificates](https://smallstep.com/docs/step-cli/reference/certificate/install/) on your machine and browsers, so your CA is trusted
 - [Inspect](https://smallstep.com/docs/step-cli/reference/certificate/inspect/) and [lint](https://smallstep.com/docs/step-cli/reference/certificate/lint/) certificates
 
+### Issuer validity limits
+
+Local SoftCAS issuance bounds X.509 expiration to the selected signing path,
+including its applicable configured root, rather than every root in the trust
+store. This applies to signing, renewal/rekey, SSH-associated X.509 identities,
+and subordinate CA creation. Returned issuer bundles are unchanged.
+
+The optional `authority.issuerValidityLimit` setting accepts `truncate` (the
+default) or `reject`:
+
+```json
+{
+  "authority": {
+    "issuerValidityLimit": "truncate"
+  }
+}
+```
+
+`truncate` reduces only the resolved `NotAfter`, after the original request has
+passed provisioner validation. A positive remaining interval may be shorter
+than `minTLSCertDuration`; an already-expired or non-positive interval is always
+rejected. Equal or earlier requested expiry is unchanged.
+
+`reject` refuses an expiry beyond the issuing path with native HTTP 403 and a
+safe chain-expiry diagnostic. It also applies to the CA's own 24-hour TLS
+certificate: restarting near issuer expiry can fail, without a truncation
+exemption. There is no per-request override or `off` mode.
+
+Direct standalone SoftCAS callers without roots are limited to their supplied
+issuer path; initialized `step-ca` supplies configured roots separately.
+Bundles must be ordered, cryptographically linked paths. This is expiry
+enforcement, not new PKIX/name-constraint or ancestor-start-date validation.
+Other CAS backends retain their behavior when the setting is omitted and refuse
+an explicit unsupported policy. A StepCAS RA relies on the issuing CA's policy,
+not its TLS trust chain.
+
+Successful truncation emits a server warning and, for native sign/renew/rekey
+and SSH X.509 identity responses, an optional `warnings` array. Warning-free
+responses omit it. For example (certificate fields omitted):
+
+```json
+{
+  "warnings": [{
+    "code": "issuer_validity_truncated",
+    "message": "Certificate expiration was reduced from 2026-10-13T00:00:00Z to 2026-10-10T12:00:00Z because the issuing CA chain expires then. Contact the CA operator to renew the limiting CA certificate.",
+    "requestedNotAfter": "2026-10-13T00:00:00Z",
+    "effectiveNotAfter": "2026-10-10T12:00:00Z",
+    "limitingCertificate": {
+      "subject": "CN=Example root CA",
+      "fingerprint": "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
+      "notAfter": "2026-10-10T12:00:00Z"
+    }
+  }]
+}
+```
+
+`requestedNotAfter` is the resolved expiry before limiting, including defaults,
+templates, or renewal arithmetic. Dates are UTC with certificate-second
+precision; the fingerprint is lowercase SHA-256 of the limiting certificate
+DER, distinguishing same-subject rollovers. A configured HTTP logger emits one
+WARN access record with `certificate-warnings` and the existing request
+correlation fields; non-HTTP TLS/PKI issuance uses a standard warning log.
+StepCAS forwards actual upstream warnings unchanged. ACME/SCEP preserve their
+standard successful certificate payloads and server-side warning logs, but
+arbitrary protocol clients cannot be promised to display native warnings.
+The coordinated `step` CLI prints warnings once on stderr after successful
+credential handling, without contaminating PEM/stdout or changing success.
+
+Truncation does not renew a CA or repair existing certificates. Renewal retains
+the previous leaf duration, so a shortened duration can persist after CA
+rotation. Fixed CLI renewal periods longer than the remaining lifetime can
+cause immediate repeated renewals near expiry; scheduling policy is unchanged.
+
 ## Installation
 
 See our installation docs [here](https://smallstep.com/docs/step-ca/installation).
