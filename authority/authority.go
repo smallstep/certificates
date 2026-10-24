@@ -273,9 +273,17 @@ func (a *Authority) ReloadAdminResources(ctx context.Context) error {
 	provClxn := provisioner.NewCollection(provisionerConfig.Audiences)
 	for _, p := range provList {
 		if err := p.Init(provisionerConfig); err != nil {
-			log.Printf("failed to initialize %s provisioner %q: %v\n", p.GetType(), p.GetName(), err)
-			p = provisioner.Uninitialized{
-				Interface: p, Reason: err,
+			// Provisioners that failed for a temporary reason, e.g. an OIDC
+			// provisioner that cannot reach its identity provider, stay enabled
+			// and initialize themselves when they are used.
+			if errors.Is(err, provisioner.ErrRetryInit) {
+				log.Printf("failed to initialize %s provisioner %q, it will be retried when the provisioner is used: %v\n",
+					p.GetType(), p.GetName(), err)
+			} else {
+				log.Printf("failed to initialize %s provisioner %q: %v\n", p.GetType(), p.GetName(), err)
+				p = provisioner.Uninitialized{
+					Interface: p, Reason: err,
+				}
 			}
 		}
 		if err := provClxn.Store(p); err != nil {
