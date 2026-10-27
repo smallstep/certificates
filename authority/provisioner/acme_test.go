@@ -36,6 +36,7 @@ func TestACMEChallenge_Validate(t *testing.T) {
 		{"device-attest-01", DEVICE_ATTEST_01, false},
 		{"wire-oidc-01", DEVICE_ATTEST_01, false},
 		{"wire-dpop-01", DEVICE_ATTEST_01, false},
+		{"dns-persist-01", DNS_PERSIST_01, false},
 		{"uppercase", "HTTP-01", false},
 		{"fail", "http-02", true},
 	}
@@ -93,6 +94,13 @@ func TestACME_Getters(t *testing.T) {
 	tokenID, err := p.GetTokenID("token")
 	assert.Empty(t, tokenID)
 	assert.Equal(t, ErrTokenFlowNotSupported, err)
+	assert.Empty(t, p.GetIssuerDomainNames())
+	assert.Empty(t, p.GetAccountHashPrefix())
+
+	p.IssuerDomainNames = []string{"ca.example.com"}
+	p.AccountHashPrefix = "https://ca.example.com/acme/account-hash/"
+	assert.Equal(t, []string{"ca.example.com"}, p.GetIssuerDomainNames())
+	assert.Equal(t, "https://ca.example.com/acme/account-hash/", p.GetAccountHashPrefix())
 }
 
 func TestACME_Init(t *testing.T) {
@@ -198,6 +206,130 @@ MCowBQYDK2VwAyEA5c+4NKZSNQcR1T8qN6SjwgdPZQ0Ge12Ylx/YeGAJ35k=
 				err: errors.New("failed initializing Wire options: failed validating Wire options: failed initializing OIDC options: provider not set"),
 			}
 		},
+		"fail/dns-persist-missing-issuer-domain-names": func(t *testing.T) ProvisionerValidateTest {
+			return ProvisionerValidateTest{
+				p: &ACME{
+					Name:              "foo",
+					Type:              "ACME",
+					Challenges:        []ACMEChallenge{DNS_PERSIST_01},
+					AccountHashPrefix: "https://ca.example.com/acme/account-hash/",
+				},
+				err: errors.New("failed validating dns-persist-01 options: issuerDomainNames cannot be empty"),
+			}
+		},
+		"fail/dns-persist-too-many-issuer-domain-names": func(t *testing.T) ProvisionerValidateTest {
+			names := make([]string, 11)
+			for i := range names {
+				names[i] = fmt.Sprintf("ca%d.example.com", i)
+			}
+			return ProvisionerValidateTest{
+				p: &ACME{
+					Name:              "foo",
+					Type:              "ACME",
+					Challenges:        []ACMEChallenge{DNS_PERSIST_01},
+					IssuerDomainNames: names,
+					AccountHashPrefix: "https://ca.example.com/acme/account-hash/",
+				},
+				err: errors.New("failed validating dns-persist-01 options: issuerDomainNames cannot have more than 10 names"),
+			}
+		},
+		"fail/dns-persist-invalid-issuer-domain-name": func(t *testing.T) ProvisionerValidateTest {
+			return ProvisionerValidateTest{
+				p: &ACME{
+					Name:              "foo",
+					Type:              "ACME",
+					Challenges:        []ACMEChallenge{DNS_PERSIST_01},
+					IssuerDomainNames: []string{"ca_example.com"},
+					AccountHashPrefix: "https://ca.example.com/acme/account-hash/",
+				},
+				err: errors.New(`failed validating dns-persist-01 options: issuerDomainNames "ca_example.com" is not valid: server name contains invalid character`),
+			}
+		},
+		"fail/dns-persist-issuer-domain-name-too-long": func(t *testing.T) ProvisionerValidateTest {
+			name := strings.Repeat(strings.Repeat("a", 63)+".", 4) + "com"
+			return ProvisionerValidateTest{
+				p: &ACME{
+					Name:              "foo",
+					Type:              "ACME",
+					Challenges:        []ACMEChallenge{DNS_PERSIST_01},
+					IssuerDomainNames: []string{name},
+					AccountHashPrefix: "https://ca.example.com/acme/account-hash/",
+				},
+				err: fmt.Errorf("failed validating dns-persist-01 options: issuerDomainNames %q is not valid: domain name cannot be longer than 253 octets", name),
+			}
+		},
+		"fail/dns-persist-issuer-domain-name-not-normalized": func(t *testing.T) ProvisionerValidateTest {
+			return ProvisionerValidateTest{
+				p: &ACME{
+					Name:              "foo",
+					Type:              "ACME",
+					Challenges:        []ACMEChallenge{DNS_PERSIST_01},
+					IssuerDomainNames: []string{"CA.Example.com."},
+					AccountHashPrefix: "https://ca.example.com/acme/account-hash/",
+				},
+				err: errors.New(`failed validating dns-persist-01 options: issuerDomainNames "CA.Example.com." must be a lowercase A-label without a trailing dot; use "ca.example.com" instead`),
+			}
+		},
+		"fail/dns-persist-issuer-domain-name-not-a-label": func(t *testing.T) ProvisionerValidateTest {
+			return ProvisionerValidateTest{
+				p: &ACME{
+					Name:              "foo",
+					Type:              "ACME",
+					Challenges:        []ACMEChallenge{DNS_PERSIST_01},
+					IssuerDomainNames: []string{"bücher.example"},
+					AccountHashPrefix: "https://ca.example.com/acme/account-hash/",
+				},
+				err: errors.New(`failed validating dns-persist-01 options: issuerDomainNames "bücher.example" must be a lowercase A-label without a trailing dot; use "xn--bcher-kva.example" instead`),
+			}
+		},
+		"fail/dns-persist-issuer-domain-name-not-in-caa-identities": func(t *testing.T) ProvisionerValidateTest {
+			return ProvisionerValidateTest{
+				p: &ACME{
+					Name:              "foo",
+					Type:              "ACME",
+					Challenges:        []ACMEChallenge{DNS_PERSIST_01},
+					CaaIdentities:     []string{"ca.example.com"},
+					IssuerDomainNames: []string{"ca.example.com", "ca.example.net"},
+					AccountHashPrefix: "https://ca.example.com/acme/account-hash/",
+				},
+				err: errors.New(`failed validating dns-persist-01 options: issuerDomainNames "ca.example.net" must be included in caaIdentities`),
+			}
+		},
+		"fail/dns-persist-missing-account-hash-prefix": func(t *testing.T) ProvisionerValidateTest {
+			return ProvisionerValidateTest{
+				p: &ACME{
+					Name:              "foo",
+					Type:              "ACME",
+					Challenges:        []ACMEChallenge{DNS_PERSIST_01},
+					IssuerDomainNames: []string{"ca.example.com"},
+				},
+				err: errors.New("failed validating dns-persist-01 options: accountHashPrefix cannot be empty"),
+			}
+		},
+		"fail/dns-persist-account-hash-prefix-invalid-characters": func(t *testing.T) ProvisionerValidateTest {
+			return ProvisionerValidateTest{
+				p: &ACME{
+					Name:              "foo",
+					Type:              "ACME",
+					Challenges:        []ACMEChallenge{DNS_PERSIST_01},
+					IssuerDomainNames: []string{"ca.example.com"},
+					AccountHashPrefix: "https://ca.example.com/acme;account-hash/",
+				},
+				err: errors.New(`failed validating dns-persist-01 options: accountHashPrefix "https://ca.example.com/acme;account-hash/" contains invalid characters`),
+			}
+		},
+		"fail/dns-persist-account-hash-prefix-not-absolute": func(t *testing.T) ProvisionerValidateTest {
+			return ProvisionerValidateTest{
+				p: &ACME{
+					Name:              "foo",
+					Type:              "ACME",
+					Challenges:        []ACMEChallenge{DNS_PERSIST_01},
+					IssuerDomainNames: []string{"ca.example.com"},
+					AccountHashPrefix: "/acme/account-hash/",
+				},
+				err: errors.New(`failed validating dns-persist-01 options: accountHashPrefix "/acme/account-hash/" is not a valid absolute URL prefix`),
+			}
+		},
 		"ok": func(t *testing.T) ProvisionerValidateTest {
 			return ProvisionerValidateTest{
 				p: &ACME{Name: "foo", Type: "ACME"},
@@ -211,6 +343,28 @@ MCowBQYDK2VwAyEA5c+4NKZSNQcR1T8qN6SjwgdPZQ0Ge12Ylx/YeGAJ35k=
 					Challenges:         []ACMEChallenge{DNS_01, DEVICE_ATTEST_01},
 					AttestationFormats: []ACMEAttestationFormat{APPLE, STEP, ANDROIDKEY},
 					AttestationRoots:   bytes.Join([][]byte{appleCA, yubicoCA}, []byte("\n")),
+				},
+			}
+		},
+		"ok/dns-persist": func(t *testing.T) ProvisionerValidateTest {
+			return ProvisionerValidateTest{
+				p: &ACME{
+					Name:              "foo",
+					Type:              "ACME",
+					Challenges:        []ACMEChallenge{DNS_01, "DNS-PERSIST-01"},
+					CaaIdentities:     []string{"CA.example.com.", "ca.example.net"},
+					IssuerDomainNames: []string{"ca.example.com"},
+					AccountHashPrefix: "https://ca.example.com/acme/account-hash/",
+				},
+			}
+		},
+		"ok/dns-persist-disabled": func(t *testing.T) ProvisionerValidateTest {
+			return ProvisionerValidateTest{
+				p: &ACME{
+					Name:              "foo",
+					Type:              "ACME",
+					Challenges:        []ACMEChallenge{DNS_01},
+					IssuerDomainNames: []string{"CA.example.com."},
 				},
 			}
 		},
@@ -395,12 +549,14 @@ func TestACME_IsChallengeEnabled(t *testing.T) {
 		{"ok dns-01", fields{nil}, args{ctx, DNS_01}, true},
 		{"ok tls-alpn-01", fields{[]ACMEChallenge{}}, args{ctx, TLS_ALPN_01}, true},
 		{"fail device-attest-01", fields{[]ACMEChallenge{}}, args{ctx, "device-attest-01"}, false},
+		{"fail dns-persist-01", fields{nil}, args{ctx, DNS_PERSIST_01}, false},
 		{"ok http-01 enabled", fields{[]ACMEChallenge{"http-01"}}, args{ctx, "HTTP-01"}, true},
 		{"ok dns-01 enabled", fields{[]ACMEChallenge{"http-01", "dns-01"}}, args{ctx, DNS_01}, true},
 		{"ok tls-alpn-01 enabled", fields{[]ACMEChallenge{"http-01", "dns-01", "tls-alpn-01"}}, args{ctx, TLS_ALPN_01}, true},
 		{"ok device-attest-01 enabled", fields{[]ACMEChallenge{"device-attest-01", "dns-01"}}, args{ctx, DEVICE_ATTEST_01}, true},
 		{"ok wire-oidc-01 enabled", fields{[]ACMEChallenge{"wire-oidc-01"}}, args{ctx, WIREOIDC_01}, true},
 		{"ok wire-dpop-01 enabled", fields{[]ACMEChallenge{"wire-dpop-01"}}, args{ctx, WIREDPOP_01}, true},
+		{"ok dns-persist-01 enabled", fields{[]ACMEChallenge{"dns-01", "dns-persist-01"}}, args{ctx, DNS_PERSIST_01}, true},
 		{"fail http-01", fields{[]ACMEChallenge{"dns-01"}}, args{ctx, "http-01"}, false},
 		{"fail dns-01", fields{[]ACMEChallenge{"http-01", "tls-alpn-01"}}, args{ctx, "dns-01"}, false},
 		{"fail tls-alpn-01", fields{[]ACMEChallenge{"http-01", "dns-01", "device-attest-01"}}, args{ctx, "tls-alpn-01"}, false},

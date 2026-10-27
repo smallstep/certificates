@@ -905,6 +905,8 @@ func ProvisionerToCertificates(p *linkedca.Provisioner) (provisioner.Interface, 
 			Challenges:         challengesToCertificates(cfg.Challenges),
 			AttestationFormats: attestationFormatsToCertificates(cfg.AttestationFormats),
 			AttestationRoots:   provisionerPEMToCertificates(cfg.AttestationRoots),
+			IssuerDomainNames:  cfg.IssuerDomainNames,
+			AccountHashPrefix:  cfg.AccountHashPrefix,
 			Claims:             claims,
 			Options:            options,
 		}, nil
@@ -1184,6 +1186,8 @@ func ProvisionerToLinkedca(p provisioner.Interface) (*linkedca.Provisioner, erro
 						Challenges:         challengesToLinkedca(p.Challenges),
 						AttestationFormats: attestationFormatsToLinkedca(p.AttestationFormats),
 						AttestationRoots:   provisionerPEMToLinkedca(p.AttestationRoots),
+						IssuerDomainNames:  p.IssuerDomainNames,
+						AccountHashPrefix:  p.AccountHashPrefix,
 					},
 				},
 			},
@@ -1331,6 +1335,8 @@ func challengesToCertificates(challenges []linkedca.ACMEProvisioner_ChallengeTyp
 			ret = append(ret, provisioner.TLS_ALPN_01)
 		case linkedca.ACMEProvisioner_DEVICE_ATTEST_01:
 			ret = append(ret, provisioner.DEVICE_ATTEST_01)
+		case linkedca.ACMEProvisioner_DNS_PERSIST_01:
+			ret = append(ret, provisioner.DNS_PERSIST_01)
 		}
 	}
 	return ret
@@ -1350,6 +1356,8 @@ func challengesToLinkedca(challenges []provisioner.ACMEChallenge) []linkedca.ACM
 			ret = append(ret, linkedca.ACMEProvisioner_TLS_ALPN_01)
 		case provisioner.DEVICE_ATTEST_01:
 			ret = append(ret, linkedca.ACMEProvisioner_DEVICE_ATTEST_01)
+		case provisioner.DNS_PERSIST_01:
+			ret = append(ret, linkedca.ACMEProvisioner_DNS_PERSIST_01)
 		}
 	}
 	return ret
