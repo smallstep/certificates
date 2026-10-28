@@ -65,26 +65,27 @@ var (
 
 // Config represents the CA configuration and it's mapped to a JSON object.
 type Config struct {
-	Root             multiString          `json:"root"`
-	FederatedRoots   []string             `json:"federatedRoots"`
-	IntermediateCert string               `json:"crt"`
-	IntermediateKey  string               `json:"key"`
-	Address          string               `json:"address"`
-	InsecureAddress  string               `json:"insecureAddress"`
-	DNSNames         []string             `json:"dnsNames"`
-	KMS              *kms.Options         `json:"kms,omitempty"`
-	SSH              *SSHConfig           `json:"ssh,omitempty"`
-	Logger           json.RawMessage      `json:"logger,omitempty"`
-	DB               *db.Config           `json:"db,omitempty"`
-	Monitoring       json.RawMessage      `json:"monitoring,omitempty"`
-	AuthorityConfig  *AuthConfig          `json:"authority,omitempty"`
-	TLS              *TLSOptions          `json:"tls,omitempty"`
-	Password         string               `json:"password,omitempty"`
-	Templates        *templates.Templates `json:"templates,omitempty"`
-	CommonName       string               `json:"commonName,omitempty"`
-	CRL              *CRLConfig           `json:"crl,omitempty"`
-	MetricsAddress   string               `json:"metricsAddress,omitempty"`
-	SkipValidation   bool                 `json:"-"`
+	Root               multiString          `json:"root"`
+	FederatedRoots     []string             `json:"federatedRoots"`
+	IntermediateCert   string               `json:"crt"`
+	IntermediateKey    string               `json:"key"`
+	Address            string               `json:"address"`
+	InsecureAddress    string               `json:"insecureAddress"`
+	DNSNames           []string             `json:"dnsNames"`
+	KMS                *kms.Options         `json:"kms,omitempty"`
+	SSH                *SSHConfig           `json:"ssh,omitempty"`
+	Logger             json.RawMessage      `json:"logger,omitempty"`
+	DB                 *db.Config           `json:"db,omitempty"`
+	Monitoring         json.RawMessage      `json:"monitoring,omitempty"`
+	AuthorityConfig    *AuthConfig          `json:"authority,omitempty"`
+	TLS                *TLSOptions          `json:"tls,omitempty"`
+	Password           string               `json:"password,omitempty"`
+	Templates          *templates.Templates `json:"templates,omitempty"`
+	CommonName         string               `json:"commonName,omitempty"`
+	CRL                *CRLConfig           `json:"crl,omitempty"`
+	MetricsAddress     string               `json:"metricsAddress,omitempty"`
+	SkipValidation     bool                 `json:"-"`
+	SkipSCEPValidation bool                 `json:"-"`
 
 	// Keeps record of the filename the Config is read from
 	loadedFromFilepath string
