@@ -209,6 +209,8 @@ const (
 	TypeSCEP Type = 10
 	// TypeNebula is used to indicate the Nebula provisioners
 	TypeNebula Type = 11
+	// TypeEST is used to indicate the EST provisioners
+	TypeEST Type = 12
 )
 
 // String returns the string representation of the type.
@@ -236,6 +238,8 @@ func (t Type) String() string {
 		return "SCEP"
 	case TypeNebula:
 		return "Nebula"
+	case TypeEST:
+		return "EST"
 	default:
 		return ""
 	}
@@ -333,6 +337,8 @@ func (l *List) UnmarshalJSON(data []byte) error {
 			p = &SCEP{}
 		case "nebula":
 			p = &Nebula{}
+		case "est":
+			p = &EST{}
 		default:
 			// Skip unsupported provisioners. A client using this method may be
 			// compiled with a version of smallstep/certificates that does not
