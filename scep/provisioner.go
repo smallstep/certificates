@@ -17,6 +17,7 @@ type Provisioner interface {
 	GetCapabilities() []string
 	ShouldIncludeRootInChain() bool
 	ShouldIncludeIntermediateInChain() bool
+	ShouldReturnEntireCertChain() bool
 	GetDecrypter() (*x509.Certificate, crypto.Decrypter)
 	GetSigner() (*x509.Certificate, crypto.Signer)
 	GetContentEncryptionAlgorithm() int
