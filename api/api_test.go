@@ -1718,6 +1718,43 @@ func TestIntermediates(t *testing.T) {
 	}
 }
 
+func TestIntermediateCert(t *testing.T) {
+	ca, err := minica.New()
+	require.NoError(t, err)
+
+	getRequest := func(t *testing.T, crt []*x509.Certificate) *http.Request {
+		mockMustAuthority(t, &mockAuthority{
+			ret1: crt,
+		})
+		return httptest.NewRequest("GET", "/intermediate.crt", http.NoBody)
+	}
+
+	type args struct {
+		crts []*x509.Certificate
+	}
+	tests := []struct {
+		name            string
+		args            args
+		wantStatusCode  int
+		wantContentType string
+		wantBody        []byte
+	}{
+		{"ok", args{[]*x509.Certificate{ca.Intermediate}}, http.StatusOK, "application/pkix-cert", ca.Intermediate.Raw},
+		{"ok multiple returns first", args{[]*x509.Certificate{ca.Intermediate, ca.Root}}, http.StatusOK, "application/pkix-cert", ca.Intermediate.Raw},
+		{"fail", args{}, http.StatusNotImplemented, "application/json", mustJSON(t, errs.NotImplemented("not implemented"))},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			w := httptest.NewRecorder()
+			r := getRequest(t, tt.args.crts)
+			IntermediateCert(w, r)
+			assert.Equal(t, tt.wantStatusCode, w.Result().StatusCode)
+			assert.Equal(t, tt.wantContentType, w.Result().Header.Get("Content-Type"))
+			assert.Equal(t, tt.wantBody, w.Body.Bytes())
+		})
+	}
+}
+
 func TestIntermediatesPEM(t *testing.T) {
 	ca, err := minica.New()
 	require.NoError(t, err)
