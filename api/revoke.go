@@ -42,9 +42,6 @@ func (r *RevokeRequest) Validate() (err error) {
 	if r.ReasonCode < ocsp.Unspecified || r.ReasonCode > ocsp.AACompromise {
 		return errs.BadRequest("reasonCode out of bounds")
 	}
-	if !r.Passive {
-		return errs.NotImplemented("non-passive revocation not implemented")
-	}
 
 	return
 }
