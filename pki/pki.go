@@ -39,6 +39,7 @@ import (
 	"github.com/smallstep/certificates/cas"
 	"github.com/smallstep/certificates/cas/apiv1"
 	"github.com/smallstep/certificates/db"
+	"github.com/smallstep/certificates/logging"
 )
 
 // DeploymentType defines witch type of deployment a user is initializing
@@ -616,9 +617,15 @@ func (p *PKI) GenerateIntermediateCertificate(name, org, resource string, parent
 	// If a kms is used it will not have the private key
 	if resp.PrivateKey != nil {
 		p.Files[p.IntermediateKey], err = encodePrivateKey(resp.PrivateKey, pass)
+		if err != nil {
+			return err
+		}
 	}
 
-	return err
+	for _, warning := range resp.Warnings {
+		logging.LogCertificateWarning(context.Background(), warning)
+	}
+	return nil
 }
 
 // CreateCertificateAuthorityResponse returns a
@@ -792,7 +799,14 @@ type ConfigOption func(c *authconfig.Config) error
 // GenerateConfig returns the step certificates configuration.
 func (p *PKI) GenerateConfig(opt ...ConfigOption) (*authconfig.Config, error) {
 	var authorityOptions *apiv1.Options
-	if !p.casOptions.Is(apiv1.SoftCAS) {
+	if p.casOptions.Is(apiv1.SoftCAS) {
+		if p.casOptions.IssuerValidityLimit != "" {
+			authorityOptions = &apiv1.Options{
+				Type:                apiv1.SoftCAS,
+				IssuerValidityLimit: p.casOptions.IssuerValidityLimit,
+			}
+		}
+	} else {
 		authorityOptions = &p.casOptions
 	}
 

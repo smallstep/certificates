@@ -15,6 +15,13 @@ type CertificateAuthorityService interface {
 	RevokeCertificate(req *RevokeCertificateRequest) (*RevokeCertificateResponse, error)
 }
 
+// IssuerValidityLimiter configures local signing-path expiry enforcement.
+// The setter is initialization-time configuration, not a runtime control.
+// An empty mode preserves a policy explicitly set on the service.
+type IssuerValidityLimiter interface {
+	SetIssuerValidityLimit(IssuerValidityLimit, []*x509.Certificate) error
+}
+
 // CertificateAuthorityCRLGenerator is an optional interface implemented by CertificateAuthorityService
 // that has a method to create a CRL
 type CertificateAuthorityCRLGenerator interface {

@@ -20,6 +20,7 @@ import (
 	"github.com/smallstep/certificates/api/log"
 	"github.com/smallstep/certificates/authority"
 	"github.com/smallstep/certificates/authority/provisioner"
+	casapi "github.com/smallstep/certificates/cas/apiv1"
 	"github.com/smallstep/certificates/scep"
 )
 
@@ -413,7 +414,12 @@ func PKIOperation(ctx context.Context, req request) (Response, error) {
 			// TODO(hs): ignore this error case? It's not critical if the notification fails; but logging it might be good
 			_ = notifyErr
 		}
-		return createFailureResponse(ctx, csr, msg, smallscep.BadRequest, "internal server error; please see the certificate authority logs for more info", fmt.Errorf("error when signing new certificate: %w", err))
+		failInfoText := "internal server error; please see the certificate authority logs for more info"
+		var validityErr *casapi.IssuerValidityError
+		if errors.As(err, &validityErr) {
+			failInfoText = validityErr.Error()
+		}
+		return createFailureResponse(ctx, csr, msg, smallscep.BadRequest, failInfoText, fmt.Errorf("error when signing new certificate: %w", err))
 	}
 
 	if notifyErr := auth.NotifySuccess(ctx, csr, certRep.Certificate, transactionID); notifyErr != nil {

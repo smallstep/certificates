@@ -19,6 +19,7 @@ import (
 	"github.com/smallstep/certificates/authority"
 	"github.com/smallstep/certificates/authority/config"
 	"github.com/smallstep/certificates/authority/provisioner"
+	"github.com/smallstep/certificates/cas/apiv1"
 	"github.com/smallstep/certificates/errs"
 	"github.com/smallstep/certificates/internal/cast"
 	"github.com/smallstep/certificates/templates"
@@ -74,9 +75,10 @@ func (s *SSHSignRequest) Validate() error {
 
 // SSHSignResponse is the response object that returns the SSH certificate.
 type SSHSignResponse struct {
-	Certificate         SSHCertificate  `json:"crt"`
-	AddUserCertificate  *SSHCertificate `json:"addUserCrt,omitempty"`
-	IdentityCertificate []Certificate   `json:"identityCrt,omitempty"`
+	Certificate         SSHCertificate             `json:"crt"`
+	AddUserCertificate  *SSHCertificate            `json:"addUserCrt,omitempty"`
+	IdentityCertificate []Certificate              `json:"identityCrt,omitempty"`
+	Warnings            []apiv1.CertificateWarning `json:"warnings,omitempty"`
 }
 
 // SSHRootsResponse represents the response object that returns the SSH user and
@@ -291,7 +293,8 @@ func SSHSign(w http.ResponseWriter, r *http.Request) {
 		TemplateData: body.TemplateData,
 	}
 
-	ctx := provisioner.NewContextWithMethod(r.Context(), provisioner.SSHSignMethod)
+	ctx, warnings := collectCertificateWarnings(r.Context())
+	ctx = provisioner.NewContextWithMethod(ctx, provisioner.SSHSignMethod)
 	ctx = provisioner.NewContextWithToken(ctx, body.OTT)
 	ctx = provisioner.NewContextWithCertType(ctx, opts.CertType)
 
@@ -321,9 +324,9 @@ func SSHSign(w http.ResponseWriter, r *http.Request) {
 	// Sign identity certificate if available.
 	var identityCertificate []Certificate
 	if cr := body.IdentityCSR.CertificateRequest; cr != nil {
-		ctx := authority.NewContextWithSkipTokenReuse(r.Context())
-		ctx = provisioner.NewContextWithMethod(ctx, provisioner.SignIdentityMethod)
-		signOpts, err := a.Authorize(ctx, body.OTT)
+		identityCtx := authority.NewContextWithSkipTokenReuse(ctx)
+		identityCtx = provisioner.NewContextWithMethod(identityCtx, provisioner.SignIdentityMethod)
+		signOpts, err := a.Authorize(identityCtx, body.OTT)
 		if err != nil {
 			render.Error(w, r, errs.UnauthorizedErr(err))
 			return
@@ -336,7 +339,7 @@ func SSHSign(w http.ResponseWriter, r *http.Request) {
 			NotAfter:  time.Unix(cast.Int64(cert.ValidBefore), 0),
 		})
 
-		certChain, err := a.SignWithContext(ctx, cr, provisioner.SignOptions{}, signOpts...)
+		certChain, err := a.SignWithContext(identityCtx, cr, provisioner.SignOptions{}, signOpts...)
 		if err != nil {
 			render.Error(w, r, errs.ForbiddenErr(err, "error signing identity certificate"))
 			return
@@ -349,6 +352,7 @@ func SSHSign(w http.ResponseWriter, r *http.Request) {
 		Certificate:         SSHCertificate{cert},
 		AddUserCertificate:  addUserCertificate,
 		IdentityCertificate: identityCertificate,
+		Warnings:            *warnings,
 	}, http.StatusCreated)
 }
 
