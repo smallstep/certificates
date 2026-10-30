@@ -44,6 +44,14 @@ type mockAdminAuthority struct {
 	MockCreateAuthorityPolicy func(ctx context.Context, adm *linkedca.Admin, policy *linkedca.Policy) (*linkedca.Policy, error)
 	MockUpdateAuthorityPolicy func(ctx context.Context, adm *linkedca.Admin, policy *linkedca.Policy) (*linkedca.Policy, error)
 	MockRemoveAuthorityPolicy func(ctx context.Context) error
+	MockReloadAdminResources  func(ctx context.Context) error
+}
+
+func (m *mockAdminAuthority) ReloadAdminResources(ctx context.Context) error {
+	if m.MockReloadAdminResources != nil {
+		return m.MockReloadAdminResources(ctx)
+	}
+	return m.MockErr
 }
 
 func (m *mockAdminAuthority) IsAdminAPIEnabled() bool {
