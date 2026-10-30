@@ -22,6 +22,8 @@ import (
 // Note that export will not export neither the pki password nor the certificate
 // issuer password.
 func (a *Authority) Export() (c *linkedca.Configuration, err error) {
+	a.adminMutex.RLock()
+	defer a.adminMutex.RUnlock()
 	// Recover from panics
 	defer func() {
 		if r := recover(); r != nil {
