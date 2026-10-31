@@ -306,3 +306,63 @@ func TestWebhookController_AppendRequestBodyOptions(t *testing.T) {
 	require.NoError(t, wc.Authorize(context.Background(), req))
 	assert.Equal(t, a, req.Attestation)
 }
+
+// fakeTDXVerifier stands in for the TDX verifier: a real quote's report data
+// cannot be chosen, and a test quote cannot pass Intel's collateral.
+type fakeTDXVerifier struct {
+	result *attestation.TDX
+	bound  []byte
+	err    error
+	quote  []byte
+}
+
+func (f *fakeTDXVerifier) Verify(_ context.Context, quote []byte) (*attestation.TDX, []byte, error) {
+	f.quote = quote
+	return f.result, f.bound, f.err
+}
+
+func TestACME_VerifyRemoteAttestation_tdx(t *testing.T) {
+	bound := testBound()
+	const mediaType = `application/vnd.veraison.tsm-report+json; provider="tdx_guest"`
+	value := []byte(`{"provider":"tdx_guest","outblob":"AAEC"}`)
+
+	t.Run("ok", func(t *testing.T) {
+		p := newRemoteAttestationACME(t, nil, staticHTTPClient{})
+		fake := &fakeTDXVerifier{result: &attestation.TDX{MRTD: "aa", TCBStatus: "UpToDate"}, bound: bound}
+		p.remoteAttestation.tdx = fake
+		got, gotBound, err := p.VerifyRemoteAttestation(context.Background(), jsonCMW(mediaType, value, cmw.Evidence), "")
+		require.NoError(t, err)
+		assert.Equal(t, []byte{0, 1, 2}, fake.quote, "the outblob is the quote")
+		assert.Equal(t, bound, gotBound)
+		assert.Equal(t, attestation.FormatTDX, got.Format)
+		assert.Equal(t, mediaType, got.MediaType)
+		assert.Equal(t, value, got.Evidence)
+		assert.Equal(t, fake.result, got.TDX)
+		assert.Nil(t, got.SEVSNP)
+		assert.Nil(t, got.ConfidentialSpace)
+	})
+
+	tests := []struct {
+		name        string
+		fake        *fakeTDXVerifier
+		wantErr     string
+		wantInvalid bool
+	}{
+		{"fail invalid quote", &fakeTDXVerifier{err: attestation.Invalidf("tdx quote is from a debug trust domain")},
+			"debug trust domain", true},
+		// A collateral fetch failure is the CA's, not the evidence's.
+		{"fail collateral", &fakeTDXVerifier{err: errors.New("error fetching tdx collateral")},
+			"error fetching tdx collateral", false},
+		{"fail report data size", &fakeTDXVerifier{result: &attestation.TDX{}, bound: bound[:32]},
+			"evidence binds 32 bytes, not 64", true},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			p := newRemoteAttestationACME(t, nil, staticHTTPClient{})
+			p.remoteAttestation.tdx = tt.fake
+			_, _, err := p.VerifyRemoteAttestation(context.Background(), jsonCMW(mediaType, value, 0), "")
+			assert.ErrorContains(t, err, tt.wantErr)
+			assert.Equal(t, tt.wantInvalid, errors.Is(err, attestation.ErrInvalidEvidence))
+		})
+	}
+}

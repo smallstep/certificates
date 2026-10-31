@@ -87,13 +87,25 @@ func (o *ACMERemoteAttestation) GetClaimsHint() []string {
 // challenges with the provisioner's configuration.
 type remoteAttestationVerifier struct {
 	formats     []attestation.Format
-	tdx         *tdx.Verifier
-	sevsnp      *sevsnp.Verifier
+	tdx         tdxVerifier
+	sevsnp      sevSNPVerifier
 	csRoots     *x509.CertPool
 	csAudience  string
 	csMaxAge    time.Duration
 	csExpecting *confidentialspace.Expectations
 	now         func() time.Time
+}
+
+// tdxVerifier is implemented by *tdx.Verifier. Tests replace it, since a real
+// quote's report data cannot be chosen and a test quote cannot pass Intel's
+// collateral.
+type tdxVerifier interface {
+	Verify(ctx context.Context, quote []byte) (*attestation.TDX, []byte, error)
+}
+
+// sevSNPVerifier is implemented by *sevsnp.Verifier.
+type sevSNPVerifier interface {
+	Verify(ctx context.Context, report, certTable []byte) (*attestation.SEVSNP, []byte, error)
 }
 
 // initializeRemoteAttestation validates the remote attestation options and
