@@ -194,6 +194,13 @@ func mustAttestAndroid(t *testing.T, keyAuthorization string) ([]byte, *x509.Cer
 	return payload, leaf, ca.Root
 }
 
+var (
+	oidAppleSerialNumber                    = asn1.ObjectIdentifier{1, 2, 840, 113635, 100, 8, 9, 1}
+	oidAppleUniqueDeviceIdentifier          = asn1.ObjectIdentifier{1, 2, 840, 113635, 100, 8, 9, 2}
+	oidAppleSecureEnclaveProcessorOSVersion = asn1.ObjectIdentifier{1, 2, 840, 113635, 100, 8, 10, 2}
+	oidAppleNonce                           = asn1.ObjectIdentifier{1, 2, 840, 113635, 100, 8, 11, 1}
+)
+
 func mustAttestApple(t *testing.T, nonce string) ([]byte, *x509.Certificate, *x509.Certificate) {
 	t.Helper()
 
@@ -3509,123 +3516,6 @@ func Test_http01ChallengeHost(t *testing.T) {
 			StrictFQDN = tt.strictFQDN
 			if got := http01ChallengeHost(tt.value); got != tt.want {
 				t.Errorf("http01ChallengeHost() = %v, want %v", got, tt.want)
-			}
-		})
-	}
-}
-
-func Test_doAppleAttestationFormat(t *testing.T) {
-	ctx := context.Background()
-	ca, err := minica.New()
-	if err != nil {
-		t.Fatal(err)
-	}
-	caRoot := pem.EncodeToMemory(&pem.Block{Type: "CERTIFICATE", Bytes: ca.Root.Raw})
-	signer, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
-	if err != nil {
-		t.Fatal(err)
-	}
-	leaf, err := ca.Sign(&x509.Certificate{
-		Subject:   pkix.Name{CommonName: "attestation cert"},
-		PublicKey: signer.Public(),
-		ExtraExtensions: []pkix.Extension{
-			{Id: oidAppleSerialNumber, Value: []byte("serial-number")},
-			{Id: oidAppleUniqueDeviceIdentifier, Value: []byte("udid")},
-			{Id: oidAppleSecureEnclaveProcessorOSVersion, Value: []byte("16.0")},
-			{Id: oidAppleNonce, Value: []byte("nonce")},
-		},
-	})
-	if err != nil {
-		t.Fatal(err)
-	}
-	fingerprint, err := keyutil.Fingerprint(signer.Public())
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	type args struct {
-		ctx  context.Context
-		prov Provisioner
-		ch   *Challenge
-		att  *attestationObject
-	}
-	tests := []struct {
-		name    string
-		args    args
-		want    *appleAttestationData
-		wantErr bool
-	}{
-		{"ok", args{ctx, mustAttestationProvisioner(t, caRoot), &Challenge{}, &attestationObject{
-			Format: "apple",
-			AttStatement: map[string]any{
-				"x5c": []any{leaf.Raw, ca.Intermediate.Raw},
-			},
-		}}, &appleAttestationData{
-			Nonce:        []byte("nonce"),
-			SerialNumber: "serial-number",
-			UDID:         "udid",
-			SEPVersion:   "16.0",
-			Certificate:  leaf,
-			Fingerprint:  fingerprint,
-		}, false},
-		{"fail apple issuer", args{ctx, mustAttestationProvisioner(t, nil), &Challenge{}, &attestationObject{
-			Format: "apple",
-			AttStatement: map[string]any{
-				"x5c": []any{leaf.Raw, ca.Intermediate.Raw},
-			},
-		}}, nil, true},
-		{"fail missing x5c", args{ctx, mustAttestationProvisioner(t, caRoot), &Challenge{}, &attestationObject{
-			Format: "apple",
-			AttStatement: map[string]any{
-				"foo": "bar",
-			},
-		}}, nil, true},
-		{"fail empty issuer", args{ctx, mustAttestationProvisioner(t, caRoot), &Challenge{}, &attestationObject{
-			Format: "apple",
-			AttStatement: map[string]any{
-				"x5c": []any{},
-			},
-		}}, nil, true},
-		{"fail leaf type", args{ctx, mustAttestationProvisioner(t, caRoot), &Challenge{}, &attestationObject{
-			Format: "apple",
-			AttStatement: map[string]any{
-				"x5c": []any{"leaf", ca.Intermediate.Raw},
-			},
-		}}, nil, true},
-		{"fail leaf parse", args{ctx, mustAttestationProvisioner(t, caRoot), &Challenge{}, &attestationObject{
-			Format: "apple",
-			AttStatement: map[string]any{
-				"x5c": []any{leaf.Raw[:100], ca.Intermediate.Raw},
-			},
-		}}, nil, true},
-		{"fail intermediate type", args{ctx, mustAttestationProvisioner(t, caRoot), &Challenge{}, &attestationObject{
-			Format: "apple",
-			AttStatement: map[string]any{
-				"x5c": []any{leaf.Raw, "intermediate"},
-			},
-		}}, nil, true},
-		{"fail intermediate parse", args{ctx, mustAttestationProvisioner(t, caRoot), &Challenge{}, &attestationObject{
-			Format: "apple",
-			AttStatement: map[string]any{
-				"x5c": []any{leaf.Raw, ca.Intermediate.Raw[:100]},
-			},
-		}}, nil, true},
-		{"fail verify", args{ctx, mustAttestationProvisioner(t, caRoot), &Challenge{}, &attestationObject{
-			Format: "apple",
-			AttStatement: map[string]any{
-				"x5c": []any{leaf.Raw},
-			},
-		}}, nil, true},
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			got, err := doAppleAttestationFormat(tt.args.ctx, tt.args.prov, tt.args.ch, tt.args.att)
-			if (err != nil) != tt.wantErr {
-				t.Errorf("doAppleAttestationFormat() error = %v, wantErr %v", err, tt.wantErr)
-				return
-			}
-			if !reflect.DeepEqual(got, tt.want) {
-				t.Errorf("doAppleAttestationFormat() = %v, want %v", got, tt.want)
 			}
 		})
 	}

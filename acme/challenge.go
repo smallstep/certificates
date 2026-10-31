@@ -31,7 +31,7 @@ import (
 	"github.com/fxamacker/cbor/v2"
 	"github.com/google/go-tpm/legacy/tpm2"
 
-	attestation "github.com/smallstep/android-attestation"
+	androidattestation "github.com/smallstep/android-attestation"
 	"github.com/smallstep/go-attestation/attest"
 	"go.step.sm/crypto/jose"
 	"go.step.sm/crypto/keyutil"
@@ -40,6 +40,8 @@ import (
 	"go.step.sm/crypto/x509util"
 
 	"github.com/smallstep/certificates/acme/wire"
+	"github.com/smallstep/certificates/attestation"
+	"github.com/smallstep/certificates/attestation/apple"
 	"github.com/smallstep/certificates/authority/provisioner"
 	wireprovisioner "github.com/smallstep/certificates/authority/provisioner/wire"
 	"github.com/smallstep/certificates/internal/cast"
@@ -886,15 +888,9 @@ func deviceAttest01Validate(ctx context.Context, ch *Challenge, db DB, jwk *jose
 		// Update attestation key fingerprint to compare against the CSR
 		az.Fingerprint = data.Fingerprint
 	case "apple":
-		data, err := doAppleAttestationFormat(ctx, prov, ch, &att)
+		data, err := apple.Verify(att.AttStatement, attestationRoots(prov))
 		if err != nil {
-			if acmeError, ok := errors.AsType[*Error](err); ok {
-				if acmeError.Status == 500 {
-					return acmeError
-				}
-				return storeError(ctx, db, ch, true, acmeError)
-			}
-			return WrapErrorISE(err, "error validating attestation")
+			return storeAttestationError(ctx, db, ch, err)
 		}
 
 		// Validate nonce with SHA-256 of the token.
@@ -999,6 +995,26 @@ func deviceAttest01Validate(ctx context.Context, ch *Challenge, db DB, jwk *jose
 		return WrapErrorISE(err, "error updating challenge")
 	}
 	return nil
+}
+
+// attestationRoots returns the attestation roots configured in the
+// provisioner, or nil, which makes a verifier use its default roots.
+func attestationRoots(prov Provisioner) *x509.CertPool {
+	if roots, ok := prov.GetAttestationRoots(); ok {
+		return roots
+	}
+	return nil
+}
+
+// storeAttestationError handles an error of a device-attest-01 verifier. An
+// error of the attestation statement is stored in the challenge, which becomes
+// invalid, as a bad attestation statement with the error in its detail. Any
+// other error is returned as an internal error.
+func storeAttestationError(ctx context.Context, db DB, ch *Challenge, err error) error {
+	if !errors.Is(err, attestation.ErrInvalidEvidence) {
+		return newError(ErrorServerInternalType, err)
+	}
+	return storeError(ctx, db, ch, true, newError(ErrorBadAttestationStatementType, err).withDetail())
 }
 
 var (
@@ -1299,112 +1315,6 @@ func validateAKCertificateExtendedKeyUsage(c *x509.Certificate) error {
 	return nil
 }
 
-// Apple Enterprise Attestation Root CA from
-// https://www.apple.com/certificateauthority/private/
-const appleEnterpriseAttestationRootCA = `-----BEGIN CERTIFICATE-----
-MIICJDCCAamgAwIBAgIUQsDCuyxyfFxeq/bxpm8frF15hzcwCgYIKoZIzj0EAwMw
-UTEtMCsGA1UEAwwkQXBwbGUgRW50ZXJwcmlzZSBBdHRlc3RhdGlvbiBSb290IENB
-MRMwEQYDVQQKDApBcHBsZSBJbmMuMQswCQYDVQQGEwJVUzAeFw0yMjAyMTYxOTAx
-MjRaFw00NzAyMjAwMDAwMDBaMFExLTArBgNVBAMMJEFwcGxlIEVudGVycHJpc2Ug
-QXR0ZXN0YXRpb24gUm9vdCBDQTETMBEGA1UECgwKQXBwbGUgSW5jLjELMAkGA1UE
-BhMCVVMwdjAQBgcqhkjOPQIBBgUrgQQAIgNiAAT6Jigq+Ps9Q4CoT8t8q+UnOe2p
-oT9nRaUfGhBTbgvqSGXPjVkbYlIWYO+1zPk2Sz9hQ5ozzmLrPmTBgEWRcHjA2/y7
-7GEicps9wn2tj+G89l3INNDKETdxSPPIZpPj8VmjQjBAMA8GA1UdEwEB/wQFMAMB
-Af8wHQYDVR0OBBYEFPNqTQGd8muBpV5du+UIbVbi+d66MA4GA1UdDwEB/wQEAwIB
-BjAKBggqhkjOPQQDAwNpADBmAjEA1xpWmTLSpr1VH4f8Ypk8f3jMUKYz4QPG8mL5
-8m9sX/b2+eXpTv2pH4RZgJjucnbcAjEA4ZSB6S45FlPuS/u4pTnzoz632rA+xW/T
-ZwFEh9bhKjJ+5VQ9/Do1os0u3LEkgN/r
------END CERTIFICATE-----`
-
-var (
-	oidAppleSerialNumber                    = asn1.ObjectIdentifier{1, 2, 840, 113635, 100, 8, 9, 1}
-	oidAppleUniqueDeviceIdentifier          = asn1.ObjectIdentifier{1, 2, 840, 113635, 100, 8, 9, 2}
-	oidAppleSecureEnclaveProcessorOSVersion = asn1.ObjectIdentifier{1, 2, 840, 113635, 100, 8, 10, 2}
-	oidAppleNonce                           = asn1.ObjectIdentifier{1, 2, 840, 113635, 100, 8, 11, 1}
-)
-
-type appleAttestationData struct {
-	Nonce        []byte
-	SerialNumber string
-	UDID         string
-	SEPVersion   string
-	Certificate  *x509.Certificate
-	Fingerprint  string
-}
-
-func doAppleAttestationFormat(_ context.Context, prov Provisioner, _ *Challenge, att *attestationObject) (*appleAttestationData, error) {
-	// Use configured or default attestation roots if none is configured.
-	roots, ok := prov.GetAttestationRoots()
-	if !ok {
-		root, err := pemutil.ParseCertificate([]byte(appleEnterpriseAttestationRootCA))
-		if err != nil {
-			return nil, WrapErrorISE(err, "error parsing apple enterprise ca")
-		}
-		roots = x509.NewCertPool()
-		roots.AddCert(root)
-	}
-
-	x5c, ok := att.AttStatement["x5c"].([]any)
-	if !ok {
-		return nil, NewDetailedError(ErrorBadAttestationStatementType, "x5c not present")
-	}
-	if len(x5c) == 0 {
-		return nil, NewDetailedError(ErrorBadAttestationStatementType, "x5c is empty")
-	}
-
-	der, ok := x5c[0].([]byte)
-	if !ok {
-		return nil, NewDetailedError(ErrorBadAttestationStatementType, "x5c is malformed")
-	}
-	leaf, err := x509.ParseCertificate(der)
-	if err != nil {
-		return nil, WrapDetailedError(ErrorBadAttestationStatementType, err, "x5c is malformed")
-	}
-
-	intermediates := x509.NewCertPool()
-	for _, v := range x5c[1:] {
-		der, ok = v.([]byte)
-		if !ok {
-			return nil, NewDetailedError(ErrorBadAttestationStatementType, "x5c is malformed")
-		}
-		cert, err := x509.ParseCertificate(der)
-		if err != nil {
-			return nil, WrapDetailedError(ErrorBadAttestationStatementType, err, "x5c is malformed")
-		}
-		intermediates.AddCert(cert)
-	}
-
-	if _, err := leaf.Verify(x509.VerifyOptions{
-		Intermediates: intermediates,
-		Roots:         roots,
-		CurrentTime:   time.Now().Truncate(time.Second),
-		KeyUsages:     []x509.ExtKeyUsage{x509.ExtKeyUsageAny},
-	}); err != nil {
-		return nil, WrapDetailedError(ErrorBadAttestationStatementType, err, "x5c is not valid")
-	}
-
-	data := &appleAttestationData{
-		Certificate: leaf,
-	}
-	if data.Fingerprint, err = keyutil.Fingerprint(leaf.PublicKey); err != nil {
-		return nil, WrapErrorISE(err, "error calculating key fingerprint")
-	}
-	for _, ext := range leaf.Extensions {
-		switch {
-		case ext.Id.Equal(oidAppleSerialNumber):
-			data.SerialNumber = string(ext.Value)
-		case ext.Id.Equal(oidAppleUniqueDeviceIdentifier):
-			data.UDID = string(ext.Value)
-		case ext.Id.Equal(oidAppleSecureEnclaveProcessorOSVersion):
-			data.SEPVersion = string(ext.Value)
-		case ext.Id.Equal(oidAppleNonce):
-			data.Nonce = ext.Value
-		}
-	}
-
-	return data, nil
-}
-
 // Android RSA Root CA
 // https://developer.android.com/privacy-and-security/security-key-attestation#root_certificate
 var androidRSARootCA = `-----BEGIN CERTIFICATE-----
@@ -1461,7 +1371,7 @@ var oidAndroidAttestation = asn1.ObjectIdentifier{1, 3, 6, 1, 4, 1, 11129, 2, 1,
 type androidKeyAttestationData struct {
 	Certificate *x509.Certificate
 	Fingerprint string
-	Attestation *attestation.KeyDescription
+	Attestation *androidattestation.KeyDescription
 }
 
 // findAndroidAttestationCert traverses the slice of [*x509.Certificate] from
@@ -1629,7 +1539,7 @@ func doAndroidKeyAttestationFormat(ctx context.Context, prov Provisioner, ch *Ch
 		if !ext.Id.Equal(oidAndroidAttestation) {
 			continue
 		}
-		keyDesc, err := attestation.ParseExtension(ext.Value)
+		keyDesc, err := androidattestation.ParseExtension(ext.Value)
 		if err != nil {
 			return nil, WrapError(ErrorBadAttestationStatementType, err, "error parsing attestation")
 		}
