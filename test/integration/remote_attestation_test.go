@@ -28,6 +28,7 @@ import (
 	"github.com/smallstep/certificates/attestation"
 	cstest "github.com/smallstep/certificates/attestation/confidentialspace/confidentialspacetest"
 	"github.com/smallstep/certificates/authority/config"
+	"github.com/smallstep/certificates/authority/policy"
 	"github.com/smallstep/certificates/authority/provisioner"
 	"github.com/smallstep/certificates/ca"
 	"github.com/smallstep/certificates/db"
@@ -267,4 +268,125 @@ func TestRemoteAttestation(t *testing.T) {
 		}
 	}
 	assert.Equal(t, "confidential-space/GCP_INTEL_TDX", recorded)
+}
+
+// TestRemoteAttestationWithoutTemplate runs the flow against a provisioner with
+// no template and no webhook. The order, whose hint is empty, and the request
+// name nothing, so the default template signs a certificate with no names,
+// which a policy that allows only URIs admits. The token carries the binding
+// as its only nonce.
+func TestRemoteAttestationWithoutTemplate(t *testing.T) {
+	dir := t.TempDir()
+	t.Setenv("STEPPATH", dir)
+
+	m, err := minica.New(minica.WithName("Step E2E"))
+	require.NoError(t, err)
+	rootFilepath := filepath.Join(dir, "root.crt")
+	_, err = pemutil.Serialize(m.Root, pemutil.WithFilename(rootFilepath))
+	require.NoError(t, err)
+	intermediateCertFilepath := filepath.Join(dir, "intermediate.crt")
+	_, err = pemutil.Serialize(m.Intermediate, pemutil.WithFilename(intermediateCertFilepath))
+	require.NoError(t, err)
+	intermediateKeyFilepath := filepath.Join(dir, "intermediate.key")
+	_, err = pemutil.Serialize(m.Signer, pemutil.WithFilename(intermediateKeyFilepath))
+	require.NoError(t, err)
+
+	attestor := cstest.New(t)
+	host, port := reservePort(t)
+	cfg := &config.Config{
+		Root:             []string{rootFilepath},
+		IntermediateCert: intermediateCertFilepath,
+		IntermediateKey:  intermediateKeyFilepath,
+		Address:          net.JoinHostPort(host, port),
+		DNSNames:         []string{"127.0.0.1", "[::1]", "localhost"},
+		AuthorityConfig: &config.AuthConfig{
+			AuthorityID:    "stepca-test",
+			DeploymentType: "standalone-test",
+			Provisioners: provisioner.List{
+				&provisioner.ACME{
+					Type:       "ACME",
+					Name:       "attested",
+					Challenges: []provisioner.ACMEChallenge{provisioner.REMOTE_ATTEST_01},
+					RemoteAttestation: &provisioner.ACMERemoteAttestation{
+						Require: true,
+						Formats: []attestation.Format{attestation.FormatConfidentialSpace},
+						ConfidentialSpace: &provisioner.ACMEConfidentialSpace{
+							Roots: attestor.RootPEM(),
+						},
+					},
+					Claims: &config.GlobalProvisionerClaims,
+					Options: &provisioner.Options{
+						X509: &provisioner.X509Options{
+							AllowedNames: &policy.X509NameOptions{URIDomains: []string{"example.org"}},
+						},
+					},
+				},
+			},
+		},
+		DB: &db.Config{
+			Type:       "bbolt",
+			DataSource: filepath.Join(dir, "db"),
+		},
+		Logger: json.RawMessage(`{"format": "text"}`),
+	}
+	c, err := ca.New(cfg)
+	require.NoError(t, err)
+
+	var wg sync.WaitGroup
+	wg.Go(func() {
+		err := c.Run()
+		require.ErrorIs(t, err, http.ErrServerClosed)
+	})
+	t.Cleanup(func() {
+		require.NoError(t, c.Stop())
+		wg.Wait()
+	})
+	requireCAServerToBeAvailable(t, net.JoinHostPort("localhost", port), 10*time.Second)
+
+	directory := fmt.Sprintf("https://localhost:%s/acme/attested/directory", port)
+	client, err := ca.NewACMEClient(directory, nil, ca.WithRootFile(rootFilepath))
+	require.NoError(t, err)
+
+	order, err := client.NewOrder([]byte(`{"identifiers":[{"type":"remote-attestation","value":""}]}`))
+	require.NoError(t, err)
+	require.Len(t, order.AuthorizationURLs, 1)
+	az, err := client.GetAuthz(order.AuthorizationURLs[0])
+	require.NoError(t, err)
+	require.Len(t, az.Challenges, 1)
+	ch := az.Challenges[0]
+	require.Equal(t, acme.REMOTEATTEST01, ch.Type)
+
+	certKey, err := keyutil.GenerateDefaultSigner()
+	require.NoError(t, err)
+	keyAuth, err := acme.KeyAuthorization(ch.FreshnessNonce, client.Key)
+	require.NoError(t, err)
+	spki, err := x509.MarshalPKIXPublicKey(certKey.Public())
+	require.NoError(t, err)
+	binding := sha256.Sum256(append([]byte(keyAuth), spki...))
+	token := attestor.Mint(t, cstest.Claims(time.Now(), directory, base64.RawURLEncoding.EncodeToString(binding[:])))
+	payload, err := json.Marshal([]any{"application/eat+jwt", base64.RawURLEncoding.EncodeToString([]byte(token)), 8})
+	require.NoError(t, err)
+	require.NoError(t, client.ValidateWithPayload(ch.URL, payload))
+	ch, err = client.GetChallenge(ch.URL)
+	require.NoError(t, err)
+	require.Equal(t, acme.StatusValid, ch.Status, "challenge error: %v", ch.Error)
+
+	csrDER, err := x509.CreateCertificateRequest(rand.Reader, &x509.CertificateRequest{}, certKey)
+	require.NoError(t, err)
+	csr, err := x509.ParseCertificateRequest(csrDER)
+	require.NoError(t, err)
+	require.NoError(t, client.FinalizeOrder(order.FinalizeURL, csr))
+	order, err = client.GetOrder(order.ID)
+	require.NoError(t, err)
+	require.Equal(t, acme.StatusValid, order.Status)
+	leaf, _, err := client.GetCertificate(order.CertificateURL)
+	require.NoError(t, err)
+
+	assert.Empty(t, leaf.Subject.String())
+	assert.Empty(t, leaf.DNSNames)
+	assert.Empty(t, leaf.IPAddresses)
+	assert.Empty(t, leaf.EmailAddresses)
+	assert.Empty(t, leaf.URIs)
+	assert.Equal(t, certKey.Public(), leaf.PublicKey)
+	assert.Equal(t, m.Intermediate.Subject.String(), leaf.Issuer.String())
 }
