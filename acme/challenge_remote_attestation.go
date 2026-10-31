@@ -4,8 +4,8 @@ import (
 	"bytes"
 	"context"
 	"crypto/sha256"
-	"crypto/subtle"
 	"crypto/x509"
+	"encoding/base64"
 	"encoding/hex"
 	"errors"
 	"time"
@@ -22,19 +22,23 @@ import (
 // (draft-ietf-acme-rats-03). The payload is a CMW record (RFC 9999) holding the
 // evidence: a TDX quote or an SEV-SNP report in a configfs-tsm report, or a
 // Confidential Space token. step-ca profiles the draft, which defines no
-// binding, by requiring the evidence to bind 64 bytes:
+// binding, by requiring the evidence to bind first
 //
-//   - The SHA-256 digest of the key authorization of the challenge, computed
-//     over its freshnessNonce: freshnessNonce || '.' || base64url(JWK
-//     thumbprint of the account key). It makes the evidence fresh and binds it
-//     to the account.
-//   - The SHA-256 digest of the DER SubjectPublicKeyInfo of the key the order
-//     will be finalized with. The CSR has not been sent yet, so the digest is
-//     stored on the authorization and finalize compares it with the CSR's key.
+//	SHA-256(keyAuthorization || DER SubjectPublicKeyInfo of the certificate key)
 //
-// A TDX quote or SEV-SNP report carries the 64 bytes as its report data; a
-// Confidential Space token carries each digest, base64url encoded without
-// padding, as its first two eat_nonce values.
+// where keyAuthorization is freshnessNonce || '.' || base64url(JWK thumbprint
+// of the account key). The binding makes the evidence fresh, ties it to the
+// account, and attests the key the order will be finalized with. A TDX quote or
+// an SEV-SNP report carries it as the first half of its report data and the
+// relying party's nonce, its claim nonce, as the second half; a Confidential
+// Space token carries it, base64url encoded without padding, as its first
+// eat_nonce value, and the relying party's nonces after it.
+//
+// The certificate request is sent only when the order is finalized, so this
+// validation verifies the evidence and stores the key authorization, the
+// binding and the claim nonce on the authorization, and Finalize checks the
+// binding against the request's key. Evidence replayed from another challenge
+// validates the challenge but can never finalize the order.
 //
 // An empty payload, or an empty JSON object, leaves the challenge unchanged.
 func remoteAttest01Validate(ctx context.Context, ch *Challenge, db DB, jwk *jose.JSONWebKey, payload []byte) error {
@@ -61,18 +65,20 @@ func remoteAttest01Validate(ctx context.Context, ch *Challenge, db DB, jwk *jose
 		return storeError(ctx, db, ch, true, WrapDetailedError(ErrorBadAttestationStatementType, err, "%s", err))
 	case err != nil:
 		return WrapErrorISE(err, "error verifying remote attestation")
-	case len(bound) != provisioner.RemoteAttestationBoundSize:
-		return NewErrorISE("remote attestation binds %d bytes, not %d", len(bound), provisioner.RemoteAttestationBoundSize)
+	}
+
+	var claimNonce string
+	switch len(bound) {
+	case provisioner.RemoteAttestationBindingSize:
+	case provisioner.RemoteAttestationBindingSize + provisioner.RemoteAttestationClaimNonceSize:
+		claimNonce = base64.RawURLEncoding.EncodeToString(bound[provisioner.RemoteAttestationBindingSize:])
+	default:
+		return NewErrorISE("remote attestation binds %d bytes", len(bound))
 	}
 
 	keyAuth, err := KeyAuthorization(ch.FreshnessNonce, jwk)
 	if err != nil {
 		return err
-	}
-	keyAuthDigest := sha256.Sum256([]byte(keyAuth))
-	if subtle.ConstantTimeCompare(bound[:sha256.Size], keyAuthDigest[:]) != 1 {
-		return storeError(ctx, db, ch, true, NewDetailedError(ErrorBadAttestationStatementType,
-			"the evidence does not bind the key authorization of the challenge"))
 	}
 
 	az, err := db.GetAuthorization(ctx, ch.AuthorizationID)
@@ -80,12 +86,13 @@ func remoteAttest01Validate(ctx context.Context, ch *Challenge, db DB, jwk *jose
 		return WrapErrorISE(err, "error loading authorization")
 	}
 	az.Attestation = &webhook.Attestation{
-		Challenge:              string(REMOTEATTEST01),
-		Hint:                   az.Identifier.Value,
-		FreshnessNonce:         ch.FreshnessNonce,
-		KeyAuthorizationDigest: hex.EncodeToString(keyAuthDigest[:]),
-		KeyDigest:              hex.EncodeToString(bound[sha256.Size:]),
-		Result:                 result,
+		Challenge:        string(REMOTEATTEST01),
+		Hint:             az.Identifier.Value,
+		FreshnessNonce:   ch.FreshnessNonce,
+		KeyAuthorization: keyAuth,
+		BindingDigest:    hex.EncodeToString(bound[:provisioner.RemoteAttestationBindingSize]),
+		ClaimNonce:       claimNonce,
+		Result:           result,
 	}
 
 	ch.Status = StatusValid
@@ -103,9 +110,12 @@ func remoteAttest01Validate(ctx context.Context, ch *Challenge, db DB, jwk *jose
 	return nil
 }
 
-// remoteAttestationKeyDigest returns the hex encoded SHA-256 digest of the DER
-// SubjectPublicKeyInfo of the CSR's key, which remote-attest-01 evidence binds.
-func remoteAttestationKeyDigest(csr *x509.CertificateRequest) string {
-	sum := sha256.Sum256(csr.RawSubjectPublicKeyInfo)
-	return hex.EncodeToString(sum[:])
+// RemoteAttestationBinding returns the hex encoded binding remote-attest-01
+// evidence carries for a certificate request: SHA-256 of the key authorization
+// followed by the DER SubjectPublicKeyInfo of the request's key.
+func RemoteAttestationBinding(keyAuthorization string, csr *x509.CertificateRequest) string {
+	h := sha256.New()
+	h.Write([]byte(keyAuthorization))
+	h.Write(csr.RawSubjectPublicKeyInfo)
+	return hex.EncodeToString(h.Sum(nil))
 }

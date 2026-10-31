@@ -38,11 +38,17 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
   Intel TDX quote or an AMD SEV-SNP report as a configfs-tsm report
   (`application/vnd.veraison.tsm-report+json` or `+cbor`), or a Google
   Confidential Space PKI token (`application/eat+jwt`). The draft defines no
-  binding, so step-ca requires the evidence to bind the SHA-256 digests of the
-  challenge's key authorization, computed over its `freshnessNonce`, and of the
-  DER SubjectPublicKeyInfo of the key the order is finalized with. The verified
-  attestation is sent to webhooks as `attestation` and given to templates as
-  `.Attestation`. The challenge can be configured in `ca.json` only for now.
+  binding, so step-ca requires the evidence to carry first SHA-256 of the
+  challenge's key authorization, computed over its `freshnessNonce`, followed
+  by the DER SubjectPublicKeyInfo of the key the order is finalized with; the
+  binding is checked at finalize. A TDX quote or SEV-SNP report carries the
+  relying party's nonce in the second half of its report data, and a
+  Confidential Space token its relying party's nonces after the binding.
+  Google Cloud Attestation's root is embedded, so Confidential Space tokens
+  verify without configured roots. The verified attestation, with the ACME
+  account and the EAB key it was created with, is sent to webhooks as
+  `attestation` and given to templates as `.Attestation`. The challenge can be
+  configured in `ca.json` only for now.
 - The `attestation` package and its subpackages, which verify TDX quotes,
   SEV-SNP reports and Confidential Space tokens, and parse CMW records and
   configfs-tsm reports. The `device-attest-01` formats' verifiers (`apple`,

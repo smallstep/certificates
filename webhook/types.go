@@ -75,11 +75,15 @@ type AttestationData struct {
 // verified (draft-ietf-acme-rats), sent to webhook servers when the order is
 // finalized and given to certificate templates as .Attestation.
 //
-// The evidence binds two SHA-256 digests: of the challenge's key authorization,
-// and of the DER SubjectPublicKeyInfo of the certificate's key. The CA has
-// checked both, so the certificate's key is the attested one. Binary values are
-// hex encoded. The fields of the embedded attestation.Result, the format and the
-// verified measurements or claims, are at the top level.
+// The evidence binds BindingDigest, SHA-256 of the challenge's key
+// authorization followed by the DER SubjectPublicKeyInfo of the certificate's
+// key. The CA has checked it against the certificate request, so the evidence is
+// fresh, is the account's, and attests the certificate's key. A TDX quote or an
+// SEV-SNP report also carries the relying party's ClaimNonce, which the CA does
+// not interpret; a Confidential Space token carries the relying party's nonces
+// after the binding in its eat_nonce claim. Binary values are hex encoded,
+// except the nonces. The fields of the embedded attestation.Result, the format
+// and the verified measurements or claims, are at the top level.
 type Attestation struct {
 	// Challenge is the challenge type that verified the evidence,
 	// remote-attest-01.
@@ -88,13 +92,28 @@ type Attestation struct {
 	Hint string `json:"hint"`
 	// FreshnessNonce is the challenge's freshness nonce.
 	FreshnessNonce string `json:"freshnessNonce"`
-	// KeyAuthorizationDigest is the SHA-256 digest of the challenge's key
-	// authorization, which the evidence binds.
-	KeyAuthorizationDigest string `json:"keyAuthorizationDigest"`
-	// KeyDigest is the SHA-256 digest of the DER SubjectPublicKeyInfo of the
-	// certificate's key, which the evidence binds.
-	KeyDigest string `json:"keyDigest"`
+	// KeyAuthorization is the challenge's key authorization: the freshness
+	// nonce, a period, and the account key's thumbprint.
+	KeyAuthorization string `json:"keyAuthorization"`
+	// BindingDigest is SHA-256 of the key authorization followed by the DER
+	// SubjectPublicKeyInfo of the certificate's key, which the evidence binds.
+	BindingDigest string `json:"bindingDigest"`
+	// ClaimNonce is the second half of a TDX quote's or SEV-SNP report's
+	// report data, base64url encoded without padding.
+	ClaimNonce string `json:"claimNonce,omitempty"`
+	// Account is the ACME account that ordered the certificate.
+	Account *AttestationAccount `json:"account,omitempty"`
 	*attestation.Result
+}
+
+// AttestationAccount is the ACME account of an attested order, and the external
+// account binding key it was created with, if any.
+type AttestationAccount struct {
+	ID string `json:"id"`
+	// ExternalAccountKeyID and Reference identify the EAB key the account was
+	// created with.
+	ExternalAccountKeyID string `json:"externalAccountKeyID,omitempty"`
+	Reference            string `json:"reference,omitempty"`
 }
 
 // X5CCertificate is the authorization certificate sent to webhook servers for

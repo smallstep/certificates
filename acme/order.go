@@ -147,14 +147,14 @@ func (o *Order) UpdateStatus(ctx context.Context, db DB) error {
 
 // checkAttestedKeys checks the CSR's key against every key an authorization of
 // the order attested: the fingerprint of the key a device-attest-01 challenge
-// verified, and the digest of the key the evidence of a remote-attest-01
-// challenge bound. It returns the attestation of the order's remote-attest-01
-// challenge, if there is one.
+// verified, and the binding the evidence of a remote-attest-01 challenge
+// carries, SHA-256 of the challenge's key authorization followed by the key. It
+// returns the attestation of the order's remote-attest-01 challenge, if there
+// is one.
 func (o *Order) checkAttestedKeys(ctx context.Context, db DB, csr *x509.CertificateRequest) (*webhook.Attestation, error) {
 	var (
 		att         *webhook.Attestation
 		fingerprint string
-		keyDigest   string
 	)
 	for _, azID := range o.AuthorizationIDs {
 		az, err := db.GetAuthorization(ctx, azID)
@@ -172,16 +172,33 @@ func (o *Order) checkAttestedKeys(ctx context.Context, db DB, csr *x509.Certific
 			}
 		}
 		if az.Attestation != nil {
-			if keyDigest == "" {
-				keyDigest = remoteAttestationKeyDigest(csr)
+			if az.Attestation.KeyAuthorization == "" {
+				return nil, NewError(ErrorUnauthorizedType, "order %s csr does not match the attested key", o.ID)
 			}
-			if subtle.ConstantTimeCompare([]byte(az.Attestation.KeyDigest), []byte(keyDigest)) == 0 {
+			binding := RemoteAttestationBinding(az.Attestation.KeyAuthorization, csr)
+			if subtle.ConstantTimeCompare([]byte(az.Attestation.BindingDigest), []byte(binding)) == 0 {
 				return nil, NewError(ErrorUnauthorizedType, "order %s csr does not match the attested key", o.ID)
 			}
 			att = az.Attestation
 		}
 	}
 	return att, nil
+}
+
+// attestationAccount returns the order's ACME account for the webhooks of a
+// remote-attest-01 order, with the external account binding key the account
+// was created with, if any.
+func (o *Order) attestationAccount(ctx context.Context, db DB) (*webhook.AttestationAccount, error) {
+	account := &webhook.AttestationAccount{ID: o.AccountID}
+	eak, err := db.GetExternalAccountKeyByAccountID(ctx, o.ProvisionerID, o.AccountID)
+	if err != nil {
+		return nil, WrapErrorISE(err, "error getting the external account key of account %q", o.AccountID)
+	}
+	if eak != nil {
+		account.ExternalAccountKeyID = eak.ID
+		account.Reference = eak.Reference
+	}
+	return account, nil
 }
 
 // Finalize signs a certificate if the necessary conditions for Order completion
@@ -214,6 +231,11 @@ func (o *Order) Finalize(ctx context.Context, db DB, csr *x509.CertificateReques
 	att, err := o.checkAttestedKeys(ctx, db, csr)
 	if err != nil {
 		return err
+	}
+	if att != nil {
+		if att.Account, err = o.attestationAccount(ctx, db); err != nil {
+			return err
+		}
 	}
 
 	// canonicalize the CSR to allow for comparison

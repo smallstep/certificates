@@ -12,11 +12,13 @@ import (
 
 func TestWithAttestation(t *testing.T) {
 	a := &Attestation{
-		Challenge:              "remote-attest-01",
-		Hint:                   "measured_boot",
-		FreshnessNonce:         "nonce",
-		KeyAuthorizationDigest: "00",
-		KeyDigest:              "01",
+		Challenge:        "remote-attest-01",
+		Hint:             "measured_boot",
+		FreshnessNonce:   "nonce",
+		KeyAuthorization: "nonce.thumbprint",
+		BindingDigest:    "00",
+		ClaimNonce:       "claim",
+		Account:          &AttestationAccount{ID: "account", ExternalAccountKeyID: "eak", Reference: "machine-1"},
 		Result: &attestation.Result{
 			Format:    attestation.FormatTDX,
 			MediaType: "application/vnd.veraison.tsm-report+json",
@@ -38,8 +40,10 @@ func TestWithAttestation(t *testing.T) {
 	assert.Equal(t, "remote-attest-01", att["challenge"])
 	assert.Equal(t, "measured_boot", att["hint"])
 	assert.Equal(t, "nonce", att["freshnessNonce"])
-	assert.Equal(t, "00", att["keyAuthorizationDigest"])
-	assert.Equal(t, "01", att["keyDigest"])
+	assert.Equal(t, "nonce.thumbprint", att["keyAuthorization"])
+	assert.Equal(t, "00", att["bindingDigest"])
+	assert.Equal(t, "claim", att["claimNonce"])
+	assert.Equal(t, map[string]any{"id": "account", "externalAccountKeyID": "eak", "reference": "machine-1"}, att["account"])
 	assert.Equal(t, "tdx", att["format"])
 	assert.Equal(t, "application/vnd.veraison.tsm-report+json", att["mediaType"])
 	assert.Equal(t, "cXVvdGU=", att["evidence"])

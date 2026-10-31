@@ -2,6 +2,7 @@ package nosql
 
 import (
 	"context"
+	"encoding/json"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -67,9 +68,11 @@ func TestDB_Authorization_remoteAttestation(t *testing.T) {
 		},
 	}}
 	att := &webhook.Attestation{
-		Challenge:      "remote-attest-01",
-		FreshnessNonce: "nonce",
-		KeyDigest:      "01",
+		Challenge:        "remote-attest-01",
+		FreshnessNonce:   "nonce",
+		KeyAuthorization: "nonce.thumbprint",
+		BindingDigest:    "01",
+		ClaimNonce:       "claim",
 		Result: &attestation.Result{
 			Format:   attestation.FormatSEVSNP,
 			SEVSNP:   &attestation.SEVSNP{Measurement: "aa", GuestSVN: 2},
@@ -92,4 +95,44 @@ func TestDB_Authorization_remoteAttestation(t *testing.T) {
 	got, err := d.GetAuthorization(context.Background(), az.ID)
 	require.NoError(t, err)
 	assert.Equal(t, att, got.Attestation)
+}
+
+// TestDB_GetExternalAccountKeyByAccountID checks that the EAB key an account
+// was created with is found among its provisioner's keys, as a remote-attest-01
+// order's webhooks receive it.
+func TestDB_GetExternalAccountKeyByAccountID(t *testing.T) {
+	keys := map[string]dbExternalAccountKey{
+		"eak-1": {ID: "eak-1", ProvisionerID: "acme", Reference: "machine-1", AccountID: "account-1"},
+		"eak-2": {ID: "eak-2", ProvisionerID: "acme", Reference: "machine-2"},
+	}
+	d := DB{db: &db.MockNoSQLDB{
+		MGet: func(bucket, key []byte) ([]byte, error) {
+			switch string(bucket) {
+			case string(externalAccountKeyIDsByProvisionerIDTable):
+				assert.Equal(t, "acme", string(key))
+				return json.Marshal([]string{"eak-1", "eak-2"})
+			case string(externalAccountKeyTable):
+				eak, ok := keys[string(key)]
+				require.True(t, ok)
+				return json.Marshal(eak)
+			default:
+				t.Fatalf("unexpected bucket %s", bucket)
+				return nil, nil
+			}
+		},
+	}}
+
+	got, err := d.GetExternalAccountKeyByAccountID(context.Background(), "acme", "account-1")
+	require.NoError(t, err)
+	require.NotNil(t, got)
+	assert.Equal(t, "eak-1", got.ID)
+	assert.Equal(t, "machine-1", got.Reference)
+
+	got, err = d.GetExternalAccountKeyByAccountID(context.Background(), "acme", "account-without-eab")
+	require.NoError(t, err)
+	assert.Nil(t, got)
+
+	got, err = d.GetExternalAccountKeyByAccountID(context.Background(), "acme", "")
+	require.NoError(t, err)
+	assert.Nil(t, got)
 }

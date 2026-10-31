@@ -230,9 +230,24 @@ func (db *DB) GetExternalAccountKeyByReference(ctx context.Context, provisionerI
 	return db.GetExternalAccountKey(ctx, provisionerID, dbExternalAccountKeyReference.ExternalAccountKeyID)
 }
 
-func (db *DB) GetExternalAccountKeyByAccountID(context.Context, string, string) (*acme.ExternalAccountKey, error) {
-	//nolint:nilnil // legacy
-	return nil, nil
+// GetExternalAccountKeyByAccountID returns the EAB key the account was created
+// with, or nil if there is none. Open source keeps no index from accounts to
+// keys, so it reads the provisioner's keys, which is fine for the few EAB keys
+// an open source CA holds.
+func (db *DB) GetExternalAccountKeyByAccountID(ctx context.Context, provisionerID, accountID string) (*acme.ExternalAccountKey, error) {
+	if accountID == "" {
+		return nil, nil //nolint:nilnil // no account, no key
+	}
+	keys, _, err := db.GetExternalAccountKeys(ctx, provisionerID, "", 0)
+	if err != nil {
+		return nil, err
+	}
+	for _, eak := range keys {
+		if eak.AccountID == accountID {
+			return eak, nil
+		}
+	}
+	return nil, nil //nolint:nilnil // the account has no key
 }
 
 func (db *DB) UpdateExternalAccountKey(ctx context.Context, provisionerID string, eak *acme.ExternalAccountKey) error {

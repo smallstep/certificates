@@ -20,11 +20,16 @@ import (
 	"github.com/smallstep/certificates/attestation/tsm"
 )
 
-// RemoteAttestationBoundSize is the size of the data the evidence of a
-// remote-attest-01 challenge binds: the SHA-256 digest of the challenge's key
-// authorization followed by the SHA-256 digest of the DER SubjectPublicKeyInfo
-// of the key to be certified.
-const RemoteAttestationBoundSize = 2 * sha256.Size
+// RemoteAttestationBindingSize is the size of the binding the evidence of a
+// remote-attest-01 challenge carries first: SHA-256 of the challenge's key
+// authorization followed by the DER SubjectPublicKeyInfo of the key to be
+// certified.
+const RemoteAttestationBindingSize = sha256.Size
+
+// RemoteAttestationClaimNonceSize is the size of the relying party's nonce a
+// TDX quote or an SEV-SNP report carries after the binding, in the second half
+// of its report data.
+const RemoteAttestationClaimNonceSize = 32
 
 // remoteAttestationTimeout bounds the verification of the evidence of a
 // remote-attest-01 challenge, which may fetch collateral from Intel's and AMD's
@@ -57,8 +62,8 @@ type ACMERemoteAttestation struct {
 // remote-attest-01 challenge, which accepts the PKI tokens Google Cloud
 // Attestation issues to Confidential Space workloads.
 type ACMEConfidentialSpace struct {
-	// Roots is a PEM bundle with the roots of Google Cloud Attestation's
-	// PKI. It is required.
+	// Roots is a PEM bundle that replaces the root of Google Cloud
+	// Attestation's PKI, which step-ca embeds.
 	Roots []byte `json:"roots,omitempty"`
 	// Audience is the audience the token must have been requested for. It
 	// defaults to the ACME directory URL.
@@ -160,12 +165,15 @@ func (p *ACME) initializeRemoteAttestation() error {
 }
 
 func (v *remoteAttestationVerifier) initializeConfidentialSpace(o *ACMEConfidentialSpace) error {
-	if o == nil || len(o.Roots) == 0 {
-		return errors.New("confidentialSpace.roots is required")
+	if o == nil {
+		o = &ACMEConfidentialSpace{}
 	}
-	v.csRoots = x509.NewCertPool()
-	if !v.csRoots.AppendCertsFromPEM(o.Roots) {
-		return errors.New("no certificates found in confidentialSpace.roots")
+	v.csRoots = confidentialspace.Roots()
+	if len(o.Roots) > 0 {
+		v.csRoots = x509.NewCertPool()
+		if !v.csRoots.AppendCertsFromPEM(o.Roots) {
+			return errors.New("no certificates found in confidentialSpace.roots")
+		}
 	}
 	if o.MaxTokenAge != nil {
 		if o.MaxTokenAge.Duration <= 0 {
@@ -187,17 +195,20 @@ func (p *ACME) GetRemoteAttestation() *ACMERemoteAttestation {
 }
 
 // VerifyRemoteAttestation verifies the evidence of a remote-attest-01
-// challenge, a CMW record, and returns it with the RemoteAttestationBoundSize
-// bytes it binds:
+// challenge, a CMW record, and returns it with the data it binds: first the
+// RemoteAttestationBindingSize bytes of the binding, then, for a TDX quote or an
+// SEV-SNP report, the relying party's RemoteAttestationClaimNonceSize bytes.
 //
 //   - For a TDX quote or an SEV-SNP report, sent as a configfs-tsm report
-//     (application/vnd.veraison.tsm-report+json or +cbor), its report data.
+//     (application/vnd.veraison.tsm-report+json or +cbor), its 64 bytes of
+//     report data.
 //   - For a Confidential Space token (application/eat+jwt or application/jwt),
-//     its first two eat_nonce values, each the base64url encoding, without
-//     padding, of 32 bytes. The token must have been requested for the
-//     configured audience, or else for the given default audience.
+//     its first eat_nonce value, the base64url encoding, without padding, of 32
+//     bytes. Its other nonces are the relying party's and stay in the claims.
+//     The token must have been requested for the configured audience, or else
+//     for the given default audience.
 //
-// The caller checks what the bound data must be. Errors of the evidence match
+// The caller checks what the binding must be. Errors of the evidence match
 // attestation.ErrInvalidEvidence.
 func (p *ACME) VerifyRemoteAttestation(ctx context.Context, r *cmw.Record, defaultAudience string) (*attestation.Result, []byte, error) {
 	v := p.remoteAttestation
@@ -210,21 +221,24 @@ func (p *ACME) VerifyRemoteAttestation(ctx context.Context, r *cmw.Record, defau
 	var (
 		res   *attestation.Result
 		bound []byte
+		size  int
 		err   error
 	)
 	switch {
 	case tsm.IsMediaType(r.MediaType):
 		res, bound, err = v.verifyTSMReport(ctx, r)
+		size = RemoteAttestationBindingSize + RemoteAttestationClaimNonceSize
 	case isJWTMediaType(r.MediaType):
 		res, bound, err = v.verifyConfidentialSpace(r, defaultAudience)
+		size = RemoteAttestationBindingSize
 	default:
 		return nil, nil, attestation.Invalidf("evidence media type %q is not supported", r.MediaType)
 	}
 	if err != nil {
 		return nil, nil, err
 	}
-	if len(bound) != RemoteAttestationBoundSize {
-		return nil, nil, attestation.Invalidf("evidence binds %d bytes, not %d", len(bound), RemoteAttestationBoundSize)
+	if len(bound) != size {
+		return nil, nil, attestation.Invalidf("evidence binds %d bytes, not %d", len(bound), size)
 	}
 	res.MediaType = r.MediaType
 	res.Evidence = r.Value
@@ -289,7 +303,7 @@ func (v *remoteAttestationVerifier) verifyConfidentialSpace(r *cmw.Record, defau
 		Roots:       v.csRoots,
 		Audience:    audience,
 		MaxTokenAge: v.csMaxAge,
-		MinNonces:   2,
+		MinNonces:   1,
 		Now:         v.now(),
 	})
 	if err != nil {
@@ -299,13 +313,9 @@ func (v *remoteAttestationVerifier) verifyConfidentialSpace(r *cmw.Record, defau
 		return nil, nil, err
 	}
 
-	bound := make([]byte, 0, RemoteAttestationBoundSize)
-	for i, nonce := range tok.Claims.EATNonce[:2] {
-		b, err := base64.RawURLEncoding.DecodeString(nonce)
-		if err != nil || len(b) != sha256.Size {
-			return nil, nil, attestation.Invalidf("eat_nonce[%d] is not the base64url encoding of %d bytes", i, sha256.Size)
-		}
-		bound = append(bound, b...)
+	bound, err := base64.RawURLEncoding.DecodeString(tok.Claims.EATNonce[0])
+	if err != nil || len(bound) != RemoteAttestationBindingSize {
+		return nil, nil, attestation.Invalidf("eat_nonce[0] is not the base64url encoding of %d bytes", RemoteAttestationBindingSize)
 	}
 	return &attestation.Result{
 		Format:            attestation.FormatConfidentialSpace,

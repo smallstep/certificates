@@ -102,9 +102,10 @@ func TestACME_Init_remoteAttestation(t *testing.T) {
 			&ACMERemoteAttestation{TDXRoots: []byte("not pem")}, nil, "error initializing the tdx format"},
 		{"fail sev-snp roots", []ACMEChallenge{REMOTE_ATTEST_01},
 			&ACMERemoteAttestation{SEVSNPRoots: pki.RootPEM()}, nil, "error initializing the sev-snp format"},
-		{"fail confidential space without roots", []ACMEChallenge{REMOTE_ATTEST_01},
-			&ACMERemoteAttestation{Formats: []attestation.Format{attestation.FormatConfidentialSpace}}, nil,
-			"confidentialSpace.roots is required"},
+		// Google's root is pinned, so the format needs no configuration.
+		{"ok confidential space with the pinned root", []ACMEChallenge{REMOTE_ATTEST_01},
+			&ACMERemoteAttestation{Formats: []attestation.Format{attestation.FormatConfidentialSpace}},
+			[]attestation.Format{attestation.FormatConfidentialSpace}, ""},
 		{"fail confidential space roots", []ACMEChallenge{REMOTE_ATTEST_01},
 			&ACMERemoteAttestation{ConfidentialSpace: &ACMEConfidentialSpace{Roots: []byte("not pem")}}, nil,
 			"no certificates found in confidentialSpace.roots"},
@@ -170,11 +171,11 @@ func TestACME_AuthorizeOrderIdentifier_remoteAttestation(t *testing.T) {
 func TestACME_VerifyRemoteAttestation_confidentialSpace(t *testing.T) {
 	pki := cstest.New(t)
 	now := time.Now()
-	bound := testBound()
+	// The binding first, then the relying party's own nonces.
+	bound := testBound()[:RemoteAttestationBindingSize]
 	nonces := []string{
-		base64.RawURLEncoding.EncodeToString(bound[:32]),
-		base64.RawURLEncoding.EncodeToString(bound[32:]),
-		"extra-nonce",
+		base64.RawURLEncoding.EncodeToString(bound),
+		"relying-party-nonce",
 	}
 	newProv := func(cs *ACMEConfidentialSpace) *ACME {
 		cs.Roots = pki.RootPEM()
@@ -206,6 +207,23 @@ func TestACME_VerifyRemoteAttestation_confidentialSpace(t *testing.T) {
 		assert.Equal(t, bound, gotBound)
 	})
 
+	t.Run("ok binding alone", func(t *testing.T) {
+		_, gotBound, err := newProv(&ACMEConfidentialSpace{}).VerifyRemoteAttestation(context.Background(),
+			jsonCMW("application/eat+jwt", mint(testRemoteAttestationAudience, nonces[0]), 0), testRemoteAttestationAudience)
+		require.NoError(t, err)
+		assert.Equal(t, bound, gotBound)
+	})
+
+	t.Run("fail token under another root than Google's", func(t *testing.T) {
+		// Without configured roots the provisioner trusts only Google Cloud
+		// Attestation's pinned root, so the test PKI's token is refused.
+		p := newRemoteAttestationACME(t, &ACMERemoteAttestation{ConfidentialSpace: &ACMEConfidentialSpace{}}, staticHTTPClient{})
+		_, _, err := p.VerifyRemoteAttestation(context.Background(),
+			jsonCMW("application/eat+jwt", mint(testRemoteAttestationAudience, nonces...), 0), testRemoteAttestationAudience)
+		assert.ErrorContains(t, err, "attestation token x5c is not valid")
+		assert.ErrorIs(t, err, attestation.ErrInvalidEvidence)
+	})
+
 	tests := []struct {
 		name    string
 		cs      *ACMEConfidentialSpace
@@ -217,12 +235,12 @@ func TestACME_VerifyRemoteAttestation_confidentialSpace(t *testing.T) {
 			"must be indicated as an attestation result"},
 		{"fail audience", &ACMEConfidentialSpace{},
 			jsonCMW("application/eat+jwt", mint("https://other.example.com", nonces...), 0), "attestation token is not valid"},
-		{"fail one nonce", &ACMEConfidentialSpace{},
-			jsonCMW("application/eat+jwt", mint(testRemoteAttestationAudience, nonces[0]), 0), "between 2 and 6 nonces"},
-		{"fail nonce encoding", &ACMEConfidentialSpace{},
-			jsonCMW("application/eat+jwt", mint(testRemoteAttestationAudience, nonces[0], "SHA256:"+nonces[1]), 0),
-			"eat_nonce[1] is not the base64url encoding of 32 bytes"},
-		{"fail nonce size", &ACMEConfidentialSpace{},
+		{"fail no nonce", &ACMEConfidentialSpace{},
+			jsonCMW("application/eat+jwt", mint(testRemoteAttestationAudience), 0), "between 1 and 6 nonces"},
+		{"fail binding encoding", &ACMEConfidentialSpace{},
+			jsonCMW("application/eat+jwt", mint(testRemoteAttestationAudience, "SHA256:"+nonces[0], nonces[1]), 0),
+			"eat_nonce[0] is not the base64url encoding of 32 bytes"},
+		{"fail binding size", &ACMEConfidentialSpace{},
 			jsonCMW("application/eat+jwt", mint(testRemoteAttestationAudience, "c2hvcnQ", nonces[1]), 0),
 			"eat_nonce[0] is not the base64url encoding of 32 bytes"},
 		{"fail expectations", &ACMEConfidentialSpace{

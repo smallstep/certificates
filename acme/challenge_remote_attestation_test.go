@@ -9,6 +9,7 @@ import (
 	"crypto/sha256"
 	"crypto/x509"
 	"crypto/x509/pkix"
+	"encoding/base64"
 	"encoding/hex"
 	"errors"
 	"testing"
@@ -16,7 +17,6 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"go.step.sm/crypto/jose"
 	"go.step.sm/crypto/keyutil"
 	"go.step.sm/crypto/x509util"
 
@@ -45,34 +45,45 @@ func mustCSR(t *testing.T, cn string) (*x509.CertificateRequest, crypto.Signer) 
 	return csr, key
 }
 
-// testBoundData returns the data the evidence of a challenge with the given
-// account key binds, for the given CSR's key.
-func testBoundData(t *testing.T, jwk *jose.JSONWebKey, csr *x509.CertificateRequest) []byte {
-	t.Helper()
-	keyAuth, err := KeyAuthorization(testFreshnessNonce, jwk)
-	require.NoError(t, err)
-	ka := sha256.Sum256([]byte(keyAuth))
-	key := sha256.Sum256(csr.RawSubjectPublicKeyInfo)
-	return append(ka[:], key[:]...)
+// testBinding returns the binding the evidence of a challenge with the given
+// key authorization carries for the CSR's key.
+func testBinding(keyAuth string, csr *x509.CertificateRequest) []byte {
+	sum := sha256.Sum256(append([]byte(keyAuth), csr.RawSubjectPublicKeyInfo...))
+	return sum[:]
+}
+
+func TestRemoteAttestationBinding(t *testing.T) {
+	csr, _ := mustCSR(t, "")
+	want := testBinding("nonce.thumbprint", csr)
+	assert.Equal(t, hex.EncodeToString(want), RemoteAttestationBinding("nonce.thumbprint", csr))
+	assert.NotEqual(t, hex.EncodeToString(want), RemoteAttestationBinding("other.thumbprint", csr))
 }
 
 func TestRemoteAttest01Validate(t *testing.T) {
-	jwk, _ := mustAccountAndKeyAuthorization(t, testFreshnessNonce)
+	jwk, keyAuth := mustAccountAndKeyAuthorization(t, testFreshnessNonce)
 	csr, _ := mustCSR(t, "")
-	bound := testBoundData(t, jwk, csr)
-	result := &attestation.Result{
+	binding := testBinding(keyAuth, csr)
+	claimNonce := make([]byte, 32)
+	for i := range claimNonce {
+		claimNonce[i] = byte(i)
+	}
+	csResult := &attestation.Result{
 		Format:            attestation.FormatConfidentialSpace,
 		MediaType:         "application/eat+jwt",
 		Evidence:          []byte("token"),
 		ConfidentialSpace: &attestation.ConfidentialSpace{Claims: map[string]any{"hwmodel": "GCP_INTEL_TDX"}},
 	}
+	tdxResult := &attestation.Result{Format: attestation.FormatTDX, TDX: &attestation.TDX{MRTD: "aa"}}
 
 	type want struct {
-		status    Status
-		errType   string
-		errDetail string
-		err       string
-		stored    bool
+		status     Status
+		errType    string
+		errDetail  string
+		err        string
+		stored     bool
+		format     string
+		claimNonce string
+		result     *attestation.Result
 	}
 	tests := []struct {
 		name    string
@@ -81,12 +92,25 @@ func TestRemoteAttest01Validate(t *testing.T) {
 		verify  func(context.Context, *cmw.Record, string) (*attestation.Result, []byte, error)
 		want    want
 	}{
-		{"ok", testRemoteAttestationCMW, testFreshnessNonce,
+		{"ok confidential space", testRemoteAttestationCMW, testFreshnessNonce,
 			func(_ context.Context, r *cmw.Record, aud string) (*attestation.Result, []byte, error) {
 				assert.Equal(t, "application/eat+jwt", r.MediaType)
 				assert.Equal(t, "https://ca.example.com/acme/acme/directory", aud)
-				return result, bound, nil
-			}, want{status: StatusValid, stored: true}},
+				return csResult, binding, nil
+			}, want{status: StatusValid, stored: true, format: "confidential-space", result: csResult}},
+		// A quote's report data carries the relying party's claim nonce after
+		// the binding.
+		{"ok tdx with claim nonce", testRemoteAttestationCMW, testFreshnessNonce,
+			func(context.Context, *cmw.Record, string) (*attestation.Result, []byte, error) {
+				return tdxResult, append(append([]byte(nil), binding...), claimNonce...), nil
+			}, want{status: StatusValid, stored: true, format: "tdx", result: tdxResult,
+				claimNonce: base64.RawURLEncoding.EncodeToString(claimNonce)}},
+		// The binding is checked when the order is finalized, so evidence
+		// with any binding validates the challenge.
+		{"ok binding checked at finalize", testRemoteAttestationCMW, testFreshnessNonce,
+			func(context.Context, *cmw.Record, string) (*attestation.Result, []byte, error) {
+				return csResult, make([]byte, 32), nil
+			}, want{status: StatusValid, stored: true, format: "confidential-space", result: csResult}},
 		{"ok empty payload", nil, testFreshnessNonce, nil, want{status: StatusPending}},
 		{"ok empty object", []byte(" {} "), testFreshnessNonce, nil, want{status: StatusPending}},
 		{"fail no nonce", testRemoteAttestationCMW, "", nil, want{status: StatusPending, err: "has no freshness nonce"}},
@@ -102,14 +126,8 @@ func TestRemoteAttest01Validate(t *testing.T) {
 			}, want{status: StatusPending, err: "error verifying remote attestation"}},
 		{"fail bound size", testRemoteAttestationCMW, testFreshnessNonce,
 			func(context.Context, *cmw.Record, string) (*attestation.Result, []byte, error) {
-				return result, bound[:32], nil
-			}, want{status: StatusPending, err: "binds 32 bytes"}},
-		{"fail key authorization", testRemoteAttestationCMW, testFreshnessNonce,
-			func(context.Context, *cmw.Record, string) (*attestation.Result, []byte, error) {
-				other := append([]byte(nil), bound...)
-				other[0] ^= 1
-				return result, other, nil
-			}, want{status: StatusInvalid, errType: "badAttestationStatement", errDetail: "does not bind the key authorization"}},
+				return csResult, binding[:16], nil
+			}, want{status: StatusPending, err: "binds 16 bytes"}},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -171,16 +189,18 @@ func TestRemoteAttest01Validate(t *testing.T) {
 			require.NotNil(t, updatedCh)
 			assert.Nil(t, ch.Error)
 			assert.NotEmpty(t, ch.ValidatedAt)
-			assert.Equal(t, "confidential-space", ch.PayloadFormat)
+			assert.Equal(t, tt.want.format, ch.PayloadFormat)
 			require.NotNil(t, updatedAz)
 			require.NotNil(t, updatedAz.Attestation)
 			att := updatedAz.Attestation
 			assert.Equal(t, "remote-attest-01", att.Challenge)
 			assert.Equal(t, "measured_boot", att.Hint)
 			assert.Equal(t, testFreshnessNonce, att.FreshnessNonce)
-			assert.Equal(t, hex.EncodeToString(bound[:32]), att.KeyAuthorizationDigest)
-			assert.Equal(t, remoteAttestationKeyDigest(csr), att.KeyDigest)
-			assert.Equal(t, result, att.Result)
+			assert.Equal(t, keyAuth, att.KeyAuthorization)
+			assert.Len(t, att.BindingDigest, 64)
+			assert.Equal(t, tt.want.claimNonce, att.ClaimNonce)
+			assert.Nil(t, att.Account, "the account is added at finalize")
+			assert.Equal(t, tt.want.result, att.Result)
 		})
 	}
 }
@@ -192,8 +212,19 @@ func TestOrder_checkAttestedKeys(t *testing.T) {
 	require.NoError(t, err)
 	otherFP, err := keyutil.Fingerprint(otherCSR.PublicKey)
 	require.NoError(t, err)
-	att := &webhook.Attestation{Challenge: "remote-attest-01", KeyDigest: remoteAttestationKeyDigest(csr)}
-	otherAtt := &webhook.Attestation{Challenge: "remote-attest-01", KeyDigest: remoteAttestationKeyDigest(otherCSR)}
+	newAtt := func(keyAuth string, csr *x509.CertificateRequest) *webhook.Attestation {
+		return &webhook.Attestation{
+			Challenge:        "remote-attest-01",
+			KeyAuthorization: keyAuth,
+			BindingDigest:    hex.EncodeToString(testBinding(keyAuth, csr)),
+		}
+	}
+	att := newAtt("nonce.thumbprint", csr)
+	otherKeyAtt := newAtt("nonce.thumbprint", otherCSR)
+	// The binding is stored with one key authorization but was computed with
+	// another, as evidence replayed from another challenge or account would be.
+	replayedAtt := newAtt("nonce.thumbprint", csr)
+	replayedAtt.KeyAuthorization = "other-nonce.other-thumbprint"
 
 	tests := []struct {
 		name    string
@@ -206,13 +237,16 @@ func TestOrder_checkAttestedKeys(t *testing.T) {
 		{"ok attestation", map[string]*Authorization{"az1": {}, "az2": {Attestation: att}}, att, ""},
 		{"ok both", map[string]*Authorization{"az1": {Fingerprint: fp}, "az2": {Attestation: att}}, att, ""},
 		{"fail fingerprint", map[string]*Authorization{"az1": {Fingerprint: otherFP}, "az2": {}}, nil, "csr does not match the attested key"},
-		{"fail attestation", map[string]*Authorization{"az1": {}, "az2": {Attestation: otherAtt}}, nil, "csr does not match the attested key"},
-		{"fail attestation without digest", map[string]*Authorization{"az1": {Attestation: &webhook.Attestation{}}, "az2": {}}, nil,
+		{"fail attestation of another key", map[string]*Authorization{"az1": {}, "az2": {Attestation: otherKeyAtt}}, nil,
+			"csr does not match the attested key"},
+		{"fail replayed evidence", map[string]*Authorization{"az1": {}, "az2": {Attestation: replayedAtt}}, nil,
+			"csr does not match the attested key"},
+		{"fail attestation without key authorization", map[string]*Authorization{"az1": {Attestation: &webhook.Attestation{}}, "az2": {}}, nil,
 			"csr does not match the attested key"},
 		// Every attested key is checked, not only the first one found.
 		{"fail second fingerprint", map[string]*Authorization{"az1": {Fingerprint: fp}, "az2": {Fingerprint: otherFP}}, nil,
 			"csr does not match the attested key"},
-		{"fail attestation after fingerprint", map[string]*Authorization{"az1": {Fingerprint: fp}, "az2": {Attestation: otherAtt}}, nil,
+		{"fail attestation after fingerprint", map[string]*Authorization{"az1": {Fingerprint: fp}, "az2": {Attestation: otherKeyAtt}}, nil,
 			"csr does not match the attested key"},
 		{"fail db", map[string]*Authorization{"az1": nil}, nil, "error getting authorization"},
 	}
@@ -240,35 +274,48 @@ func TestOrder_checkAttestedKeys(t *testing.T) {
 }
 
 // TestOrder_Finalize_remoteAttestation finalizes an order whose only
-// identifier is remote-attestation: the CSR names nothing, and the attestation
-// reaches the template data and the bodies of the webhook requests.
+// identifier is remote-attestation: the CSR names nothing, the binding is
+// checked against the CSR's key, and the attestation, with the account and its
+// EAB key, reaches the template data and the bodies of the webhook requests.
 func TestOrder_Finalize_remoteAttestation(t *testing.T) {
 	csr, _ := mustCSR(t, "")
-	att := &webhook.Attestation{
-		Challenge: "remote-attest-01",
-		KeyDigest: remoteAttestationKeyDigest(csr),
-		Result:    &attestation.Result{Format: attestation.FormatTDX, TDX: &attestation.TDX{MRTD: "aa"}},
+	newAtt := func() *webhook.Attestation {
+		return &webhook.Attestation{
+			Challenge:        "remote-attest-01",
+			KeyAuthorization: "nonce.thumbprint",
+			BindingDigest:    hex.EncodeToString(testBinding("nonce.thumbprint", csr)),
+			ClaimNonce:       "claim",
+			Result:           &attestation.Result{Format: attestation.FormatTDX, TDX: &attestation.TDX{MRTD: "aa"}},
+		}
 	}
 
 	newOrder := func() *Order {
 		return &Order{
 			ID:               "orderID",
 			AccountID:        "accID",
+			ProvisionerID:    "provID",
 			Status:           StatusReady,
 			ExpiresAt:        time.Now().Add(time.Hour),
 			Identifiers:      []Identifier{{Type: RemoteAttestation}},
 			AuthorizationIDs: []string{"azID"},
 		}
 	}
-	db := &MockDB{
-		MockGetAuthorization: func(_ context.Context, id string) (*Authorization, error) {
-			return &Authorization{ID: id, Status: StatusValid, Attestation: att}, nil
-		},
-		MockCreateCertificate: func(_ context.Context, cert *Certificate) error {
-			cert.ID = "certID"
-			return nil
-		},
-		MockUpdateOrder: func(context.Context, *Order) error { return nil },
+	newDB := func(eak *ExternalAccountKey, eakErr error) *MockDB {
+		return &MockDB{
+			MockGetAuthorization: func(_ context.Context, id string) (*Authorization, error) {
+				return &Authorization{ID: id, Status: StatusValid, Attestation: newAtt()}, nil
+			},
+			MockGetExternalAccountKeyByAccountID: func(_ context.Context, provisionerID, accountID string) (*ExternalAccountKey, error) {
+				assert.Equal(t, "provID", provisionerID)
+				assert.Equal(t, "accID", accountID)
+				return eak, eakErr
+			},
+			MockCreateCertificate: func(_ context.Context, cert *Certificate) error {
+				cert.ID = "certID"
+				return nil
+			},
+			MockUpdateOrder: func(context.Context, *Order) error { return nil },
+		}
 	}
 	prov := &MockProvisioner{
 		MauthorizeSign: func(context.Context, string) ([]provisioner.SignOption, error) {
@@ -276,10 +323,9 @@ func TestOrder_Finalize_remoteAttestation(t *testing.T) {
 		},
 		MgetOptions: func() *provisioner.Options { return nil },
 	}
-
-	t.Run("ok", func(t *testing.T) {
+	signAndCheck := func(t *testing.T, wantAccount *webhook.AttestationAccount) *mockSignAuth {
 		leaf, intermediate := &x509.Certificate{Raw: []byte("leaf")}, &x509.Certificate{Raw: []byte("intermediate")}
-		ca := &mockSignAuth{
+		return &mockSignAuth{
 			signWithContext: func(ctx context.Context, _ *x509.CertificateRequest, _ provisioner.SignOptions, opts ...provisioner.SignOption) ([]*x509.Certificate, error) {
 				var wc *provisioner.WebhookController
 				for _, o := range opts {
@@ -288,33 +334,52 @@ func TestOrder_Finalize_remoteAttestation(t *testing.T) {
 					}
 				}
 				require.NotNil(t, wc)
+				want := newAtt()
+				want.Account = wantAccount
 				data, ok := wc.TemplateData.(x509util.TemplateData)
 				require.True(t, ok)
-				assert.Equal(t, att, data["Attestation"])
+				assert.Equal(t, want, data["Attestation"])
 				assert.Empty(t, data[x509util.SANsKey])
 
 				req := &webhook.RequestBody{}
 				require.NoError(t, wc.Enrich(ctx, req))
-				assert.Equal(t, att, req.Attestation)
+				assert.Equal(t, want, req.Attestation)
 				return []*x509.Certificate{leaf, intermediate}, nil
 			},
 		}
+	}
+
+	t.Run("ok without eab", func(t *testing.T) {
 		o := newOrder()
-		require.NoError(t, o.Finalize(context.Background(), db, csr, ca, prov))
+		require.NoError(t, o.Finalize(context.Background(), newDB(nil, nil), csr, signAndCheck(t, &webhook.AttestationAccount{ID: "accID"}), prov))
 		assert.Equal(t, StatusValid, o.Status)
 		assert.Equal(t, "certID", o.CertificateID)
 	})
 
+	t.Run("ok with eab", func(t *testing.T) {
+		eak := &ExternalAccountKey{ID: "eakID", Reference: "machine-1", AccountID: "accID"}
+		o := newOrder()
+		require.NoError(t, o.Finalize(context.Background(), newDB(eak, nil), csr, signAndCheck(t, &webhook.AttestationAccount{
+			ID: "accID", ExternalAccountKeyID: "eakID", Reference: "machine-1",
+		}), prov))
+		assert.Equal(t, StatusValid, o.Status)
+	})
+
+	t.Run("fail eab lookup", func(t *testing.T) {
+		err := newOrder().Finalize(context.Background(), newDB(nil, errors.New("force")), csr, &mockSignAuth{}, prov)
+		assert.ErrorContains(t, err, "error getting the external account key")
+	})
+
 	t.Run("fail other key", func(t *testing.T) {
 		other, _ := mustCSR(t, "")
-		err := newOrder().Finalize(context.Background(), db, other, &mockSignAuth{}, prov)
+		err := newOrder().Finalize(context.Background(), newDB(nil, nil), other, &mockSignAuth{}, prov)
 		assert.ErrorContains(t, err, "csr does not match the attested key")
 	})
 
 	t.Run("fail common name", func(t *testing.T) {
 		// The order names nothing, so the CSR cannot name anything either.
 		named := mustCSRWithKeyOf(t, csr, "workload.example.com")
-		err := newOrder().Finalize(context.Background(), db, named, &mockSignAuth{}, prov)
+		err := newOrder().Finalize(context.Background(), newDB(nil, nil), named, &mockSignAuth{}, prov)
 		var acmeErr *Error
 		require.ErrorAs(t, err, &acmeErr)
 		assert.Equal(t, "urn:ietf:params:acme:error:badCSR", acmeErr.Type)

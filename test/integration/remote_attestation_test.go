@@ -184,18 +184,19 @@ func TestRemoteAttestation(t *testing.T) {
 	require.NotEmpty(t, ch.FreshnessNonce)
 	assert.Equal(t, []string{"hwmodel", "submods"}, ch.AttestClaimsHint)
 
-	// The workload's key, and the two digests its evidence binds.
+	// The workload's key, and the binding its evidence carries first:
+	// SHA-256 of the key authorization followed by the key's DER
+	// SubjectPublicKeyInfo. The relying party's own nonce follows.
 	certKey, err := keyutil.GenerateDefaultSigner()
 	require.NoError(t, err)
 	keyAuth, err := acme.KeyAuthorization(ch.FreshnessNonce, client.Key)
 	require.NoError(t, err)
-	keyAuthDigest := sha256.Sum256([]byte(keyAuth))
 	spki, err := x509.MarshalPKIXPublicKey(certKey.Public())
 	require.NoError(t, err)
-	keyDigest := sha256.Sum256(spki)
+	binding := sha256.Sum256(append([]byte(keyAuth), spki...))
 	token := attestor.Mint(t, cstest.Claims(time.Now(), directory,
-		base64.RawURLEncoding.EncodeToString(keyAuthDigest[:]),
-		base64.RawURLEncoding.EncodeToString(keyDigest[:]),
+		base64.RawURLEncoding.EncodeToString(binding[:]),
+		"relying-party-nonce",
 	))
 	payload, err := json.Marshal([]any{"application/eat+jwt", base64.RawURLEncoding.EncodeToString([]byte(token)), 8})
 	require.NoError(t, err)
@@ -241,7 +242,13 @@ func TestRemoteAttestation(t *testing.T) {
 	assert.Equal(t, "remote-attest-01", got.Challenge)
 	assert.Equal(t, "measured_boot", got.Hint)
 	assert.Equal(t, ch.FreshnessNonce, got.FreshnessNonce)
-	assert.Equal(t, fmt.Sprintf("%x", keyDigest), got.KeyDigest)
+	assert.Equal(t, keyAuth, got.KeyAuthorization)
+	assert.Equal(t, fmt.Sprintf("%x", binding), got.BindingDigest)
+	assert.Empty(t, got.ClaimNonce)
+	require.NotNil(t, got.Account)
+	assert.NotEmpty(t, got.Account.ID)
+	assert.Empty(t, got.Account.Reference)
+	assert.Equal(t, []any{base64.RawURLEncoding.EncodeToString(binding[:]), "relying-party-nonce"}, got.ConfidentialSpace.Claims["eat_nonce"])
 	assert.Equal(t, attestation.FormatConfidentialSpace, got.Format)
 	assert.Equal(t, []byte(token), got.Evidence)
 	require.NotNil(t, got.ConfidentialSpace)
