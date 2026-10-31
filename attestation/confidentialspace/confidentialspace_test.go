@@ -32,6 +32,7 @@ func TestNonces_UnmarshalJSON(t *testing.T) {
 	}{
 		{"ok string", `"nonce-0123"`, Nonces{"nonce-0123"}, false},
 		{"ok array", `["nonce-0123","nonce-4567"]`, Nonces{"nonce-0123", "nonce-4567"}, false},
+		{"ok null", `null`, nil, false},
 		{"fail number", `123`, nil, true},
 		{"fail object", `{"a":"b"}`, nil, true},
 	}

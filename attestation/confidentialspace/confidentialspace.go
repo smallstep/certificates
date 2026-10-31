@@ -41,6 +41,10 @@ type Nonces []string
 
 // UnmarshalJSON implements [json.Unmarshaler].
 func (n *Nonces) UnmarshalJSON(data []byte) error {
+	if string(data) == "null" {
+		*n = nil
+		return nil
+	}
 	var s string
 	if err := json.Unmarshal(data, &s); err == nil {
 		*n = Nonces{s}
