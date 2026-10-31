@@ -11,7 +11,6 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"encoding/pem"
-	"errors"
 	"fmt"
 	"net/url"
 	"testing"
@@ -301,6 +300,34 @@ func Test_deviceAttest01ValidateWithTPMSimulator(t *testing.T) {
 				wantErr: nil,
 			}
 		},
+		"fail/doTPMAttestationFormat-keyAuthorization": func(t *testing.T) test {
+			_, keyAuth := mustAccountAndKeyAuthorization(t, "token")
+			payload, _, root := mustAttestTPM(t, keyAuth, nil)
+			caRoot := pem.EncodeToMemory(&pem.Block{Type: "CERTIFICATE", Bytes: root.Raw})
+			ctx := NewProvisionerContext(context.Background(), mustAttestationProvisioner(t, caRoot))
+			return test{
+				args: args{
+					ctx: ctx,
+					jwk: &jose.JSONWebKey{Key: []byte("not an asymmetric key")},
+					ch: &Challenge{
+						ID:              "chID",
+						AuthorizationID: "azID",
+						Token:           "token",
+						Type:            "device-attest-01",
+						Status:          StatusPending,
+						Value:           "device.id.12345678",
+					},
+					payload: payload,
+					db: &MockDB{
+						MockGetAuthorization: func(ctx context.Context, id string) (*Authorization, error) {
+							assert.Equal(t, "azID", id)
+							return &Authorization{ID: "azID"}, nil
+						},
+					},
+				},
+				wantErr: NewErrorISE("failed creating key auth digest: error generating JWK thumbprint: go-jose/go-jose: unknown key type '[]uint8'"),
+			}
+		},
 		"ok": func(t *testing.T) test {
 			jwk, keyAuth := mustAccountAndKeyAuthorization(t, "token")
 			payload, signer, root := mustAttestTPM(t, keyAuth, nil) // TODO: value(s) for AK cert?
@@ -403,457 +430,92 @@ func Test_deviceAttest01ValidateWithTPMSimulator(t *testing.T) {
 	}
 }
 
-func newBadAttestationStatementError(msg string) *Error {
-	return &Error{
-		Type:   "urn:ietf:params:acme:error:badAttestationStatement",
-		Status: 400,
-		Err:    errors.New(msg),
-	}
-}
-
-func newInternalServerError(msg string) *Error {
-	return &Error{
-		Type:   "urn:ietf:params:acme:error:serverInternal",
-		Status: 500,
-		Err:    errors.New(msg),
-	}
-}
-
 var (
-	oidPermanentIdentifier          = asn1.ObjectIdentifier{1, 3, 6, 1, 5, 5, 7, 8, 3}
-	oidHardwareModuleNameIdentifier = asn1.ObjectIdentifier{1, 3, 6, 1, 5, 5, 7, 8, 4}
+	oidSubjectAlternativeName = asn1.ObjectIdentifier{2, 5, 29, 17}
+	oidTCGKpAIKCertificate    = asn1.ObjectIdentifier{2, 23, 133, 8, 3}
 )
 
-func Test_doTPMAttestationFormat(t *testing.T) {
-	ctx := context.Background()
-	aca, err := minica.New(
-		minica.WithName("TPM Testing"),
-		minica.WithGetSignerFunc(
-			func() (crypto.Signer, error) {
-				return keyutil.GenerateSigner("RSA", "", 2048)
-			},
-		),
-	)
-	require.NoError(t, err)
-	acaRoot := pem.EncodeToMemory(&pem.Block{Type: "CERTIFICATE", Bytes: aca.Root.Raw})
+var (
+	oidTPMManufacturer = asn1.ObjectIdentifier{2, 23, 133, 2, 1}
+	oidTPMModel        = asn1.ObjectIdentifier{2, 23, 133, 2, 2}
+	oidTPMVersion      = asn1.ObjectIdentifier{2, 23, 133, 2, 3}
+)
 
-	// prepare simulated TPM and create an AK
-	stpm := newSimulatedTPM(t)
-	eks, err := stpm.GetEKs(context.Background())
-	require.NoError(t, err)
-	ak, err := stpm.CreateAK(context.Background(), "first-ak")
-	require.NoError(t, err)
-	require.NotNil(t, ak)
+// createSubjectAltNameExtension will construct an Extension containing all
+// SubjectAlternativeNames held in a Certificate. It implements more types than
+// the golang x509 library, so it is used whenever OtherName or RegisteredID
+// type SANs are present in the certificate.
+//
+// See also https://datatracker.ietf.org/doc/html/rfc5280.html#section-4.2.1.6
+//
+// TODO(hs): this was copied from go.step.sm/crypto/x509util to make it easier
+// to create the SAN extension for testing purposes. Should it be exposed instead?
+func createSubjectAltNameExtension(dnsNames, emailAddresses x509util.MultiString, ipAddresses x509util.MultiIP, uris x509util.MultiURL, sans []x509util.SubjectAlternativeName, subjectIsEmpty bool) (x509util.Extension, error) {
+	var zero x509util.Extension
 
-	// extract the AK public key // TODO(hs): replace this when there's a simpler method to get the AK public key (e.g. ak.Public())
-	ap, err := ak.AttestationParameters(context.Background())
-	require.NoError(t, err)
-	akp, err := attest.ParseAKPublic(attest.TPMVersion20, ap.Public)
-	require.NoError(t, err)
+	var rawValues []asn1.RawValue
+	for _, dnsName := range dnsNames {
+		rawValue, err := x509util.SubjectAlternativeName{
+			Type: x509util.DNSType, Value: dnsName,
+		}.RawValue()
+		if err != nil {
+			return zero, err
+		}
 
-	// create template and sign certificate for the AK public key
-	keyID := generateKeyID(t, eks[0].Public())
-	template := &x509.Certificate{
-		PublicKey:          akp.Public,
-		IsCA:               false,
-		UnknownExtKeyUsage: []asn1.ObjectIdentifier{oidTCGKpAIKCertificate},
+		rawValues = append(rawValues, rawValue)
 	}
-	sans := []x509util.SubjectAlternativeName{}
-	uris := []*url.URL{{Scheme: "urn", Opaque: "ek:sha256:" + base64.StdEncoding.EncodeToString(keyID)}}
-	asn1Value := []byte(fmt.Sprintf(`{"extraNames":[{"type": %q, "value": %q},{"type": %q, "value": %q},{"type": %q, "value": %q}]}`, oidTPMManufacturer, "1414747215", oidTPMModel, "SLB 9670 TPM2.0", oidTPMVersion, "7.55"))
-	sans = append(sans, x509util.SubjectAlternativeName{
-		Type:      x509util.DirectoryNameType,
-		ASN1Value: asn1Value,
-	})
-	ext, err := createSubjectAltNameExtension(nil, nil, nil, uris, sans, true)
-	require.NoError(t, err)
-	ext.Set(template)
-	akCert, err := aca.Sign(template)
-	require.NoError(t, err)
-	require.NotNil(t, akCert)
 
-	invalidTemplate := &x509.Certificate{
-		PublicKey:          akp.Public,
-		IsCA:               false,
-		UnknownExtKeyUsage: []asn1.ObjectIdentifier{oidTCGKpAIKCertificate},
+	for _, emailAddress := range emailAddresses {
+		rawValue, err := x509util.SubjectAlternativeName{
+			Type: x509util.EmailType, Value: emailAddress,
+		}.RawValue()
+		if err != nil {
+			return zero, err
+		}
+
+		rawValues = append(rawValues, rawValue)
 	}
-	invalidAKCert, err := aca.Sign(invalidTemplate)
-	require.NoError(t, err)
-	require.NotNil(t, invalidAKCert)
 
-	// generate a JWK and the key authorization value
-	jwk, err := jose.GenerateJWK("EC", "P-256", "ES256", "sig", "", 0)
-	require.NoError(t, err)
-	keyAuthorization, err := KeyAuthorization("token", jwk)
-	require.NoError(t, err)
+	for _, ip := range ipAddresses {
+		rawValue, err := x509util.SubjectAlternativeName{
+			Type: x509util.IPType, Value: ip.String(),
+		}.RawValue()
+		if err != nil {
+			return zero, err
+		}
 
-	// create a new key attested by the AK, while including
-	// the key authorization bytes as qualifying data.
-	keyAuthSum := sha256.Sum256([]byte(keyAuthorization))
-	config := tpm.AttestKeyConfig{
-		Algorithm:      "RSA",
-		Size:           2048,
-		QualifyingData: keyAuthSum[:],
+		rawValues = append(rawValues, rawValue)
 	}
-	key, err := stpm.AttestKey(context.Background(), "first-ak", "first-key", config)
-	require.NoError(t, err)
-	require.NotNil(t, key)
-	params, err := key.CertificationParameters(context.Background())
-	require.NoError(t, err)
 
-	signer, err := key.Signer(context.Background())
-	require.NoError(t, err)
-	fingerprint, err := keyutil.Fingerprint(signer.Public())
-	require.NoError(t, err)
+	for _, uri := range uris {
+		rawValue, err := x509util.SubjectAlternativeName{
+			Type: x509util.URIType, Value: uri.String(),
+		}.RawValue()
+		if err != nil {
+			return zero, err
+		}
 
-	// attest another key and get its certification parameters
-	anotherKey, err := stpm.AttestKey(context.Background(), "first-ak", "another-key", config)
-	require.NoError(t, err)
-	require.NotNil(t, key)
-	anotherKeyParams, err := anotherKey.CertificationParameters(context.Background())
-	require.NoError(t, err)
-
-	type args struct {
-		ctx  context.Context
-		prov Provisioner
-		ch   *Challenge
-		jwk  *jose.JSONWebKey
-		att  *attestationObject
+		rawValues = append(rawValues, rawValue)
 	}
-	tests := []struct {
-		name   string
-		args   args
-		want   *tpmAttestationData
-		expErr *Error
-	}{
-		{"ok", args{ctx, mustAttestationProvisioner(t, acaRoot), &Challenge{Token: "token"}, jwk, &attestationObject{
-			Format: "tpm",
-			AttStatement: map[string]interface{}{
-				"ver":      "2.0",
-				"x5c":      []interface{}{akCert.Raw, aca.Intermediate.Raw},
-				"alg":      int64(-257), // RS256
-				"sig":      params.CreateSignature,
-				"certInfo": params.CreateAttestation,
-				"pubArea":  params.Public,
-			},
-		}}, nil, nil},
-		{"fail ver not present", args{ctx, mustAttestationProvisioner(t, acaRoot), &Challenge{Token: "token"}, jwk, &attestationObject{
-			Format: "tpm",
-			AttStatement: map[string]interface{}{
-				"x5c":      []interface{}{akCert.Raw, aca.Intermediate.Raw},
-				"alg":      int64(-257), // RS256
-				"sig":      params.CreateSignature,
-				"certInfo": params.CreateAttestation,
-				"pubArea":  params.Public,
-			},
-		}}, nil, newBadAttestationStatementError("ver not present")},
-		{"fail ver type", args{ctx, mustAttestationProvisioner(t, acaRoot), &Challenge{Token: "token"}, jwk, &attestationObject{
-			Format: "tpm",
-			AttStatement: map[string]interface{}{
-				"ver":      []interface{}{},
-				"x5c":      []interface{}{akCert.Raw, aca.Intermediate.Raw},
-				"alg":      int64(-257), // RS256
-				"sig":      params.CreateSignature,
-				"certInfo": params.CreateAttestation,
-				"pubArea":  params.Public,
-			},
-		}}, nil, newBadAttestationStatementError("ver not present")},
-		{"fail bogus ver", args{ctx, mustAttestationProvisioner(t, acaRoot), &Challenge{Token: "token"}, jwk, &attestationObject{
-			Format: "tpm",
-			AttStatement: map[string]interface{}{
-				"ver":      "bogus",
-				"x5c":      []interface{}{akCert.Raw, aca.Intermediate.Raw},
-				"alg":      int64(-257), // RS256
-				"sig":      params.CreateSignature,
-				"certInfo": params.CreateAttestation,
-				"pubArea":  params.Public,
-			},
-		}}, nil, newBadAttestationStatementError(`version "bogus" is not supported`)},
-		{"fail x5c not present", args{ctx, mustAttestationProvisioner(t, acaRoot), &Challenge{Token: "token"}, jwk, &attestationObject{
-			Format: "tpm",
-			AttStatement: map[string]interface{}{
-				"ver":      "2.0",
-				"alg":      int64(-257), // RS256
-				"sig":      params.CreateSignature,
-				"certInfo": params.CreateAttestation,
-				"pubArea":  params.Public,
-			},
-		}}, nil, newBadAttestationStatementError("x5c not present")},
-		{"fail x5c type", args{ctx, mustAttestationProvisioner(t, acaRoot), &Challenge{Token: "token"}, jwk, &attestationObject{
-			Format: "tpm",
-			AttStatement: map[string]interface{}{
-				"ver":      "2.0",
-				"x5c":      [][]byte{akCert.Raw, aca.Intermediate.Raw},
-				"alg":      int64(-257), // RS256
-				"sig":      params.CreateSignature,
-				"certInfo": params.CreateAttestation,
-				"pubArea":  params.Public,
-			},
-		}}, nil, newBadAttestationStatementError("x5c not present")},
-		{"fail x5c empty", args{ctx, mustAttestationProvisioner(t, acaRoot), &Challenge{Token: "token"}, jwk, &attestationObject{
-			Format: "tpm",
-			AttStatement: map[string]interface{}{
-				"ver":      "2.0",
-				"x5c":      []interface{}{},
-				"alg":      int64(-257), // RS256
-				"sig":      params.CreateSignature,
-				"certInfo": params.CreateAttestation,
-				"pubArea":  params.Public,
-			},
-		}}, nil, newBadAttestationStatementError("x5c is empty")},
-		{"fail leaf type", args{ctx, mustAttestationProvisioner(t, acaRoot), &Challenge{Token: "token"}, jwk, &attestationObject{
-			Format: "step",
-			AttStatement: map[string]interface{}{
-				"ver":      "2.0",
-				"x5c":      []interface{}{"leaf", aca.Intermediate.Raw},
-				"alg":      int64(-257), // RS256
-				"sig":      params.CreateSignature,
-				"certInfo": params.CreateAttestation,
-				"pubArea":  params.Public,
-			},
-		}}, nil, newBadAttestationStatementError("x5c is malformed")},
-		{"fail leaf parse", args{ctx, mustAttestationProvisioner(t, acaRoot), &Challenge{Token: "token"}, jwk, &attestationObject{
-			Format: "step",
-			AttStatement: map[string]interface{}{
-				"ver":      "2.0",
-				"x5c":      []interface{}{akCert.Raw[:100], aca.Intermediate.Raw},
-				"alg":      int64(-257), // RS256
-				"sig":      params.CreateSignature,
-				"certInfo": params.CreateAttestation,
-				"pubArea":  params.Public,
-			},
-		}}, nil, newBadAttestationStatementError("x5c is malformed: x509: malformed certificate")},
-		{"fail intermediate type", args{ctx, mustAttestationProvisioner(t, acaRoot), &Challenge{Token: "token"}, jwk, &attestationObject{
-			Format: "step",
-			AttStatement: map[string]interface{}{
-				"ver":      "2.0",
-				"x5c":      []interface{}{akCert.Raw, "intermediate"},
-				"alg":      int64(-257), // RS256
-				"sig":      params.CreateSignature,
-				"certInfo": params.CreateAttestation,
-				"pubArea":  params.Public,
-			},
-		}}, nil, newBadAttestationStatementError("x5c is malformed")},
-		{"fail intermediate parse", args{ctx, mustAttestationProvisioner(t, acaRoot), &Challenge{Token: "token"}, jwk, &attestationObject{
-			Format: "step",
-			AttStatement: map[string]interface{}{
-				"ver":      "2.0",
-				"x5c":      []interface{}{akCert.Raw, aca.Intermediate.Raw[:100]},
-				"alg":      int64(-257), // RS256
-				"sig":      params.CreateSignature,
-				"certInfo": params.CreateAttestation,
-				"pubArea":  params.Public,
-			},
-		}}, nil, newBadAttestationStatementError("x5c is malformed: x509: malformed certificate")},
-		{"fail roots", args{ctx, mustAttestationProvisioner(t, nil), &Challenge{Token: "token"}, jwk, &attestationObject{
-			Format: "tpm",
-			AttStatement: map[string]interface{}{
-				"ver":      "2.0",
-				"x5c":      []interface{}{akCert.Raw, aca.Intermediate.Raw},
-				"alg":      int64(-257), // RS256
-				"sig":      params.CreateSignature,
-				"certInfo": params.CreateAttestation,
-				"pubArea":  params.Public,
-			},
-		}}, nil, newInternalServerError("no root CA bundle available to verify the attestation certificate")},
-		{"fail verify", args{ctx, mustAttestationProvisioner(t, acaRoot), &Challenge{Token: "token"}, jwk, &attestationObject{
-			Format: "step",
-			AttStatement: map[string]interface{}{
-				"ver":      "2.0",
-				"x5c":      []interface{}{akCert.Raw},
-				"alg":      int64(-257), // RS256
-				"sig":      params.CreateSignature,
-				"certInfo": params.CreateAttestation,
-				"pubArea":  params.Public,
-			},
-		}}, nil, newBadAttestationStatementError("x5c is not valid: x509: certificate signed by unknown authority")},
-		{"fail validateAKCertificate", args{ctx, mustAttestationProvisioner(t, acaRoot), &Challenge{Token: "token"}, jwk, &attestationObject{
-			Format: "tpm",
-			AttStatement: map[string]interface{}{
-				"ver":      "2.0",
-				"x5c":      []interface{}{invalidAKCert.Raw, aca.Intermediate.Raw},
-				"alg":      int64(-257), // RS256
-				"sig":      params.CreateSignature,
-				"certInfo": params.CreateAttestation,
-				"pubArea":  params.Public,
-			},
-		}}, nil, newBadAttestationStatementError("AK certificate is not valid: missing TPM manufacturer")},
-		{"fail pubArea not present", args{ctx, mustAttestationProvisioner(t, acaRoot), &Challenge{Token: "token"}, jwk, &attestationObject{
-			Format: "tpm",
-			AttStatement: map[string]interface{}{
-				"ver":      "2.0",
-				"x5c":      []interface{}{akCert.Raw, aca.Intermediate.Raw},
-				"alg":      int64(-257), // RS256
-				"sig":      params.CreateSignature,
-				"certInfo": params.CreateAttestation,
-			},
-		}}, nil, newBadAttestationStatementError("invalid pubArea in attestation statement")},
-		{"fail pubArea type", args{ctx, mustAttestationProvisioner(t, acaRoot), &Challenge{Token: "token"}, jwk, &attestationObject{
-			Format: "tpm",
-			AttStatement: map[string]interface{}{
-				"ver":      "2.0",
-				"x5c":      []interface{}{akCert.Raw, aca.Intermediate.Raw},
-				"alg":      int64(-257), // RS256
-				"sig":      params.CreateSignature,
-				"certInfo": params.CreateAttestation,
-				"pubArea":  []interface{}{},
-			},
-		}}, nil, newBadAttestationStatementError("invalid pubArea in attestation statement")},
-		{"fail pubArea empty", args{ctx, mustAttestationProvisioner(t, acaRoot), &Challenge{Token: "token"}, jwk, &attestationObject{
-			Format: "tpm",
-			AttStatement: map[string]interface{}{
-				"ver":      "2.0",
-				"x5c":      []interface{}{akCert.Raw, aca.Intermediate.Raw},
-				"alg":      int64(-257), // RS256
-				"sig":      params.CreateSignature,
-				"certInfo": params.CreateAttestation,
-				"pubArea":  []byte{},
-			},
-		}}, nil, newBadAttestationStatementError("pubArea is empty")},
-		{"fail sig not present", args{ctx, mustAttestationProvisioner(t, acaRoot), &Challenge{Token: "token"}, jwk, &attestationObject{
-			Format: "tpm",
-			AttStatement: map[string]interface{}{
-				"ver":      "2.0",
-				"x5c":      []interface{}{akCert.Raw, aca.Intermediate.Raw},
-				"alg":      int64(-257), // RS256
-				"certInfo": params.CreateAttestation,
-				"pubArea":  params.Public,
-			},
-		}}, nil, newBadAttestationStatementError("invalid sig in attestation statement")},
-		{"fail sig type", args{ctx, mustAttestationProvisioner(t, acaRoot), &Challenge{Token: "token"}, jwk, &attestationObject{
-			Format: "tpm",
-			AttStatement: map[string]interface{}{
-				"ver":      "2.0",
-				"x5c":      []interface{}{akCert.Raw, aca.Intermediate.Raw},
-				"alg":      int64(-257), // RS256
-				"sig":      []interface{}{},
-				"certInfo": params.CreateAttestation,
-				"pubArea":  params.Public,
-			},
-		}}, nil, newBadAttestationStatementError("invalid sig in attestation statement")},
-		{"fail sig empty", args{ctx, mustAttestationProvisioner(t, acaRoot), &Challenge{Token: "token"}, jwk, &attestationObject{
-			Format: "tpm",
-			AttStatement: map[string]interface{}{
-				"ver":      "2.0",
-				"x5c":      []interface{}{akCert.Raw, aca.Intermediate.Raw},
-				"alg":      int64(-257), // RS256
-				"sig":      []byte{},
-				"certInfo": params.CreateAttestation,
-				"pubArea":  params.Public,
-			},
-		}}, nil, newBadAttestationStatementError("sig is empty")},
-		{"fail certInfo not present", args{ctx, mustAttestationProvisioner(t, acaRoot), &Challenge{Token: "token"}, jwk, &attestationObject{
-			Format: "tpm",
-			AttStatement: map[string]interface{}{
-				"ver":     "2.0",
-				"x5c":     []interface{}{akCert.Raw, aca.Intermediate.Raw},
-				"alg":     int64(-257), // RS256
-				"sig":     params.CreateSignature,
-				"pubArea": params.Public,
-			},
-		}}, nil, newBadAttestationStatementError("invalid certInfo in attestation statement")},
-		{"fail certInfo type", args{ctx, mustAttestationProvisioner(t, acaRoot), &Challenge{Token: "token"}, jwk, &attestationObject{
-			Format: "tpm",
-			AttStatement: map[string]interface{}{
-				"ver":      "2.0",
-				"x5c":      []interface{}{akCert.Raw, aca.Intermediate.Raw},
-				"alg":      int64(-257), // RS256
-				"sig":      params.CreateSignature,
-				"certInfo": []interface{}{},
-				"pubArea":  params.Public,
-			},
-		}}, nil, newBadAttestationStatementError("invalid certInfo in attestation statement")},
-		{"fail certInfo empty", args{ctx, mustAttestationProvisioner(t, acaRoot), &Challenge{Token: "token"}, jwk, &attestationObject{
-			Format: "tpm",
-			AttStatement: map[string]interface{}{
-				"ver":      "2.0",
-				"x5c":      []interface{}{akCert.Raw, aca.Intermediate.Raw},
-				"alg":      int64(-257), // RS256
-				"sig":      params.CreateSignature,
-				"certInfo": []byte{},
-				"pubArea":  params.Public,
-			},
-		}}, nil, newBadAttestationStatementError("certInfo is empty")},
-		{"fail alg not present", args{ctx, mustAttestationProvisioner(t, acaRoot), &Challenge{Token: "token"}, jwk, &attestationObject{
-			Format: "tpm",
-			AttStatement: map[string]interface{}{
-				"ver":      "2.0",
-				"x5c":      []interface{}{akCert.Raw, aca.Intermediate.Raw},
-				"sig":      params.CreateSignature,
-				"certInfo": params.CreateAttestation,
-				"pubArea":  params.Public,
-			},
-		}}, nil, newBadAttestationStatementError("invalid alg in attestation statement")},
-		{"fail alg type", args{ctx, mustAttestationProvisioner(t, acaRoot), &Challenge{Token: "token"}, jwk, &attestationObject{
-			Format: "tpm",
-			AttStatement: map[string]interface{}{
-				"ver":      "2.0",
-				"x5c":      []interface{}{akCert.Raw, aca.Intermediate.Raw},
-				"alg":      int64(0), // invalid alg
-				"sig":      params.CreateSignature,
-				"certInfo": params.CreateAttestation,
-				"pubArea":  params.Public,
-			},
-		}}, nil, newBadAttestationStatementError("invalid alg 0 in attestation statement")},
-		{"fail attestation verification", args{ctx, mustAttestationProvisioner(t, acaRoot), &Challenge{Token: "token"}, jwk, &attestationObject{
-			Format: "tpm",
-			AttStatement: map[string]interface{}{
-				"ver":      "2.0",
-				"x5c":      []interface{}{akCert.Raw, aca.Intermediate.Raw},
-				"alg":      int64(-257), // RS256
-				"sig":      params.CreateSignature,
-				"certInfo": params.CreateAttestation,
-				"pubArea":  anotherKeyParams.Public,
-			},
-		}}, nil, newBadAttestationStatementError("invalid certification parameters: certification refers to a different key")},
-		{"fail keyAuthorization", args{ctx, mustAttestationProvisioner(t, acaRoot), &Challenge{Token: "token"}, &jose.JSONWebKey{Key: []byte("not an asymmetric key")}, &attestationObject{
-			Format: "tpm",
-			AttStatement: map[string]interface{}{
-				"ver":      "2.0",
-				"x5c":      []interface{}{akCert.Raw, aca.Intermediate.Raw},
-				"alg":      int64(-257), // RS256
-				"sig":      params.CreateSignature,
-				"certInfo": params.CreateAttestation,
-				"pubArea":  params.Public,
-			},
-		}}, nil, newInternalServerError("failed creating key auth digest: error generating JWK thumbprint: go-jose/go-jose: unknown key type '[]uint8'")},
-		{"fail different keyAuthorization", args{ctx, mustAttestationProvisioner(t, acaRoot), &Challenge{Token: "aDifferentToken"}, jwk, &attestationObject{
-			Format: "tpm",
-			AttStatement: map[string]interface{}{
-				"ver":      "2.0",
-				"x5c":      []interface{}{akCert.Raw, aca.Intermediate.Raw},
-				"alg":      int64(-257), //
-				"sig":      params.CreateSignature,
-				"certInfo": params.CreateAttestation,
-				"pubArea":  params.Public,
-			},
-		}}, nil, newBadAttestationStatementError("key authorization invalid")},
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			got, err := doTPMAttestationFormat(tt.args.ctx, tt.args.prov, tt.args.ch, tt.args.jwk, tt.args.att)
-			if tt.expErr != nil {
-				var ae *Error
-				if assert.True(t, errors.As(err, &ae)) {
-					assert.EqualError(t, err, tt.expErr.Error())
-					assert.Equal(t, ae.StatusCode(), tt.expErr.StatusCode())
-					assert.Equal(t, ae.Type, tt.expErr.Type)
-				}
-				assert.Nil(t, got)
-				return
-			}
 
-			assert.NoError(t, err)
-			if assert.NotNil(t, got) {
-				assert.Equal(t, akCert, got.Certificate)
-				assert.Equal(t, [][]*x509.Certificate{
-					{
-						akCert, aca.Intermediate, aca.Root,
-					},
-				}, got.VerifiedChains)
-				assert.Equal(t, fingerprint, got.Fingerprint)
-				assert.Empty(t, got.PermanentIdentifiers) // currently expected to be always empty
-			}
-		})
+	for _, san := range sans {
+		rawValue, err := san.RawValue()
+		if err != nil {
+			return zero, err
+		}
+
+		rawValues = append(rawValues, rawValue)
 	}
+
+	// Now marshal the rawValues into the ASN1 sequence, and create an Extension object to hold the extension
+	rawBytes, err := asn1.Marshal(rawValues)
+	if err != nil {
+		return zero, fmt.Errorf("error marshaling SubjectAlternativeName extension to ASN1: %w", err)
+	}
+
+	return x509util.Extension{
+		ID:       x509util.ObjectIdentifier(oidSubjectAlternativeName),
+		Critical: subjectIsEmpty,
+		Value:    rawBytes,
+	}, nil
 }
