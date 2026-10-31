@@ -41,6 +41,7 @@ import (
 	"go.step.sm/crypto/pemutil"
 
 	"github.com/smallstep/certificates/attestation"
+	attandroidkey "github.com/smallstep/certificates/attestation/androidkey"
 	"github.com/smallstep/certificates/attestation/yubikey"
 	"github.com/smallstep/certificates/authority/config"
 	"github.com/smallstep/certificates/authority/provisioner"
@@ -136,6 +137,8 @@ func mustAccountAndKeyAuthorization(t *testing.T, token string) (*jose.JSONWebKe
 	fatalError(t, err)
 	return jwk, keyAuth
 }
+
+var oidAndroidAttestation = asn1.ObjectIdentifier{1, 3, 6, 1, 4, 1, 11129, 2, 1, 17}
 
 func mustAttestAndroid(t *testing.T, keyAuthorization string) ([]byte, *x509.Certificate, *x509.Certificate) {
 	t.Helper()
@@ -375,6 +378,7 @@ func newWireProvisionerWithOptions(t *testing.T, options *provisioner.Options) *
 func Test_storeAttestationError(t *testing.T) {
 	asn1Err := asn1.StructuralError{Msg: "tags don't match"}
 	verifyErr := errors.New("x509: certificate signed by unknown authority")
+	crlErr := errors.New("failed checking certificate against Android CRL: unavailable")
 	// The errors expected are made as acme made them before the verifiers
 	// moved to the attestation packages.
 	tests := []struct {
@@ -389,6 +393,12 @@ func Test_storeAttestationError(t *testing.T) {
 			NewDetailedError(ErrorRejectedIdentifierType, "x5c is empty"), nil},
 		{"step serial number", attestation.Invalid(fmt.Errorf("error finding serial number: %w: %w", yubikey.ErrSerialNumber, asn1Err)),
 			WrapErrorISE(WrapError(ErrorBadAttestationStatementType, asn1Err, "error parsing serial number"), "error finding serial number"), nil},
+		{"android-key empty x5c", attestation.Invalid(attandroidkey.ErrEmptyX5C),
+			NewDetailedError(ErrorRejectedIdentifierType, "x5c is empty"), nil},
+		{"android-key key description", attestation.Invalid(fmt.Errorf("%w: %w", attandroidkey.ErrKeyDescription, asn1Err)),
+			WrapError(ErrorBadAttestationStatementType, asn1Err, "error parsing attestation"), nil},
+		{"android-key revocation", fmt.Errorf("failed checking certificate revocation status: %w", crlErr), nil,
+			WrapDetailedError(ErrorServerInternalType, crlErr, "failed checking certificate revocation status")},
 		{"internal", errors.New("error calculating key fingerprint: unsupported key"), nil,
 			WrapErrorISE(errors.New("unsupported key"), "error calculating key fingerprint")},
 	}
