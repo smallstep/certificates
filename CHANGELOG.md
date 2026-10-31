@@ -31,9 +31,29 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
 
 - Support for ML-DSA (FIPS 204) keys, available when built with Go 1.27 or
   newer. JOSE-based flows (JWK, JWS and JWT tokens) do not support ML-DSA yet.
+- Experimental support for the ACME `remote-attest-01` challenge and the
+  `remote-attestation` identifier of draft-ietf-acme-rats-03, enabled per ACME
+  provisioner with `remote-attest-01` in `challenges` and configured by its new
+  `remoteAttestation` block. The evidence is a CMW record (RFC 9999) holding an
+  Intel TDX quote or an AMD SEV-SNP report as a configfs-tsm report
+  (`application/vnd.veraison.tsm-report+json` or `+cbor`), or a Google
+  Confidential Space PKI token (`application/eat+jwt`). The draft defines no
+  binding, so step-ca requires the evidence to bind the SHA-256 digests of the
+  challenge's key authorization, computed over its `freshnessNonce`, and of the
+  DER SubjectPublicKeyInfo of the key the order is finalized with. The verified
+  attestation is sent to webhooks as `attestation` and given to templates as
+  `.Attestation`. The challenge can be configured in `ca.json` only for now.
+- The `attestation` package and its subpackages, which verify TDX quotes,
+  SEV-SNP reports and Confidential Space tokens, and parse CMW records and
+  configfs-tsm reports.
 
 ### Changed
 
+- ACME finalize checks the CSR's key against the attested key of every
+  authorization of the order. Before, it checked only the first fingerprint a
+  `device-attest-01` challenge had stored, so an order whose authorizations
+  attested different keys could be finalized with the first one.
+- `github.com/google/go-sev-guest` is updated to v0.15.0.
 - `--resolver` now accepts an address without a port and uses port 53. Before,
   an address without a port caused all DNS queries to fail with
   `missing port in address`.
