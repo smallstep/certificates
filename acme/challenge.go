@@ -144,7 +144,7 @@ func (ch *Challenge) Validate(ctx context.Context, db DB, jwk *jose.JSONWebKey, 
 		}
 		return wireDPOP01Validate(ctx, ch, wireDB, jwk, payload)
 	case REMOTEATTEST01:
-		return NewError(ErrorMalformedType, "remote-attest-01 is not implemented yet")
+		return remoteAttest01Validate(ctx, ch, db, jwk, payload)
 	default:
 		return NewErrorISE("unexpected challenge type %q", ch.Type)
 	}

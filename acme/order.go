@@ -145,25 +145,43 @@ func (o *Order) UpdateStatus(ctx context.Context, db DB) error {
 	return nil
 }
 
-// getAuthorizationFingerprint returns a fingerprint from the list of authorizations. This
-// fingerprint is used on the device-attest-01 flow to verify the attestation
-// certificate public key with the CSR public key.
-//
-// There's no point on reading all the authorizations as there will be only one
-// for a permanent identifier.
-func (o *Order) getAuthorizationFingerprint(ctx context.Context, db DB) (string, error) {
+// checkAttestedKeys checks the CSR's key against every key an authorization of
+// the order attested: the fingerprint of the key a device-attest-01 challenge
+// verified, and the digest of the key the evidence of a remote-attest-01
+// challenge bound. It returns the attestation of the order's remote-attest-01
+// challenge, if there is one.
+func (o *Order) checkAttestedKeys(ctx context.Context, db DB, csr *x509.CertificateRequest) (*webhook.Attestation, error) {
+	var (
+		att         *webhook.Attestation
+		fingerprint string
+		keyDigest   string
+	)
 	for _, azID := range o.AuthorizationIDs {
 		az, err := db.GetAuthorization(ctx, azID)
 		if err != nil {
-			return "", WrapErrorISE(err, "error getting authorization %q", azID)
+			return nil, WrapErrorISE(err, "error getting authorization %q", azID)
 		}
-		// There's no point on reading all the authorizations as there will
-		// be only one for a permanent identifier.
 		if az.Fingerprint != "" {
-			return az.Fingerprint, nil
+			if fingerprint == "" {
+				if fingerprint, err = keyutil.Fingerprint(csr.PublicKey); err != nil {
+					return nil, WrapErrorISE(err, "error calculating key fingerprint")
+				}
+			}
+			if subtle.ConstantTimeCompare([]byte(az.Fingerprint), []byte(fingerprint)) == 0 {
+				return nil, NewError(ErrorUnauthorizedType, "order %s csr does not match the attested key", o.ID)
+			}
+		}
+		if az.Attestation != nil {
+			if keyDigest == "" {
+				keyDigest = remoteAttestationKeyDigest(csr)
+			}
+			if subtle.ConstantTimeCompare([]byte(az.Attestation.KeyDigest), []byte(keyDigest)) == 0 {
+				return nil, NewError(ErrorUnauthorizedType, "order %s csr does not match the attested key", o.ID)
+			}
+			att = az.Attestation
 		}
 	}
-	return "", nil
+	return att, nil
 }
 
 // Finalize signs a certificate if the necessary conditions for Order completion
@@ -191,22 +209,11 @@ func (o *Order) Finalize(ctx context.Context, db DB, csr *x509.CertificateReques
 		return NewErrorISE("unexpected status %s for order %s", o.Status, o.ID)
 	}
 
-	// Get key fingerprint if any. And then compare it with the CSR fingerprint.
-	//
-	// In device-attest-01 challenges we should check that the keys in the CSR
-	// and the attestation certificate are the same.
-	fingerprint, err := o.getAuthorizationFingerprint(ctx, db)
+	// In device-attest-01 and remote-attest-01 challenges, the key in the CSR
+	// must be the attested one.
+	att, err := o.checkAttestedKeys(ctx, db, csr)
 	if err != nil {
 		return err
-	}
-	if fingerprint != "" {
-		fp, err := keyutil.Fingerprint(csr.PublicKey)
-		if err != nil {
-			return WrapErrorISE(err, "error calculating key fingerprint")
-		}
-		if subtle.ConstantTimeCompare([]byte(fingerprint), []byte(fp)) == 0 {
-			return NewError(ErrorUnauthorizedType, "order %s csr does not match the attested key", o.ID)
-		}
 	}
 
 	// canonicalize the CSR to allow for comparison
@@ -239,6 +246,9 @@ func (o *Order) Finalize(ctx context.Context, db DB, csr *x509.CertificateReques
 		data.Set("Oidc", oidc)
 	} else {
 		data.SetCommonName(csr.Subject.CommonName)
+	}
+	if att != nil {
+		data.Set("Attestation", att)
 	}
 
 	// Custom sign options passed to authority.Sign
@@ -293,6 +303,9 @@ func (o *Order) Finalize(ctx context.Context, db DB, csr *x509.CertificateReques
 	for _, signOp := range signOps {
 		if wc, ok := signOp.(*provisioner.WebhookController); ok {
 			wc.TemplateData = data
+			if att != nil {
+				wc.AppendRequestBodyOptions(webhook.WithAttestation(att))
+			}
 		}
 	}
 
@@ -448,6 +461,9 @@ func (o *Order) sans(csr *x509.CertificateRequest) ([]x509util.SubjectAlternativ
 			}
 			tmpOrderURIs[indexURI] = clientID
 			indexURI++
+		case RemoteAttestation:
+			// It names nothing in the certificate.
+			continue
 		default:
 			return sans, NewErrorISE("unsupported identifier type in order: %s", n.Type)
 		}

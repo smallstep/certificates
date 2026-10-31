@@ -7,22 +7,25 @@ import (
 
 	"github.com/pkg/errors"
 	"github.com/smallstep/certificates/acme"
+	"github.com/smallstep/certificates/webhook"
 	"github.com/smallstep/nosql"
 )
 
 // dbAuthz is the base authz type that others build from.
 type dbAuthz struct {
-	ID           string          `json:"id"`
-	AccountID    string          `json:"accountID"`
-	Identifier   acme.Identifier `json:"identifier"`
-	Status       acme.Status     `json:"status"`
-	Token        string          `json:"token"`
-	Fingerprint  string          `json:"fingerprint,omitempty"`
-	ChallengeIDs []string        `json:"challengeIDs"`
-	Wildcard     bool            `json:"wildcard"`
-	CreatedAt    time.Time       `json:"createdAt"`
-	ExpiresAt    time.Time       `json:"expiresAt"`
-	Error        *acme.Error     `json:"error"`
+	ID          string          `json:"id"`
+	AccountID   string          `json:"accountID"`
+	Identifier  acme.Identifier `json:"identifier"`
+	Status      acme.Status     `json:"status"`
+	Token       string          `json:"token"`
+	Fingerprint string          `json:"fingerprint,omitempty"`
+	// Attestation is set by a valid remote-attest-01 challenge.
+	Attestation  *webhook.Attestation `json:"attestation,omitempty"`
+	ChallengeIDs []string             `json:"challengeIDs"`
+	Wildcard     bool                 `json:"wildcard"`
+	CreatedAt    time.Time            `json:"createdAt"`
+	ExpiresAt    time.Time            `json:"expiresAt"`
+	Error        *acme.Error          `json:"error"`
 }
 
 func (ba *dbAuthz) clone() *dbAuthz {
@@ -71,6 +74,7 @@ func (db *DB) GetAuthorization(ctx context.Context, id string) (*acme.Authorizat
 		ExpiresAt:   dbaz.ExpiresAt,
 		Token:       dbaz.Token,
 		Fingerprint: dbaz.Fingerprint,
+		Attestation: dbaz.Attestation,
 		Error:       dbaz.Error,
 	}, nil
 }
@@ -100,6 +104,7 @@ func (db *DB) CreateAuthorization(ctx context.Context, az *acme.Authorization) e
 		ChallengeIDs: chIDs,
 		Token:        az.Token,
 		Fingerprint:  az.Fingerprint,
+		Attestation:  az.Attestation,
 		Wildcard:     az.Wildcard,
 	}
 
@@ -116,6 +121,7 @@ func (db *DB) UpdateAuthorization(ctx context.Context, az *acme.Authorization) e
 	nu := old.clone()
 	nu.Status = az.Status
 	nu.Fingerprint = az.Fingerprint
+	nu.Attestation = az.Attestation
 	nu.Error = az.Error
 	return db.save(ctx, old.ID, nu, old, "authz", authzTable)
 }
@@ -148,6 +154,7 @@ func (db *DB) GetAuthorizationsByAccountID(_ context.Context, accountID string) 
 			ExpiresAt:   dbaz.ExpiresAt,
 			Token:       dbaz.Token,
 			Fingerprint: dbaz.Fingerprint,
+			Attestation: dbaz.Attestation,
 			Error:       dbaz.Error,
 		})
 	}
