@@ -45,7 +45,8 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
   `.Attestation`. The challenge can be configured in `ca.json` only for now.
 - The `attestation` package and its subpackages, which verify TDX quotes,
   SEV-SNP reports and Confidential Space tokens, and parse CMW records and
-  configfs-tsm reports.
+  configfs-tsm reports. The `device-attest-01` formats' verifiers (`apple`,
+  `step`, `tpm` and `android-key`) moved there too.
 
 ### Changed
 
@@ -61,6 +62,12 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
 ### Deprecated
 
 - Go 1.25 support. Go 1.26 or newer is now required.
+
+### Fixed
+
+- A `device-attest-01` challenge in the `step` format whose attestation
+  certificate's serial number extension has trailing data is refused as a bad
+  attestation statement. Before, it made the request panic.
 
 ## [0.30.2] - 2026-03-22
 
