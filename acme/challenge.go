@@ -42,6 +42,7 @@ import (
 	"github.com/smallstep/certificates/acme/wire"
 	"github.com/smallstep/certificates/attestation"
 	"github.com/smallstep/certificates/attestation/apple"
+	"github.com/smallstep/certificates/attestation/yubikey"
 	"github.com/smallstep/certificates/authority/provisioner"
 	wireprovisioner "github.com/smallstep/certificates/authority/provisioner/wire"
 	"github.com/smallstep/certificates/internal/cast"
@@ -917,15 +918,13 @@ func deviceAttest01Validate(ctx context.Context, ch *Challenge, db DB, jwk *jose
 		// Update attestation key fingerprint to compare against the CSR
 		az.Fingerprint = data.Fingerprint
 	case "step":
-		data, err := doStepAttestationFormat(ctx, prov, ch, jwk, &att)
+		keyAuth, err := KeyAuthorization(ch.Token, jwk)
 		if err != nil {
-			if acmeError, ok := errors.AsType[*Error](err); ok {
-				if acmeError.Status == 500 {
-					return acmeError
-				}
-				return storeError(ctx, db, ch, true, acmeError)
-			}
-			return WrapErrorISE(err, "error validating attestation")
+			return err
+		}
+		data, err := yubikey.Verify(att.AttStatement, attestationRoots(prov), []byte(keyAuth))
+		if err != nil {
+			return storeAttestationError(ctx, db, ch, err)
 		}
 
 		// Validate the YubiKey serial number from the attestation
@@ -1010,11 +1009,22 @@ func attestationRoots(prov Provisioner) *x509.CertPool {
 // error of the attestation statement is stored in the challenge, which becomes
 // invalid, as a bad attestation statement with the error in its detail. Any
 // other error is returned as an internal error.
+//
+// The exceptions keep the errors the step format has always returned: an empty
+// x5c is a rejected identifier, and a malformed serial number has no detail.
 func storeAttestationError(ctx context.Context, db DB, ch *Challenge, err error) error {
-	if !errors.Is(err, attestation.ErrInvalidEvidence) {
+	var acmeErr *Error
+	switch {
+	case !errors.Is(err, attestation.ErrInvalidEvidence):
 		return newError(ErrorServerInternalType, err)
+	case errors.Is(err, yubikey.ErrEmptyX5C):
+		acmeErr = newError(ErrorRejectedIdentifierType, err).withDetail()
+	case errors.Is(err, yubikey.ErrSerialNumber):
+		acmeErr = newError(ErrorBadAttestationStatementType, err)
+	default:
+		acmeErr = newError(ErrorBadAttestationStatementType, err).withDetail()
 	}
-	return storeError(ctx, db, ch, true, newError(ErrorBadAttestationStatementType, err).withDetail())
+	return storeError(ctx, db, ch, true, acmeErr)
 }
 
 var (
@@ -1555,160 +1565,6 @@ func doAndroidKeyAttestationFormat(ctx context.Context, prov Provisioner, ch *Ch
 	return data, nil
 }
 
-// Yubico PIV Root CA Serial 263751
-// https://developers.yubico.com/PIV/Introduction/piv-attestation-ca.pem
-const yubicoPIVRootCA = `-----BEGIN CERTIFICATE-----
-MIIDFzCCAf+gAwIBAgIDBAZHMA0GCSqGSIb3DQEBCwUAMCsxKTAnBgNVBAMMIFl1
-YmljbyBQSVYgUm9vdCBDQSBTZXJpYWwgMjYzNzUxMCAXDTE2MDMxNDAwMDAwMFoY
-DzIwNTIwNDE3MDAwMDAwWjArMSkwJwYDVQQDDCBZdWJpY28gUElWIFJvb3QgQ0Eg
-U2VyaWFsIDI2Mzc1MTCCASIwDQYJKoZIhvcNAQEBBQADggEPADCCAQoCggEBAMN2
-cMTNR6YCdcTFRxuPy31PabRn5m6pJ+nSE0HRWpoaM8fc8wHC+Tmb98jmNvhWNE2E
-ilU85uYKfEFP9d6Q2GmytqBnxZsAa3KqZiCCx2LwQ4iYEOb1llgotVr/whEpdVOq
-joU0P5e1j1y7OfwOvky/+AXIN/9Xp0VFlYRk2tQ9GcdYKDmqU+db9iKwpAzid4oH
-BVLIhmD3pvkWaRA2H3DA9t7H/HNq5v3OiO1jyLZeKqZoMbPObrxqDg+9fOdShzgf
-wCqgT3XVmTeiwvBSTctyi9mHQfYd2DwkaqxRnLbNVyK9zl+DzjSGp9IhVPiVtGet
-X02dxhQnGS7K6BO0Qe8CAwEAAaNCMEAwHQYDVR0OBBYEFMpfyvLEojGc6SJf8ez0
-1d8Cv4O/MA8GA1UdEwQIMAYBAf8CAQEwDgYDVR0PAQH/BAQDAgEGMA0GCSqGSIb3
-DQEBCwUAA4IBAQBc7Ih8Bc1fkC+FyN1fhjWioBCMr3vjneh7MLbA6kSoyWF70N3s
-XhbXvT4eRh0hvxqvMZNjPU/VlRn6gLVtoEikDLrYFXN6Hh6Wmyy1GTnspnOvMvz2
-lLKuym9KYdYLDgnj3BeAvzIhVzzYSeU77/Cupofj093OuAswW0jYvXsGTyix6B3d
-bW5yWvyS9zNXaqGaUmP3U9/b6DlHdDogMLu3VLpBB9bm5bjaKWWJYgWltCVgUbFq
-Fqyi4+JE014cSgR57Jcu3dZiehB6UtAPgad9L5cNvua/IWRmm+ANy3O2LH++Pyl8
-SREzU8onbBsjMg9QDiSf5oJLKvd/Ren+zGY7
------END CERTIFICATE-----`
-
-// Yubico Attestation Root 1 (YubiKey 5.7.4+)
-// https://developers.yubico.com/PKI/yubico-ca-1.pem
-const yubicoAttestationRootCA = `-----BEGIN CERTIFICATE-----
-MIIDPjCCAiagAwIBAgIUXzeiEDJEOTt14F5n0o6Zf/bBwiUwDQYJKoZIhvcNAQEN
-BQAwJDEiMCAGA1UEAwwZWXViaWNvIEF0dGVzdGF0aW9uIFJvb3QgMTAgFw0yNDEy
-MDEwMDAwMDBaGA85OTk5MTIzMTIzNTk1OVowJDEiMCAGA1UEAwwZWXViaWNvIEF0
-dGVzdGF0aW9uIFJvb3QgMTCCASIwDQYJKoZIhvcNAQEBBQADggEPADCCAQoCggEB
-AMZ6/TxM8rIT+EaoPvG81ontMOo/2mQ2RBwJHS0QZcxVaNXvl12LUhBZ5LmiBScI
-Zd1Rnx1od585h+/dhK7hEm7JAALkKKts1fO53KGNLZujz5h3wGncr4hyKF0G74b/
-U3K9hE5mGND6zqYchCRAHfrYMYRDF4YL0X4D5nGdxvppAy6nkEmtWmMnwO3i0TAu
-csrbE485HvGM4r0VpgVdJpvgQjiTJCTIq+D35hwtT8QDIv+nGvpcyi5wcIfCkzyC
-imJukhYy6KoqNMKQEdpNiSOvWyDMTMt1bwCvEzpw91u+msUt4rj0efnO9s0ZOwdw
-MRDnH4xgUl5ZLwrrPkfC1/0CAwEAAaNmMGQwHQYDVR0OBBYEFNLu71oijTptXCOX
-PfKF1SbxJXuSMB8GA1UdIwQYMBaAFNLu71oijTptXCOXPfKF1SbxJXuSMBIGA1Ud
-EwEB/wQIMAYBAf8CAQMwDgYDVR0PAQH/BAQDAgGGMA0GCSqGSIb3DQEBDQUAA4IB
-AQC3IW/sgB9pZ8apJNjxuGoX+FkILks0wMNrdXL/coUvsrhzsvl6mePMrbGJByJ1
-XnquB5sgcRENFxdQFma3mio8Upf1owM1ZreXrJ0mADG2BplqbJnxiyYa+R11reIF
-TWeIhMNcZKsDZrFAyPuFjCWSQvJmNWe9mFRYFgNhXJKkXIb5H1XgEDlwiedYRM7V
-olBNlld6pRFKlX8ust6OTMOeADl2xNF0m1LThSdeuXvDyC1g9+ILfz3S6OIYgc3i
-roRcFD354g7rKfu67qFAw9gC4yi0xBTPrY95rh4/HqaUYCA/L8ldRk6H7Xk35D+W
-Vpmq2Sh/xT5HiFuhf4wJb0bK
------END CERTIFICATE-----`
-
-var (
-	// serial number of the YubiKey, encoded as an integer.
-	// https://developers.yubico.com/PIV/Introduction/PIV_attestation.html
-	oidYubicoSerialNumber = asn1.ObjectIdentifier{1, 3, 6, 1, 4, 1, 41482, 3, 7}
-
-	// custom Smallstep managed device extension carrying a device ID or serial number
-	oidStepManagedDevice = asn1.ObjectIdentifier{1, 3, 6, 1, 4, 1, 37476, 9000, 64, 4}
-)
-
-type stepAttestationData struct {
-	Certificate  *x509.Certificate
-	SerialNumber string
-	Fingerprint  string
-}
-
-func doStepAttestationFormat(_ context.Context, prov Provisioner, ch *Challenge, jwk *jose.JSONWebKey, att *attestationObject) (*stepAttestationData, error) {
-	// Use configured or default attestation roots if none is configured.
-	roots, ok := prov.GetAttestationRoots()
-	if !ok {
-		pivRoot, err := pemutil.ParseCertificate([]byte(yubicoPIVRootCA))
-		if err != nil {
-			return nil, WrapErrorISE(err, "error parsing root ca")
-		}
-		attRoot, err := pemutil.ParseCertificate([]byte(yubicoAttestationRootCA))
-		if err != nil {
-			return nil, WrapErrorISE(err, "error parsing root ca")
-		}
-		roots = x509.NewCertPool()
-		roots.AddCert(pivRoot)
-		roots.AddCert(attRoot)
-	}
-
-	// Extract x5c and verify certificate
-	x5c, ok := att.AttStatement["x5c"].([]any)
-	if !ok {
-		return nil, NewDetailedError(ErrorBadAttestationStatementType, "x5c not present")
-	}
-	if len(x5c) == 0 {
-		return nil, NewDetailedError(ErrorRejectedIdentifierType, "x5c is empty")
-	}
-	der, ok := x5c[0].([]byte)
-	if !ok {
-		return nil, NewDetailedError(ErrorBadAttestationStatementType, "x5c is malformed")
-	}
-	leaf, err := x509.ParseCertificate(der)
-	if err != nil {
-		return nil, WrapDetailedError(ErrorBadAttestationStatementType, err, "x5c is malformed")
-	}
-	intermediates := x509.NewCertPool()
-	for _, v := range x5c[1:] {
-		der, ok = v.([]byte)
-		if !ok {
-			return nil, NewDetailedError(ErrorBadAttestationStatementType, "x5c is malformed")
-		}
-		cert, err := x509.ParseCertificate(der)
-		if err != nil {
-			return nil, WrapDetailedError(ErrorBadAttestationStatementType, err, "x5c is malformed")
-		}
-		intermediates.AddCert(cert)
-	}
-	if _, err := leaf.Verify(x509.VerifyOptions{
-		Intermediates: intermediates,
-		Roots:         roots,
-		CurrentTime:   time.Now().Truncate(time.Second),
-		KeyUsages:     []x509.ExtKeyUsage{x509.ExtKeyUsageAny},
-	}); err != nil {
-		return nil, WrapDetailedError(ErrorBadAttestationStatementType, err, "x5c is not valid")
-	}
-
-	// Verify proof of possession of private key validating the key
-	// authorization. Per recommendation at
-	// https://w3c.github.io/webauthn/#sctn-signature-attestation-types the
-	// signature is CBOR-encoded.
-	var sig []byte
-	csig, ok := att.AttStatement["sig"].([]byte)
-	if !ok {
-		return nil, NewDetailedError(ErrorBadAttestationStatementType, "sig not present")
-	}
-	if err := cbor.Unmarshal(csig, &sig); err != nil {
-		return nil, NewDetailedError(ErrorBadAttestationStatementType, "sig is malformed")
-	}
-
-	keyAuth, err := KeyAuthorization(ch.Token, jwk)
-	if err != nil {
-		return nil, err
-	}
-
-	// Verify attestation statement sig
-	if err := validateAttestationSignature(leaf, keyAuth, sig); err != nil {
-		return nil, err
-	}
-
-	// Parse attestation data:
-	// TODO(mariano): add support for other extensions.
-	data := &stepAttestationData{
-		Certificate: leaf,
-	}
-
-	if data.Fingerprint, err = keyutil.Fingerprint(leaf.PublicKey); err != nil {
-		return nil, WrapErrorISE(err, "error calculating key fingerprint")
-	}
-
-	if data.SerialNumber, err = searchSerialNumber(leaf); err != nil {
-		return nil, WrapErrorISE(err, "error finding serial number")
-	}
-
-	return data, nil
-}
-
 // validateAttestationSignature verifies that sig is a signature of the key
 // authorization made with the private key of the given attestation certificate.
 func validateAttestationSignature(cert *x509.Certificate, keyAuth string, sig []byte) error {
@@ -1739,35 +1595,6 @@ func validateAttestationSignature(cert *x509.Certificate, keyAuth string, sig []
 	}
 
 	return nil
-}
-
-// searchSerialNumber searches the certificate extensions, looking for a serial
-// number encoded in one of them. It is not guaranteed that a certificate contains
-// an extension carrying a serial number, so the result can be empty.
-func searchSerialNumber(cert *x509.Certificate) (string, error) {
-	for _, ext := range cert.Extensions {
-		if ext.Id.Equal(oidYubicoSerialNumber) {
-			var serialNumber int
-			rest, err := asn1.Unmarshal(ext.Value, &serialNumber)
-			if err != nil || len(rest) > 0 {
-				return "", WrapError(ErrorBadAttestationStatementType, err, "error parsing serial number")
-			}
-			return strconv.Itoa(serialNumber), nil
-		}
-		if ext.Id.Equal(oidStepManagedDevice) {
-			type stepManagedDevice struct {
-				DeviceID string
-			}
-			var md stepManagedDevice
-			rest, err := asn1.Unmarshal(ext.Value, &md)
-			if err != nil || len(rest) > 0 {
-				return "", WrapError(ErrorBadAttestationStatementType, err, "error parsing serial number")
-			}
-			return md.DeviceID, nil
-		}
-	}
-
-	return "", nil
 }
 
 // serverName determines the SNI HostName to set based on an acme.Challenge

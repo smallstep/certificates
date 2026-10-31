@@ -24,7 +24,6 @@ import (
 	"net"
 	"net/http"
 	"net/http/httptest"
-	"reflect"
 	"slices"
 	"strconv"
 	"strings"
@@ -32,7 +31,7 @@ import (
 	"time"
 
 	"github.com/fxamacker/cbor/v2"
-	attestation "github.com/smallstep/android-attestation"
+	androidattestation "github.com/smallstep/android-attestation"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
@@ -42,6 +41,8 @@ import (
 	"go.step.sm/crypto/pemutil"
 	"go.step.sm/crypto/x509util"
 
+	"github.com/smallstep/certificates/attestation"
+	"github.com/smallstep/certificates/attestation/yubikey"
 	"github.com/smallstep/certificates/authority/config"
 	"github.com/smallstep/certificates/authority/provisioner"
 	"github.com/smallstep/certificates/authority/provisioner/androidkey"
@@ -152,15 +153,15 @@ func mustAttestAndroid(t *testing.T, keyAuthorization string) ([]byte, *x509.Cer
 	sig, err := signer.Sign(rand.Reader, keyAuthSum[:], crypto.SHA256)
 	require.NoError(t, err)
 
-	atts := attestation.KeyDescription{
+	atts := androidattestation.KeyDescription{
 		AttestationVersion:       300,
 		AttestationSecurityLevel: 1,
 		AttestationChallenge:     []byte(keyAuthorization),
-		TeeEnforced: attestation.AuthorizationList{
+		TeeEnforced: androidattestation.AuthorizationList{
 			AttestationIdSerial: []byte("serial-number"),
 		},
 	}
-	attestByte, err := attestation.CreateKeyDescription(&atts)
+	attestByte, err := androidattestation.CreateKeyDescription(&atts)
 	require.NoError(t, err)
 
 	leaf, err := ca.Sign(&x509.Certificate{
@@ -243,6 +244,11 @@ func mustAttestApple(t *testing.T, nonce string) ([]byte, *x509.Certificate, *x5
 
 	return payload, leaf, ca.Root
 }
+
+var (
+	oidYubicoSerialNumber = asn1.ObjectIdentifier{1, 3, 6, 1, 4, 1, 41482, 3, 7}
+	oidStepManagedDevice  = asn1.ObjectIdentifier{1, 3, 6, 1, 4, 1, 37476, 9000, 64, 4}
+)
 
 func mustAttestYubikey(t *testing.T, _, keyAuthorization string, serial int) ([]byte, *x509.Certificate, *x509.Certificate) {
 	t.Helper()
@@ -365,6 +371,54 @@ func newWireProvisionerWithOptions(t *testing.T, options *provisioner.Options) *
 		t.Fatal(err)
 	}
 	return prov
+}
+
+func Test_storeAttestationError(t *testing.T) {
+	asn1Err := asn1.StructuralError{Msg: "tags don't match"}
+	verifyErr := errors.New("x509: certificate signed by unknown authority")
+	// The errors expected are made as acme made them before the verifiers
+	// moved to the attestation packages.
+	tests := []struct {
+		name      string
+		err       error
+		wantStore *Error
+		wantErr   *Error
+	}{
+		{"bad attestation statement", attestation.Invalidf("x5c is not valid: %w", verifyErr),
+			WrapDetailedError(ErrorBadAttestationStatementType, verifyErr, "x5c is not valid"), nil},
+		{"step empty x5c", attestation.Invalid(yubikey.ErrEmptyX5C),
+			NewDetailedError(ErrorRejectedIdentifierType, "x5c is empty"), nil},
+		{"step serial number", attestation.Invalid(fmt.Errorf("error finding serial number: %w: %w", yubikey.ErrSerialNumber, asn1Err)),
+			WrapErrorISE(WrapError(ErrorBadAttestationStatementType, asn1Err, "error parsing serial number"), "error finding serial number"), nil},
+		{"internal", errors.New("error calculating key fingerprint: unsupported key"), nil,
+			WrapErrorISE(errors.New("unsupported key"), "error calculating key fingerprint")},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			db := &MockDB{
+				MockUpdateChallenge: func(ctx context.Context, updch *Challenge) error {
+					require.NotNil(t, tt.wantStore, "unexpected stored error %v", updch.Error)
+					assert.Equal(t, StatusInvalid, updch.Status)
+					assert.EqualError(t, updch.Error.Err, tt.wantStore.Err.Error())
+					assert.Equal(t, tt.wantStore.Type, updch.Error.Type)
+					assert.Equal(t, tt.wantStore.Detail, updch.Error.Detail)
+					assert.Equal(t, tt.wantStore.Status, updch.Error.Status)
+					return nil
+				},
+			}
+			err := storeAttestationError(context.Background(), db, &Challenge{ID: "chID", Status: StatusPending}, tt.err)
+			if tt.wantErr == nil {
+				assert.NoError(t, err)
+				return
+			}
+			var acmeErr *Error
+			require.ErrorAs(t, err, &acmeErr)
+			assert.EqualError(t, acmeErr.Err, tt.wantErr.Err.Error())
+			assert.Equal(t, tt.wantErr.Type, acmeErr.Type)
+			assert.Equal(t, tt.wantErr.Detail, acmeErr.Detail)
+			assert.Equal(t, tt.wantErr.Status, acmeErr.Status)
+		})
+	}
 }
 
 func Test_storeError(t *testing.T) {
@@ -3521,353 +3575,6 @@ func Test_http01ChallengeHost(t *testing.T) {
 	}
 }
 
-func Test_doStepAttestationFormat(t *testing.T) {
-	ctx := context.Background()
-	ca, err := minica.New()
-	require.NoError(t, err)
-
-	caRoot := pem.EncodeToMemory(&pem.Block{Type: "CERTIFICATE", Bytes: ca.Root.Raw})
-
-	makeLeaf := func(signer crypto.Signer, serialNumber []byte) *x509.Certificate {
-		leaf, err := ca.Sign(&x509.Certificate{
-			Subject:   pkix.Name{CommonName: "attestation cert"},
-			PublicKey: signer.Public(),
-			ExtraExtensions: []pkix.Extension{
-				{Id: oidYubicoSerialNumber, Value: serialNumber},
-			},
-		})
-		require.NoError(t, err)
-		return leaf
-	}
-
-	makeLeafWithStepManagedDeviceID := func(signer crypto.Signer, serialNumber string) *x509.Certificate {
-		v, err := asn1.Marshal(stepManagedDevice{DeviceID: serialNumber})
-		require.NoError(t, err)
-		leaf, err := ca.Sign(&x509.Certificate{
-			Subject:   pkix.Name{CommonName: "attestation cert"},
-			PublicKey: signer.Public(),
-			ExtraExtensions: []pkix.Extension{
-				{Id: oidStepManagedDevice, Value: v},
-			},
-		})
-		require.NoError(t, err)
-		return leaf
-	}
-
-	mustSigner := func(kty, crv string, size int) crypto.Signer {
-		s, err := keyutil.GenerateSigner(kty, crv, size)
-		require.NoError(t, err)
-		return s
-	}
-
-	signer, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
-	require.NoError(t, err)
-
-	fingerprint, err := keyutil.Fingerprint(signer.Public())
-	require.NoError(t, err)
-
-	serialNumber, err := asn1.Marshal(1234)
-	require.NoError(t, err)
-
-	leaf := makeLeaf(signer, serialNumber)
-	leafWithStepManagedDeviceID := makeLeafWithStepManagedDeviceID(signer, "1234")
-
-	jwk, err := jose.GenerateJWK("EC", "P-256", "ES256", "sig", "", 0)
-	require.NoError(t, err)
-
-	keyAuth, err := KeyAuthorization("token", jwk)
-	require.NoError(t, err)
-
-	keyAuthSum := sha256.Sum256([]byte(keyAuth))
-	sig, err := signer.Sign(rand.Reader, keyAuthSum[:], crypto.SHA256)
-	require.NoError(t, err)
-
-	cborSig, err := cbor.Marshal(sig)
-	require.NoError(t, err)
-
-	otherSigner, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
-	require.NoError(t, err)
-
-	otherSig, err := otherSigner.Sign(rand.Reader, keyAuthSum[:], crypto.SHA256)
-	require.NoError(t, err)
-
-	otherCBORSig, err := cbor.Marshal(otherSig)
-	require.NoError(t, err)
-
-	type args struct {
-		ctx  context.Context
-		prov Provisioner
-		ch   *Challenge
-		jwk  *jose.JSONWebKey
-		att  *attestationObject
-	}
-	tests := []struct {
-		name    string
-		args    args
-		want    *stepAttestationData
-		wantErr bool
-	}{
-		{"ok", args{ctx, mustAttestationProvisioner(t, caRoot), &Challenge{Token: "token"}, jwk, &attestationObject{
-			Format: "step",
-			AttStatement: map[string]any{
-				"x5c": []any{leaf.Raw, ca.Intermediate.Raw},
-				"alg": -7,
-				"sig": cborSig,
-			},
-		}}, &stepAttestationData{
-			SerialNumber: "1234",
-			Certificate:  leaf,
-			Fingerprint:  fingerprint,
-		}, false},
-		{"ok/step-managed-device-id", args{ctx, mustAttestationProvisioner(t, caRoot), &Challenge{Token: "token"}, jwk, &attestationObject{
-			Format: "step",
-			AttStatement: map[string]any{
-				"x5c": []any{leafWithStepManagedDeviceID.Raw, ca.Intermediate.Raw},
-				"alg": -7,
-				"sig": cborSig,
-			},
-		}}, &stepAttestationData{
-			SerialNumber: "1234",
-			Certificate:  leafWithStepManagedDeviceID,
-			Fingerprint:  fingerprint,
-		}, false},
-		{"fail yubico issuer", args{ctx, mustAttestationProvisioner(t, nil), &Challenge{Token: "token"}, jwk, &attestationObject{
-			Format: "step",
-			AttStatement: map[string]any{
-				"x5c": []any{leaf.Raw, ca.Intermediate.Raw},
-				"alg": -7,
-				"sig": cborSig,
-			},
-		}}, nil, true},
-		{"fail x5c type", args{ctx, mustAttestationProvisioner(t, caRoot), &Challenge{Token: "token"}, jwk, &attestationObject{
-			Format: "step",
-			AttStatement: map[string]any{
-				"x5c": [][]byte{leaf.Raw, ca.Intermediate.Raw},
-				"alg": -7,
-				"sig": cborSig,
-			},
-		}}, nil, true},
-		{"fail x5c empty", args{ctx, mustAttestationProvisioner(t, caRoot), &Challenge{Token: "token"}, jwk, &attestationObject{
-			Format: "step",
-			AttStatement: map[string]any{
-				"x5c": []any{},
-				"alg": -7,
-				"sig": cborSig,
-			},
-		}}, nil, true},
-		{"fail leaf type", args{ctx, mustAttestationProvisioner(t, caRoot), &Challenge{Token: "token"}, jwk, &attestationObject{
-			Format: "step",
-			AttStatement: map[string]any{
-				"x5c": []any{"leaf", ca.Intermediate.Raw},
-				"alg": -7,
-				"sig": cborSig,
-			},
-		}}, nil, true},
-		{"fail leaf parse", args{ctx, mustAttestationProvisioner(t, caRoot), &Challenge{Token: "token"}, jwk, &attestationObject{
-			Format: "step",
-			AttStatement: map[string]any{
-				"x5c": []any{leaf.Raw[:100], ca.Intermediate.Raw},
-				"alg": -7,
-				"sig": cborSig,
-			},
-		}}, nil, true},
-		{"fail intermediate type", args{ctx, mustAttestationProvisioner(t, caRoot), &Challenge{Token: "token"}, jwk, &attestationObject{
-			Format: "step",
-			AttStatement: map[string]any{
-				"x5c": []any{leaf.Raw, "intermediate"},
-				"alg": -7,
-				"sig": cborSig,
-			},
-		}}, nil, true},
-		{"fail intermediate parse", args{ctx, mustAttestationProvisioner(t, caRoot), &Challenge{Token: "token"}, jwk, &attestationObject{
-			Format: "step",
-			AttStatement: map[string]any{
-				"x5c": []any{leaf.Raw, ca.Intermediate.Raw[:100]},
-				"alg": -7,
-				"sig": cborSig,
-			},
-		}}, nil, true},
-		{"fail verify", args{ctx, mustAttestationProvisioner(t, caRoot), &Challenge{Token: "token"}, jwk, &attestationObject{
-			Format: "step",
-			AttStatement: map[string]any{
-				"x5c": []any{leaf.Raw},
-				"alg": -7,
-				"sig": cborSig,
-			},
-		}}, nil, true},
-		{"fail sig type", args{ctx, mustAttestationProvisioner(t, caRoot), &Challenge{Token: "token"}, jwk, &attestationObject{
-			Format: "step",
-			AttStatement: map[string]any{
-				"x5c": []any{leaf.Raw, ca.Intermediate.Raw},
-				"alg": -7,
-				"sig": string(cborSig),
-			},
-		}}, nil, true},
-		{"fail sig unmarshal", args{ctx, mustAttestationProvisioner(t, caRoot), &Challenge{Token: "token"}, jwk, &attestationObject{
-			Format: "step",
-			AttStatement: map[string]any{
-				"x5c": []any{leaf.Raw, ca.Intermediate.Raw},
-				"alg": -7,
-				"sig": []byte("bad-sig"),
-			},
-		}}, nil, true},
-		{"fail keyAuthorization", args{ctx, mustAttestationProvisioner(t, caRoot), &Challenge{Token: "token"}, &jose.JSONWebKey{Key: []byte("not an asymmetric key")}, &attestationObject{
-			Format: "step",
-			AttStatement: map[string]any{
-				"x5c": []any{leaf.Raw, ca.Intermediate.Raw},
-				"alg": -7,
-				"sig": cborSig,
-			},
-		}}, nil, true},
-		{"fail sig verify P-256", args{ctx, mustAttestationProvisioner(t, caRoot), &Challenge{Token: "token"}, jwk, &attestationObject{
-			Format: "step",
-			AttStatement: map[string]any{
-				"x5c": []any{leaf.Raw, ca.Intermediate.Raw},
-				"alg": -7,
-				"sig": otherCBORSig,
-			},
-		}}, nil, true},
-		{"fail sig verify P-384", args{ctx, mustAttestationProvisioner(t, caRoot), &Challenge{Token: "token"}, jwk, &attestationObject{
-			Format: "step",
-			AttStatement: map[string]any{
-				"x5c": []any{makeLeaf(mustSigner("EC", "P-384", 0), serialNumber).Raw, ca.Intermediate.Raw},
-				"alg": -7,
-				"sig": cborSig,
-			},
-		}}, nil, true},
-		{"fail sig verify RSA", args{ctx, mustAttestationProvisioner(t, caRoot), &Challenge{Token: "token"}, jwk, &attestationObject{
-			Format: "step",
-			AttStatement: map[string]any{
-				"x5c": []any{makeLeaf(mustSigner("RSA", "", 2048), serialNumber).Raw, ca.Intermediate.Raw},
-				"alg": -7,
-				"sig": cborSig,
-			},
-		}}, nil, true},
-		{"fail sig verify Ed25519", args{ctx, mustAttestationProvisioner(t, caRoot), &Challenge{Token: "token"}, jwk, &attestationObject{
-			Format: "step",
-			AttStatement: map[string]any{
-				"x5c": []any{makeLeaf(mustSigner("OKP", "Ed25519", 0), serialNumber).Raw, ca.Intermediate.Raw},
-				"alg": -7,
-				"sig": cborSig,
-			},
-		}}, nil, true},
-		{"fail unmarshal serial number", args{ctx, mustAttestationProvisioner(t, caRoot), &Challenge{Token: "token"}, jwk, &attestationObject{
-			Format: "step",
-			AttStatement: map[string]any{
-				"x5c": []any{makeLeaf(signer, []byte("bad-serial")).Raw, ca.Intermediate.Raw},
-				"alg": -7,
-				"sig": cborSig,
-			},
-		}}, nil, true},
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			got, err := doStepAttestationFormat(tt.args.ctx, tt.args.prov, tt.args.ch, tt.args.jwk, tt.args.att)
-			if (err != nil) != tt.wantErr {
-				t.Errorf("doStepAttestationFormat() error = %#v, wantErr %v", err, tt.wantErr)
-				return
-			}
-			if !reflect.DeepEqual(got, tt.want) {
-				t.Errorf("doStepAttestationFormat() = %v, want %v", got, tt.want)
-			}
-		})
-	}
-}
-
-func Test_doStepAttestationFormat_noCAIntermediate(t *testing.T) {
-	ctx := context.Background()
-
-	// This CA simulates a YubiKey v5.2.4, where the attestation intermediate in
-	// the CA does not have the basic constraint extension. With the current
-	// validation of the certificate the test case below returns an error. If
-	// we change the validation to support this use case, the test case below
-	// should change.
-	//
-	// See https://github.com/Yubico/yubikey-manager/issues/522
-	ca, err := minica.New(minica.WithIntermediateTemplate(`{"subject": {{ toJson .Subject }}}`))
-	if err != nil {
-		t.Fatal(err)
-	}
-	caRoot := pem.EncodeToMemory(&pem.Block{Type: "CERTIFICATE", Bytes: ca.Root.Raw})
-
-	makeLeaf := func(signer crypto.Signer, serialNumber []byte) *x509.Certificate {
-		leaf, err := ca.Sign(&x509.Certificate{
-			Subject:   pkix.Name{CommonName: "attestation cert"},
-			PublicKey: signer.Public(),
-			ExtraExtensions: []pkix.Extension{
-				{Id: oidYubicoSerialNumber, Value: serialNumber},
-			},
-		})
-		if err != nil {
-			t.Fatal(err)
-		}
-		return leaf
-	}
-
-	signer, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
-	if err != nil {
-		t.Fatal(err)
-	}
-	serialNumber, err := asn1.Marshal(1234)
-	if err != nil {
-		t.Fatal(err)
-	}
-	leaf := makeLeaf(signer, serialNumber)
-
-	jwk, err := jose.GenerateJWK("EC", "P-256", "ES256", "sig", "", 0)
-	if err != nil {
-		t.Fatal(err)
-	}
-	keyAuth, err := KeyAuthorization("token", jwk)
-	if err != nil {
-		t.Fatal(err)
-	}
-	keyAuthSum := sha256.Sum256([]byte(keyAuth))
-	sig, err := signer.Sign(rand.Reader, keyAuthSum[:], crypto.SHA256)
-	if err != nil {
-		t.Fatal(err)
-	}
-	cborSig, err := cbor.Marshal(sig)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	type args struct {
-		ctx  context.Context
-		prov Provisioner
-		ch   *Challenge
-		jwk  *jose.JSONWebKey
-		att  *attestationObject
-	}
-	tests := []struct {
-		name    string
-		args    args
-		want    *stepAttestationData
-		wantErr bool
-	}{
-		{"fail no intermediate", args{ctx, mustAttestationProvisioner(t, caRoot), &Challenge{Token: "token"}, jwk, &attestationObject{
-			Format: "step",
-			AttStatement: map[string]any{
-				"x5c": []any{leaf.Raw, ca.Intermediate.Raw},
-				"alg": -7,
-				"sig": cborSig,
-			},
-		}}, nil, true},
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			got, err := doStepAttestationFormat(tt.args.ctx, tt.args.prov, tt.args.ch, tt.args.jwk, tt.args.att)
-			if (err != nil) != tt.wantErr {
-				t.Errorf("doStepAttestationFormat() error = %#v, wantErr %v", err, tt.wantErr)
-				return
-			}
-			if !reflect.DeepEqual(got, tt.want) {
-				t.Errorf("doStepAttestationFormat() = %v, want %v", got, tt.want)
-			}
-		})
-	}
-}
-
 func Test_deviceAttest01Validate(t *testing.T) {
 	invalidPayload := "!?"
 	errorPayload, err := json.Marshal(struct {
@@ -4598,6 +4305,7 @@ func Test_deviceAttest01Validate(t *testing.T) {
 			return test{
 				args: args{
 					ctx: ctx,
+					jwk: jwk,
 					ch: &Challenge{
 						ID:              "chID",
 						AuthorizationID: "azID",
@@ -4788,6 +4496,36 @@ func Test_deviceAttest01Validate(t *testing.T) {
 					jwk: jwk,
 				},
 				wantErr: nil,
+			}
+		},
+		"fail/doStepAttestationFormat-keyAuthorization": func(t *testing.T) test {
+			_, keyAuth := mustAccountAndKeyAuthorization(t, "token")
+			payload, _, root := mustAttestYubikey(t, "nonce", keyAuth, 12345678)
+
+			caRoot := pem.EncodeToMemory(&pem.Block{Type: "CERTIFICATE", Bytes: root.Raw})
+			ctx := NewProvisionerContext(context.Background(), mustAttestationProvisioner(t, caRoot))
+
+			return test{
+				args: args{
+					ctx: ctx,
+					jwk: &jose.JSONWebKey{Key: []byte("not an asymmetric key")},
+					ch: &Challenge{
+						ID:              "chID",
+						AuthorizationID: "azID",
+						Token:           "token",
+						Type:            "device-attest-01",
+						Status:          StatusPending,
+						Value:           "12345678",
+					},
+					payload: payload,
+					db: &MockDB{
+						MockGetAuthorization: func(ctx context.Context, id string) (*Authorization, error) {
+							assert.Equal(t, "azID", id)
+							return &Authorization{ID: "azID"}, nil
+						},
+					},
+				},
+				wantErr: NewErrorISE("error generating JWK thumbprint: go-jose/go-jose: unknown key type '[]uint8'"),
 			}
 		},
 		"fail/db.UpdateAuthorization": func(t *testing.T) test {
