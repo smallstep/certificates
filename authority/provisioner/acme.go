@@ -37,6 +37,9 @@ const (
 	WIREOIDC_01 ACMEChallenge = "wire-oidc-01"
 	// WIREDPOP_01 is the Wire DPoP challenge.
 	WIREDPOP_01 ACMEChallenge = "wire-dpop-01"
+	// REMOTE_ATTEST_01 is the remote-attest-01 ACME challenge
+	// (draft-ietf-acme-rats).
+	REMOTE_ATTEST_01 ACMEChallenge = "remote-attest-01"
 )
 
 // String returns a normalized version of the challenge.
@@ -47,7 +50,7 @@ func (c ACMEChallenge) String() string {
 // Validate returns an error if the acme challenge is not a valid one.
 func (c ACMEChallenge) Validate() error {
 	switch ACMEChallenge(c.String()) {
-	case HTTP_01, DNS_01, TLS_ALPN_01, DEVICE_ATTEST_01, WIREOIDC_01, WIREDPOP_01:
+	case HTTP_01, DNS_01, TLS_ALPN_01, DEVICE_ATTEST_01, WIREOIDC_01, WIREDPOP_01, REMOTE_ATTEST_01:
 		return nil
 	default:
 		return fmt.Errorf("acme challenge %q is not supported", c)
@@ -116,8 +119,8 @@ type ACME struct {
 	RequireEAB bool `json:"requireEAB,omitempty"`
 	// Challenges contains the enabled challenges for this provisioner. If this
 	// value is not set the default http-01, dns-01 and tls-alpn-01 challenges
-	// will be enabled, device-attest-01, wire-oidc-01 and wire-dpop-01 will be
-	// disabled.
+	// will be enabled, device-attest-01, wire-oidc-01, wire-dpop-01 and
+	// remote-attest-01 will be disabled.
 	Challenges []ACMEChallenge `json:"challenges,omitempty"`
 	// AttestationFormats contains the enabled attestation formats for this
 	// provisioner. If this value is not set the default apple, step and tpm
@@ -126,11 +129,15 @@ type ACME struct {
 	// AttestationRoots contains a bundle of root certificates in PEM format
 	// that will be used to verify the attestation certificates. If provided,
 	// this bundle will be used even for well-known CAs like Apple and Yubico.
-	AttestationRoots    []byte   `json:"attestationRoots,omitempty"`
-	Claims              *Claims  `json:"claims,omitempty"`
-	Options             *Options `json:"options,omitempty"`
+	AttestationRoots []byte `json:"attestationRoots,omitempty"`
+	// RemoteAttestation configures the remote-attest-01 challenge, if it is
+	// enabled.
+	RemoteAttestation   *ACMERemoteAttestation `json:"remoteAttestation,omitempty"`
+	Claims              *Claims                `json:"claims,omitempty"`
+	Options             *Options               `json:"options,omitempty"`
 	androidCRL          *androidCRLCache
 	attestationRootPool *x509.CertPool
+	remoteAttestation   *remoteAttestationVerifier
 	ctl                 *Controller
 }
 
@@ -252,8 +259,14 @@ func (p *ACME) Init(config Config) (err error) {
 
 	p.androidCRL = &androidCRLCache{}
 
-	p.ctl, err = NewController(p, p.Claims, config, p.Options)
-	return
+	if p.ctl, err = NewController(p, p.Claims, config, p.Options); err != nil {
+		return err
+	}
+
+	if err := p.initializeRemoteAttestation(); err != nil {
+		return fmt.Errorf("failed initializing remote attestation: %w", err)
+	}
+	return nil
 }
 
 const (
@@ -381,6 +394,10 @@ const (
 	WireUser ACMEIdentifierType = "wireapp-user"
 	// WireDevice is the Wire device identifier type
 	WireDevice ACMEIdentifierType = "wireapp-device"
+	// RemoteAttestation is the remote-attestation identifier type
+	// (draft-ietf-acme-rats). Its value is a hint of the attestation asked
+	// for, and it puts nothing in the certificate.
+	RemoteAttestation ACMEIdentifierType = "remote-attestation"
 )
 
 // ACMEIdentifier encodes ACME Order Identifiers
@@ -392,6 +409,12 @@ type ACMEIdentifier struct {
 // AuthorizeOrderIdentifier verifies the provisioner is allowed to issue a
 // certificate for an ACME Order Identifier.
 func (p *ACME) AuthorizeOrderIdentifier(_ context.Context, identifier ACMEIdentifier) error {
+	// A remote-attestation identifier names nothing in the certificate, so
+	// no name policy applies to it.
+	if identifier.Type == RemoteAttestation {
+		return nil
+	}
+
 	x509Policy := p.ctl.getPolicy().getX509()
 
 	// identifier is allowed if no policy is configured

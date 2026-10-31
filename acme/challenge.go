@@ -60,6 +60,9 @@ const (
 	WIREOIDC01 ChallengeType = "wire-oidc-01"
 	// WIREDPOP01 is the Wire DPoP challenge type
 	WIREDPOP01 ChallengeType = "wire-dpop-01"
+	// REMOTEATTEST01 is the remote-attest-01 ACME challenge type defined in
+	// https://datatracker.ietf.org/doc/html/draft-ietf-acme-rats-03
+	REMOTEATTEST01 ChallengeType = "remote-attest-01"
 )
 
 var (
@@ -91,9 +94,15 @@ type Challenge struct {
 	ValidatedAt     string        `json:"validated,omitempty"`
 	URL             string        `json:"url"`
 	Target          string        `json:"target,omitempty"`
-	Error           *Error        `json:"error,omitempty"`
-	Payload         []byte        `json:"-"`
-	PayloadFormat   string        `json:"-"`
+	// FreshnessNonce is the nonce the evidence of a remote-attest-01
+	// challenge must include, through its key authorization.
+	FreshnessNonce string `json:"freshnessNonce,omitempty"`
+	// AttestClaimsHint names the claims a remote-attest-01 challenge asks
+	// for.
+	AttestClaimsHint []string `json:"attestClaimsHint,omitempty"`
+	Error            *Error   `json:"error,omitempty"`
+	Payload          []byte   `json:"-"`
+	PayloadFormat    string   `json:"-"`
 }
 
 // ToLog enables response logging.
@@ -134,6 +143,8 @@ func (ch *Challenge) Validate(ctx context.Context, db DB, jwk *jose.JSONWebKey, 
 			return NewErrorISE("db %T is not a WireDB", db)
 		}
 		return wireDPOP01Validate(ctx, ch, wireDB, jwk, payload)
+	case REMOTEATTEST01:
+		return NewError(ErrorMalformedType, "remote-attest-01 is not implemented yet")
 	default:
 		return NewErrorISE("unexpected challenge type %q", ch.Type)
 	}

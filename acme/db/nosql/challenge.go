@@ -23,6 +23,10 @@ type dbChallenge struct {
 	ValidatedAt string             `json:"validatedAt"`
 	CreatedAt   time.Time          `json:"createdAt"`
 	Error       *acme.Error        `json:"error"` // TODO(hs): a bit dangerous; should become db-specific type
+	// FreshnessNonce and AttestClaimsHint are set on remote-attest-01
+	// challenges.
+	FreshnessNonce   string   `json:"freshnessNonce,omitempty"`
+	AttestClaimsHint []string `json:"attestClaimsHint,omitempty"`
 }
 
 func (dbc *dbChallenge) clone() *dbChallenge {
@@ -63,6 +67,9 @@ func (db *DB) CreateChallenge(ctx context.Context, ch *acme.Challenge) error {
 		CreatedAt: clock.Now(),
 		Type:      ch.Type,
 		Target:    ch.Target,
+
+		FreshnessNonce:   ch.FreshnessNonce,
+		AttestClaimsHint: ch.AttestClaimsHint,
 	}
 
 	return db.save(ctx, ch.ID, dbch, nil, "challenge", challengeTable)
@@ -87,6 +94,9 @@ func (db *DB) GetChallenge(ctx context.Context, id, authzID string) (*acme.Chall
 		Error:       dbch.Error,
 		ValidatedAt: dbch.ValidatedAt,
 		Target:      dbch.Target,
+
+		FreshnessNonce:   dbch.FreshnessNonce,
+		AttestClaimsHint: dbch.AttestClaimsHint,
 	}
 	return ch, nil
 }

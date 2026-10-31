@@ -36,6 +36,7 @@ func TestACMEChallenge_Validate(t *testing.T) {
 		{"device-attest-01", DEVICE_ATTEST_01, false},
 		{"wire-oidc-01", DEVICE_ATTEST_01, false},
 		{"wire-dpop-01", DEVICE_ATTEST_01, false},
+		{"remote-attest-01", REMOTE_ATTEST_01, false},
 		{"uppercase", "HTTP-01", false},
 		{"fail", "http-02", true},
 	}

@@ -37,6 +37,11 @@ const (
 	WireUser IdentifierType = "wireapp-user"
 	// WireDevice is the Wire device identifier type
 	WireDevice IdentifierType = "wireapp-device"
+	// RemoteAttestation is the remote-attestation identifier type defined in
+	// https://datatracker.ietf.org/doc/html/draft-ietf-acme-rats-03. Its
+	// value is a hint of the attestation asked for, and it puts nothing in
+	// the certificate.
+	RemoteAttestation IdentifierType = "remote-attestation"
 )
 
 // Identifier encodes the type that an order pertains to.

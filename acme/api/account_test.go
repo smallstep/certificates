@@ -21,6 +21,8 @@ import (
 
 	"github.com/smallstep/assert"
 	"github.com/smallstep/certificates/acme"
+	"github.com/smallstep/certificates/attestation"
+	"github.com/smallstep/certificates/attestation/cmw"
 	"github.com/smallstep/certificates/authority/provisioner"
 )
 
@@ -56,6 +58,12 @@ func (*fakeProvisioner) GetID() string                                 { return 
 func (*fakeProvisioner) GetName() string                               { return "" }
 func (*fakeProvisioner) DefaultTLSCertDuration() time.Duration         { return 0 }
 func (*fakeProvisioner) GetOptions() *provisioner.Options              { return nil }
+func (*fakeProvisioner) GetRemoteAttestation() *provisioner.ACMERemoteAttestation {
+	return nil
+}
+func (*fakeProvisioner) VerifyRemoteAttestation(context.Context, *cmw.Record, string) (*attestation.Result, []byte, error) {
+	return nil, nil, nil
+}
 
 func newProv() acme.Provisioner {
 	// Initialize provisioners

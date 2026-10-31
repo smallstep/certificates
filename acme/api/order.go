@@ -2,6 +2,7 @@ package api
 
 import (
 	"context"
+	"crypto/rand"
 	"crypto/x509"
 	"encoding/base64"
 	"encoding/json"
@@ -23,6 +24,10 @@ import (
 	"github.com/smallstep/certificates/authority/provisioner"
 )
 
+// maxRemoteAttestationHint is the maximum length of the value of a
+// remote-attestation identifier.
+const maxRemoteAttestationHint = 128
+
 // NewOrderRequest represents the body for a NewOrder request.
 type NewOrderRequest struct {
 	Identifiers []acme.Identifier `json:"identifiers"`
@@ -35,6 +40,7 @@ func (n *NewOrderRequest) Validate() error {
 	if len(n.Identifiers) == 0 {
 		return acme.NewError(acme.ErrorMalformedType, "identifiers list cannot be empty")
 	}
+	var remoteAttestations int
 	for _, id := range n.Identifiers {
 		switch id.Type {
 		case acme.IP:
@@ -54,6 +60,17 @@ func (n *NewOrderRequest) Validate() error {
 			// validation of Wire identifiers is performed in `validateWireIdentifiers`, but
 			// marked here as known and supported types.
 			continue
+		case acme.RemoteAttestation:
+			// The value is a hint, which may be empty.
+			if len(id.Value) > maxRemoteAttestationHint {
+				return acme.NewError(acme.ErrorMalformedType, "remote-attestation identifier value cannot be longer than %d bytes", maxRemoteAttestationHint)
+			}
+			// One attestation per order, so that finalize, the webhooks
+			// and the templates each see a single one.
+			remoteAttestations++
+			if remoteAttestations > 1 {
+				return acme.NewError(acme.ErrorMalformedType, "an order cannot have more than one remote-attestation identifier")
+			}
 		default:
 			return acme.NewError(acme.ErrorMalformedType, "identifier type unsupported: %s", id.Type)
 		}
@@ -206,6 +223,11 @@ func NewOrder(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	if err := addRemoteAttestationIdentifier(ctx, acmeProv, &nor); err != nil {
+		render.Error(w, r, err)
+		return
+	}
+
 	var eak *acme.ExternalAccountKey
 	if acmeProv.RequireEAB {
 		if eak, err = db.GetExternalAccountKeyByAccountID(ctx, prov.GetID(), acc.ID); err != nil {
@@ -221,6 +243,11 @@ func NewOrder(w http.ResponseWriter, r *http.Request) {
 	}
 
 	for _, identifier := range nor.Identifiers {
+		// A remote-attestation identifier names nothing in the certificate,
+		// so the name policies do not apply to it.
+		if identifier.Type == acme.RemoteAttestation {
+			continue
+		}
 		// evaluate the ACME account level policy
 		if err = isIdentifierAllowed(acmePolicy, identifier); err != nil {
 			render.Error(w, r, acme.WrapError(acme.ErrorRejectedIdentifierType, err, "not authorized"))
@@ -292,6 +319,26 @@ func NewOrder(w http.ResponseWriter, r *http.Request) {
 
 	w.Header().Set("Location", linker.GetLink(ctx, acme.OrderLinkType, o.ID))
 	render.JSONStatus(w, r, o, http.StatusCreated)
+}
+
+// addRemoteAttestationIdentifier refuses a remote-attestation identifier if the
+// provisioner does not enable remote-attest-01, and adds one with an empty hint
+// if the provisioner requires remote attestation and the order has none, as
+// draft-ietf-acme-rats-03 section 3.2 allows.
+func addRemoteAttestationIdentifier(ctx context.Context, prov *provisioner.ACME, nor *NewOrderRequest) error {
+	enabled := prov.IsChallengeEnabled(ctx, provisioner.REMOTE_ATTEST_01)
+	for _, id := range nor.Identifiers {
+		if id.Type == acme.RemoteAttestation {
+			if !enabled {
+				return acme.NewError(acme.ErrorUnsupportedIdentifierType, "remote-attestation identifiers are not supported by this provisioner")
+			}
+			return nil
+		}
+	}
+	if enabled && prov.GetRemoteAttestation().IsRequired() {
+		nor.Identifiers = append(nor.Identifiers, acme.Identifier{Type: acme.RemoteAttestation})
+	}
+	return nil
 }
 
 func isIdentifierAllowed(acmePolicy policy.X509Policy, identifier acme.Identifier) error {
@@ -378,6 +425,10 @@ func newAuthorization(ctx context.Context, az *acme.Authorization) error {
 			Status:    acme.StatusPending,
 			Target:    target,
 		}
+		if typ == acme.REMOTEATTEST01 {
+			ch.FreshnessNonce = newFreshnessNonce()
+			ch.AttestClaimsHint = prov.GetRemoteAttestation().GetClaimsHint()
+		}
 		if err := db.CreateChallenge(ctx, ch); err != nil {
 			return acme.WrapErrorISE(err, "error creating challenge")
 		}
@@ -387,6 +438,14 @@ func newAuthorization(ctx context.Context, az *acme.Authorization) error {
 		return acme.WrapErrorISE(err, "error creating authorization")
 	}
 	return nil
+}
+
+// newFreshnessNonce returns the freshness nonce of a remote-attest-01
+// challenge: 32 random bytes, base64url encoded without padding.
+func newFreshnessNonce() string {
+	b := make([]byte, 32)
+	_, _ = rand.Read(b) // never fails
+	return base64.RawURLEncoding.EncodeToString(b)
 }
 
 // GetOrder ACME api for retrieving an order.
@@ -512,6 +571,8 @@ func challengeTypes(az *acme.Authorization) []acme.ChallengeType {
 		chTypes = []acme.ChallengeType{acme.WIREOIDC01}
 	case acme.WireDevice:
 		chTypes = []acme.ChallengeType{acme.WIREDPOP01}
+	case acme.RemoteAttestation:
+		chTypes = []acme.ChallengeType{acme.REMOTEATTEST01}
 	default:
 		chTypes = []acme.ChallengeType{}
 	}

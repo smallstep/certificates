@@ -5,6 +5,8 @@ import (
 	"crypto/x509"
 	"time"
 
+	"github.com/smallstep/certificates/attestation"
+	"github.com/smallstep/certificates/attestation/cmw"
 	"github.com/smallstep/certificates/authority"
 	"github.com/smallstep/certificates/authority/provisioner"
 )
@@ -79,6 +81,8 @@ type Provisioner interface {
 	GetName() string
 	DefaultTLSCertDuration() time.Duration
 	GetOptions() *provisioner.Options
+	GetRemoteAttestation() *provisioner.ACMERemoteAttestation
+	VerifyRemoteAttestation(ctx context.Context, record *cmw.Record, defaultAudience string) (*attestation.Result, []byte, error)
 }
 
 type provisionerKey struct{}
@@ -121,6 +125,8 @@ type MockProvisioner struct {
 	MgetAttestationRoots      func() (*x509.CertPool, bool)
 	MdefaultTLSCertDuration   func() time.Duration
 	MgetOptions               func() *provisioner.Options
+	MgetRemoteAttestation     func() *provisioner.ACMERemoteAttestation
+	MverifyRemoteAttestation  func(ctx context.Context, record *cmw.Record, defaultAudience string) (*attestation.Result, []byte, error)
 }
 
 // GetName mock
@@ -192,6 +198,22 @@ func (m *MockProvisioner) GetOptions() *provisioner.Options {
 		return m.MgetOptions()
 	}
 	return m.Mret1.(*provisioner.Options)
+}
+
+// GetRemoteAttestation mock
+func (m *MockProvisioner) GetRemoteAttestation() *provisioner.ACMERemoteAttestation {
+	if m.MgetRemoteAttestation != nil {
+		return m.MgetRemoteAttestation()
+	}
+	return nil
+}
+
+// VerifyRemoteAttestation mock
+func (m *MockProvisioner) VerifyRemoteAttestation(ctx context.Context, record *cmw.Record, defaultAudience string) (*attestation.Result, []byte, error) {
+	if m.MverifyRemoteAttestation != nil {
+		return m.MverifyRemoteAttestation(ctx, record, defaultAudience)
+	}
+	return nil, nil, m.Merr
 }
 
 // GetID mock

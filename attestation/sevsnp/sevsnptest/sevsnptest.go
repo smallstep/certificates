@@ -14,6 +14,7 @@ import (
 	"crypto/x509"
 	"encoding/binary"
 	"encoding/pem"
+	"math/big"
 	"testing"
 	"time"
 
@@ -101,6 +102,27 @@ func (s *Signer) Report(t testing.TB, reportData []byte, debug bool) []byte {
 		t.Fatal(err)
 	}
 	return report
+}
+
+// CRL returns a revocation list, signed by the signer's ARK, that revokes
+// nothing, and the URL go-sev-guest fetches it from when it checks
+// revocations.
+func (s *Signer) CRL(t testing.TB) (url string, crl []byte) {
+	t.Helper()
+	if len(s.signer.Ask.CRLDistributionPoints) == 0 {
+		t.Fatal("the test ASK has no CRL distribution point")
+	}
+	now := time.Now()
+	crl, err := x509.CreateRevocationList(rand.Reader, &x509.RevocationList{
+		Number:             big.NewInt(1),
+		ThisUpdate:         now.Add(-time.Hour),
+		NextUpdate:         now.Add(time.Hour),
+		SignatureAlgorithm: x509.SHA384WithRSAPSS,
+	}, s.signer.Ark, s.signer.Keys.Ark)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return s.signer.Ask.CRLDistributionPoints[0], crl
 }
 
 func pemEncode(certs ...*x509.Certificate) []byte {
