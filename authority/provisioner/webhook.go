@@ -42,6 +42,13 @@ type WebhookController struct {
 	TemplateData  WebhookSetter
 }
 
+// AppendRequestBodyOptions adds options to the bodies of the controller's
+// requests, for data that is known only after the controller is created, such
+// as the attestation an ACME order verified.
+func (wc *WebhookController) AppendRequestBodyOptions(opts ...webhook.RequestBodyOption) {
+	wc.options = append(wc.options, opts...)
+}
+
 // Enrich fetches data from remote servers and adds returned data to the
 // templateData
 func (wc *WebhookController) Enrich(ctx context.Context, req *webhook.RequestBody) error {

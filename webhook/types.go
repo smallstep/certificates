@@ -6,6 +6,8 @@ import (
 
 	"go.step.sm/crypto/sshutil"
 	"go.step.sm/crypto/x509util"
+
+	"github.com/smallstep/certificates/attestation"
 )
 
 // ResponseBody is the body returned by webhook servers.
@@ -69,6 +71,32 @@ type AttestationData struct {
 	PermanentIdentifier string `json:"permanentIdentifier"`
 }
 
+// Attestation is the attestation evidence an ACME remote-attest-01 challenge
+// verified (draft-ietf-acme-rats), sent to webhook servers when the order is
+// finalized and given to certificate templates as .Attestation.
+//
+// The evidence binds two SHA-256 digests: of the challenge's key authorization,
+// and of the DER SubjectPublicKeyInfo of the certificate's key. The CA has
+// checked both, so the certificate's key is the attested one. Binary values are
+// hex encoded. The fields of the embedded attestation.Result, the format and the
+// verified measurements or claims, are at the top level.
+type Attestation struct {
+	// Challenge is the challenge type that verified the evidence,
+	// remote-attest-01.
+	Challenge string `json:"challenge"`
+	// Hint is the value of the order's remote-attestation identifier.
+	Hint string `json:"hint"`
+	// FreshnessNonce is the challenge's freshness nonce.
+	FreshnessNonce string `json:"freshnessNonce"`
+	// KeyAuthorizationDigest is the SHA-256 digest of the challenge's key
+	// authorization, which the evidence binds.
+	KeyAuthorizationDigest string `json:"keyAuthorizationDigest"`
+	// KeyDigest is the SHA-256 digest of the DER SubjectPublicKeyInfo of the
+	// certificate's key, which the evidence binds.
+	KeyDigest string `json:"keyDigest"`
+	*attestation.Result
+}
+
 // X5CCertificate is the authorization certificate sent to webhook servers for
 // enriching or authorizing webhooks when signing X509 or SSH certificates using
 // the X5C provisioner.
@@ -86,6 +114,8 @@ type RequestBody struct {
 	ProvisionerName string    `json:"provisionerName,omitempty"`
 	// Only set after successfully completing acme device-attest-01 challenge
 	AttestationData *AttestationData `json:"attestationData,omitempty"`
+	// Only set after successfully completing acme remote-attest-01 challenge
+	Attestation *Attestation `json:"attestation,omitempty"`
 	// Set for most provisioners, but not acme or scep
 	// Token any `json:"token,omitempty"`
 	// Exactly one of the remaining fields should be set

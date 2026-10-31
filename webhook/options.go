@@ -84,6 +84,15 @@ func WithAttestationData(data *AttestationData) RequestBodyOption {
 	}
 }
 
+// WithAttestation sets the attestation evidence an ACME remote-attest-01
+// challenge verified.
+func WithAttestation(a *Attestation) RequestBodyOption {
+	return func(rb *RequestBody) error {
+		rb.Attestation = a
+		return nil
+	}
+}
+
 func WithAuthorizationPrincipal(p string) RequestBodyOption {
 	return func(rb *RequestBody) error {
 		rb.AuthorizationPrincipal = p

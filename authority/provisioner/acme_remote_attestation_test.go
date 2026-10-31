@@ -20,6 +20,7 @@ import (
 	"github.com/smallstep/certificates/attestation/confidentialspace"
 	cstest "github.com/smallstep/certificates/attestation/confidentialspace/confidentialspacetest"
 	"github.com/smallstep/certificates/authority/policy"
+	"github.com/smallstep/certificates/webhook"
 )
 
 const testRemoteAttestationAudience = "https://ca.example.com/acme/attested/directory"
@@ -290,4 +291,18 @@ func TestIsJWTMediaType(t *testing.T) {
 	assert.True(t, isJWTMediaType(`application/eat+jwt; eat_profile="tag:example.com,2026:x"`))
 	assert.False(t, isJWTMediaType("application/eat+cwt"))
 	assert.False(t, isJWTMediaType(strings.Repeat(";", 3)))
+}
+
+func TestWebhookController_AppendRequestBodyOptions(t *testing.T) {
+	a := &webhook.Attestation{Challenge: "remote-attest-01"}
+	wc := &WebhookController{}
+	wc.AppendRequestBodyOptions(webhook.WithAttestation(a))
+
+	req := &webhook.RequestBody{}
+	require.NoError(t, wc.Enrich(context.Background(), req))
+	assert.Equal(t, a, req.Attestation)
+
+	req = &webhook.RequestBody{}
+	require.NoError(t, wc.Authorize(context.Background(), req))
+	assert.Equal(t, a, req.Attestation)
 }
