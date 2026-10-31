@@ -16,6 +16,8 @@ import (
 	"github.com/smallstep/linkedca"
 	"go.step.sm/crypto/jose"
 
+	"github.com/smallstep/certificates/attestation"
+	"github.com/smallstep/certificates/attestation/confidentialspace"
 	"github.com/smallstep/certificates/authority/admin"
 	"github.com/smallstep/certificates/authority/config"
 	"github.com/smallstep/certificates/authority/policy"
@@ -893,6 +895,10 @@ func ProvisionerToCertificates(p *linkedca.Provisioner) (provisioner.Interface, 
 		}, nil
 	case *linkedca.ProvisionerDetails_ACME:
 		cfg := d.ACME
+		remoteAttestation, err := remoteAttestationToCertificates(cfg.RemoteAttestation)
+		if err != nil {
+			return nil, err
+		}
 		return &provisioner.ACME{
 			ID:                 p.Id,
 			Type:               p.Type.String(),
@@ -905,6 +911,7 @@ func ProvisionerToCertificates(p *linkedca.Provisioner) (provisioner.Interface, 
 			Challenges:         challengesToCertificates(cfg.Challenges),
 			AttestationFormats: attestationFormatsToCertificates(cfg.AttestationFormats),
 			AttestationRoots:   provisionerPEMToCertificates(cfg.AttestationRoots),
+			RemoteAttestation:  remoteAttestation,
 			Claims:             claims,
 			Options:            options,
 		}, nil
@@ -1184,6 +1191,7 @@ func ProvisionerToLinkedca(p provisioner.Interface) (*linkedca.Provisioner, erro
 						Challenges:         challengesToLinkedca(p.Challenges),
 						AttestationFormats: attestationFormatsToLinkedca(p.AttestationFormats),
 						AttestationRoots:   provisionerPEMToLinkedca(p.AttestationRoots),
+						RemoteAttestation:  remoteAttestationToLinkedca(p.RemoteAttestation),
 					},
 				},
 			},
@@ -1331,6 +1339,8 @@ func challengesToCertificates(challenges []linkedca.ACMEProvisioner_ChallengeTyp
 			ret = append(ret, provisioner.TLS_ALPN_01)
 		case linkedca.ACMEProvisioner_DEVICE_ATTEST_01:
 			ret = append(ret, provisioner.DEVICE_ATTEST_01)
+		case linkedca.ACMEProvisioner_REMOTE_ATTEST_01:
+			ret = append(ret, provisioner.REMOTE_ATTEST_01)
 		}
 	}
 	return ret
@@ -1350,6 +1360,82 @@ func challengesToLinkedca(challenges []provisioner.ACMEChallenge) []linkedca.ACM
 			ret = append(ret, linkedca.ACMEProvisioner_TLS_ALPN_01)
 		case provisioner.DEVICE_ATTEST_01:
 			ret = append(ret, linkedca.ACMEProvisioner_DEVICE_ATTEST_01)
+		case provisioner.REMOTE_ATTEST_01:
+			ret = append(ret, linkedca.ACMEProvisioner_REMOTE_ATTEST_01)
+		}
+	}
+	return ret
+}
+
+// remoteAttestationToCertificates converts the linkedca configuration of the
+// remote-attest-01 challenge to the provisioner's.
+func remoteAttestationToCertificates(ra *linkedca.ACMERemoteAttestation) (*provisioner.ACMERemoteAttestation, error) {
+	if ra == nil {
+		return nil, nil //nolint:nilnil // no configuration is not an error
+	}
+	ret := &provisioner.ACMERemoteAttestation{
+		Require:     ra.Require,
+		ClaimsHint:  ra.ClaimsHint,
+		TDXRoots:    ra.TdxRoots,
+		SEVSNPRoots: ra.SevSnpRoots,
+	}
+	for _, f := range ra.Formats {
+		ret.Formats = append(ret.Formats, attestation.Format(f))
+	}
+	if cs := ra.ConfidentialSpace; cs != nil {
+		ret.ConfidentialSpace = &provisioner.ACMEConfidentialSpace{
+			Roots:    cs.Roots,
+			Audience: cs.Audience,
+			Expectations: confidentialspace.Expectations{
+				ImageDigests:             cs.ImageDigests,
+				ImageSignerKeyIDs:        cs.ImageSignerKeyIds,
+				RequireSupportAttributes: cs.RequireSupportAttributes,
+				HWModels:                 cs.Hwmodels,
+				SWNames:                  cs.Swnames,
+				ProjectIDs:               cs.ProjectIds,
+				ServiceAccounts:          cs.ServiceAccounts,
+			},
+		}
+		if cs.MaxTokenAge != "" {
+			d, err := provisioner.NewDuration(cs.MaxTokenAge)
+			if err != nil {
+				return nil, fmt.Errorf("error parsing remote attestation maxTokenAge: %w", err)
+			}
+			ret.ConfidentialSpace.MaxTokenAge = d
+		}
+	}
+	return ret, nil
+}
+
+// remoteAttestationToLinkedca converts the provisioner's configuration of the
+// remote-attest-01 challenge to linkedca's.
+func remoteAttestationToLinkedca(ra *provisioner.ACMERemoteAttestation) *linkedca.ACMERemoteAttestation {
+	if ra == nil {
+		return nil
+	}
+	ret := &linkedca.ACMERemoteAttestation{
+		Require:     ra.Require,
+		ClaimsHint:  ra.ClaimsHint,
+		TdxRoots:    ra.TDXRoots,
+		SevSnpRoots: ra.SEVSNPRoots,
+	}
+	for _, f := range ra.Formats {
+		ret.Formats = append(ret.Formats, string(f))
+	}
+	if cs := ra.ConfidentialSpace; cs != nil {
+		ret.ConfidentialSpace = &linkedca.ACMEConfidentialSpace{
+			Roots:                    cs.Roots,
+			Audience:                 cs.Audience,
+			ImageDigests:             cs.ImageDigests,
+			ImageSignerKeyIds:        cs.ImageSignerKeyIDs,
+			RequireSupportAttributes: cs.RequireSupportAttributes,
+			Hwmodels:                 cs.HWModels,
+			Swnames:                  cs.SWNames,
+			ProjectIds:               cs.ProjectIDs,
+			ServiceAccounts:          cs.ServiceAccounts,
+		}
+		if cs.MaxTokenAge != nil {
+			ret.ConfidentialSpace.MaxTokenAge = cs.MaxTokenAge.String()
 		}
 	}
 	return ret

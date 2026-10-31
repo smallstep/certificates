@@ -47,8 +47,9 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
   Google Cloud Attestation's root is embedded, so Confidential Space tokens
   verify without configured roots. The verified attestation, with the ACME
   account and the EAB key it was created with, is sent to webhooks as
-  `attestation` and given to templates as `.Attestation`. The challenge can be
-  configured in `ca.json` only for now.
+  `attestation` and given to templates as `.Attestation`. Remote management
+  carries the challenge and its configuration through linkedca's
+  `REMOTE_ATTEST_01` challenge type and `ACMERemoteAttestation` message.
 - The `attestation` package and its subpackages, which verify TDX quotes,
   SEV-SNP reports and Confidential Space tokens, and parse CMW records and
   configfs-tsm reports. The `device-attest-01` formats' verifiers (`apple`,
