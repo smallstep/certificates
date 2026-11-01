@@ -17,6 +17,7 @@ import (
 	"github.com/google/go-sev-guest/abi"
 	"github.com/google/go-sev-guest/kds"
 	spb "github.com/google/go-sev-guest/proto/sevsnp"
+	sevvalidate "github.com/google/go-sev-guest/validate"
 	sevverify "github.com/google/go-sev-guest/verify"
 	sevtrust "github.com/google/go-sev-guest/verify/trust"
 
@@ -31,7 +32,8 @@ const ReportDataSize = 64
 // or ASVK to the ARK of the product line. Certificates the workload does not
 // send are fetched from AMD's key distribution service, as are the revocation
 // lists. Reports from guests whose policy allows debugging are refused. The TCB
-// versions are reported, not checked against a minimum.
+// versions must match the signing key's certificate, and are reported, not
+// checked against a minimum.
 type Verifier struct {
 	// roots are the ARK, ASK and ASVK certificates to trust per product
 	// line: the configured ones, or AMD's.
@@ -158,6 +160,21 @@ func (v *Verifier) Verify(ctx context.Context, rawReport, certTable []byte) (*at
 			return nil, nil, fmt.Errorf("error fetching sev-snp certificates: %w", err)
 		}
 		return nil, nil, attestation.Invalidf("error verifying sev-snp report: %w", err)
+	}
+	// The signature proves only that the VCEK or VLEK signed the report. The
+	// key's certificate carries the TCB it was issued for, and for a VCEK the
+	// chip's id, which a certificate table from the workload need not match:
+	// with an old VCEK, the report's TCB fields would say whatever its signer
+	// chose. validate binds them to the certificate, refusing a reported TCB
+	// that differs from the certificate's, a current TCB below it, a committed
+	// TCB above the current one, and a CHIP_ID that is not the VCEK's. Its
+	// guest policy options permit everything, since debugging is refused below
+	// with its own error and nothing else of the policy is checked.
+	if err := sevvalidate.SnpAttestation(att, &sevvalidate.Options{
+		GuestPolicy:               abi.SnpPolicy{MigrateMA: true, Debug: true, SMT: true, CXLAllowed: true},
+		PermitProvisionalFirmware: true,
+	}); err != nil {
+		return nil, nil, attestation.Invalidf("error validating sev-snp report: %w", err)
 	}
 
 	policy, err := abi.ParseSnpPolicy(report.GetPolicy())

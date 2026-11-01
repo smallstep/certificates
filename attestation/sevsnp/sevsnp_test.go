@@ -4,6 +4,7 @@ package sevsnp
 
 import (
 	"context"
+	"encoding/binary"
 	"encoding/pem"
 	"errors"
 	"testing"
@@ -81,6 +82,16 @@ func TestVerifier(t *testing.T) {
 			report[0x50] ^= 1 // the first byte of REPORT_DATA
 			return report
 		}(), s.CertTable, "error verifying sev-snp report", true},
+		// The VCEK signed the report but was issued for another TCB, so the
+		// report's TCB fields would be whatever its signer chose.
+		{"fail tcb of another vcek", newVerifier(t, s.Roots), s.EditedReport(t, reportData, false, func(report []byte) {
+			const newer = uint64(0x1800000000000a04)
+			binary.LittleEndian.PutUint64(report[0x38:0x40], newer)   // CURRENT_TCB
+			binary.LittleEndian.PutUint64(report[0x180:0x188], newer) // REPORTED_TCB
+		}), s.CertTable, "does not match the TCB of the V[CL]EK certificate", true},
+		{"fail chip id of another vcek", newVerifier(t, s.Roots), s.EditedReport(t, reportData, false, func(report []byte) {
+			report[0x1a0] ^= 1 // the first byte of CHIP_ID
+		}), s.CertTable, "is not the same as the VCEK certificate's HWID", true},
 		{"fail parse", newVerifier(t, s.Roots), []byte("not a report"), nil, "error parsing sev-snp report", true},
 		{"fail certificate table", newVerifier(t, s.Roots), s.Report(t, reportData, false), []byte("not a table"),
 			"error parsing sev-snp certificate table", true},

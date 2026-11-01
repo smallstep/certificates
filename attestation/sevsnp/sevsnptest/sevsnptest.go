@@ -85,6 +85,13 @@ func (s *Signer) Asvk() *x509.Certificate { return s.signer.Asvk }
 // guest whose policy allows debugging if debug is set.
 func (s *Signer) Report(t testing.TB, reportData []byte, debug bool) []byte {
 	t.Helper()
+	return s.EditedReport(t, reportData, debug, nil)
+}
+
+// EditedReport is Report with edit, if not nil, applied to the report's bytes
+// before they are signed.
+func (s *Signer) EditedReport(t testing.TB, reportData []byte, debug bool, edit func(report []byte)) []byte {
+	t.Helper()
 	raw := sevtest.CreateRawReport(&sevtest.TestReportOptions{
 		ReportData: reportData,
 		Version:    3,
@@ -94,6 +101,9 @@ func (s *Signer) Report(t testing.TB, reportData []byte, debug bool) []byte {
 	report := append([]byte(nil), raw[:abi.ReportSize]...)
 	// CreateRawReport's policy allows debugging.
 	binary.LittleEndian.PutUint64(report[0x08:0x10], abi.SnpPolicyToBytes(abi.SnpPolicy{Debug: debug, SMT: true}))
+	if edit != nil {
+		edit(report)
+	}
 	r, sig, err := s.signer.Sign(abi.SignedComponent(report))
 	if err != nil {
 		t.Fatal(err)
