@@ -398,6 +398,12 @@ func TestOrder_Finalize_remoteAttestation(t *testing.T) {
 		assert.Equal(t, StatusValid, o.Status)
 	})
 
+	// A key removed since the order was created revokes the account.
+	t.Run("fail eab removed", func(t *testing.T) {
+		err := newOrder().Finalize(context.Background(), newDB(nil, nil), csr, &mockSignAuth{}, eabProv)
+		assert.ErrorContains(t, err, "has no external account binding key")
+	})
+
 	t.Run("fail eab lookup", func(t *testing.T) {
 		err := newOrder().Finalize(context.Background(), newDB(nil, errors.New("force")), csr, &mockSignAuth{}, eabProv)
 		assert.ErrorContains(t, err, "error getting the external account key")

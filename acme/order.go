@@ -195,7 +195,8 @@ func (o *Order) checkAttestedKeys(ctx context.Context, db DB, csr *x509.Certific
 // remote-attest-01 order, with the external account binding key the account
 // was created with, if any. As for new orders, the key is read only if the
 // provisioner requires one: some databases report an account without a key as
-// an error.
+// an error. A key removed since the order was created revokes the account, so
+// the order does not finalize.
 func (o *Order) attestationAccount(ctx context.Context, db DB, p Provisioner) (*webhook.AttestationAccount, error) {
 	account := &webhook.AttestationAccount{ID: o.AccountID}
 	if !p.IsEABRequired() {
@@ -205,10 +206,11 @@ func (o *Order) attestationAccount(ctx context.Context, db DB, p Provisioner) (*
 	if err != nil {
 		return nil, WrapErrorISE(err, "error getting the external account key of account %q", o.AccountID)
 	}
-	if eak != nil {
-		account.ExternalAccountKeyID = eak.ID
-		account.Reference = eak.Reference
+	if eak == nil {
+		return nil, NewError(ErrorUnauthorizedType, "account %s has no external account binding key", o.AccountID)
 	}
+	account.ExternalAccountKeyID = eak.ID
+	account.Reference = eak.Reference
 	return account, nil
 }
 

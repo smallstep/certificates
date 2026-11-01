@@ -228,10 +228,17 @@ func NewOrder(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Under a provisioner that requires EAB, an account orders only while the
+	// key it was created with exists: removing the key revokes the account.
 	var eak *acme.ExternalAccountKey
 	if acmeProv.RequireEAB {
 		if eak, err = db.GetExternalAccountKeyByAccountID(ctx, prov.GetID(), acc.ID); err != nil {
 			render.Error(w, r, acme.WrapErrorISE(err, "error retrieving external account binding key"))
+			return
+		}
+		if eak == nil {
+			render.Error(w, r, acme.NewError(acme.ErrorUnauthorizedType,
+				"account %s has no external account binding key", acc.ID))
 			return
 		}
 	}

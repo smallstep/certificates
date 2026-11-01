@@ -1221,6 +1221,34 @@ MCowBQYDK2VwAyEA5c+4NKZSNQcR1T8qN6SjwgdPZQ0Ge12Ylx/YeGAJ35k=
 				err: acme.NewErrorISE("error retrieving external account binding key: force"),
 			}
 		},
+		// Under a provisioner that requires EAB, an account whose key was
+		// removed no longer orders.
+		"fail/eab-removed": func(t *testing.T) test {
+			acmeProv := newACMEProv(t)
+			acmeProv.RequireEAB = true
+			acc := &acme.Account{ID: "accID"}
+			fr := &NewOrderRequest{
+				Identifiers: []acme.Identifier{
+					{Type: "dns", Value: "zap.internal"},
+				},
+			}
+			b, err := json.Marshal(fr)
+			assert.FatalError(t, err)
+			ctx := acme.NewProvisionerContext(context.Background(), acmeProv)
+			ctx = context.WithValue(ctx, accContextKey, acc)
+			ctx = context.WithValue(ctx, payloadContextKey, &payloadInfo{value: b})
+			return test{
+				ctx:        ctx,
+				statusCode: 401,
+				ca:         &mockCA{},
+				db: &acme.MockDB{
+					MockGetExternalAccountKeyByAccountID: func(ctx context.Context, provisionerID, accountID string) (*acme.ExternalAccountKey, error) {
+						return nil, nil
+					},
+				},
+				err: acme.NewError(acme.ErrorUnauthorizedType, "account accID has no external account binding key"),
+			}
+		},
 		"fail/newACMEPolicyEngine-error": func(t *testing.T) test {
 			acmeProv := newACMEProv(t)
 			acmeProv.RequireEAB = true
@@ -2310,7 +2338,8 @@ MCowBQYDK2VwAyEA5c+4NKZSNQcR1T8qN6SjwgdPZQ0Ge12Ylx/YeGAJ35k=
 					MockGetExternalAccountKeyByAccountID: func(ctx context.Context, provisionerID, accountID string) (*acme.ExternalAccountKey, error) {
 						assert.Equals(t, prov.GetID(), provisionerID)
 						assert.Equals(t, "accID", accountID)
-						return nil, nil
+						// The account has the EAB key it was created with.
+						return &acme.ExternalAccountKey{ID: "eakID", AccountID: "accID"}, nil
 					},
 				},
 				vr: func(t *testing.T, o *acme.Order) {
