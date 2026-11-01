@@ -61,6 +61,7 @@ func (*fakeProvisioner) GetOptions() *provisioner.Options              { return 
 func (*fakeProvisioner) GetRemoteAttestation() *provisioner.ACMERemoteAttestation {
 	return nil
 }
+func (*fakeProvisioner) IsEABRequired() bool { return false }
 func (*fakeProvisioner) VerifyRemoteAttestation(context.Context, *cmw.Record, string) (*attestation.Result, []byte, error) {
 	return nil, nil, nil
 }

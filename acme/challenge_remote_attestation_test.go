@@ -317,12 +317,16 @@ func TestOrder_Finalize_remoteAttestation(t *testing.T) {
 			MockUpdateOrder: func(context.Context, *Order) error { return nil },
 		}
 	}
-	prov := &MockProvisioner{
-		MauthorizeSign: func(context.Context, string) ([]provisioner.SignOption, error) {
-			return []provisioner.SignOption{&provisioner.WebhookController{}}, nil
-		},
-		MgetOptions: func() *provisioner.Options { return nil },
+	newProv := func(requireEAB bool) *MockProvisioner {
+		return &MockProvisioner{
+			MauthorizeSign: func(context.Context, string) ([]provisioner.SignOption, error) {
+				return []provisioner.SignOption{&provisioner.WebhookController{}}, nil
+			},
+			MgetOptions:    func() *provisioner.Options { return nil },
+			MisEABRequired: func() bool { return requireEAB },
+		}
 	}
+	prov, eabProv := newProv(false), newProv(true)
 	signAndCheck := func(t *testing.T, wantAccount *webhook.AttestationAccount) *mockSignAuth {
 		leaf, intermediate := &x509.Certificate{Raw: []byte("leaf")}, &x509.Certificate{Raw: []byte("intermediate")}
 		return &mockSignAuth{
@@ -350,8 +354,10 @@ func TestOrder_Finalize_remoteAttestation(t *testing.T) {
 	}
 
 	t.Run("ok without eab", func(t *testing.T) {
+		// A provisioner without EAB never reads the key, which some databases
+		// report as missing with an error.
 		o := newOrder()
-		require.NoError(t, o.Finalize(context.Background(), newDB(nil, nil), csr, signAndCheck(t, &webhook.AttestationAccount{ID: "accID"}), prov))
+		require.NoError(t, o.Finalize(context.Background(), newDB(nil, errors.New("not found")), csr, signAndCheck(t, &webhook.AttestationAccount{ID: "accID"}), prov))
 		assert.Equal(t, StatusValid, o.Status)
 		assert.Equal(t, "certID", o.CertificateID)
 	})
@@ -361,12 +367,12 @@ func TestOrder_Finalize_remoteAttestation(t *testing.T) {
 		o := newOrder()
 		require.NoError(t, o.Finalize(context.Background(), newDB(eak, nil), csr, signAndCheck(t, &webhook.AttestationAccount{
 			ID: "accID", ExternalAccountKeyID: "eakID", Reference: "machine-1",
-		}), prov))
+		}), eabProv))
 		assert.Equal(t, StatusValid, o.Status)
 	})
 
 	t.Run("fail eab lookup", func(t *testing.T) {
-		err := newOrder().Finalize(context.Background(), newDB(nil, errors.New("force")), csr, &mockSignAuth{}, prov)
+		err := newOrder().Finalize(context.Background(), newDB(nil, errors.New("force")), csr, &mockSignAuth{}, eabProv)
 		assert.ErrorContains(t, err, "error getting the external account key")
 	})
 

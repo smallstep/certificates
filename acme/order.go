@@ -187,9 +187,14 @@ func (o *Order) checkAttestedKeys(ctx context.Context, db DB, csr *x509.Certific
 
 // attestationAccount returns the order's ACME account for the webhooks of a
 // remote-attest-01 order, with the external account binding key the account
-// was created with, if any.
-func (o *Order) attestationAccount(ctx context.Context, db DB) (*webhook.AttestationAccount, error) {
+// was created with, if any. As for new orders, the key is read only if the
+// provisioner requires one: some databases report an account without a key as
+// an error.
+func (o *Order) attestationAccount(ctx context.Context, db DB, p Provisioner) (*webhook.AttestationAccount, error) {
 	account := &webhook.AttestationAccount{ID: o.AccountID}
+	if !p.IsEABRequired() {
+		return account, nil
+	}
 	eak, err := db.GetExternalAccountKeyByAccountID(ctx, o.ProvisionerID, o.AccountID)
 	if err != nil {
 		return nil, WrapErrorISE(err, "error getting the external account key of account %q", o.AccountID)
@@ -233,7 +238,7 @@ func (o *Order) Finalize(ctx context.Context, db DB, csr *x509.CertificateReques
 		return err
 	}
 	if att != nil {
-		if att.Account, err = o.attestationAccount(ctx, db); err != nil {
+		if att.Account, err = o.attestationAccount(ctx, db, p); err != nil {
 			return err
 		}
 	}

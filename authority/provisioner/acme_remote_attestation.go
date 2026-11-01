@@ -194,6 +194,12 @@ func (p *ACME) GetRemoteAttestation() *ACMERemoteAttestation {
 	return p.RemoteAttestation
 }
 
+// IsEABRequired returns whether new accounts need an external account binding,
+// so whether every account of the provisioner has an EAB key.
+func (p *ACME) IsEABRequired() bool {
+	return p.RequireEAB
+}
+
 // VerifyRemoteAttestation verifies the evidence of a remote-attest-01
 // challenge, a CMW record, and returns it with the data it binds: first the
 // RemoteAttestationBindingSize bytes of the binding, then, for a TDX quote or an

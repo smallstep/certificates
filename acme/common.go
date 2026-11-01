@@ -82,6 +82,7 @@ type Provisioner interface {
 	DefaultTLSCertDuration() time.Duration
 	GetOptions() *provisioner.Options
 	GetRemoteAttestation() *provisioner.ACMERemoteAttestation
+	IsEABRequired() bool
 	VerifyRemoteAttestation(ctx context.Context, record *cmw.Record, defaultAudience string) (*attestation.Result, []byte, error)
 }
 
@@ -126,6 +127,7 @@ type MockProvisioner struct {
 	MdefaultTLSCertDuration   func() time.Duration
 	MgetOptions               func() *provisioner.Options
 	MgetRemoteAttestation     func() *provisioner.ACMERemoteAttestation
+	MisEABRequired            func() bool
 	MverifyRemoteAttestation  func(ctx context.Context, record *cmw.Record, defaultAudience string) (*attestation.Result, []byte, error)
 }
 
@@ -206,6 +208,14 @@ func (m *MockProvisioner) GetRemoteAttestation() *provisioner.ACMERemoteAttestat
 		return m.MgetRemoteAttestation()
 	}
 	return nil
+}
+
+// IsEABRequired mock
+func (m *MockProvisioner) IsEABRequired() bool {
+	if m.MisEABRequired != nil {
+		return m.MisEABRequired()
+	}
+	return false
 }
 
 // VerifyRemoteAttestation mock
