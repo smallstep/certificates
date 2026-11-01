@@ -2,7 +2,9 @@ package db
 
 import (
 	"context"
+	"crypto/sha256"
 	"crypto/x509"
+	"encoding/hex"
 	"encoding/json"
 	"strconv"
 	"strings"
@@ -22,6 +24,7 @@ var (
 	certsTable             = []byte("x509_certs")
 	certsDataTable         = []byte("x509_certs_data")
 	revokedCertsTable      = []byte("revoked_x509_certs")
+	revokedKeysTable       = []byte("revoked_x509_keys")
 	crlTable               = []byte("x509_crl")
 	revokedSSHCertsTable   = []byte("revoked_ssh_certs")
 	usedOTTTable           = []byte("used_ott")
@@ -105,6 +108,25 @@ type CertificateRevocationListDB interface {
 	StoreCRL(*CertificateRevocationListInfo) error
 }
 
+// KeyRevocationDB is an extension of AuthDB that records revoked public keys.
+// Renewals keep the public key of the certificate they renew, so a key that
+// is revoked blocks every certificate with that key, including the ones
+// renewed from a revoked certificate and the ones that are no longer valid.
+//
+// Keys are identified by KeyFingerprint.
+type KeyRevocationDB interface {
+	IsKeyRevoked(fingerprint string) (bool, error)
+	RevokeKey(fingerprint string, rci *RevokedCertificateInfo) error
+}
+
+// KeyFingerprint returns the identifier used by KeyRevocationDB for the public
+// key of a certificate or CSR: the hex encoded SHA-256 of its DER encoded
+// SubjectPublicKeyInfo.
+func KeyFingerprint(rawSubjectPublicKeyInfo []byte) string {
+	sum := sha256.Sum256(rawSubjectPublicKeyInfo)
+	return hex.EncodeToString(sum[:])
+}
+
 // DB is a wrapper over the nosql.DB interface.
 type DB struct {
 	nosql.DB
@@ -131,7 +153,7 @@ func New(c *Config) (AuthDB, error) {
 	tables := [][]byte{
 		revokedCertsTable, certsTable, usedOTTTable,
 		sshCertsTable, sshHostsTable, sshHostPrincipalsTable, sshUsersTable,
-		revokedSSHCertsTable, certsDataTable, crlTable,
+		revokedSSHCertsTable, certsDataTable, crlTable, revokedKeysTable,
 	}
 	for _, b := range tables {
 		if err := db.CreateTable(b); err != nil {
@@ -220,6 +242,47 @@ func (db *DB) Revoke(rci *RevokedCertificateInfo) error {
 	}
 
 	_, swapped, err := db.CmpAndSwap(revokedCertsTable, []byte(rci.Serial), nil, rcib)
+	switch {
+	case err != nil:
+		return errors.Wrap(err, "error AuthDB CmpAndSwap")
+	case !swapped:
+		return ErrAlreadyExists
+	default:
+		return nil
+	}
+}
+
+// IsKeyRevoked returns whether or not the public key with the given
+// fingerprint (see KeyFingerprint) has been revoked.
+func (db *DB) IsKeyRevoked(fingerprint string) (bool, error) {
+	// If the DB is nil then act as pass through.
+	if db == nil {
+		return false, nil
+	}
+
+	// If the error is `Not Found` then the key has not been revoked.
+	// Any other error should be propagated to the caller.
+	if _, err := db.Get(revokedKeysTable, []byte(fingerprint)); err != nil {
+		if nosql.IsErrNotFound(err) {
+			return false, nil
+		}
+		return false, errors.Wrap(err, "error checking key revocation bucket")
+	}
+
+	// This key has been revoked.
+	return true, nil
+}
+
+// RevokeKey adds a public key to the key revocation table. The given
+// revocation info is the one of the certificate whose revocation revoked the
+// key. It returns ErrAlreadyExists if the key was already revoked.
+func (db *DB) RevokeKey(fingerprint string, rci *RevokedCertificateInfo) error {
+	rcib, err := json.Marshal(rci)
+	if err != nil {
+		return errors.Wrap(err, "error marshaling revoked key info")
+	}
+
+	_, swapped, err := db.CmpAndSwap(revokedKeysTable, []byte(fingerprint), nil, rcib)
 	switch {
 	case err != nil:
 		return errors.Wrap(err, "error AuthDB CmpAndSwap")
@@ -505,6 +568,8 @@ type MockAuthDB struct {
 	MGetRevokedCertificates func() (*[]RevokedCertificateInfo, error)
 	MGetCRL                 func() (*CertificateRevocationListInfo, error)
 	MStoreCRL               func(*CertificateRevocationListInfo) error
+	MIsKeyRevoked           func(fingerprint string) (bool, error)
+	MRevokeKey              func(fingerprint string, rci *RevokedCertificateInfo) error
 }
 
 func (m *MockAuthDB) GetRevokedCertificates() (*[]RevokedCertificateInfo, error) {
@@ -534,6 +599,22 @@ func (m *MockAuthDB) IsRevoked(sn string) (bool, error) {
 		return m.MIsRevoked(sn)
 	}
 	return m.Ret1.(bool), m.Err
+}
+
+// IsKeyRevoked mock. Without MIsKeyRevoked no key is revoked.
+func (m *MockAuthDB) IsKeyRevoked(fingerprint string) (bool, error) {
+	if m.MIsKeyRevoked != nil {
+		return m.MIsKeyRevoked(fingerprint)
+	}
+	return false, nil
+}
+
+// RevokeKey mock. Without MRevokeKey it does nothing.
+func (m *MockAuthDB) RevokeKey(fingerprint string, rci *RevokedCertificateInfo) error {
+	if m.MRevokeKey != nil {
+		return m.MRevokeKey(fingerprint, rci)
+	}
+	return nil
 }
 
 // IsSSHRevoked mock.
