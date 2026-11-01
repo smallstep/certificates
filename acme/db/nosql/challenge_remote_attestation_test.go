@@ -95,6 +95,15 @@ func TestDB_Authorization_remoteAttestation(t *testing.T) {
 	got, err := d.GetAuthorization(context.Background(), az.ID)
 	require.NoError(t, err)
 	assert.Equal(t, att, got.Attestation)
+
+	// A status update from a copy read before the challenge validated, as
+	// an order's status update may write, keeps the stored attestation.
+	stale := *az
+	stale.Attestation = nil
+	require.NoError(t, d.UpdateAuthorization(context.Background(), &stale))
+	got, err = d.GetAuthorization(context.Background(), az.ID)
+	require.NoError(t, err)
+	assert.Equal(t, att, got.Attestation)
 }
 
 // TestDB_GetExternalAccountKeyByAccountID checks that the EAB key an account

@@ -121,7 +121,11 @@ func (db *DB) UpdateAuthorization(ctx context.Context, az *acme.Authorization) e
 	nu := old.clone()
 	nu.Status = az.Status
 	nu.Fingerprint = az.Fingerprint
-	nu.Attestation = az.Attestation
+	// An attestation, once stored, is never cleared: a status update from a
+	// copy read before the challenge validated would otherwise erase it.
+	if az.Attestation != nil {
+		nu.Attestation = az.Attestation
+	}
 	nu.Error = az.Error
 	return db.save(ctx, old.ID, nu, old, "authz", authzTable)
 }
