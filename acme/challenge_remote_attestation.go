@@ -8,6 +8,7 @@ import (
 	"encoding/base64"
 	"encoding/hex"
 	"errors"
+	"slices"
 	"time"
 
 	"go.step.sm/crypto/jose"
@@ -81,9 +82,16 @@ func remoteAttest01Validate(ctx context.Context, ch *Challenge, db DB, jwk *jose
 		return err
 	}
 
+	// The handler takes the authorization from the request's URL, and a
+	// store that does not keep a challenge's authorization cannot refuse a
+	// challenge requested under another one, so the attestation is stored
+	// only on the authorization that holds the challenge, for its account.
 	az, err := db.GetAuthorization(ctx, ch.AuthorizationID)
 	if err != nil {
 		return WrapErrorISE(err, "error loading authorization")
+	}
+	if az.AccountID != ch.AccountID || !slices.ContainsFunc(az.Challenges, func(c *Challenge) bool { return c.ID == ch.ID }) {
+		return NewError(ErrorUnauthorizedType, "challenge %s does not belong to authorization %s", ch.ID, ch.AuthorizationID)
 	}
 	az.Attestation = &webhook.Attestation{
 		Challenge:        string(REMOTEATTEST01),

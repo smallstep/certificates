@@ -90,6 +90,7 @@ func TestRemoteAttest01Validate(t *testing.T) {
 		payload []byte
 		nonce   string
 		verify  func(context.Context, *cmw.Record, string) (*attestation.Result, []byte, error)
+		az      func(az *Authorization)
 		want    want
 	}{
 		{"ok confidential space", testRemoteAttestationCMW, testFreshnessNonce,
@@ -97,37 +98,49 @@ func TestRemoteAttest01Validate(t *testing.T) {
 				assert.Equal(t, "application/eat+jwt", r.MediaType)
 				assert.Equal(t, "https://ca.example.com/acme/acme/directory", aud)
 				return csResult, binding, nil
-			}, want{status: StatusValid, stored: true, format: "confidential-space", result: csResult}},
+			}, nil, want{status: StatusValid, stored: true, format: "confidential-space", result: csResult}},
 		// A quote's report data carries the relying party's claim nonce after
 		// the binding.
 		{"ok tdx with claim nonce", testRemoteAttestationCMW, testFreshnessNonce,
 			func(context.Context, *cmw.Record, string) (*attestation.Result, []byte, error) {
 				return tdxResult, append(append([]byte(nil), binding...), claimNonce...), nil
-			}, want{status: StatusValid, stored: true, format: "tdx", result: tdxResult,
+			}, nil, want{status: StatusValid, stored: true, format: "tdx", result: tdxResult,
 				claimNonce: base64.RawURLEncoding.EncodeToString(claimNonce)}},
 		// The binding is checked when the order is finalized, so evidence
 		// with any binding validates the challenge.
 		{"ok binding checked at finalize", testRemoteAttestationCMW, testFreshnessNonce,
 			func(context.Context, *cmw.Record, string) (*attestation.Result, []byte, error) {
 				return csResult, make([]byte, 32), nil
-			}, want{status: StatusValid, stored: true, format: "confidential-space", result: csResult}},
-		{"ok empty payload", nil, testFreshnessNonce, nil, want{status: StatusPending}},
-		{"ok empty object", []byte(" {} "), testFreshnessNonce, nil, want{status: StatusPending}},
-		{"fail no nonce", testRemoteAttestationCMW, "", nil, want{status: StatusPending, err: "has no freshness nonce"}},
-		{"fail malformed", []byte(`["application/eat+jwt"]`), testFreshnessNonce, nil,
+			}, nil, want{status: StatusValid, stored: true, format: "confidential-space", result: csResult}},
+		{"ok empty payload", nil, testFreshnessNonce, nil, nil, want{status: StatusPending}},
+		{"ok empty object", []byte(" {} "), testFreshnessNonce, nil, nil, want{status: StatusPending}},
+		{"fail no nonce", testRemoteAttestationCMW, "", nil, nil, want{status: StatusPending, err: "has no freshness nonce"}},
+		{"fail malformed", []byte(`["application/eat+jwt"]`), testFreshnessNonce, nil, nil,
 			want{status: StatusPending, err: "must have 2 or 3 elements"}},
 		{"fail invalid evidence", testRemoteAttestationCMW, testFreshnessNonce,
 			func(context.Context, *cmw.Record, string) (*attestation.Result, []byte, error) {
 				return nil, nil, attestation.Invalidf("attestation token dbgstat is %q", "enabled")
-			}, want{status: StatusInvalid, errType: "badAttestationStatement", errDetail: `attestation token dbgstat is "enabled"`}},
+			}, nil, want{status: StatusInvalid, errType: "badAttestationStatement", errDetail: `attestation token dbgstat is "enabled"`}},
 		{"fail verifier", testRemoteAttestationCMW, testFreshnessNonce,
 			func(context.Context, *cmw.Record, string) (*attestation.Result, []byte, error) {
 				return nil, nil, errors.New("error fetching tdx collateral")
-			}, want{status: StatusPending, err: "error verifying remote attestation"}},
+			}, nil, want{status: StatusPending, err: "error verifying remote attestation"}},
 		{"fail bound size", testRemoteAttestationCMW, testFreshnessNonce,
 			func(context.Context, *cmw.Record, string) (*attestation.Result, []byte, error) {
 				return csResult, binding[:16], nil
-			}, want{status: StatusPending, err: "binds 16 bytes"}},
+			}, nil, want{status: StatusPending, err: "binds 16 bytes"}},
+		// The challenge is requested under an authorization from the URL; the
+		// attestation must not land on one that does not hold the challenge.
+		{"fail challenge of another authorization", testRemoteAttestationCMW, testFreshnessNonce,
+			func(context.Context, *cmw.Record, string) (*attestation.Result, []byte, error) {
+				return csResult, binding, nil
+			}, func(az *Authorization) { az.Challenges = []*Challenge{{ID: "otherChID"}} },
+			want{status: StatusPending, err: "does not belong to authorization"}},
+		{"fail authorization of another account", testRemoteAttestationCMW, testFreshnessNonce,
+			func(context.Context, *cmw.Record, string) (*attestation.Result, []byte, error) {
+				return csResult, binding, nil
+			}, func(az *Authorization) { az.AccountID = "otherAccID" },
+			want{status: StatusPending, err: "does not belong to authorization"}},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -138,7 +151,14 @@ func TestRemoteAttest01Validate(t *testing.T) {
 			db := &MockDB{
 				MockGetAuthorization: func(_ context.Context, id string) (*Authorization, error) {
 					assert.Equal(t, "azID", id)
-					return &Authorization{ID: id, Identifier: Identifier{Type: RemoteAttestation, Value: "measured_boot"}}, nil
+					az := &Authorization{
+						ID: id, AccountID: "accID", Identifier: Identifier{Type: RemoteAttestation, Value: "measured_boot"},
+						Challenges: []*Challenge{{ID: "chID"}},
+					}
+					if tt.az != nil {
+						tt.az(az)
+					}
+					return az, nil
 				},
 				MockUpdateAuthorization: func(_ context.Context, az *Authorization) error {
 					updatedAz = az
@@ -157,6 +177,7 @@ func TestRemoteAttest01Validate(t *testing.T) {
 			ctx = NewLinkerContext(ctx, NewLinker("ca.example.com", "acme"))
 			ch := &Challenge{
 				ID:              "chID",
+				AccountID:       "accID",
 				AuthorizationID: "azID",
 				Type:            REMOTEATTEST01,
 				Status:          StatusPending,
@@ -243,6 +264,12 @@ func TestOrder_checkAttestedKeys(t *testing.T) {
 			"csr does not match the attested key"},
 		{"fail attestation without key authorization", map[string]*Authorization{"az1": {Attestation: &webhook.Attestation{}}, "az2": {}}, nil,
 			"csr does not match the attested key"},
+		// A remote-attestation authorization made valid without its
+		// challenge's attestation (a lost update, a challenge requested under
+		// another authorization) fails closed.
+		{"fail remote attestation without attestation", map[string]*Authorization{
+			"az1": {Identifier: Identifier{Type: RemoteAttestation}}, "az2": {},
+		}, nil, "has no attestation for its remote-attestation identifier"},
 		// Every attested key is checked, not only the first one found.
 		{"fail second fingerprint", map[string]*Authorization{"az1": {Fingerprint: fp}, "az2": {Fingerprint: otherFP}}, nil,
 			"csr does not match the attested key"},

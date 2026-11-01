@@ -171,6 +171,12 @@ func (o *Order) checkAttestedKeys(ctx context.Context, db DB, csr *x509.Certific
 				return nil, NewError(ErrorUnauthorizedType, "order %s csr does not match the attested key", o.ID)
 			}
 		}
+		// A remote-attestation authorization is valid only through its
+		// challenge, which stores the attestation: one without it never
+		// finalizes, whatever made it valid.
+		if az.Identifier.Type == RemoteAttestation && az.Attestation == nil {
+			return nil, NewError(ErrorUnauthorizedType, "order %s has no attestation for its remote-attestation identifier", o.ID)
+		}
 		if az.Attestation != nil {
 			if az.Attestation.KeyAuthorization == "" {
 				return nil, NewError(ErrorUnauthorizedType, "order %s csr does not match the attested key", o.ID)
