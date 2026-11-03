@@ -188,6 +188,51 @@ func (w *Webhook) Validate() error {
 // [http.RoundTripper].
 type TransportWrapper = httptransport.Wrapper
 
+// redactWebhookURLError rewrites a transport error from a webhook call so logs
+// keep the webhook name, scheme, host, and underlying cause, while userinfo,
+// path, query, and fragment are replaced with "<redacted>" markers. If the URL
+// cannot be parsed, it fails closed and the URL renders as "<redacted>".
+func redactWebhookURLError(err error, name string) error {
+	var urlErr *url.Error
+	if errors.As(err, &urlErr) {
+		redacted := *urlErr
+		redacted.URL = redactURLString(urlErr.URL)
+		return fmt.Errorf("webhook %q: %w", name, &redacted)
+	}
+	return err
+}
+
+// redactURLString renders a raw URL string with every sensitive part replaced
+// by a "<redacted>" marker, failing closed to "<redacted>" when unparseable.
+func redactURLString(raw string) string {
+	u, err := url.Parse(raw)
+	if err != nil {
+		return "<redacted>"
+	}
+	return redactURL(u)
+}
+
+// redactURL renders a URL as scheme://[userinfo@]host with every sensitive
+// part replaced by a "<redacted>" marker when present. A root path "/" carries
+// nothing sensitive and is kept as-is.
+func redactURL(u *url.URL) string {
+	s := u.Scheme + "://"
+	if u.User != nil {
+		s += "<redacted>@"
+	}
+	s += u.Host
+	if u.Path != "" && u.Path != "/" {
+		s += "/<redacted>"
+	}
+	if u.RawQuery != "" {
+		s += "?<redacted>"
+	}
+	if u.Fragment != "" {
+		s += "#<redacted>"
+	}
+	return s
+}
+
 func (w *Webhook) DoWithContext(ctx context.Context, client HTTPClient, tw TransportWrapper, reqBody *webhook.RequestBody, data any) (*webhook.ResponseBody, error) {
 	tmpl, err := template.New("url").Funcs(templates.StepFuncMap()).Parse(w.URL)
 	if err != nil {
@@ -224,7 +269,7 @@ retry:
 
 	req, err := http.NewRequestWithContext(ctx, "POST", webhookURL, bytes.NewReader(reqBytes))
 	if err != nil {
-		return nil, err
+		return nil, redactWebhookURLError(err, w.Name)
 	}
 
 	req.Header.Set("Content-Type", "application/json")
@@ -269,17 +314,17 @@ retry:
 	resp, err := client.Do(req)
 	if err != nil {
 		if errors.Is(err, context.DeadlineExceeded) {
-			return nil, err
+			return nil, redactWebhookURLError(err, w.Name)
 		} else if retries > 0 {
 			retries--
 			time.Sleep(time.Second)
 			goto retry
 		}
-		return nil, err
+		return nil, redactWebhookURLError(err, w.Name)
 	}
 	defer func() {
 		if err := resp.Body.Close(); err != nil {
-			log.Printf("Failed to close body of response from %s", w.URL)
+			log.Printf("Failed to close body of response from webhook %q URL %s", w.Name, redactURLString(w.URL))
 		}
 	}()
 	if resp.StatusCode >= 500 && retries > 0 {
