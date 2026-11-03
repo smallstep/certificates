@@ -390,8 +390,9 @@ func PKIOperation(ctx context.Context, req request) (Response, error) {
 			if errors.Is(err, provisioner.ErrSCEPChallengeInvalid) {
 				return createFailureResponse(ctx, csr, msg, smallscep.BadRequest, err.Error(), err)
 			}
-			scepErr := errors.New("failed validating challenge password")
-			return createFailureResponse(ctx, csr, msg, smallscep.BadRequest, scepErr.Error(), scepErr)
+			// Keep the client-facing infoText fixed, but pass the real error
+			// as failError so writeResponse logs the actual cause.
+			return createFailureResponse(ctx, csr, msg, smallscep.BadRequest, "failed validating challenge password", err)
 		}
 		signCSROpts = append(signCSROpts, challengeOptions...)
 	} else {
