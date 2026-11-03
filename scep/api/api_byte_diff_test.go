@@ -13,12 +13,14 @@ import (
 	"net/url"
 	"testing"
 
-	"github.com/smallstep/certificates/authority/provisioner"
-	"github.com/smallstep/certificates/scep"
+	"github.com/stretchr/testify/require"
+
 	"github.com/smallstep/pkcs7"
 	smallscep "github.com/smallstep/scep"
-	"github.com/stretchr/testify/require"
 	"go.step.sm/crypto/minica"
+
+	"github.com/smallstep/certificates/authority/provisioner"
+	"github.com/smallstep/certificates/scep"
 )
 
 // oidSCEPfailInfoText mirrors the attribute the CA signs into failure CertReps.
