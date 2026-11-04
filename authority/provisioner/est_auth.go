@@ -57,22 +57,10 @@ func (s *EST) AuthorizeRequest(ctx context.Context, req ESTAuthRequest) ([]SignC
 func (s *EST) authorizeRequestLocal(req ESTAuthRequest) ([]SignCSROption, error) {
 	var lastErr error = ErrESTAuthMethodNotFound
 	if req.ClientCertificate != nil {
-		if boolValue(s.EnableTLSClientCertificate, false) {
-			if s.hasClientCertificateRoots() {
-				if err := verifyCertificateWithPool(req.ClientCertificate, req.ClientCertificateChain, s.clientCertificateRootPool, nil); err == nil {
-					return []SignCSROption{}, nil
-				} else {
-					lastErr = err
-				}
-			} else {
-				if err := verifyCertificate(req.ClientCertificate, req.ClientCertificateChain, req.CARoots, req.CAIntermediates); err == nil {
-					return []SignCSROption{}, nil
-				} else {
-					lastErr = err
-				}
-			}
+		if err := s.verifyClientCertificate(req); err == nil {
+			return []SignCSROption{}, nil
 		} else {
-			lastErr = ErrESTAuthMethodDisabled
+			lastErr = err
 		}
 	}
 
@@ -89,6 +77,19 @@ func (s *EST) authorizeRequestLocal(req ESTAuthRequest) ([]SignCSROption, error)
 	}
 
 	return nil, lastErr
+}
+
+// verifyClientCertificate checks that client certificate authentication is
+// enabled and that the certificate chains to the configured client certificate
+// roots, or to the CA itself when none are configured.
+func (s *EST) verifyClientCertificate(req ESTAuthRequest) error {
+	if !boolValue(s.EnableTLSClientCertificate, false) {
+		return ErrESTAuthMethodDisabled
+	}
+	if s.hasClientCertificateRoots() {
+		return verifyCertificateWithPool(req.ClientCertificate, req.ClientCertificateChain, s.clientCertificateRootPool, nil)
+	}
+	return verifyCertificate(req.ClientCertificate, req.ClientCertificateChain, req.CARoots, req.CAIntermediates)
 }
 
 // validateBasicAuthPassword verifies the configured basic auth password.
@@ -108,27 +109,29 @@ func (s *EST) authorizeWithWebhook(ctx context.Context, req *ESTAuthRequest) ([]
 		return nil, ErrESTAuthMethodMisconfigured
 	}
 
-	var (
-		whreq *webhook.RequestBody
-		err   error
-	)
-	switch {
-	case req.ClientCertificate != nil:
-		whreq, err = webhook.NewRequestBody(webhook.WithX509CertificateRequest(req.CSR), webhook.WithClientCertificate(req.ClientCertificate))
-		if err != nil {
-			return nil, fmt.Errorf("failed creating webhook request: %w", err)
-		}
-	case req.AuthenticationHeader != "":
-		whreq, err = webhook.NewRequestBody(webhook.WithX509CertificateRequest(req.CSR), webhook.WithAuthenticationHeader(req.AuthenticationHeader))
-		if err != nil {
-			return nil, fmt.Errorf("failed creating webhook request: %w", err)
-		}
-		if req.BearerToken != "" {
-			whreq.BearerToken = req.BearerToken
-		}
-	default:
-		return nil, errors.New("missing certificate or basic auth for webhook validation")
+	// Behind a reverse proxy the client certificate comes from a request
+	// header, so webhooks only ever receive one that has been verified here. A
+	// certificate that fails verification is dropped rather than rejected, as
+	// the request can still authenticate with its Authorization header.
+	bodyOpts := []webhook.RequestBodyOption{webhook.WithX509CertificateRequest(req.CSR)}
+	hasCredential := false
+	if req.ClientCertificate != nil && s.verifyClientCertificate(*req) == nil {
+		bodyOpts = append(bodyOpts, webhook.WithClientCertificate(req.ClientCertificate))
+		hasCredential = true
 	}
+	if req.AuthenticationHeader != "" {
+		bodyOpts = append(bodyOpts, webhook.WithAuthenticationHeader(req.AuthenticationHeader))
+		hasCredential = true
+	}
+	if !hasCredential {
+		return nil, ErrESTAuthDenied
+	}
+
+	whreq, err := webhook.NewRequestBody(bodyOpts...)
+	if err != nil {
+		return nil, fmt.Errorf("failed creating webhook request: %w", err)
+	}
+	whreq.BearerToken = req.BearerToken
 	whreq.ProvisionerName = s.Name
 	var opts []SignCSROption
 

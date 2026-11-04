@@ -202,16 +202,9 @@ func authContextFromRequest(ctx context.Context, r *http.Request) (context.Conte
 			// fall back to r.TLS.PeerCertificates, which would be the
 			// proxy's own certificate, not the actual client's.
 			if forwardedtlsClientCert := r.Header.Get(cfg.ForwardedTLSClientCertHeader); forwardedtlsClientCert != "" {
-				certDER, err := base64.StdEncoding.DecodeString(forwardedtlsClientCert)
+				certs, err := parseForwardedClientCertificates(forwardedtlsClientCert)
 				if err != nil {
-					return ctx, fmt.Errorf("failed to decode client certificate from forwarded header: %w", err)
-				}
-				certs, err := x509.ParseCertificates(certDER)
-				if err != nil {
-					return ctx, fmt.Errorf("failed to parse client certificate from forwarded header: %w", err)
-				}
-				if len(certs) == 0 {
-					return ctx, errors.New("no certificates found in forwarded header")
+					return ctx, err
 				}
 				ctx = est.NewClientCertificateContext(ctx, certs[0])
 				ctx = est.NewClientCertificateChainContext(ctx, certs)
@@ -240,6 +233,34 @@ func authContextFromRequest(ctx context.Context, r *http.Request) (context.Conte
 		}
 	}
 	return ctx, nil
+}
+
+// parseForwardedClientCertificates parses a client certificate chain forwarded
+// by a reverse proxy, leaf first. The value holds base64 DER certificates
+// separated by commas, which is the format of Traefik's passTLSClientCert
+// middleware. URL escaped values are also accepted; PathUnescape is used because
+// it leaves the '+' of the base64 alphabet untouched.
+func parseForwardedClientCertificates(value string) ([]*x509.Certificate, error) {
+	value, err := url.PathUnescape(value)
+	if err != nil {
+		return nil, fmt.Errorf("failed to unescape client certificate from forwarded header: %w", err)
+	}
+	var certs []*x509.Certificate
+	for part := range strings.SplitSeq(value, ",") {
+		der, err := base64.StdEncoding.DecodeString(strings.TrimSpace(part))
+		if err != nil {
+			return nil, fmt.Errorf("failed to decode client certificate from forwarded header: %w", err)
+		}
+		parsed, err := x509.ParseCertificates(der)
+		if err != nil {
+			return nil, fmt.Errorf("failed to parse client certificate from forwarded header: %w", err)
+		}
+		certs = append(certs, parsed...)
+	}
+	if len(certs) == 0 {
+		return nil, errors.New("no certificates found in forwarded header")
+	}
+	return certs, nil
 }
 
 // authorizeEnrollRequest validates the request against provisioner-configured auth methods.
