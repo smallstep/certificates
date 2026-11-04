@@ -109,7 +109,7 @@ func MustProvisionerFromContext(ctx context.Context) Provisioner {
 
 // MockProvisioner for testing
 type MockProvisioner struct {
-	Mret1                     interface{}
+	Mret1                     any
 	Merr                      error
 	MgetID                    func() string
 	MgetName                  func() string

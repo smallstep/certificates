@@ -199,7 +199,7 @@ func setTeeReader(t *testing.T, w *bytes.Buffer) {
 }
 
 func TestNew(t *testing.T) {
-	assertEqual := func(x, y interface{}) bool {
+	assertEqual := func(x, y any) bool {
 		return reflect.DeepEqual(x, y) || fmt.Sprintf("%#v", x) == fmt.Sprintf("%#v", y)
 	}
 

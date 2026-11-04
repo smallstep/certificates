@@ -27,7 +27,7 @@ You can use `step-ca` to:
 
 `step-ca` is optimized for a two-tier PKI serving common DevOps use cases.
 
-As you design your PKI, if you need any of the following, [consider our commerical CA](http://smallstep.com):
+As you design your PKI, if you need any of the following, [consider our commercial CA](http://smallstep.com):
 - Multiple certificate authorities
 - Active revocation (CRL, OCSP)
 - Turnkey high-volume, high availability CA

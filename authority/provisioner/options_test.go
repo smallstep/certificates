@@ -292,10 +292,10 @@ func Test_unsafeParseSigned(t *testing.T) {
 	tests := []struct {
 		name    string
 		args    args
-		want    map[string]interface{}
+		want    map[string]any
 		wantErr bool
 	}{
-		{"ok", args{okToken}, map[string]interface{}{
+		{"ok", args{okToken}, map[string]any{
 			"sub": "jane@doe.com",
 			"iss": "https://doe.com",
 			"jti": "8ff32481-fd5f-4e2e-96df-908c127c85f7",

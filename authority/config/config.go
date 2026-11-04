@@ -154,7 +154,7 @@ type ASN1DN struct {
 }
 
 // AuthConfig represents the configuration options for the authority. An
-// underlaying registration authority can also be configured using the
+// underlying registration authority can also be configured using the
 // cas.Options.
 type AuthConfig struct {
 	*cas.Options

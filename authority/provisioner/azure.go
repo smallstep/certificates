@@ -9,6 +9,7 @@ import (
 	"io"
 	"net/http"
 	"regexp"
+	"slices"
 	"strings"
 	"time"
 
@@ -325,11 +326,8 @@ func (p *Azure) AuthorizeSign(ctx context.Context, token string) ([]SignOption, 
 	// Filter by resource group
 	if len(p.ResourceGroups) > 0 {
 		var found bool
-		for _, g := range p.ResourceGroups {
-			if g == group {
-				found = true
-				break
-			}
+		if slices.Contains(p.ResourceGroups, group) {
+			found = true
 		}
 		if !found {
 			return nil, errs.Unauthorized("azure.AuthorizeSign; azure token validation failed - invalid resource group")
@@ -339,11 +337,8 @@ func (p *Azure) AuthorizeSign(ctx context.Context, token string) ([]SignOption, 
 	// Filter by subscription id
 	if len(p.SubscriptionIDs) > 0 {
 		var found bool
-		for _, s := range p.SubscriptionIDs {
-			if s == subscription {
-				found = true
-				break
-			}
+		if slices.Contains(p.SubscriptionIDs, subscription) {
+			found = true
 		}
 		if !found {
 			return nil, errs.Unauthorized("azure.AuthorizeSign; azure token validation failed - invalid subscription id")
@@ -353,11 +348,8 @@ func (p *Azure) AuthorizeSign(ctx context.Context, token string) ([]SignOption, 
 	// Filter by Azure AD identity object id
 	if len(p.ObjectIDs) > 0 {
 		var found bool
-		for _, i := range p.ObjectIDs {
-			if i == identityObjectID {
-				found = true
-				break
-			}
+		if slices.Contains(p.ObjectIDs, identityObjectID) {
+			found = true
 		}
 		if !found {
 			return nil, errs.Unauthorized("azure.AuthorizeSign; azure token validation failed - invalid identity object id")

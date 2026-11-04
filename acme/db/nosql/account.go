@@ -84,7 +84,7 @@ func (db *DB) GetAccountByKeyID(ctx context.Context, kid string) (*acme.Account,
 	return db.GetAccount(ctx, id)
 }
 
-// CreateAccount imlements the AcmeDB.CreateAccount interface.
+// CreateAccount implements the AcmeDB.CreateAccount interface.
 func (db *DB) CreateAccount(ctx context.Context, acc *acme.Account) error {
 	var err error
 	acc.ID, err = randID()
@@ -125,7 +125,7 @@ func (db *DB) CreateAccount(ctx context.Context, acc *acme.Account) error {
 	}
 }
 
-// UpdateAccount imlements the AcmeDB.UpdateAccount interface.
+// UpdateAccount implements the AcmeDB.UpdateAccount interface.
 func (db *DB) UpdateAccount(ctx context.Context, acc *acme.Account) error {
 	old, err := db.getDBAccount(ctx, acc.ID)
 	if err != nil {

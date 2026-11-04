@@ -209,7 +209,7 @@ type Directory struct {
 }
 
 // ToLog enables response logging for the Directory type.
-func (d *Directory) ToLog() (interface{}, error) {
+func (d *Directory) ToLog() (any, error) {
 	b, err := json.Marshal(d)
 	if err != nil {
 		return nil, acme.WrapErrorISE(err, "error marshaling directory for logging")

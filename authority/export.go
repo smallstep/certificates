@@ -230,7 +230,7 @@ func mustDuration(d *provisioner.Duration) string {
 	return d.String()
 }
 
-func mustMarshalToStruct(v interface{}) *structpb.Struct {
+func mustMarshalToStruct(v any) *structpb.Struct {
 	b, err := json.Marshal(v)
 	if err != nil {
 		panic(errors.Wrapf(err, "error marshaling %T", v))

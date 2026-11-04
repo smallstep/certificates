@@ -276,7 +276,7 @@ type mockSignAuth struct {
 	signWithContext       func(ctx context.Context, csr *x509.CertificateRequest, signOpts provisioner.SignOptions, extraOpts ...provisioner.SignOption) ([]*x509.Certificate, error)
 	areSANsAllowed        func(ctx context.Context, sans []string) error
 	loadProvisionerByName func(string) (provisioner.Interface, error)
-	ret1, ret2            interface{}
+	ret1, ret2            any
 	err                   error
 }
 
@@ -1133,16 +1133,16 @@ func TestOrder_Finalize(t *testing.T) {
 							return &Authorization{ID: id, Status: StatusValid}, nil
 						},
 					},
-					MockGetDpopToken: func(ctx context.Context, orderID string) (map[string]interface{}, error) {
+					MockGetDpopToken: func(ctx context.Context, orderID string) (map[string]any, error) {
 						assert.Equals(t, orderID, o.ID)
-						dpopMap := map[string]interface{}{
+						dpopMap := map[string]any{
 							"dpop": "a-dpop-token",
 						}
 						return dpopMap, nil
 					},
-					MockGetOidcToken: func(ctx context.Context, orderID string) (map[string]interface{}, error) {
+					MockGetOidcToken: func(ctx context.Context, orderID string) (map[string]any, error) {
 						assert.Equals(t, orderID, o.ID)
-						oidcMap := map[string]interface{}{
+						oidcMap := map[string]any{
 							"oidc": "a-oidc-token",
 						}
 						return oidcMap, nil
@@ -1226,16 +1226,16 @@ func TestOrder_Finalize(t *testing.T) {
 							return &Authorization{ID: id, Status: StatusValid}, nil
 						},
 					},
-					MockGetDpopToken: func(ctx context.Context, orderID string) (map[string]interface{}, error) {
+					MockGetDpopToken: func(ctx context.Context, orderID string) (map[string]any, error) {
 						assert.Equals(t, orderID, o.ID)
-						dpopMap := map[string]interface{}{
+						dpopMap := map[string]any{
 							"dpop": "a-dpop-token",
 						}
 						return dpopMap, nil
 					},
-					MockGetOidcToken: func(ctx context.Context, orderID string) (map[string]interface{}, error) {
+					MockGetOidcToken: func(ctx context.Context, orderID string) (map[string]any, error) {
 						assert.Equals(t, orderID, o.ID)
-						oidcMap := map[string]interface{}{
+						oidcMap := map[string]any{
 							"oidc": "a-oidc-token",
 						}
 						return oidcMap, nil
@@ -1614,16 +1614,16 @@ func TestOrder_Finalize(t *testing.T) {
 							return &Authorization{ID: id, Status: StatusValid}, nil
 						},
 					},
-					MockGetDpopToken: func(ctx context.Context, orderID string) (map[string]interface{}, error) {
+					MockGetDpopToken: func(ctx context.Context, orderID string) (map[string]any, error) {
 						assert.Equals(t, orderID, o.ID)
-						dpopMap := map[string]interface{}{
+						dpopMap := map[string]any{
 							"dpop": "a-dpop-token",
 						}
 						return dpopMap, nil
 					},
-					MockGetOidcToken: func(ctx context.Context, orderID string) (map[string]interface{}, error) {
+					MockGetOidcToken: func(ctx context.Context, orderID string) (map[string]any, error) {
 						assert.Equals(t, orderID, o.ID)
-						oidcMap := map[string]interface{}{
+						oidcMap := map[string]any{
 							"oidc": "a-oidc-token",
 						}
 						return oidcMap, nil
@@ -1706,16 +1706,16 @@ func TestOrder_Finalize(t *testing.T) {
 							return &Authorization{ID: id, Status: StatusValid}, nil
 						},
 					},
-					MockGetDpopToken: func(ctx context.Context, orderID string) (map[string]interface{}, error) {
+					MockGetDpopToken: func(ctx context.Context, orderID string) (map[string]any, error) {
 						assert.Equals(t, orderID, o.ID)
-						dpopMap := map[string]interface{}{
+						dpopMap := map[string]any{
 							"dpop": "a-dpop-token",
 						}
 						return dpopMap, nil
 					},
-					MockGetOidcToken: func(ctx context.Context, orderID string) (map[string]interface{}, error) {
+					MockGetOidcToken: func(ctx context.Context, orderID string) (map[string]any, error) {
 						assert.Equals(t, orderID, o.ID)
-						oidcMap := map[string]interface{}{
+						oidcMap := map[string]any{
 							"oidc": "a-oidc-token",
 						}
 						return oidcMap, nil

@@ -448,14 +448,14 @@ func serializeCertificate(crt *x509.Certificate) string {
 }
 
 func serializeCertificateChain(fullchain ...*x509.Certificate) string {
-	var chain string
+	var chain strings.Builder
 	for _, crt := range fullchain {
-		chain += string(pem.EncodeToMemory(&pem.Block{
+		chain.WriteString(string(pem.EncodeToMemory(&pem.Block{
 			Type:  "CERTIFICATE",
 			Bytes: crt.Raw,
-		}))
+		})))
 	}
-	return chain
+	return chain.String()
 }
 
 func serializeSSHCertificate(crt *ssh.Certificate) string {
@@ -599,7 +599,7 @@ func login(authority, token string, csr *x509.CertificateRequest, signer crypto.
 
 	// Add intermediates to the tls.Certificate
 	last := len(bundle) - 1
-	for i := 0; i < last; i++ {
+	for i := range last {
 		cert.Certificate = append(cert.Certificate, bundle[i].Raw)
 	}
 

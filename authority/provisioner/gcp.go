@@ -105,7 +105,7 @@ type GCP struct {
 	DisableTrustOnFirstUse bool     `json:"disableTrustOnFirstUse"`
 	DisableSSHCAUser       *bool    `json:"disableSSHCAUser,omitempty"`
 	DisableSSHCAHost       *bool    `json:"disableSSHCAHost,omitempty"`
-	InstanceAge            Duration `json:"instanceAge,omitempty"`
+	InstanceAge            Duration `json:"instanceAge"`
 	Claims                 *Claims  `json:"claims,omitempty"`
 	Options                *Options `json:"options,omitempty"`
 	config                 *gcpConfig

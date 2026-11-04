@@ -211,8 +211,7 @@ func decodeMessage(message string, r *http.Request) ([]byte, error) {
 
 	// only interested in corrupt input errors below this. This type of error is the
 	// most likely to return, but better safe than sorry.
-	var cie base64.CorruptInputError
-	if !errors.As(err, &cie) {
+	if _, ok := errors.AsType[base64.CorruptInputError](err); !ok {
 		return nil, fmt.Errorf("failed base64 decoding message: %w", err)
 	}
 
@@ -391,8 +390,9 @@ func PKIOperation(ctx context.Context, req request) (Response, error) {
 			if errors.Is(err, provisioner.ErrSCEPChallengeInvalid) {
 				return createFailureResponse(ctx, csr, msg, smallscep.BadRequest, err.Error(), err)
 			}
-			scepErr := errors.New("failed validating challenge password")
-			return createFailureResponse(ctx, csr, msg, smallscep.BadRequest, scepErr.Error(), scepErr)
+			// Keep the client-facing infoText fixed, but pass the real error
+			// as failError so writeResponse logs the actual cause.
+			return createFailureResponse(ctx, csr, msg, smallscep.BadRequest, "failed validating challenge password", err)
 		}
 		signCSROpts = append(signCSROpts, challengeOptions...)
 	} else {

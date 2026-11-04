@@ -55,6 +55,20 @@ func TestNamePolicyEngine_matchDomainConstraint(t *testing.T) {
 			wantErr:    false,
 		},
 		{
+			name:       "fail/empty-domain",
+			domain:     "",
+			constraint: "host.example.com",
+			want:       false,
+			wantErr:    false,
+		},
+		{
+			name:       "fail/single-asterisk-domain",
+			domain:     "*",
+			constraint: "host.example.com",
+			want:       false,
+			wantErr:    false,
+		},
+		{
 			name:       "fail/period-domain",
 			domain:     ".host.example.com",
 			constraint: ".example.com",

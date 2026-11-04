@@ -625,6 +625,65 @@ func TestHandler_validateExternalAccountBinding(t *testing.T) {
 				err: acme.NewError(acme.ErrorUnauthorizedType, "external account binding key with id '%s' was already bound to account '%s' on %s", "eakID", "some-account-id", boundAt),
 			}
 		},
+		"fail/eab-already-bound-key-bytes-cleared": func(t *testing.T) test {
+			jwk, err := jose.GenerateJWK("EC", "P-256", "ES256", "sig", "", 0)
+			assert.FatalError(t, err)
+			url := fmt.Sprintf("%s/acme/%s/account/new-account", baseURL.String(), escProvName)
+			rawEABJWS, err := createRawEABJWS(jwk, []byte{1, 3, 3, 7}, "eakID", url)
+			assert.FatalError(t, err)
+			eab := &ExternalAccountBinding{}
+			err = json.Unmarshal(rawEABJWS, &eab)
+			assert.FatalError(t, err)
+			nar := &NewAccountRequest{
+				Contact:                []string{"foo", "bar"},
+				ExternalAccountBinding: eab,
+			}
+			payloadBytes, err := json.Marshal(nar)
+			assert.FatalError(t, err)
+			so := new(jose.SignerOptions)
+			so.WithHeader("alg", jose.SignatureAlgorithm(jwk.Algorithm))
+			so.WithHeader("url", url)
+			signer, err := jose.NewSigner(jose.SigningKey{
+				Algorithm: jose.SignatureAlgorithm(jwk.Algorithm),
+				Key:       jwk.Key,
+			}, so)
+			assert.FatalError(t, err)
+			jws, err := signer.Sign(payloadBytes)
+			assert.FatalError(t, err)
+			raw, err := jws.CompactSerialize()
+			assert.FatalError(t, err)
+			parsedJWS, err := jose.ParseJWS(raw)
+			assert.FatalError(t, err)
+			prov := newACMEProv(t)
+			prov.RequireEAB = true
+			ctx := context.WithValue(context.Background(), jwkContextKey, jwk)
+			ctx = acme.NewProvisionerContext(ctx, prov)
+			ctx = context.WithValue(ctx, jwsContextKey, parsedJWS)
+			createdAt := time.Now()
+			boundAt := time.Now().Add(1 * time.Second)
+			return test{
+				db: &acme.MockDB{
+					MockGetExternalAccountKey: func(ctx context.Context, provisionerName, keyID string) (*acme.ExternalAccountKey, error) {
+						return &acme.ExternalAccountKey{
+							ID:            "eakID",
+							ProvisionerID: provID,
+							Reference:     "testeak",
+							CreatedAt:     createdAt,
+							AccountID:     "some-account-id",
+							HmacKey:       []byte{}, // BindTo clears the key bytes when it binds
+							BoundAt:       boundAt,
+						}, nil
+					},
+				},
+				ctx: ctx,
+				nar: &NewAccountRequest{
+					Contact:                []string{"foo", "bar"},
+					ExternalAccountBinding: eab,
+				},
+				eak: nil,
+				err: acme.NewError(acme.ErrorUnauthorizedType, "external account binding key with id '%s' was already bound to account '%s' on %s", "eakID", "some-account-id", boundAt),
+			}
+		},
 		"fail/eab-verify": func(t *testing.T) test {
 			jwk, err := jose.GenerateJWK("EC", "P-256", "ES256", "sig", "", 0)
 			assert.FatalError(t, err)

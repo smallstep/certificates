@@ -195,7 +195,7 @@ func (v *VaultCAS) RevokeCertificate(req *apiv1.RevokeCertificateRequest) (*apiv
 		sn = req.Certificate.SerialNumber
 	}
 
-	vaultReq := map[string]interface{}{
+	vaultReq := map[string]any{
 		"serial_number": formatSerialNumber(sn),
 	}
 	_, err := v.client.Logical().Write(v.config.PKIMountPath+"/revoke/", vaultReq)
@@ -223,7 +223,7 @@ func (v *VaultCAS) createCertificate(cr *x509.CertificateRequest, lifetime time.
 		return nil, nil, fmt.Errorf("unsupported public key algorithm %v", cr.PublicKeyAlgorithm)
 	}
 
-	vaultReq := map[string]interface{}{
+	vaultReq := map[string]any{
 		"csr": string(pem.EncodeToMemory(&pem.Block{
 			Type:  "CERTIFICATE REQUEST",
 			Bytes: cr.Raw,

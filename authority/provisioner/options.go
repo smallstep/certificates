@@ -164,9 +164,9 @@ func CustomTemplateOptions(o *Options, data x509util.TemplateData, defaultTempla
 
 		// Add user provided data.
 		if len(so.TemplateData) > 0 {
-			userObject := make(map[string]interface{})
+			userObject := make(map[string]any)
 			if err := json.Unmarshal(so.TemplateData, &userObject); err != nil {
-				data.SetUserData(map[string]interface{}{})
+				data.SetUserData(map[string]any{})
 			} else {
 				data.SetUserData(userObject)
 			}
@@ -196,12 +196,12 @@ func CustomTemplateOptions(o *Options, data x509util.TemplateData, defaultTempla
 
 // unsafeParseSigned parses the given token and returns all the claims without
 // verifying the signature of the token.
-func unsafeParseSigned(s string) (map[string]interface{}, error) {
+func unsafeParseSigned(s string) (map[string]any, error) {
 	token, err := jose.ParseSigned(s)
 	if err != nil {
 		return nil, err
 	}
-	claims := make(map[string]interface{})
+	claims := make(map[string]any)
 	if err := token.UnsafeClaimsWithoutVerification(&claims); err != nil {
 		return nil, err
 	}

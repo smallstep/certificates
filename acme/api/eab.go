@@ -53,8 +53,7 @@ func validateExternalAccountBinding(ctx context.Context, nar *NewAccountRequest)
 	db := acme.MustDatabaseFromContext(ctx)
 	externalAccountKey, err := db.GetExternalAccountKey(ctx, acmeProv.ID, keyID)
 	if err != nil {
-		var ae *acme.Error
-		if errors.As(err, &ae) {
+		if _, ok := errors.AsType[*acme.Error](err); ok {
 			return nil, acme.WrapError(acme.ErrorUnauthorizedType, err, "the field 'kid' references an unknown key")
 		}
 		return nil, acme.WrapErrorISE(err, "error retrieving external account key")
@@ -64,12 +63,15 @@ func validateExternalAccountBinding(ctx context.Context, nar *NewAccountRequest)
 		return nil, acme.NewError(acme.ErrorUnauthorizedType, "the field 'kid' references an unknown key")
 	}
 
-	if len(externalAccountKey.HmacKey) == 0 {
-		return nil, acme.NewError(acme.ErrorServerInternalType, "external account binding key with id '%s' does not have secret bytes", keyID)
-	}
-
+	// A bound key has had its secret cleared (see ExternalAccountKey.BindTo),
+	// so this must be checked before the secret: a client reusing a key is
+	// unauthorized, not a server error.
 	if externalAccountKey.AlreadyBound() {
 		return nil, acme.NewError(acme.ErrorUnauthorizedType, "external account binding key with id '%s' was already bound to account '%s' on %s", keyID, externalAccountKey.AccountID, externalAccountKey.BoundAt)
+	}
+
+	if len(externalAccountKey.HmacKey) == 0 {
+		return nil, acme.NewError(acme.ErrorServerInternalType, "external account binding key with id '%s' does not have secret bytes", keyID)
 	}
 
 	payload, err := eabJWS.Verify(externalAccountKey.HmacKey)

@@ -41,7 +41,7 @@ func (cb *ClosingBuffer) Close() error {
 	return nil
 }
 
-func getCSR(priv interface{}) (*x509.CertificateRequest, error) {
+func getCSR(priv any) (*x509.CertificateRequest, error) {
 	_csr := &x509.CertificateRequest{
 		Subject:  pkix.Name{CommonName: "test.smallstep.com"},
 		DNSNames: []string{"test.smallstep.com"},

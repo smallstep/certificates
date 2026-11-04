@@ -776,7 +776,7 @@ func TestAWS_AuthorizeSSHSign(t *testing.T) {
 	type args struct {
 		token   string
 		sshOpts SignSSHOptions
-		key     interface{}
+		key     any
 	}
 	tests := []struct {
 		name        string

@@ -320,7 +320,7 @@ type PKI struct {
 // New creates a new PKI configuration.
 func New(o apiv1.Options, opts ...Option) (*PKI, error) {
 	// TODO(hs): invoking `New` with a context active will use values from
-	// that CA context while generating the context. Thay may or may not
+	// that CA context while generating the context. They may or may not
 	// be fully expected and/or what we want. This specific behavior was
 	// changed after not relying on the `init` inside of `step`, resulting in
 	// the default context being active if `step.Init` isn't called explicitly.
@@ -557,7 +557,7 @@ func (p *PKI) GenerateRootCertificate(name, org, resource string, pass []byte) (
 }
 
 // WriteRootCertificate writes to the buffer the given certificate and key if given.
-func (p *PKI) WriteRootCertificate(rootCrt *x509.Certificate, rootKey interface{}, pass []byte) error {
+func (p *PKI) WriteRootCertificate(rootCrt *x509.Certificate, rootKey any, pass []byte) error {
 	p.Files[p.Root[0]] = encodeCertificate(rootCrt)
 	if rootKey != nil {
 		var err error

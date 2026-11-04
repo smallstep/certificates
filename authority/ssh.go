@@ -6,6 +6,7 @@ import (
 	"crypto/x509"
 	"encoding/binary"
 	"errors"
+	"maps"
 	"net/http"
 	"strings"
 	"time"
@@ -77,16 +78,14 @@ func (a *Authority) GetSSHConfig(_ context.Context, typ string, data map[string]
 	}
 
 	// Merge user and default data
-	var mergedData map[string]interface{}
+	var mergedData map[string]any
 
 	if len(data) == 0 {
 		mergedData = a.templates.Data
 	} else {
-		mergedData = make(map[string]interface{}, len(a.templates.Data)+1)
+		mergedData = make(map[string]any, len(a.templates.Data)+1)
 		mergedData["User"] = data
-		for k, v := range a.templates.Data {
-			mergedData[k] = v
-		}
+		maps.Copy(mergedData, a.templates.Data)
 	}
 
 	// Render templates
@@ -293,8 +292,7 @@ func (a *Authority) signSSH(ctx context.Context, key ssh.PublicKey, opts provisi
 
 	// Check if authority is allowed to sign the certificate
 	if err := a.isAllowedToSignSSHCertificate(certTpl); err != nil {
-		var ee *errs.Error
-		if errors.As(err, &ee) {
+		if ee, ok := errors.AsType[*errs.Error](err); ok {
 			return nil, prov, ee
 		}
 		return nil, prov, errs.InternalServerErr(err,

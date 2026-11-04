@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"net/url"
 	"path"
+	"slices"
 	"strings"
 
 	"go.step.sm/crypto/jose"
@@ -23,7 +24,7 @@ type nextHTTP = func(http.ResponseWriter, *http.Request)
 
 func logNonce(w http.ResponseWriter, nonce string) {
 	if rl, ok := w.(logging.ResponseLogger); ok {
-		m := map[string]interface{}{
+		m := map[string]any{
 			"nonce": nonce,
 		}
 		rl.WithFields(m)
@@ -77,16 +78,14 @@ func verifyContentType(next nextHTTP) nextHTTP {
 			// GET /certificate requests allow a greater range of content types.
 			expected = []string{"application/jose+json", "application/pkix-cert", "application/pkcs7-mime"}
 		} else {
-			// By default every request should have content-type applictaion/jose+json.
+			// By default every request should have content-type application/jose+json.
 			expected = []string{"application/jose+json"}
 		}
 
 		ct := r.Header.Get("Content-Type")
-		for _, e := range expected {
-			if ct == e {
-				next(w, r)
-				return
-			}
+		if slices.Contains(expected, ct) {
+			next(w, r)
+			return
 		}
 		render.Error(w, r, acme.NewError(acme.ErrorMalformedType,
 			"expected content-type to be in %s, but got %s", expected, ct))

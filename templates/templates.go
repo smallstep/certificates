@@ -48,8 +48,8 @@ func StepFuncMap() template.FuncMap {
 
 // Templates is a collection of templates and variables.
 type Templates struct {
-	SSH  *SSHTemplates          `json:"ssh,omitempty"`
-	Data map[string]interface{} `json:"data,omitempty"`
+	SSH  *SSHTemplates  `json:"ssh,omitempty"`
+	Data map[string]any `json:"data,omitempty"`
 }
 
 // Validate returns an error if a template is not valid.
@@ -213,7 +213,7 @@ func (t *Template) LoadBytes(b []byte) error {
 
 // Render executes the template with the given data and returns the rendered
 // version.
-func (t *Template) Render(data interface{}) ([]byte, error) {
+func (t *Template) Render(data any) ([]byte, error) {
 	if t.Type == Directory {
 		return nil, nil
 	}
@@ -230,7 +230,7 @@ func (t *Template) Render(data interface{}) ([]byte, error) {
 }
 
 // Output renders the template and returns a template.Output struct or an error.
-func (t *Template) Output(data interface{}) (Output, error) {
+func (t *Template) Output(data any) (Output, error) {
 	b, err := t.Render(data)
 	if err != nil {
 		return Output{}, err

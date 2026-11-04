@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"math/big"
+	"slices"
 	"strings"
 	"time"
 
@@ -59,8 +60,8 @@ type SignSSHOptions struct {
 	CertType     string          `json:"certType"`
 	KeyID        string          `json:"keyID"`
 	Principals   []string        `json:"principals"`
-	ValidAfter   TimeDuration    `json:"validAfter,omitempty"`
-	ValidBefore  TimeDuration    `json:"validBefore,omitempty"`
+	ValidAfter   TimeDuration    `json:"validAfter"`
+	ValidBefore  TimeDuration    `json:"validBefore"`
 	TemplateData json.RawMessage `json:"templateData,omitempty"`
 	Backdate     time.Duration   `json:"-"`
 }
@@ -70,10 +71,8 @@ func (o SignSSHOptions) Validate() error {
 	if o.CertType != "" && o.CertType != SSHUserCert && o.CertType != SSHHostCert {
 		return errs.BadRequest("certType '%s' is not valid", o.CertType)
 	}
-	for _, p := range o.Principals {
-		if p == "" {
-			return errs.BadRequest("principals cannot contain empty values")
-		}
+	if slices.Contains(o.Principals, "") {
+		return errs.BadRequest("principals cannot contain empty values")
 	}
 	return nil
 }
@@ -448,10 +447,10 @@ func containsAllMembers(group, subgroup []string) bool {
 		return false
 	}
 	visit := make(map[string]struct{}, lg)
-	for i := 0; i < lg; i++ {
+	for i := range lg {
 		visit[strings.ToLower(group[i])] = struct{}{}
 	}
-	for i := 0; i < lsg; i++ {
+	for i := range lsg {
 		if _, ok := visit[strings.ToLower(subgroup[i])]; !ok {
 			return false
 		}

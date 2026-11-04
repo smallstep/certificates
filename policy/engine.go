@@ -96,7 +96,7 @@ type NamePolicyEngine struct {
 	// allowLiteralWildcardNames allows literal wildcard DNS domains
 	allowLiteralWildcardNames bool
 
-	// permitted and exluded constraints similar to x509 Name Constraints
+	// permitted and excluded constraints similar to x509 Name Constraints
 	permittedCommonNames    []string
 	excludedCommonNames     []string
 	permittedDNSDomains     []string
@@ -286,7 +286,7 @@ func splitSSHPrincipals(cert *ssh.Certificate) (dnsNames []string, ips []net.IP,
 	case ssh.UserCert:
 		// re-using SplitSANs results in anything that can't be parsed as an IP, URI or email
 		// to be considered a username principal. This allows usernames like h.slatman to be present
-		// in the SSH certificate. We're exluding URIs, because they can be confusing
+		// in the SSH certificate. We're excluding URIs, because they can be confusing
 		// when used in a SSH user certificate.
 		principals, ips, emails, uris = x509util.SplitSANs(cert.ValidPrincipals)
 		if len(ips) > 0 {

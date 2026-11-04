@@ -25,7 +25,6 @@ import (
 	"time"
 
 	"github.com/pkg/errors"
-	"golang.org/x/net/http2"
 	"google.golang.org/protobuf/encoding/protojson"
 	"google.golang.org/protobuf/proto"
 
@@ -143,7 +142,7 @@ func enforceRequestID(r *http.Request) {
 func (c *uaClient) Do(req *http.Request) (*http.Response, error) {
 	req.Header.Set("User-Agent", UserAgent)
 	enforceRequestID(req)
-	return c.Client.Do(req) //nolint:gosec // request to user-configured CA server
+	return c.Client.Do(req)
 }
 
 // RetryFunc defines the method used to retry a request. If it returns true, the
@@ -251,29 +250,18 @@ func (o *clientOptions) getTransport(endpoint string) (tr http.RoundTripper, err
 
 	// Add client certificate if available
 	if o.certificate.Certificate != nil {
-		switch tr := tr.(type) {
-		case *http.Transport:
-			if tr.TLSClientConfig == nil {
-				tr.TLSClientConfig = &tls.Config{
-					MinVersion: tls.VersionTLS12,
-				}
-			}
-			if len(tr.TLSClientConfig.Certificates) == 0 && tr.TLSClientConfig.GetClientCertificate == nil {
-				tr.TLSClientConfig.Certificates = []tls.Certificate{o.certificate}
-				tr.TLSClientConfig.GetClientCertificate = o.getClientCertificate
-			}
-		case *http2.Transport:
-			if tr.TLSClientConfig == nil {
-				tr.TLSClientConfig = &tls.Config{
-					MinVersion: tls.VersionTLS12,
-				}
-			}
-			if len(tr.TLSClientConfig.Certificates) == 0 && tr.TLSClientConfig.GetClientCertificate == nil {
-				tr.TLSClientConfig.Certificates = []tls.Certificate{o.certificate}
-				tr.TLSClientConfig.GetClientCertificate = o.getClientCertificate
-			}
-		default:
+		t, ok := tr.(*http.Transport)
+		if !ok {
 			return nil, errors.Errorf("unsupported transport type %T", tr)
+		}
+		if t.TLSClientConfig == nil {
+			t.TLSClientConfig = &tls.Config{
+				MinVersion: tls.VersionTLS12,
+			}
+		}
+		if len(t.TLSClientConfig.Certificates) == 0 && t.TLSClientConfig.GetClientCertificate == nil {
+			t.TLSClientConfig.Certificates = []tls.Certificate{o.certificate}
+			t.TLSClientConfig.GetClientCertificate = o.getClientCertificate
 		}
 	}
 
@@ -366,7 +354,7 @@ func WithCertificate(cert tls.Certificate) ClientOption {
 
 // WithAdminX5C will set the given file as the X5C certificate for use
 // by the client.
-func WithAdminX5C(certs []*x509.Certificate, key interface{}, passwordFile string) ClientOption {
+func WithAdminX5C(certs []*x509.Certificate, key any, passwordFile string) ClientOption {
 	return func(o *clientOptions) error {
 		// Get private key from given key file
 		var (
@@ -431,9 +419,8 @@ func getTransportFromFile(filename string) (http.RoundTripper, error) {
 		return nil, errors.Errorf("error parsing %s: no certificates found", filename)
 	}
 	return getDefaultTransport(&tls.Config{
-		MinVersion:               tls.VersionTLS12,
-		PreferServerCipherSuites: true,
-		RootCAs:                  pool,
+		MinVersion: tls.VersionTLS12,
+		RootCAs:    pool,
 	}), nil
 }
 
@@ -450,9 +437,8 @@ func getTransportFromSHA256(endpoint, sum string) (http.RoundTripper, error) {
 	pool := x509.NewCertPool()
 	pool.AddCert(root.RootPEM.Certificate)
 	return getDefaultTransport(&tls.Config{
-		MinVersion:               tls.VersionTLS12,
-		PreferServerCipherSuites: true,
-		RootCAs:                  pool,
+		MinVersion: tls.VersionTLS12,
+		RootCAs:    pool,
 	}), nil
 }
 
@@ -462,9 +448,8 @@ func getTransportFromCABundle(bundle []byte) (http.RoundTripper, error) {
 		return nil, errors.New("error parsing ca bundle: no certificates found")
 	}
 	return getDefaultTransport(&tls.Config{
-		MinVersion:               tls.VersionTLS12,
-		PreferServerCipherSuites: true,
-		RootCAs:                  pool,
+		MinVersion: tls.VersionTLS12,
+		RootCAs:    pool,
 	}), nil
 }
 
@@ -640,20 +625,10 @@ func (c *Client) GetCaURL() string {
 // GetRootCAs returns the RootCAs certificate pool from the configured
 // transport.
 func (c *Client) GetRootCAs() *x509.CertPool {
-	switch t := c.client.GetTransport().(type) {
-	case *http.Transport:
-		if t.TLSClientConfig != nil {
-			return t.TLSClientConfig.RootCAs
-		}
-		return nil
-	case *http2.Transport:
-		if t.TLSClientConfig != nil {
-			return t.TLSClientConfig.RootCAs
-		}
-		return nil
-	default:
-		return nil
+	if t, ok := c.client.GetTransport().(*http.Transport); ok && t.TLSClientConfig != nil {
+		return t.TLSClientConfig.RootCAs
 	}
+	return nil
 }
 
 // SetTransport updates the transport of the internal HTTP client.
@@ -1569,7 +1544,7 @@ func getRootCAPath() string {
 	return filepath.Join(step.Path(), "certs", "root_ca.crt")
 }
 
-func readJSON(r io.ReadCloser, v interface{}) error {
+func readJSON(r io.ReadCloser, v any) error {
 	defer r.Close()
 	return json.NewDecoder(r).Decode(v)
 }
