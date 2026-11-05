@@ -241,7 +241,7 @@ func mustNebulaToken(t *testing.T, sub, iss, aud string, iat time.Time, sans []s
 		},
 		SANS: sans,
 	}
-	tok, err := jose.Signed(sig).Claims(claims).CompactSerialize()
+	tok, err := jose.Signed(sig).Claims(claims).Serialize()
 	require.NoError(t, err)
 
 	return tok
@@ -282,7 +282,7 @@ func mustNebulaSSHToken(t *testing.T, sub, iss, aud string, iat time.Time, opts 
 		}
 	}
 
-	tok, err := jose.Signed(sig).Claims(claims).CompactSerialize()
+	tok, err := jose.Signed(sig).Claims(claims).Serialize()
 	require.NoError(t, err)
 
 	return tok

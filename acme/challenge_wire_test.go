@@ -280,7 +280,7 @@ MCowBQYDK2VwAyEA5c+4NKZSNQcR1T8qN6SjwgdPZQ0Ge12Ylx/YeGAJ35k=
 									assert.Equal(t, "urn:ietf:params:acme:error:rejectedIdentifier", k.Type)
 									assert.Equal(t, "The server will not issue certificates for the identifier", k.Detail)
 									assert.Equal(t, 400, k.Status)
-									assert.Equal(t, `failed validating Wire access token: failed parsing token: go-jose/go-jose: compact JWS format must have three parts`, k.Err.Error())
+									assert.Equal(t, `failed validating Wire access token: failed parsing token: go-jose/go-jose: empty input`, k.Err.Error())
 								}
 							}
 							return nil

@@ -102,7 +102,7 @@ func (i *x5cIssuer) createToken(aud, sub string, sans []string, info *raInfo) (s
 		})
 	}
 
-	tok, err := builder.CompactSerialize()
+	tok, err := builder.Serialize()
 	if err != nil {
 		return "", errors.Wrap(err, "error signing token")
 	}

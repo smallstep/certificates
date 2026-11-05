@@ -291,7 +291,7 @@ func (p *AWS) GetIdentityToken(subject, caURL string) (string, error) {
 		},
 	}
 
-	tok, err := jose.Signed(signer).Claims(payload).CompactSerialize()
+	tok, err := jose.Signed(signer).Claims(payload).Serialize()
 	if err != nil {
 		return "", errors.Wrap(err, "error serializing token")
 	}

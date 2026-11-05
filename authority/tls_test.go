@@ -1551,7 +1551,7 @@ func TestAuthority_Revoke(t *testing.T) {
 				Audience:  validAudience,
 				ID:        "44",
 			}
-			raw, err := jose.Signed(sig).Claims(cl).CompactSerialize()
+			raw, err := jose.Signed(sig).Claims(cl).Serialize()
 			require.NoError(t, err)
 
 			return test{
@@ -1591,7 +1591,7 @@ func TestAuthority_Revoke(t *testing.T) {
 				Audience:  validAudience,
 				ID:        "44",
 			}
-			raw, err := jose.Signed(sig).Claims(cl).CompactSerialize()
+			raw, err := jose.Signed(sig).Claims(cl).Serialize()
 			require.NoError(t, err)
 
 			return test{
@@ -1631,7 +1631,7 @@ func TestAuthority_Revoke(t *testing.T) {
 				Audience:  validAudience,
 				ID:        "44",
 			}
-			raw, err := jose.Signed(sig).Claims(cl).CompactSerialize()
+			raw, err := jose.Signed(sig).Claims(cl).Serialize()
 			require.NoError(t, err)
 
 			return test{
@@ -1670,7 +1670,7 @@ func TestAuthority_Revoke(t *testing.T) {
 				Audience:  validAudience,
 				ID:        "44",
 			}
-			raw, err := jose.Signed(sig).Claims(cl).CompactSerialize()
+			raw, err := jose.Signed(sig).Claims(cl).Serialize()
 			require.NoError(t, err)
 			return test{
 				auth: _a,
@@ -1706,7 +1706,7 @@ func TestAuthority_Revoke(t *testing.T) {
 				Audience:  validAudience,
 				ID:        "44",
 			}
-			raw, err := jose.Signed(sig).Claims(cl).CompactSerialize()
+			raw, err := jose.Signed(sig).Claims(cl).Serialize()
 			require.NoError(t, err)
 			return test{
 				auth: _a,
@@ -1798,7 +1798,7 @@ func TestAuthority_Revoke(t *testing.T) {
 				Audience:  validAudience,
 				ID:        "44",
 			}
-			raw, err := jose.Signed(sig).Claims(cl).CompactSerialize()
+			raw, err := jose.Signed(sig).Claims(cl).Serialize()
 			require.NoError(t, err)
 			return test{
 				auth: a,
@@ -2024,7 +2024,7 @@ func TestAuthority_CRL(t *testing.T) {
 					Audience:  validAudience,
 					ID:        sn,
 				}
-				raw, err := jose.Signed(sig).Claims(cl).CompactSerialize()
+				raw, err := jose.Signed(sig).Claims(cl).Serialize()
 				require.NoError(t, err)
 				err = a.Revoke(crlCtx, &RevokeOptions{
 					Serial:     sn,
@@ -2088,7 +2088,7 @@ func TestAuthority_CRL(t *testing.T) {
 					Audience:  validAudience,
 					ID:        sn,
 				}
-				raw, err := jose.Signed(sig).Claims(cl).CompactSerialize()
+				raw, err := jose.Signed(sig).Claims(cl).Serialize()
 				require.NoError(t, err)
 				err = a.Revoke(crlCtx, &RevokeOptions{
 					Serial:     sn,

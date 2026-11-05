@@ -86,7 +86,7 @@ func generateToken(sub, iss, aud string, sans []string, iat time.Time, jwk *jose
 		},
 		SANS: sans,
 	}
-	return jose.Signed(sig).Claims(claims).CompactSerialize()
+	return jose.Signed(sig).Claims(claims).Serialize()
 }
 
 func generateCustomToken(sub, iss, aud string, jwk *jose.JSONWebKey, extraHeaders, extraClaims map[string]any) (string, error) {
@@ -119,7 +119,7 @@ func generateCustomToken(sub, iss, aud string, jwk *jose.JSONWebKey, extraHeader
 		Audience:  []string{aud},
 	}
 
-	return jose.Signed(sig).Claims(claims).Claims(extraClaims).CompactSerialize()
+	return jose.Signed(sig).Claims(claims).Claims(extraClaims).Serialize()
 }
 
 func TestAuthority_authorizeToken(t *testing.T) {
@@ -162,7 +162,7 @@ func TestAuthority_authorizeToken(t *testing.T) {
 				Audience:  validAudience,
 				ID:        "43",
 			}
-			raw, err := jose.Signed(sig).Claims(cl).CompactSerialize()
+			raw, err := jose.Signed(sig).Claims(cl).Serialize()
 			assert.FatalError(t, err)
 			return &authorizeTest{
 				auth:  a,
@@ -184,7 +184,7 @@ func TestAuthority_authorizeToken(t *testing.T) {
 				(&jose.SignerOptions{}).WithType("JWT").WithHeader("kid", "foo"))
 			assert.FatalError(t, err)
 
-			raw, err := jose.Signed(_sig).Claims(cl).CompactSerialize()
+			raw, err := jose.Signed(_sig).Claims(cl).Serialize()
 			assert.FatalError(t, err)
 			return &authorizeTest{
 				auth:  a,
@@ -203,7 +203,7 @@ func TestAuthority_authorizeToken(t *testing.T) {
 				Audience:  []string{"acme/acme"},
 				ID:        "45",
 			}
-			raw, err := jose.Signed(sig).Claims(cl).CompactSerialize()
+			raw, err := jose.Signed(sig).Claims(cl).Serialize()
 			assert.FatalError(t, err)
 			return &authorizeTest{
 				auth:  a,
@@ -221,7 +221,7 @@ func TestAuthority_authorizeToken(t *testing.T) {
 				Audience:  validAudience,
 				ID:        "43",
 			}
-			raw, err := jose.Signed(sig).Claims(cl).CompactSerialize()
+			raw, err := jose.Signed(sig).Claims(cl).Serialize()
 			assert.FatalError(t, err)
 			return &authorizeTest{
 				auth:  a,
@@ -238,7 +238,7 @@ func TestAuthority_authorizeToken(t *testing.T) {
 				Audience:  validAudience,
 				ID:        "43",
 			}
-			raw, err := jose.Signed(sig).Claims(cl).CompactSerialize()
+			raw, err := jose.Signed(sig).Claims(cl).Serialize()
 			assert.FatalError(t, err)
 			_, err = _a.authorizeToken(context.Background(), raw)
 			assert.FatalError(t, err)
@@ -257,7 +257,7 @@ func TestAuthority_authorizeToken(t *testing.T) {
 				Expiry:    jose.NewNumericDate(now.Add(time.Minute)),
 				Audience:  validAudience,
 			}
-			raw, err := jose.Signed(sig).Claims(cl).CompactSerialize()
+			raw, err := jose.Signed(sig).Claims(cl).Serialize()
 			assert.FatalError(t, err)
 			return &authorizeTest{
 				auth:  a,
@@ -273,7 +273,7 @@ func TestAuthority_authorizeToken(t *testing.T) {
 				Expiry:    jose.NewNumericDate(now.Add(time.Minute)),
 				Audience:  validAudience,
 			}
-			raw, err := jose.Signed(sig).Claims(cl).CompactSerialize()
+			raw, err := jose.Signed(sig).Claims(cl).Serialize()
 			assert.FatalError(t, err)
 			_, err = _a.authorizeToken(context.Background(), raw)
 			assert.FatalError(t, err)
@@ -300,7 +300,7 @@ func TestAuthority_authorizeToken(t *testing.T) {
 				Audience:  validAudience,
 				ID:        "43",
 			}
-			raw, err := jose.Signed(sig).Claims(cl).CompactSerialize()
+			raw, err := jose.Signed(sig).Claims(cl).Serialize()
 			assert.FatalError(t, err)
 			return &authorizeTest{
 				auth:  _a,
@@ -323,7 +323,7 @@ func TestAuthority_authorizeToken(t *testing.T) {
 				Audience:  validAudience,
 				ID:        "43",
 			}
-			raw, err := jose.Signed(sig).Claims(cl).CompactSerialize()
+			raw, err := jose.Signed(sig).Claims(cl).Serialize()
 			assert.FatalError(t, err)
 			return &authorizeTest{
 				auth:  _a,
@@ -348,7 +348,7 @@ func TestAuthority_authorizeToken(t *testing.T) {
 				Audience:  validAudience,
 				ID:        "43",
 			}
-			raw, err := jose.Signed(sig).Claims(cl).CompactSerialize()
+			raw, err := jose.Signed(sig).Claims(cl).Serialize()
 			assert.FatalError(t, err)
 			return &authorizeTest{
 				auth:  _a,
@@ -366,7 +366,7 @@ func TestAuthority_authorizeToken(t *testing.T) {
 				Audience:  validAudience,
 				ID:        uuid.NewString(),
 			}
-			raw, err := jose.Signed(sig).Claims(cl).CompactSerialize()
+			raw, err := jose.Signed(sig).Claims(cl).Serialize()
 			assert.FatalError(t, err)
 			return &authorizeTest{
 				auth:  a,
@@ -437,7 +437,7 @@ func TestAuthority_authorizeRevoke(t *testing.T) {
 				Audience:  validAudience,
 				ID:        "43",
 			}
-			raw, err := jose.Signed(sig).Claims(cl).CompactSerialize()
+			raw, err := jose.Signed(sig).Claims(cl).Serialize()
 			assert.FatalError(t, err)
 			return &authorizeTest{
 				auth:  a,
@@ -455,7 +455,7 @@ func TestAuthority_authorizeRevoke(t *testing.T) {
 				Audience:  validAudience,
 				ID:        "44",
 			}
-			raw, err := jose.Signed(sig).Claims(cl).CompactSerialize()
+			raw, err := jose.Signed(sig).Claims(cl).Serialize()
 			assert.FatalError(t, err)
 			return &authorizeTest{
 				auth:  a,
@@ -521,7 +521,7 @@ func TestAuthority_authorizeSign(t *testing.T) {
 				Audience:  validAudience,
 				ID:        "43",
 			}
-			raw, err := jose.Signed(sig).Claims(cl).CompactSerialize()
+			raw, err := jose.Signed(sig).Claims(cl).Serialize()
 			assert.FatalError(t, err)
 			return &authorizeTest{
 				auth:  a,
@@ -539,7 +539,7 @@ func TestAuthority_authorizeSign(t *testing.T) {
 				Audience:  validAudience,
 				ID:        "44",
 			}
-			raw, err := jose.Signed(sig).Claims(cl).CompactSerialize()
+			raw, err := jose.Signed(sig).Claims(cl).Serialize()
 			assert.FatalError(t, err)
 			return &authorizeTest{
 				auth:  a,
@@ -617,7 +617,7 @@ func TestAuthority_Authorize(t *testing.T) {
 				Audience:  testAudiences.Sign,
 				ID:        "1",
 			}
-			token, err := jose.Signed(sig).Claims(cl).CompactSerialize()
+			token, err := jose.Signed(sig).Claims(cl).Serialize()
 			assert.FatalError(t, err)
 			return &authorizeTest{
 				auth:  a,
@@ -643,7 +643,7 @@ func TestAuthority_Authorize(t *testing.T) {
 				Audience:  testAudiences.Revoke,
 				ID:        "2",
 			}
-			token, err := jose.Signed(sig).Claims(cl).CompactSerialize()
+			token, err := jose.Signed(sig).Claims(cl).Serialize()
 			assert.FatalError(t, err)
 			return &authorizeTest{
 				auth:  a,
@@ -743,7 +743,7 @@ func TestAuthority_Authorize(t *testing.T) {
 				Audience:  testAudiences.SSHRevoke,
 				ID:        "3",
 			}
-			token, err := jose.Signed(sig).Claims(cl).CompactSerialize()
+			token, err := jose.Signed(sig).Claims(cl).Serialize()
 			assert.FatalError(t, err)
 			return &authorizeTest{
 				auth:  a,
@@ -1008,7 +1008,7 @@ func generateSSHToken(sub, iss, aud string, iat time.Time, sshOpts *provisioner.
 			SSH: sshOpts,
 		},
 	}
-	return jose.Signed(sig).Claims(claims).CompactSerialize()
+	return jose.Signed(sig).Claims(claims).Serialize()
 }
 
 func createSSHCert(cert *ssh.Certificate, signer ssh.Signer) (*ssh.Certificate, *jose.JSONWebKey, error) {
@@ -1072,7 +1072,7 @@ func TestAuthority_authorizeSSHSign(t *testing.T) {
 				Audience:  validAudience,
 				ID:        "43",
 			}
-			raw, err := jose.Signed(sig).Claims(cl).CompactSerialize()
+			raw, err := jose.Signed(sig).Claims(cl).Serialize()
 			assert.FatalError(t, err)
 			return &authorizeTest{
 				auth:  a,
@@ -1166,7 +1166,7 @@ func TestAuthority_authorizeSSHRenew(t *testing.T) {
 				Audience:  testAudiences.SSHRenew,
 				ID:        "43",
 			}
-			raw, err := jose.Signed(sig).Claims(cl).CompactSerialize()
+			raw, err := jose.Signed(sig).Claims(cl).Serialize()
 			assert.FatalError(t, err)
 			return &authorizeTest{
 				auth:  a,
@@ -1274,7 +1274,7 @@ func TestAuthority_authorizeSSHRevoke(t *testing.T) {
 				Audience:  testAudiences.SSHRevoke,
 				ID:        "43",
 			}
-			raw, err := jose.Signed(sig).Claims(cl).CompactSerialize()
+			raw, err := jose.Signed(sig).Claims(cl).Serialize()
 			assert.FatalError(t, err)
 			return &authorizeTest{
 				auth:  a,
@@ -1366,7 +1366,7 @@ func TestAuthority_authorizeSSHRekey(t *testing.T) {
 				Audience:  testAudiences.SSHRekey,
 				ID:        "43",
 			}
-			raw, err := jose.Signed(sig).Claims(cl).CompactSerialize()
+			raw, err := jose.Signed(sig).Claims(cl).Serialize()
 			assert.FatalError(t, err)
 			return &authorizeTest{
 				auth:  a,
@@ -1463,7 +1463,7 @@ func TestAuthority_AuthorizeRenewToken(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		s, err := jose.Signed(sig).Claims(claims).CompactSerialize()
+		s, err := jose.Signed(sig).Claims(claims).Serialize()
 		if err != nil {
 			t.Fatal(err)
 		}

@@ -201,10 +201,10 @@ func TestProvisioner_Token(t *testing.T) {
 					return
 				}
 				if err := claims.ValidateWithLeeway(jose.Expected{
-					Audience: []string{"https://127.0.0.1:9000/1.0/sign"},
-					Issuer:   tt.fields.name,
-					Subject:  tt.args.subject,
-					Time:     time.Now().UTC(),
+					AnyAudience: []string{"https://127.0.0.1:9000/1.0/sign"},
+					Issuer:      tt.fields.name,
+					Subject:     tt.args.subject,
+					Time:        time.Now().UTC(),
 				}, time.Minute); err != nil {
 					t.Error(err)
 					return
@@ -297,10 +297,10 @@ func TestProvisioner_IPv6Token(t *testing.T) {
 					return
 				}
 				if err := claims.ValidateWithLeeway(jose.Expected{
-					Audience: []string{"https://[::1]:9000/1.0/sign"},
-					Issuer:   tt.fields.name,
-					Subject:  tt.args.subject,
-					Time:     time.Now().UTC(),
+					AnyAudience: []string{"https://[::1]:9000/1.0/sign"},
+					Issuer:      tt.fields.name,
+					Subject:     tt.args.subject,
+					Time:        time.Now().UTC(),
 				}, time.Minute); err != nil {
 					t.Error(err)
 					return
@@ -395,10 +395,10 @@ func TestProvisioner_SSHToken(t *testing.T) {
 					return
 				}
 				if err := claims.ValidateWithLeeway(jose.Expected{
-					Audience: []string{"https://127.0.0.1:9000/1.0/ssh/sign"},
-					Issuer:   tt.fields.name,
-					Subject:  tt.args.keyID,
-					Time:     time.Now().UTC(),
+					AnyAudience: []string{"https://127.0.0.1:9000/1.0/ssh/sign"},
+					Issuer:      tt.fields.name,
+					Subject:     tt.args.keyID,
+					Time:        time.Now().UTC(),
 				}, time.Minute); err != nil {
 					t.Error(err)
 					return

@@ -1018,7 +1018,7 @@ func Test_Renew(t *testing.T) {
 		t.Fatal(err)
 	}
 	generateX5cToken := func(claims jose.Claims) string {
-		s, err := jose.Signed(sig).Claims(claims).CompactSerialize()
+		s, err := jose.Signed(sig).Claims(claims).Serialize()
 		if err != nil {
 			t.Fatal(err)
 		}

@@ -214,9 +214,9 @@ func (o *OIDC) ValidatePayload(p openIDPayload) error {
 	// According to "rfc7519 JSON Web Token" acceptable skew should be no more
 	// than a few minutes.
 	if err := p.ValidateWithLeeway(jose.Expected{
-		Issuer:   o.configuration.Issuer,
-		Audience: jose.Audience{o.ClientID},
-		Time:     time.Now().UTC(),
+		Issuer:      o.configuration.Issuer,
+		AnyAudience: jose.Audience{o.ClientID},
+		Time:        time.Now().UTC(),
 	}, time.Minute); err != nil {
 		return errs.Wrap(http.StatusUnauthorized, err, "validatePayload: failed to validate oidc token payload")
 	}

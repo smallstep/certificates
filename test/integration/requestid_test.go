@@ -245,7 +245,7 @@ func generateOTT(t *testing.T, jwk *jose.JSONWebKey, subject string) string {
 		},
 		SANS: []string{subject},
 	}
-	raw, err := jose.Signed(signer).Claims(cl).CompactSerialize()
+	raw, err := jose.Signed(signer).Claims(cl).Serialize()
 	require.NoError(t, err)
 
 	return raw
