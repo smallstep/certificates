@@ -191,7 +191,7 @@ ZEp7knvU2psWRw==
 				},
 				SANS: []string{"invalid"},
 			}
-			raw, err := jose.Signed(sig).Claims(cl).CompactSerialize()
+			raw, err := jose.Signed(sig).Claims(cl).Serialize()
 			assert.FatalError(t, err)
 			csr, err := getCSR(priv)
 			assert.FatalError(t, err)
@@ -224,7 +224,7 @@ ZEp7knvU2psWRw==
 				},
 				SANS: []string{"test.smallstep.com"},
 			}
-			raw, err := jose.Signed(sig).Claims(cl).CompactSerialize()
+			raw, err := jose.Signed(sig).Claims(cl).Serialize()
 			assert.FatalError(t, err)
 			csr, err := getCSR(priv)
 			assert.FatalError(t, err)
@@ -257,7 +257,7 @@ ZEp7knvU2psWRw==
 					ID:        jti,
 				},
 			}
-			raw, err := jose.Signed(sig).Claims(cl).CompactSerialize()
+			raw, err := jose.Signed(sig).Claims(cl).Serialize()
 			assert.FatalError(t, err)
 			csr, err := getCSR(priv)
 			assert.FatalError(t, err)

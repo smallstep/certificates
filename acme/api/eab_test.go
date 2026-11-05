@@ -92,7 +92,7 @@ func TestHandler_validateExternalAccountBinding(t *testing.T) {
 			jwk, err := jose.GenerateJWK("EC", "P-256", "ES256", "sig", "", 0)
 			assert.FatalError(t, err)
 			url := fmt.Sprintf("%s/acme/%s/account/new-account", baseURL.String(), escProvName)
-			rawEABJWS, err := createRawEABJWS(jwk, []byte{1, 3, 3, 7}, "eakID", url)
+			rawEABJWS, err := createRawEABJWS(jwk, mustHMACKey(t, 32), "eakID", url)
 			assert.FatalError(t, err)
 			eab := &ExternalAccountBinding{}
 			err = json.Unmarshal(rawEABJWS, &eab)
@@ -115,7 +115,8 @@ func TestHandler_validateExternalAccountBinding(t *testing.T) {
 			jwk, err := jose.GenerateJWK("EC", "P-256", "ES256", "sig", "", 0)
 			assert.FatalError(t, err)
 			url := fmt.Sprintf("%s/acme/%s/account/new-account", baseURL.String(), escProvName)
-			rawEABJWS, err := createRawEABJWS(jwk, []byte{1, 3, 3, 7}, "eakID", url)
+			hmacKey := mustHMACKey(t, 32)
+			rawEABJWS, err := createRawEABJWS(jwk, hmacKey, "eakID", url)
 			assert.FatalError(t, err)
 			eab := &ExternalAccountBinding{}
 			err = json.Unmarshal(rawEABJWS, &eab)
@@ -153,7 +154,7 @@ func TestHandler_validateExternalAccountBinding(t *testing.T) {
 							ID:            "eakID",
 							ProvisionerID: provID,
 							Reference:     "testeak",
-							HmacKey:       []byte{1, 3, 3, 7},
+							HmacKey:       hmacKey,
 							CreatedAt:     createdAt,
 						}, nil
 					},
@@ -167,7 +168,7 @@ func TestHandler_validateExternalAccountBinding(t *testing.T) {
 					ID:            "eakID",
 					ProvisionerID: provID,
 					Reference:     "testeak",
-					HmacKey:       []byte{1, 3, 3, 7},
+					HmacKey:       hmacKey,
 					CreatedAt:     createdAt,
 				},
 				err: nil,
@@ -177,7 +178,7 @@ func TestHandler_validateExternalAccountBinding(t *testing.T) {
 			jwk, err := jose.GenerateJWK("EC", "P-256", "ES256", "sig", "", 0)
 			assert.FatalError(t, err)
 			url := fmt.Sprintf("%s/acme/%s/account/new-account", baseURL.String(), escProvName)
-			rawEABJWS, err := createRawEABJWS(jwk, []byte{1, 3, 3, 7}, "eakID", url)
+			rawEABJWS, err := createRawEABJWS(jwk, mustHMACKey(t, 32), "eakID", url)
 			assert.FatalError(t, err)
 			eab := &ExternalAccountBinding{}
 			err = json.Unmarshal(rawEABJWS, &eab)
@@ -201,7 +202,7 @@ func TestHandler_validateExternalAccountBinding(t *testing.T) {
 			jwk, err := jose.GenerateJWK("EC", "P-256", "ES256", "sig", "", 0)
 			assert.FatalError(t, err)
 			url := fmt.Sprintf("%s/acme/%s/account/new-account", baseURL.String(), escProvName)
-			rawEABJWS, err := createRawEABJWS(jwk, []byte{1, 3, 3, 7}, "eakID", url)
+			rawEABJWS, err := createRawEABJWS(jwk, mustHMACKey(t, 32), "eakID", url)
 			assert.FatalError(t, err)
 			eab := &ExternalAccountBinding{}
 			err = json.Unmarshal(rawEABJWS, &eab)
@@ -226,7 +227,7 @@ func TestHandler_validateExternalAccountBinding(t *testing.T) {
 			jwk, err := jose.GenerateJWK("EC", "P-256", "ES256", "sig", "", 0)
 			assert.FatalError(t, err)
 			url := fmt.Sprintf("%s/acme/%s/account/new-account", baseURL.String(), escProvName)
-			rawEABJWS, err := createRawEABJWS(jwk, []byte{1, 3, 3, 7}, "eakID", url)
+			rawEABJWS, err := createRawEABJWS(jwk, mustHMACKey(t, 32), "eakID", url)
 			assert.FatalError(t, err)
 			eab := &ExternalAccountBinding{}
 			err = json.Unmarshal(rawEABJWS, &eab)
@@ -272,7 +273,7 @@ func TestHandler_validateExternalAccountBinding(t *testing.T) {
 			jwk, err := jose.GenerateJWK("EC", "P-256", "ES256", "sig", "", 0)
 			assert.FatalError(t, err)
 			url := fmt.Sprintf("%s/acme/%s/account/new-account", baseURL.String(), escProvName)
-			rawEABJWS, err := createRawEABJWS(jwk, []byte{1, 3, 3, 7}, "eakID", url)
+			rawEABJWS, err := createRawEABJWS(jwk, mustHMACKey(t, 32), "eakID", url)
 			assert.FatalError(t, err)
 			eab := &ExternalAccountBinding{}
 			err = json.Unmarshal(rawEABJWS, &eab)
@@ -319,7 +320,7 @@ func TestHandler_validateExternalAccountBinding(t *testing.T) {
 			jwk, err := jose.GenerateJWK("EC", "P-256", "ES256", "sig", "", 0)
 			assert.FatalError(t, err)
 			url := fmt.Sprintf("%s/acme/%s/account/new-account", baseURL.String(), escProvName)
-			rawEABJWS, err := createRawEABJWS(jwk, []byte{1, 3, 3, 7}, "eakID", url)
+			rawEABJWS, err := createRawEABJWS(jwk, mustHMACKey(t, 32), "eakID", url)
 			assert.FatalError(t, err)
 			eab := &ExternalAccountBinding{}
 			err = json.Unmarshal(rawEABJWS, &eab)
@@ -368,7 +369,7 @@ func TestHandler_validateExternalAccountBinding(t *testing.T) {
 			jwk, err := jose.GenerateJWK("EC", "P-256", "ES256", "sig", "", 0)
 			assert.FatalError(t, err)
 			url := fmt.Sprintf("%s/acme/%s/account/new-account", baseURL.String(), escProvName)
-			rawEABJWS, err := createRawEABJWS(jwk, []byte{1, 3, 3, 7}, "eakID", url)
+			rawEABJWS, err := createRawEABJWS(jwk, mustHMACKey(t, 32), "eakID", url)
 			assert.FatalError(t, err)
 			eab := &ExternalAccountBinding{}
 			err = json.Unmarshal(rawEABJWS, &eab)
@@ -417,7 +418,7 @@ func TestHandler_validateExternalAccountBinding(t *testing.T) {
 			jwk, err := jose.GenerateJWK("EC", "P-256", "ES256", "sig", "", 0)
 			assert.FatalError(t, err)
 			url := fmt.Sprintf("%s/acme/%s/account/new-account", baseURL.String(), escProvName)
-			rawEABJWS, err := createRawEABJWS(jwk, []byte{1, 3, 3, 7}, "eakID", url)
+			rawEABJWS, err := createRawEABJWS(jwk, mustHMACKey(t, 32), "eakID", url)
 			assert.FatalError(t, err)
 			eab := &ExternalAccountBinding{}
 			err = json.Unmarshal(rawEABJWS, &eab)
@@ -466,7 +467,7 @@ func TestHandler_validateExternalAccountBinding(t *testing.T) {
 			jwk, err := jose.GenerateJWK("EC", "P-256", "ES256", "sig", "", 0)
 			assert.FatalError(t, err)
 			url := fmt.Sprintf("%s/acme/%s/account/new-account", baseURL.String(), escProvName)
-			rawEABJWS, err := createRawEABJWS(jwk, []byte{1, 3, 3, 7}, "eakID", url)
+			rawEABJWS, err := createRawEABJWS(jwk, mustHMACKey(t, 32), "eakID", url)
 			assert.FatalError(t, err)
 			eab := &ExternalAccountBinding{}
 			err = json.Unmarshal(rawEABJWS, &eab)
@@ -523,7 +524,7 @@ func TestHandler_validateExternalAccountBinding(t *testing.T) {
 			jwk, err := jose.GenerateJWK("EC", "P-256", "ES256", "sig", "", 0)
 			assert.FatalError(t, err)
 			url := fmt.Sprintf("%s/acme/%s/account/new-account", baseURL.String(), escProvName)
-			rawEABJWS, err := createRawEABJWS(jwk, []byte{1, 3, 3, 7}, "eakID", url)
+			rawEABJWS, err := createRawEABJWS(jwk, mustHMACKey(t, 32), "eakID", url)
 			assert.FatalError(t, err)
 			eab := &ExternalAccountBinding{}
 			err = json.Unmarshal(rawEABJWS, &eab)
@@ -570,7 +571,8 @@ func TestHandler_validateExternalAccountBinding(t *testing.T) {
 			jwk, err := jose.GenerateJWK("EC", "P-256", "ES256", "sig", "", 0)
 			assert.FatalError(t, err)
 			url := fmt.Sprintf("%s/acme/%s/account/new-account", baseURL.String(), escProvName)
-			rawEABJWS, err := createRawEABJWS(jwk, []byte{1, 3, 3, 7}, "eakID", url)
+			hmacKey := mustHMACKey(t, 32)
+			rawEABJWS, err := createRawEABJWS(jwk, hmacKey, "eakID", url)
 			assert.FatalError(t, err)
 			eab := &ExternalAccountBinding{}
 			err = json.Unmarshal(rawEABJWS, &eab)
@@ -611,7 +613,7 @@ func TestHandler_validateExternalAccountBinding(t *testing.T) {
 							Reference:     "testeak",
 							CreatedAt:     createdAt,
 							AccountID:     "some-account-id",
-							HmacKey:       []byte{1, 3, 3, 7},
+							HmacKey:       hmacKey,
 							BoundAt:       boundAt,
 						}, nil
 					},
@@ -629,7 +631,7 @@ func TestHandler_validateExternalAccountBinding(t *testing.T) {
 			jwk, err := jose.GenerateJWK("EC", "P-256", "ES256", "sig", "", 0)
 			assert.FatalError(t, err)
 			url := fmt.Sprintf("%s/acme/%s/account/new-account", baseURL.String(), escProvName)
-			rawEABJWS, err := createRawEABJWS(jwk, []byte{1, 3, 3, 7}, "eakID", url)
+			rawEABJWS, err := createRawEABJWS(jwk, mustHMACKey(t, 32), "eakID", url)
 			assert.FatalError(t, err)
 			eab := &ExternalAccountBinding{}
 			err = json.Unmarshal(rawEABJWS, &eab)
@@ -688,7 +690,7 @@ func TestHandler_validateExternalAccountBinding(t *testing.T) {
 			jwk, err := jose.GenerateJWK("EC", "P-256", "ES256", "sig", "", 0)
 			assert.FatalError(t, err)
 			url := fmt.Sprintf("%s/acme/%s/account/new-account", baseURL.String(), escProvName)
-			rawEABJWS, err := createRawEABJWS(jwk, []byte{1, 3, 3, 7}, "eakID", url)
+			rawEABJWS, err := createRawEABJWS(jwk, mustHMACKey(t, 32), "eakID", url)
 			assert.FatalError(t, err)
 			eab := &ExternalAccountBinding{}
 			err = json.Unmarshal(rawEABJWS, &eab)
@@ -725,7 +727,7 @@ func TestHandler_validateExternalAccountBinding(t *testing.T) {
 							ID:            "eakID",
 							ProvisionerID: provID,
 							Reference:     "testeak",
-							HmacKey:       []byte{1, 2, 3, 4},
+							HmacKey:       mustHMACKey(t, 32),
 							CreatedAt:     time.Now(),
 						}, nil
 					},
@@ -745,7 +747,8 @@ func TestHandler_validateExternalAccountBinding(t *testing.T) {
 			differentJWK, err := jose.GenerateJWK("EC", "P-256", "ES256", "sig", "", 0)
 			assert.FatalError(t, err)
 			url := fmt.Sprintf("%s/acme/%s/account/new-account", baseURL.String(), escProvName)
-			rawEABJWS, err := createRawEABJWS(differentJWK, []byte{1, 3, 3, 7}, "eakID", url)
+			hmacKey := mustHMACKey(t, 32)
+			rawEABJWS, err := createRawEABJWS(differentJWK, hmacKey, "eakID", url)
 			assert.FatalError(t, err)
 			eab := &ExternalAccountBinding{}
 			err = json.Unmarshal(rawEABJWS, &eab)
@@ -782,7 +785,7 @@ func TestHandler_validateExternalAccountBinding(t *testing.T) {
 							ID:            "eakID",
 							ProvisionerID: provID,
 							Reference:     "testeak",
-							HmacKey:       []byte{1, 3, 3, 7},
+							HmacKey:       hmacKey,
 							CreatedAt:     time.Now(),
 						}, nil
 					},
@@ -800,7 +803,8 @@ func TestHandler_validateExternalAccountBinding(t *testing.T) {
 			jwk, err := jose.GenerateJWK("EC", "P-256", "ES256", "sig", "", 0)
 			assert.FatalError(t, err)
 			url := fmt.Sprintf("%s/acme/%s/account/new-account", baseURL.String(), escProvName)
-			rawEABJWS, err := createRawEABJWS(jwk, []byte{1, 3, 3, 7}, "eakID", url)
+			hmacKey := mustHMACKey(t, 32)
+			rawEABJWS, err := createRawEABJWS(jwk, hmacKey, "eakID", url)
 			assert.FatalError(t, err)
 			eab := &ExternalAccountBinding{}
 			err = json.Unmarshal(rawEABJWS, &eab)
@@ -836,7 +840,7 @@ func TestHandler_validateExternalAccountBinding(t *testing.T) {
 							ID:            "eakID",
 							ProvisionerID: provID,
 							Reference:     "testeak",
-							HmacKey:       []byte{1, 3, 3, 7},
+							HmacKey:       hmacKey,
 							CreatedAt:     time.Now(),
 						}, nil
 					},
@@ -854,7 +858,8 @@ func TestHandler_validateExternalAccountBinding(t *testing.T) {
 			jwk, err := jose.GenerateJWK("EC", "P-256", "ES256", "sig", "", 0)
 			assert.FatalError(t, err)
 			url := fmt.Sprintf("%s/acme/%s/account/new-account", baseURL.String(), escProvName)
-			rawEABJWS, err := createRawEABJWS(jwk, []byte{1, 3, 3, 7}, "eakID", url)
+			hmacKey := mustHMACKey(t, 32)
+			rawEABJWS, err := createRawEABJWS(jwk, hmacKey, "eakID", url)
 			assert.FatalError(t, err)
 			eab := &ExternalAccountBinding{}
 			err = json.Unmarshal(rawEABJWS, &eab)
@@ -891,7 +896,7 @@ func TestHandler_validateExternalAccountBinding(t *testing.T) {
 							ID:            "eakID",
 							ProvisionerID: provID,
 							Reference:     "testeak",
-							HmacKey:       []byte{1, 3, 3, 7},
+							HmacKey:       hmacKey,
 							CreatedAt:     time.Now(),
 						}, nil
 					},
@@ -966,7 +971,7 @@ func Test_validateEABJWS(t *testing.T) {
 			jwk, err := jose.GenerateJWK("EC", "P-256", "ES256", "sig", "", 0)
 			assert.FatalError(t, err)
 			url := fmt.Sprintf("%s/acme/%s/account/new-account", baseURL.String(), escProvName)
-			eabJWS, err := createEABJWS(jwk, []byte{1, 3, 3, 7}, "eakID", url)
+			eabJWS, err := createEABJWS(jwk, mustHMACKey(t, 32), "eakID", url)
 			assert.FatalError(t, err)
 			eabJWS.Signatures = append(eabJWS.Signatures, jose.Signature{})
 			return test{
@@ -978,7 +983,7 @@ func Test_validateEABJWS(t *testing.T) {
 			jwk, err := jose.GenerateJWK("EC", "P-256", "ES256", "sig", "", 0)
 			assert.FatalError(t, err)
 			url := fmt.Sprintf("%s/acme/%s/account/new-account", baseURL.String(), escProvName)
-			eabJWS, err := createEABJWS(jwk, []byte{1, 3, 3, 7}, "eakID", url)
+			eabJWS, err := createEABJWS(jwk, mustHMACKey(t, 32), "eakID", url)
 			assert.FatalError(t, err)
 			eabJWS.Signatures[0].Protected.Algorithm = "HS42"
 			return test{
@@ -990,7 +995,7 @@ func Test_validateEABJWS(t *testing.T) {
 			jwk, err := jose.GenerateJWK("EC", "P-256", "ES256", "sig", "", 0)
 			assert.FatalError(t, err)
 			url := fmt.Sprintf("%s/acme/%s/account/new-account", baseURL.String(), escProvName)
-			eabJWS, err := createEABJWS(jwk, []byte{1, 3, 3, 7}, "eakID", url)
+			eabJWS, err := createEABJWS(jwk, mustHMACKey(t, 32), "eakID", url)
 			assert.FatalError(t, err)
 			eabJWS.Signatures[0].Protected.KeyID = ""
 			return test{
@@ -1002,7 +1007,7 @@ func Test_validateEABJWS(t *testing.T) {
 			jwk, err := jose.GenerateJWK("EC", "P-256", "ES256", "sig", "", 0)
 			assert.FatalError(t, err)
 			url := fmt.Sprintf("%s/acme/%s/account/new-account", baseURL.String(), escProvName)
-			eabJWS, err := createEABJWS(jwk, []byte{1, 3, 3, 7}, "eakID", url)
+			eabJWS, err := createEABJWS(jwk, mustHMACKey(t, 32), "eakID", url)
 			assert.FatalError(t, err)
 			eabJWS.Signatures[0].Protected.Nonce = "some-bogus-nonce"
 			return test{
@@ -1014,7 +1019,7 @@ func Test_validateEABJWS(t *testing.T) {
 			jwk, err := jose.GenerateJWK("EC", "P-256", "ES256", "sig", "", 0)
 			assert.FatalError(t, err)
 			url := fmt.Sprintf("%s/acme/%s/account/new-account", baseURL.String(), escProvName)
-			eabJWS, err := createEABJWS(jwk, []byte{1, 3, 3, 7}, "eakID", url)
+			eabJWS, err := createEABJWS(jwk, mustHMACKey(t, 32), "eakID", url)
 			assert.FatalError(t, err)
 			delete(eabJWS.Signatures[0].Protected.ExtraHeaders, "url")
 			return test{
@@ -1026,7 +1031,7 @@ func Test_validateEABJWS(t *testing.T) {
 			jwk, err := jose.GenerateJWK("EC", "P-256", "ES256", "sig", "", 0)
 			assert.FatalError(t, err)
 			url := fmt.Sprintf("%s/acme/%s/account/new-account", baseURL.String(), escProvName)
-			eabJWS, err := createEABJWS(jwk, []byte{1, 3, 3, 7}, "eakID", url)
+			eabJWS, err := createEABJWS(jwk, mustHMACKey(t, 32), "eakID", url)
 			assert.FatalError(t, err)
 			ctx := context.WithValue(context.TODO(), jwsContextKey, nil)
 			return test{
@@ -1039,7 +1044,7 @@ func Test_validateEABJWS(t *testing.T) {
 			jwk, err := jose.GenerateJWK("EC", "P-256", "ES256", "sig", "", 0)
 			assert.FatalError(t, err)
 			url := fmt.Sprintf("%s/acme/%s/account/new-account", baseURL.String(), escProvName)
-			eabJWS, err := createEABJWS(jwk, []byte{1, 3, 3, 7}, "eakID", url)
+			eabJWS, err := createEABJWS(jwk, mustHMACKey(t, 32), "eakID", url)
 			assert.FatalError(t, err)
 			rawEABJWS := eabJWS.FullSerialize()
 			assert.FatalError(t, err)
@@ -1077,7 +1082,7 @@ func Test_validateEABJWS(t *testing.T) {
 			jwk, err := jose.GenerateJWK("EC", "P-256", "ES256", "sig", "", 0)
 			assert.FatalError(t, err)
 			url := fmt.Sprintf("%s/acme/%s/account/new-account", baseURL.String(), escProvName)
-			eabJWS, err := createEABJWS(jwk, []byte{1, 3, 3, 7}, "eakID", url)
+			eabJWS, err := createEABJWS(jwk, mustHMACKey(t, 32), "eakID", url)
 			assert.FatalError(t, err)
 			rawEABJWS := eabJWS.FullSerialize()
 			assert.FatalError(t, err)
@@ -1114,7 +1119,7 @@ func Test_validateEABJWS(t *testing.T) {
 			jwk, err := jose.GenerateJWK("EC", "P-256", "ES256", "sig", "", 0)
 			assert.FatalError(t, err)
 			url := fmt.Sprintf("%s/acme/%s/account/new-account", baseURL.String(), escProvName)
-			eabJWS, err := createEABJWS(jwk, []byte{1, 3, 3, 7}, "eakID", url)
+			eabJWS, err := createEABJWS(jwk, mustHMACKey(t, 32), "eakID", url)
 			assert.FatalError(t, err)
 			rawEABJWS := eabJWS.FullSerialize()
 			assert.FatalError(t, err)
@@ -1152,7 +1157,7 @@ func Test_validateEABJWS(t *testing.T) {
 			jwk, err := jose.GenerateJWK("EC", "P-256", "ES256", "sig", "", 0)
 			assert.FatalError(t, err)
 			url := fmt.Sprintf("%s/acme/%s/account/new-account", baseURL.String(), escProvName)
-			eabJWS, err := createEABJWS(jwk, []byte{1, 3, 3, 7}, "eakID", url)
+			eabJWS, err := createEABJWS(jwk, mustHMACKey(t, 32), "eakID", url)
 			assert.FatalError(t, err)
 			rawEABJWS := eabJWS.FullSerialize()
 			assert.FatalError(t, err)

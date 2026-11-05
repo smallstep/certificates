@@ -140,7 +140,7 @@ func generateBootstrapToken(ca, subject, sha string) string {
 		},
 		SANS: []string{subject},
 	}
-	raw, err := jose.Signed(sig).Claims(cl).CompactSerialize()
+	raw, err := jose.Signed(sig).Claims(cl).Serialize()
 	if err != nil {
 		panic(err)
 	}

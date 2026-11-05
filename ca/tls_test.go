@@ -53,7 +53,7 @@ func generateOTT(t *testing.T, subject string) string {
 		},
 		SANS: []string{subject},
 	}
-	raw, err := jose.Signed(sig).Claims(cl).CompactSerialize()
+	raw, err := jose.Signed(sig).Claims(cl).Serialize()
 	require.NoError(t, err)
 
 	return raw

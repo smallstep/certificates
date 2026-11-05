@@ -6,10 +6,10 @@ import (
 	"reflect"
 	"testing"
 
-	"github.com/go-jose/go-jose/v3"
 	"github.com/stretchr/testify/assert"
 
 	"github.com/smallstep/linkedca"
+	"go.step.sm/crypto/jose"
 
 	"github.com/smallstep/certificates/authority/admin"
 	"github.com/smallstep/certificates/authority/administrator"

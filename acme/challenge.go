@@ -678,9 +678,9 @@ func parseAndVerifyWireAccessToken(v wireVerifyParams) (*wireAccessToken, *wireD
 	}
 
 	if err := accessToken.ValidateWithLeeway(jose.Expected{
-		Time:     v.t,
-		Issuer:   v.issuer,
-		Audience: jose.Audience{v.audience},
+		Time:        v.t,
+		Issuer:      v.issuer,
+		AnyAudience: jose.Audience{v.audience},
 	}, 1*time.Minute); err != nil {
 		return nil, nil, fmt.Errorf("failed validation: %w", err)
 	}
@@ -724,8 +724,8 @@ func parseAndVerifyWireAccessToken(v wireVerifyParams) (*wireAccessToken, *wireD
 	}
 
 	if err := wireDpop.ValidateWithLeeway(jose.Expected{
-		Time:     v.t,
-		Audience: jose.Audience{v.audience},
+		Time:        v.t,
+		AnyAudience: jose.Audience{v.audience},
 	}, 1*time.Minute); err != nil {
 		return nil, nil, fmt.Errorf("failed DPoP validation: %w", err)
 	}

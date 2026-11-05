@@ -6,10 +6,11 @@ import (
 	"net/http"
 	"testing"
 
-	"github.com/go-jose/go-jose/v3"
-	"github.com/smallstep/certificates/api/render"
 	"github.com/stretchr/testify/assert"
+	"go.step.sm/crypto/jose"
 	"golang.org/x/crypto/ssh"
+
+	"github.com/smallstep/certificates/api/render"
 )
 
 func TestType_String(t *testing.T) {

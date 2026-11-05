@@ -16,8 +16,10 @@ import (
 	"github.com/go-chi/chi/v5"
 	"github.com/google/uuid"
 	"github.com/pkg/errors"
+	"github.com/stretchr/testify/require"
 
 	"go.step.sm/crypto/jose"
+	"go.step.sm/crypto/randutil"
 
 	"github.com/smallstep/assert"
 	"github.com/smallstep/certificates/acme"
@@ -111,6 +113,13 @@ func newACMEProvWithOptions(t *testing.T, options *provisioner.Options) *provisi
 		t.Fatal("not a valid ACME provisioner")
 	}
 	return a
+}
+
+func mustHMACKey(t *testing.T, size int) []byte {
+	t.Helper()
+	b, err := randutil.Bytes(size)
+	require.NoError(t, err)
+	return b
 }
 
 func createEABJWS(jwk *jose.JSONWebKey, hmacKey []byte, keyID, u string) (*jose.JSONWebSignature, error) {
@@ -560,7 +569,7 @@ func TestHandler_NewAccount(t *testing.T) {
 			jwk, err := jose.GenerateJWK("EC", "P-256", "ES256", "sig", "", 0)
 			assert.FatalError(t, err)
 			url := fmt.Sprintf("%s/acme/%s/account/new-account", baseURL.String(), escProvName)
-			rawEABJWS, err := createRawEABJWS(jwk, []byte{1, 3, 3, 7}, "eakID", url)
+			rawEABJWS, err := createRawEABJWS(jwk, mustHMACKey(t, 32), "eakID", url)
 			assert.FatalError(t, err)
 			eab := &ExternalAccountBinding{}
 			err = json.Unmarshal(rawEABJWS, &eab)
@@ -585,7 +594,8 @@ func TestHandler_NewAccount(t *testing.T) {
 			jwk, err := jose.GenerateJWK("EC", "P-256", "ES256", "sig", "", 0)
 			assert.FatalError(t, err)
 			url := fmt.Sprintf("%s/acme/%s/account/new-account", baseURL.String(), escProvName)
-			rawEABJWS, err := createRawEABJWS(jwk, []byte{1, 3, 3, 7}, "eakID", url)
+			hmacKey := mustHMACKey(t, 32)
+			rawEABJWS, err := createRawEABJWS(jwk, hmacKey, "eakID", url)
 			assert.FatalError(t, err)
 			eab := &ExternalAccountBinding{}
 			err = json.Unmarshal(rawEABJWS, &eab)
@@ -620,7 +630,7 @@ func TestHandler_NewAccount(t *testing.T) {
 				ID:            "eakID",
 				ProvisionerID: provID,
 				Reference:     "testeak",
-				HmacKey:       []byte{1, 3, 3, 7},
+				HmacKey:       hmacKey,
 				CreatedAt:     time.Now(),
 			}
 			return test{
@@ -710,7 +720,7 @@ func TestHandler_NewAccount(t *testing.T) {
 			jwk, err := jose.GenerateJWK("EC", "P-256", "ES256", "sig", "", 0)
 			assert.FatalError(t, err)
 			url := fmt.Sprintf("%s/acme/%s/account/new-account", baseURL.String(), escProvName)
-			rawEABJWS, err := createRawEABJWS(jwk, []byte{1, 3, 3, 7}, "eakID", url)
+			rawEABJWS, err := createRawEABJWS(jwk, mustHMACKey(t, 32), "eakID", url)
 			assert.FatalError(t, err)
 			eab := &ExternalAccountBinding{}
 			err = json.Unmarshal(rawEABJWS, &eab)
@@ -750,7 +760,8 @@ func TestHandler_NewAccount(t *testing.T) {
 			jwk, err := jose.GenerateJWK("EC", "P-256", "ES256", "sig", "", 0)
 			assert.FatalError(t, err)
 			url := fmt.Sprintf("%s/acme/%s/account/new-account", baseURL.String(), escProvName)
-			rawEABJWS, err := createRawEABJWS(jwk, []byte{1, 3, 3, 7}, "eakID", url)
+			hmacKey := mustHMACKey(t, 32)
+			rawEABJWS, err := createRawEABJWS(jwk, hmacKey, "eakID", url)
 			assert.FatalError(t, err)
 			eab := &ExternalAccountBinding{}
 			err = json.Unmarshal(rawEABJWS, &eab)
@@ -794,7 +805,7 @@ func TestHandler_NewAccount(t *testing.T) {
 							ID:            "eakID",
 							ProvisionerID: provID,
 							Reference:     "testeak",
-							HmacKey:       []byte{1, 3, 3, 7},
+							HmacKey:       hmacKey,
 							CreatedAt:     time.Now(),
 						}, nil
 					},

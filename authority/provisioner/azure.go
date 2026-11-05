@@ -291,9 +291,9 @@ func (p *Azure) authorizeToken(token string) (*azurePayload, string, string, str
 	}
 
 	if err := claims.ValidateWithLeeway(jose.Expected{
-		Audience: []string{p.Audience},
-		Issuer:   p.oidcConfig.Issuer,
-		Time:     time.Now(),
+		AnyAudience: []string{p.Audience},
+		Issuer:      p.oidcConfig.Issuer,
+		Time:        time.Now(),
 	}, 1*time.Minute); err != nil {
 		return nil, "", "", "", "", errs.Wrap(http.StatusUnauthorized, err, "azure.authorizeToken; failed to validate azure token payload")
 	}

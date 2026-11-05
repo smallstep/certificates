@@ -344,7 +344,7 @@ func TestAzure_authorizeToken(t *testing.T) {
 				Version:          "the-version",
 				XMSMirID:         "foo",
 			}
-			tok, err := jose.Signed(sig).Claims(claims).CompactSerialize()
+			tok, err := jose.Signed(sig).Claims(claims).Serialize()
 			assert.FatalError(t, err)
 			return test{
 				p:     p,

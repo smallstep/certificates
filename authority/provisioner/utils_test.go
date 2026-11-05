@@ -767,7 +767,7 @@ func generateToken(sub, iss, aud, email string, sans []string, iat time.Time, jw
 		Email: email,
 		SANS:  sans,
 	}
-	return jose.Signed(sig).Claims(claims).CompactSerialize()
+	return jose.Signed(sig).Claims(claims).Serialize()
 }
 
 func generateCustomToken(sub, iss, aud string, jwk *jose.JSONWebKey, extraHeaders, extraClaims map[string]any) (string, error) {
@@ -798,7 +798,7 @@ func generateCustomToken(sub, iss, aud string, jwk *jose.JSONWebKey, extraHeader
 		Expiry:    jose.NewNumericDate(iat.Add(5 * time.Minute)),
 		Audience:  []string{aud},
 	}
-	return jose.Signed(sig).Claims(claims).Claims(extraClaims).CompactSerialize()
+	return jose.Signed(sig).Claims(claims).Claims(extraClaims).Serialize()
 }
 
 func generateOIDCToken(sub, iss, aud, email, preferredUsername string, iat time.Time, jwk *jose.JSONWebKey, tokOpts ...tokOption) (string, error) {
@@ -839,7 +839,7 @@ func generateOIDCToken(sub, iss, aud, email, preferredUsername string, iat time.
 		Email:             email,
 		PreferredUsername: preferredUsername,
 	}
-	return jose.Signed(sig).Claims(claims).CompactSerialize()
+	return jose.Signed(sig).Claims(claims).Serialize()
 }
 
 func generateX5CSSHToken(jwk *jose.JSONWebKey, claims *x5cPayload, tokOpts ...tokOption) (string, error) {
@@ -857,7 +857,7 @@ func generateX5CSSHToken(jwk *jose.JSONWebKey, claims *x5cPayload, tokOpts ...to
 	if err != nil {
 		return "", err
 	}
-	return jose.Signed(sig).Claims(claims).CompactSerialize()
+	return jose.Signed(sig).Claims(claims).Serialize()
 }
 
 func getK8sSAPayload() *k8sSAPayload {
@@ -891,7 +891,7 @@ func generateK8sSAToken(jwk *jose.JSONWebKey, claims *k8sSAPayload, tokOpts ...t
 	if claims == nil {
 		claims = getK8sSAPayload()
 	}
-	return jose.Signed(sig).Claims(*claims).CompactSerialize()
+	return jose.Signed(sig).Claims(*claims).Serialize()
 }
 
 func generateSimpleSSHUserToken(iss, aud string, jwk *jose.JSONWebKey) (string, error) {
@@ -939,7 +939,7 @@ func generateSSHToken(sub, iss, aud string, iat time.Time, sshOpts *SignSSHOptio
 			SSH: sshOpts,
 		},
 	}
-	return jose.Signed(sig).Claims(claims).CompactSerialize()
+	return jose.Signed(sig).Claims(claims).Serialize()
 }
 
 func generateGCPToken(sub, iss, aud, instanceID, instanceName, projectID, zone string, iat time.Time, jwk *jose.JSONWebKey) (string, error) {
@@ -977,7 +977,7 @@ func generateGCPToken(sub, iss, aud, instanceID, instanceName, projectID, zone s
 			},
 		},
 	}
-	return jose.Signed(sig).Claims(claims).CompactSerialize()
+	return jose.Signed(sig).Claims(claims).Serialize()
 }
 
 func generateAWSToken(p *AWS, sub, iss, aud, accountID, instanceID, privateIP, region string, iat time.Time, key crypto.Signer) (string, error) {
@@ -1034,7 +1034,7 @@ func generateAWSToken(p *AWS, sub, iss, aud, accountID, instanceID, privateIP, r
 			Signature: signature,
 		},
 	}
-	return jose.Signed(sig).Claims(claims).CompactSerialize()
+	return jose.Signed(sig).Claims(claims).Serialize()
 }
 
 func generateAzureToken(sub, iss, aud, tenantID, subscriptionID, resourceGroup, resourceName, resourceType string, iat time.Time, jwk *jose.JSONWebKey) (string, error) {
@@ -1072,7 +1072,7 @@ func generateAzureToken(sub, iss, aud, tenantID, subscriptionID, resourceGroup, 
 		Version:          "the-version",
 		XMSMirID:         xmsMirID,
 	}
-	return jose.Signed(sig).Claims(claims).CompactSerialize()
+	return jose.Signed(sig).Claims(claims).Serialize()
 }
 
 func parseToken(token string) (*jose.JSONWebToken, *jose.Claims, error) {
