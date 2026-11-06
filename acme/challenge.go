@@ -154,12 +154,12 @@ func http01Validate(ctx context.Context, ch *Challenge, db DB, jwk *jose.JSONWeb
 	vc := MustClientFromContext(ctx)
 	resp, err := vc.Get(challengeURL.String())
 	if err != nil {
-		return storeError(ctx, db, ch, false, WrapError(ErrorConnectionType, err,
+		return storeError(ctx, db, ch, challengeFailFast(ctx), WrapError(ErrorConnectionType, err,
 			"error doing http GET for url %s", u))
 	}
 	defer resp.Body.Close()
 	if resp.StatusCode >= 400 {
-		return storeError(ctx, db, ch, false, NewError(ErrorConnectionType,
+		return storeError(ctx, db, ch, challengeFailFast(ctx), NewError(ErrorConnectionType,
 			"error doing http GET for url %s with status code %d", u, resp.StatusCode))
 	}
 
@@ -268,7 +268,7 @@ func tlsalpn01Validate(ctx context.Context, ch *Challenge, db DB, jwk *jose.JSON
 			return storeError(ctx, db, ch, true, NewError(ErrorRejectedIdentifierType,
 				"cannot negotiate ALPN acme-tls/1 protocol for tls-alpn-01 challenge"))
 		}
-		return storeError(ctx, db, ch, false, WrapError(ErrorConnectionType, err,
+		return storeError(ctx, db, ch, challengeFailFast(ctx), WrapError(ErrorConnectionType, err,
 			"error doing TLS dial for %s", ch.Value))
 	}
 	defer conn.Close()
@@ -1912,6 +1912,19 @@ func KeyAuthorization(token string, jwk *jose.JSONWebKey) (string, error) {
 	}
 	encPrint := base64.RawURLEncoding.EncodeToString(thumbprint)
 	return fmt.Sprintf("%s.%s", token, encPrint), nil
+}
+
+// challengeFailFast reports whether the ACME provisioner in the context wants
+// connection errors during http-01 and tls-alpn-01 validation to mark the
+// challenge invalid right away, instead of leaving it pending for a retry.
+// dns-01 is not affected: there a failed lookup may just be propagation delay.
+func challengeFailFast(ctx context.Context) bool {
+	p, ok := ProvisionerFromContext(ctx)
+	if !ok {
+		return false
+	}
+	ff, ok := p.(interface{ IsChallengeFailFast() bool })
+	return ok && ff.IsChallengeFailFast()
 }
 
 // storeError the given error to an ACME error and saves using the DB interface.
