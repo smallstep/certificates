@@ -1,7 +1,6 @@
 package acme
 
 import (
-	"bytes"
 	"context"
 	"crypto"
 	"crypto/ecdsa"
@@ -788,7 +787,6 @@ type attestationObject struct {
 	AttStatement map[string]any `json:"attStmt,omitempty"`
 }
 
-// TODO(bweeks): move attestation verification to a shared package.
 func deviceAttest01Validate(ctx context.Context, ch *Challenge, db DB, jwk *jose.JSONWebKey, payload []byte) error {
 	// Update challenge with the payload
 	ch.Payload = payload
@@ -814,160 +812,21 @@ func deviceAttest01Validate(ctx context.Context, ch *Challenge, db DB, jwk *jose
 		return storeError(ctx, db, ch, true, NewDetailedError(ErrorBadAttestationStatementType, "failed base64 decoding attObj %q", p.AttObj))
 	}
 
-	if len(attObj) == 0 || bytes.Equal(attObj, []byte("{}")) {
-		return storeError(ctx, db, ch, true, NewDetailedError(ErrorBadAttestationStatementType, "attObj must not be empty"))
+	var prov Provisioner
+	if ctx != nil {
+		prov, _ = ProvisionerFromContext(ctx)
 	}
-
-	cborDecoderOptions := cbor.DecOptions{}
-	cborDecoder, err := cborDecoderOptions.DecMode()
+	data, err := VerifyDeviceAttestation(ctx, prov, DeviceAttestationParams{
+		Token: ch.Token, Identifier: ch.Value, AccountKey: jwk,
+	}, attObj)
 	if err != nil {
-		return WrapErrorISE(err, "failed creating CBOR decoder")
+		if acmeError, ok := errors.AsType[*Error](err); ok && acmeError.Status != 500 {
+			return storeError(ctx, db, ch, true, acmeError)
+		}
+		return err
 	}
-
-	if err := cborDecoder.Wellformed(attObj); err != nil {
-		return storeError(ctx, db, ch, true, NewDetailedError(ErrorBadAttestationStatementType, "attObj is not well formed CBOR: %v", err))
-	}
-
-	att := attestationObject{}
-	if err := cborDecoder.Unmarshal(attObj, &att); err != nil {
-		return WrapErrorISE(err, "failed unmarshalling CBOR")
-	}
-
-	format := att.Format
-	prov := MustProvisionerFromContext(ctx)
-	if !prov.IsAttestationFormatEnabled(ctx, provisioner.ACMEAttestationFormat(format)) {
-		if format != "apple" && format != "step" && format != "tpm" && format != "android-key" {
-			return storeError(ctx, db, ch, true, NewDetailedError(ErrorBadAttestationStatementType, "unsupported attestation object format %q", format))
-		}
-
-		return storeError(ctx, db, ch, true,
-			NewError(ErrorBadAttestationStatementType, "attestation format %q is not enabled", format))
-	}
-
-	switch format {
-	case "android-key":
-		data, err := doAndroidKeyAttestationFormat(ctx, prov, ch, jwk, &att)
-		if err != nil {
-			if acmeError, ok := errors.AsType[*Error](err); ok {
-				if acmeError.Status == 500 {
-					return acmeError
-				}
-				return storeError(ctx, db, ch, true, acmeError)
-			}
-			return WrapErrorISE(err, "error validating attestation")
-		}
-
-		// Enforce hardware security level (TrustedEnvironment or StrongBox; Software not allowed)
-		if data.Attestation.AttestationSecurityLevel < 1 {
-			return storeError(ctx, db, ch, true, NewDetailedError(ErrorBadAttestationStatementType, "insufficient security level: %d", data.Attestation.AttestationSecurityLevel))
-		}
-
-		// Enforce hardware backed device serial
-		if ch.Value != string(data.Attestation.TeeEnforced.AttestationIdSerial) {
-			subproblem := NewSubproblemWithIdentifier(
-				ErrorRejectedIdentifierType,
-				Identifier{Type: "permanent-identifier", Value: ch.Value},
-				"challenge identifier %q doesn't match any of the attested hardware identifiers %q", ch.Value, []string{string(data.Attestation.TeeEnforced.AttestationIdSerial)},
-			)
-			return storeError(ctx, db, ch, true, NewDetailedError(ErrorBadAttestationStatementType, "permanent identifier does not match").AddSubproblems(subproblem))
-		}
-
-		// Update attestation key fingerprint to compare against the CSR
-		az.Fingerprint = data.Fingerprint
-	case "apple":
-		data, err := doAppleAttestationFormat(ctx, prov, ch, &att)
-		if err != nil {
-			if acmeError, ok := errors.AsType[*Error](err); ok {
-				if acmeError.Status == 500 {
-					return acmeError
-				}
-				return storeError(ctx, db, ch, true, acmeError)
-			}
-			return WrapErrorISE(err, "error validating attestation")
-		}
-
-		// Validate nonce with SHA-256 of the token.
-		if len(data.Nonce) != 0 {
-			sum := sha256.Sum256([]byte(ch.Token))
-			if subtle.ConstantTimeCompare(data.Nonce, sum[:]) != 1 {
-				return storeError(ctx, db, ch, true, NewDetailedError(ErrorBadAttestationStatementType, "challenge token does not match"))
-			}
-		}
-
-		// Validate Apple's ClientIdentifier (Identifier.Value) with device
-		// identifiers.
-		//
-		// Note: We might want to use an external service for this.
-		if data.UDID != ch.Value && data.SerialNumber != ch.Value {
-			subproblem := NewSubproblemWithIdentifier(
-				ErrorRejectedIdentifierType,
-				Identifier{Type: "permanent-identifier", Value: ch.Value},
-				"challenge identifier %q doesn't match any of the attested hardware identifiers %q", ch.Value, []string{data.UDID, data.SerialNumber},
-			)
-			return storeError(ctx, db, ch, true, NewDetailedError(ErrorBadAttestationStatementType, "permanent identifier does not match").AddSubproblems(subproblem))
-		}
-
-		// Update attestation key fingerprint to compare against the CSR
-		az.Fingerprint = data.Fingerprint
-	case "step":
-		data, err := doStepAttestationFormat(ctx, prov, ch, jwk, &att)
-		if err != nil {
-			if acmeError, ok := errors.AsType[*Error](err); ok {
-				if acmeError.Status == 500 {
-					return acmeError
-				}
-				return storeError(ctx, db, ch, true, acmeError)
-			}
-			return WrapErrorISE(err, "error validating attestation")
-		}
-
-		// Validate the YubiKey serial number from the attestation
-		// certificate with the challenged Order value.
-		//
-		// Note: We might want to use an external service for this.
-		if data.SerialNumber != ch.Value {
-			subproblem := NewSubproblemWithIdentifier(
-				ErrorRejectedIdentifierType,
-				Identifier{Type: "permanent-identifier", Value: ch.Value},
-				"challenge identifier %q doesn't match the attested hardware identifier %q", ch.Value, data.SerialNumber,
-			)
-			return storeError(ctx, db, ch, true, NewDetailedError(ErrorBadAttestationStatementType, "permanent identifier does not match").AddSubproblems(subproblem))
-		}
-
-		// Update attestation key fingerprint to compare against the CSR
-		az.Fingerprint = data.Fingerprint
-
-	case "tpm":
-		data, err := doTPMAttestationFormat(ctx, prov, ch, jwk, &att)
-		if err != nil {
-			if acmeError, ok := errors.AsType[*Error](err); ok {
-				if acmeError.Status == 500 {
-					return acmeError
-				}
-				return storeError(ctx, db, ch, true, acmeError)
-			}
-			return WrapErrorISE(err, "error validating attestation")
-		}
-
-		// TODO(hs): currently this will allow a request for which no PermanentIdentifiers have been
-		// extracted from the AK certificate. This is currently the case for AK certs from the CLI, as we
-		// haven't implemented a way for AK certs requested by the CLI to always contain the requested
-		// PermanentIdentifier. Omitting the check below doesn't allow just any request, as the Order can
-		// still fail if the challenge value isn't equal to the CSR subject.
-		if len(data.PermanentIdentifiers) > 0 && !slices.Contains(data.PermanentIdentifiers, ch.Value) { // TODO(hs): add support for HardwareModuleName
-			subproblem := NewSubproblemWithIdentifier(
-				ErrorRejectedIdentifierType,
-				Identifier{Type: "permanent-identifier", Value: ch.Value},
-				"challenge identifier %q doesn't match any of the attested hardware identifiers %q", ch.Value, data.PermanentIdentifiers,
-			)
-			return storeError(ctx, db, ch, true, NewDetailedError(ErrorBadAttestationStatementType, "permanent identifier does not match").AddSubproblems(subproblem))
-		}
-
-		// Update attestation key fingerprint to compare against the CSR
-		az.Fingerprint = data.Fingerprint
-	default:
-		return storeError(ctx, db, ch, true, NewDetailedError(ErrorBadAttestationStatementType, "unsupported attestation object format %q", format))
-	}
+	format := data.Format
+	az.Fingerprint = data.Fingerprint
 
 	// Update and store the challenge.
 	ch.Status = StatusValid
@@ -1169,6 +1028,9 @@ func doTPMAttestationFormat(_ context.Context, prov Provisioner, ch *Challenge, 
 		return nil, WrapDetailedError(ErrorBadAttestationStatementType, err, "failed decoding attestation data")
 	}
 
+	if jwk == nil {
+		return nil, NewErrorISE("attestation account key is required")
+	}
 	keyAuth, err := KeyAuthorization(ch.Token, jwk)
 	if err != nil {
 		return nil, WrapErrorISE(err, "failed creating key auth digest")
@@ -1591,6 +1453,9 @@ func doAndroidKeyAttestationFormat(ctx context.Context, prov Provisioner, ch *Ch
 		return nil, NewDetailedError(ErrorBadAttestationStatementType, "sig not present")
 	}
 
+	if jwk == nil {
+		return nil, NewErrorISE("attestation account key is required")
+	}
 	keyAuth, err := KeyAuthorization(ch.Token, jwk)
 	if err != nil {
 		return nil, err
@@ -1761,6 +1626,9 @@ func doStepAttestationFormat(_ context.Context, prov Provisioner, ch *Challenge,
 		return nil, NewDetailedError(ErrorBadAttestationStatementType, "sig is malformed")
 	}
 
+	if jwk == nil {
+		return nil, NewErrorISE("attestation account key is required")
+	}
 	keyAuth, err := KeyAuthorization(ch.Token, jwk)
 	if err != nil {
 		return nil, err
