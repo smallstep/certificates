@@ -11,6 +11,7 @@ import (
 
 	"github.com/sirupsen/logrus"
 
+	"github.com/smallstep/certificates/cas/apiv1"
 	"github.com/smallstep/certificates/internal/userid"
 	"github.com/smallstep/certificates/middleware/requestid"
 )
@@ -65,7 +66,12 @@ func NewLoggerHandler(name string, logger *Logger, next http.Handler) http.Handl
 func (l *LoggerHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	t := time.Now()
 	rw := NewResponseLogger(w)
-	l.next.ServeHTTP(rw, r)
+	var warnings []apiv1.CertificateWarning
+	ctx := apiv1.WithCertificateWarningHandler(r.Context(), func(warning apiv1.CertificateWarning) {
+		warnings = append(warnings, warning)
+		rw.WithFields(map[string]any{"certificate-warnings": warnings})
+	})
+	l.next.ServeHTTP(rw, r.WithContext(ctx))
 	d := time.Since(t)
 	l.writeEntry(rw, r, t, d)
 }
@@ -123,12 +129,16 @@ func (l *LoggerHandler) writeEntry(w ResponseLogger, r *http.Request, t time.Tim
 	}
 
 	maps.Copy(fields, w.Fields())
+	warnings, _ := fields["certificate-warnings"].([]apiv1.CertificateWarning)
 
 	switch {
 	case status < http.StatusBadRequest:
-		if l.options.onlyTraceHealthEndpoint && uri == "/health" {
+		switch {
+		case len(warnings) > 0:
+			l.logger.WithFields(fields).Warn()
+		case l.options.onlyTraceHealthEndpoint && uri == "/health":
 			l.logger.WithFields(fields).Trace()
-		} else {
+		default:
 			l.logger.WithFields(fields).Info()
 		}
 	case status < http.StatusInternalServerError:

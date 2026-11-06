@@ -9,6 +9,7 @@ import (
 	"github.com/smallstep/certificates/api/read"
 	"github.com/smallstep/certificates/api/render"
 	"github.com/smallstep/certificates/authority/provisioner"
+	"github.com/smallstep/certificates/cas/apiv1"
 	"github.com/smallstep/certificates/errs"
 	"github.com/smallstep/certificates/internal/cast"
 )
@@ -33,8 +34,9 @@ func (s *SSHRekeyRequest) Validate() error {
 
 // SSHRekeyResponse is the response object that returns the SSH certificate.
 type SSHRekeyResponse struct {
-	Certificate         SSHCertificate `json:"crt"`
-	IdentityCertificate []Certificate  `json:"identityCrt,omitempty"`
+	Certificate         SSHCertificate             `json:"crt"`
+	IdentityCertificate []Certificate              `json:"identityCrt,omitempty"`
+	Warnings            []apiv1.CertificateWarning `json:"warnings,omitempty"`
 }
 
 // SSHRekey is an HTTP handler that reads an RekeySSHRequest with a one-time-token
@@ -59,7 +61,8 @@ func SSHRekey(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	ctx := provisioner.NewContextWithMethod(r.Context(), provisioner.SSHRekeyMethod)
+	ctx, warnings := collectCertificateWarnings(r.Context())
+	ctx = provisioner.NewContextWithMethod(ctx, provisioner.SSHRekeyMethod)
 	ctx = provisioner.NewContextWithToken(ctx, body.OTT)
 
 	a := mustAuthority(ctx)
@@ -84,7 +87,7 @@ func SSHRekey(w http.ResponseWriter, r *http.Request) {
 	notBefore := time.Unix(cast.Int64(oldCert.ValidAfter), 0)
 	notAfter := time.Unix(cast.Int64(oldCert.ValidBefore), 0)
 
-	identity, err := renewIdentityCertificate(r, notBefore, notAfter)
+	identity, err := renewIdentityCertificate(r.WithContext(ctx), notBefore, notAfter)
 	if err != nil {
 		render.Error(w, r, errs.ForbiddenErr(err, "error renewing identity certificate"))
 		return
@@ -94,5 +97,6 @@ func SSHRekey(w http.ResponseWriter, r *http.Request) {
 	render.JSONStatus(w, r, &SSHRekeyResponse{
 		Certificate:         SSHCertificate{newCert},
 		IdentityCertificate: identity,
+		Warnings:            *warnings,
 	}, http.StatusCreated)
 }
