@@ -1,6 +1,7 @@
 package ca
 
 import (
+	"crypto"
 	"crypto/x509"
 	"encoding/base64"
 	"encoding/json"
@@ -140,6 +141,91 @@ func TestNewACMEClient(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestNewACMEClient_externalAccountBinding(t *testing.T) {
+	var srv *httptest.Server
+	hmacKey := []byte("the external account key's hmac")
+
+	// newClient returns a client and the external account binding its new
+	// account request carried, verified by the outer JWS's key.
+	newClient := func(t *testing.T, ops ...ClientOption) (*ACMEClient, *acmeAPI.ExternalAccountBinding) {
+		t.Helper()
+		var eab *acmeAPI.ExternalAccountBinding
+		srv = httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			switch r.URL.Path {
+			case "/nonce":
+				w.Header().Set("Replay-Nonce", "abc123")
+				w.WriteHeader(http.StatusOK)
+			case "/new-account":
+				body, err := io.ReadAll(r.Body)
+				assert.FatalError(t, err)
+				jws, err := jose.ParseJWS(string(body))
+				assert.FatalError(t, err)
+				payload, err := jws.Verify(jws.Signatures[0].Protected.JSONWebKey)
+				assert.FatalError(t, err)
+				var nar acmeAPI.NewAccountRequest
+				assert.FatalError(t, json.Unmarshal(payload, &nar))
+				eab = nar.ExternalAccountBinding
+				w.Header().Set("Location", "/account/1")
+				render.JSONStatus(w, r, acme.Account{Status: "valid"}, 201)
+			default:
+				render.JSONStatus(w, r, acmeAPI.Directory{
+					NewNonce:   srv.URL + "/nonce",
+					NewAccount: srv.URL + "/new-account",
+				}, 200)
+			}
+		}))
+		t.Cleanup(srv.Close)
+		client, err := NewACMEClient(srv.URL, nil, append(ops, WithTransport(http.DefaultTransport))...)
+		assert.FatalError(t, err)
+		return client, eab
+	}
+
+	t.Run("none without the option", func(t *testing.T) {
+		_, eab := newClient(t)
+		assert.Nil(t, eab)
+	})
+
+	t.Run("the account key, signed with the hmac key", func(t *testing.T) {
+		client, eab := newClient(t, WithExternalAccountBinding("key-id", hmacKey))
+		if !assert.NotNil(t, eab) {
+			t.FailNow()
+		}
+		raw, err := json.Marshal(eab)
+		assert.FatalError(t, err)
+		jws, err := jose.ParseJWS(string(raw))
+		assert.FatalError(t, err)
+
+		header := jws.Signatures[0].Protected
+		assert.Equals(t, string(jose.HS256), header.Algorithm)
+		assert.Equals(t, "key-id", header.KeyID)
+		assert.Equals(t, srv.URL+"/new-account", header.ExtraHeaders["url"])
+
+		_, err = jws.Verify([]byte("another hmac key"))
+		assert.NotNil(t, err)
+		payload, err := jws.Verify(hmacKey)
+		assert.FatalError(t, err)
+
+		var jwk jose.JSONWebKey
+		assert.FatalError(t, json.Unmarshal(payload, &jwk))
+		assert.True(t, jwk.IsPublic())
+		got, err := jwk.Thumbprint(crypto.SHA256)
+		assert.FatalError(t, err)
+		want, err := client.Key.Thumbprint(crypto.SHA256)
+		assert.FatalError(t, err)
+		assert.Equals(t, want, got)
+	})
+
+	t.Run("refused without a key", func(t *testing.T) {
+		for _, op := range []ClientOption{
+			WithExternalAccountBinding("", hmacKey),
+			WithExternalAccountBinding("key-id", nil),
+		} {
+			_, err := NewACMEClient("http://127.0.0.1:0", nil, op)
+			assert.NotNil(t, err)
+		}
+	})
 }
 
 func TestACMEClient_GetDirectory(t *testing.T) {

@@ -75,6 +75,11 @@ func NewACMEClient(endpoint string, contact []string, opts ...ClientOption) (*AC
 		Contact:              contact,
 		TermsOfServiceAgreed: true,
 	}
+	if o.eabKeyID != "" {
+		if nar.ExternalAccountBinding, err = ac.externalAccountBinding(o.eabKeyID, o.eabHMACKey); err != nil {
+			return nil, err
+		}
+	}
 	payload, err := json.Marshal(nar)
 	if err != nil {
 		return nil, errors.Wrap(err, "error marshaling new account request")
@@ -96,6 +101,37 @@ func NewACMEClient(endpoint string, contact []string, opts ...ClientOption) (*AC
 	ac.kid = resp.Header.Get("Location")
 
 	return ac, nil
+}
+
+// externalAccountBinding returns the external account binding of a new account
+// request (RFC 8555 section 7.3.4): a JWS over the account's public key, signed
+// with the HMAC key, whose kid is the key ID and whose url is the new account
+// URL.
+func (c *ACMEClient) externalAccountBinding(keyID string, hmacKey []byte) (*acmeAPI.ExternalAccountBinding, error) {
+	payload, err := json.Marshal(c.Key.Public())
+	if err != nil {
+		return nil, errors.Wrap(err, "error marshaling the account key")
+	}
+	so := new(jose.SignerOptions)
+	so.WithHeader("kid", keyID)
+	so.WithHeader("url", c.dir.NewAccount)
+	signer, err := jose.NewSigner(jose.SigningKey{Algorithm: jose.HS256, Key: hmacKey}, so)
+	if err != nil {
+		return nil, errors.Wrap(err, "error creating external account binding signer")
+	}
+	signed, err := signer.Sign(payload)
+	if err != nil {
+		return nil, errors.Errorf("error signing external account binding: %s", jose.TrimPrefix(err))
+	}
+	raw, err := serialize(signed)
+	if err != nil {
+		return nil, err
+	}
+	eab := new(acmeAPI.ExternalAccountBinding)
+	if err := json.Unmarshal([]byte(raw), eab); err != nil {
+		return nil, errors.Wrap(err, "error reading external account binding")
+	}
+	return eab, nil
 }
 
 // GetDirectory makes a directory request to the ACME api and returns an

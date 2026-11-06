@@ -171,6 +171,8 @@ type clientOptions struct {
 	x5cCertStrs          []string
 	x5cCert              *x509.Certificate
 	x5cSubject           string
+	eabKeyID             string
+	eabHMACKey           []byte
 }
 
 func (o *clientOptions) apply(opts []ClientOption) (err error) {
@@ -302,6 +304,20 @@ func WithInsecure() ClientOption {
 				InsecureSkipVerify: true,
 			},
 		}
+		return nil
+	}
+}
+
+// WithExternalAccountBinding binds the account NewACMEClient creates to an
+// external account key, as an ACME provisioner that requires external account
+// binding asks. The key ID and the HMAC key are the ones the CA minted.
+func WithExternalAccountBinding(keyID string, hmacKey []byte) ClientOption {
+	return func(o *clientOptions) error {
+		if keyID == "" || len(hmacKey) == 0 {
+			return errors.New("an external account binding needs a key ID and an HMAC key")
+		}
+		o.eabKeyID = keyID
+		o.eabHMACKey = hmacKey
 		return nil
 	}
 }
