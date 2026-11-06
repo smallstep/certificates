@@ -296,6 +296,17 @@ func (a *Authority) signX509(ctx context.Context, csr *x509.CertificateRequest, 
 		)
 	}
 
+	var clientIdentifier string
+	var extraIdentifiers []string
+	if attData != nil {
+		if attData.PermanentIdentifier != "" {
+			clientIdentifier = attData.PermanentIdentifier
+		}
+		if attData.ExtraIdentifiers != nil {
+			extraIdentifiers = attData.ExtraIdentifiers
+		}
+	}
+
 	// Sign certificate
 	lifetime := leaf.NotAfter.Sub(leaf.NotBefore.Add(signOpts.Backdate))
 
@@ -305,6 +316,8 @@ func (a *Authority) signX509(ctx context.Context, csr *x509.CertificateRequest, 
 		Lifetime:    lifetime,
 		Backdate:    signOpts.Backdate,
 		Provisioner: pInfo,
+		ClientIdentifier: clientIdentifier,
+		ExtraIdentifiers: extraIdentifiers,
 	})
 	if err != nil {
 		return nil, prov, errs.Wrap(http.StatusInternalServerError, err, "authority.Sign; error creating certificate", opts...)

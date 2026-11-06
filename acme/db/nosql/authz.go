@@ -23,6 +23,7 @@ type dbAuthz struct {
 	CreatedAt    time.Time       `json:"createdAt"`
 	ExpiresAt    time.Time       `json:"expiresAt"`
 	Error        *acme.Error     `json:"error"`
+	ExtraIdentifiers []string 	  `json:"extraIdentifiers,omitempty"`
 }
 
 func (ba *dbAuthz) clone() *dbAuthz {
@@ -71,6 +72,7 @@ func (db *DB) GetAuthorization(ctx context.Context, id string) (*acme.Authorizat
 		ExpiresAt:   dbaz.ExpiresAt,
 		Token:       dbaz.Token,
 		Fingerprint: dbaz.Fingerprint,
+		ExtraIdentifiers: dbaz.ExtraIdentifiers,
 		Error:       dbaz.Error,
 	}, nil
 }
@@ -101,6 +103,7 @@ func (db *DB) CreateAuthorization(ctx context.Context, az *acme.Authorization) e
 		Token:        az.Token,
 		Fingerprint:  az.Fingerprint,
 		Wildcard:     az.Wildcard,
+		ExtraIdentifiers: nil,
 	}
 
 	return db.save(ctx, az.ID, dbaz, nil, "authz", authzTable)
@@ -116,6 +119,7 @@ func (db *DB) UpdateAuthorization(ctx context.Context, az *acme.Authorization) e
 	nu := old.clone()
 	nu.Status = az.Status
 	nu.Fingerprint = az.Fingerprint
+	nu.ExtraIdentifiers = az.ExtraIdentifiers
 	nu.Error = az.Error
 	return db.save(ctx, old.ID, nu, old, "authz", authzTable)
 }
@@ -149,6 +153,7 @@ func (db *DB) GetAuthorizationsByAccountID(_ context.Context, accountID string) 
 			Token:       dbaz.Token,
 			Fingerprint: dbaz.Fingerprint,
 			Error:       dbaz.Error,
+			ExtraIdentifiers: dbaz.ExtraIdentifiers,
 		})
 	}
 
