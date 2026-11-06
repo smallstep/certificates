@@ -340,6 +340,37 @@ func TestProvisionerWebhookToLinkedca(t *testing.T) {
 	}
 }
 
+func TestProvisionerToLinkedca_acmeDNSPersist01(t *testing.T) {
+	p := &provisioner.ACME{
+		ID:                "acme-id",
+		Type:              "ACME",
+		Name:              "acme",
+		Challenges:        []provisioner.ACMEChallenge{provisioner.DNS_01, provisioner.DNS_PERSIST_01},
+		CaaIdentities:     []string{"ca.example.com"},
+		IssuerDomainNames: []string{"ca.example.com"},
+		AccountHashPrefix: "https://ca.example.com/acme/acme/account-hash/",
+	}
+
+	lp, err := ProvisionerToLinkedca(p)
+	require.NoError(t, err)
+	lacme := lp.GetDetails().GetACME()
+	require.NotNil(t, lacme)
+	require.Equal(t, []linkedca.ACMEProvisioner_ChallengeType{
+		linkedca.ACMEProvisioner_DNS_01, linkedca.ACMEProvisioner_DNS_PERSIST_01,
+	}, lacme.Challenges)
+	require.Equal(t, []string{"ca.example.com"}, lacme.IssuerDomainNames)
+	require.Equal(t, "https://ca.example.com/acme/acme/account-hash/", lacme.AccountHashPrefix)
+
+	cp, err := ProvisionerToCertificates(lp)
+	require.NoError(t, err)
+	require.IsType(t, &provisioner.ACME{}, cp)
+	got := cp.(*provisioner.ACME)
+	require.Equal(t, p.Challenges, got.Challenges)
+	require.Equal(t, p.CaaIdentities, got.CaaIdentities)
+	require.Equal(t, p.IssuerDomainNames, got.IssuerDomainNames)
+	require.Equal(t, p.AccountHashPrefix, got.AccountHashPrefix)
+}
+
 func Test_wrapRAProvisioner(t *testing.T) {
 	type args struct {
 		p      provisioner.Interface
