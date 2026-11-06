@@ -1,6 +1,6 @@
 module github.com/smallstep/certificates
 
-go 1.26.0
+go 1.26.7
 
 require (
 	cloud.google.com/go/longrunning v1.3.0
@@ -174,3 +174,5 @@ require (
 	google.golang.org/genproto/googleapis/rpc v0.0.0-20261019180522-ce908d29299b // indirect
 	google.golang.org/grpc/cmd/protoc-gen-go-grpc v1.6.2 // indirect
 )
+
+replace github.com/smallstep/linkedca => github.com/jbpin/linkedca v0.0.0-20261104160711-0c4b24b43e3d
