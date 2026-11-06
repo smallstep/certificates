@@ -60,7 +60,9 @@ func (a *Authority) getProvisionerFromToken(token string) (provisioner.Interface
 	}
 
 	// This method will also validate the audiences for JWK provisioners.
+	a.adminMutex.RLock()
 	p, ok := a.provisioners.LoadByToken(tok, &claims.Claims)
+	a.adminMutex.RUnlock()
 	if !ok {
 		return nil, nil, fmt.Errorf("provisioner not found or invalid audience (%s)", strings.Join(claims.Audience, ", "))
 	}
@@ -321,7 +323,10 @@ func (a *Authority) authorizeRenew(ctx context.Context, cert *x509.Certificate) 
 		// certificate does not have a provisioner extension. LoadByCertificate
 		// returns the noop provisioner if this happens, and it allows
 		// certificate renewals.
-		if p, ok = a.provisioners.LoadByCertificate(cert); !ok {
+		a.adminMutex.RLock()
+		p, ok = a.provisioners.LoadByCertificate(cert)
+		a.adminMutex.RUnlock()
+		if !ok {
 			return nil, errs.Unauthorized("authority.authorizeRenew: provisioner not found", opts...)
 		}
 	}

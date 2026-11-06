@@ -77,6 +77,9 @@ func Route(r api.Router, options ...RouterOption) {
 		return authnz(loadProvisionerByName(next))
 	}
 
+	// Local administration cache
+	r.MethodFunc("POST", "/resources/reload", authnz(ReloadAdminResources))
+
 	// Provisioners
 	r.MethodFunc("GET", "/provisioners/{name}", authnz(GetProvisioner))
 	r.MethodFunc("GET", "/provisioners", authnz(GetProvisioners))
