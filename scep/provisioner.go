@@ -17,6 +17,8 @@ type Provisioner interface {
 	GetCapabilities() []string
 	ShouldIncludeRootInChain() bool
 	ShouldIncludeIntermediateInChain() bool
+	ShouldAllowUnsortedAuthenticatedAttributes() bool
+	ShouldUseLegacyRSADigestEncryptionAlgorithm() bool
 	GetDecrypter() (*x509.Certificate, crypto.Decrypter)
 	GetSigner() (*x509.Certificate, crypto.Signer)
 	GetContentEncryptionAlgorithm() int
