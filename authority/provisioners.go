@@ -33,6 +33,10 @@ type attProvisioner interface {
 	AttestationData() *provisioner.AttestationData
 }
 
+type notifyingProvisioner interface {
+	NotifyX509Issued(ctx context.Context, csr *x509.CertificateRequest, cert *x509.Certificate) error
+}
+
 // wrapProvisioner wraps the given provisioner with RA information and
 // attestation data.
 func wrapProvisioner(p provisioner.Interface, attData *provisioner.AttestationData) *wrappedProvisioner {
