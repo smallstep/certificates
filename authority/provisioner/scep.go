@@ -25,12 +25,13 @@ import (
 // SCEP provisioning flow
 type SCEP struct {
 	*base
-	ID                string   `json:"-"`
-	Type              string   `json:"type"`
-	Name              string   `json:"name"`
-	ForceCN           bool     `json:"forceCN,omitempty"`
-	ChallengePassword string   `json:"challenge,omitempty"`
-	Capabilities      []string `json:"capabilities,omitempty"`
+	ID                       string   `json:"-"`
+	Type                     string   `json:"type"`
+	Name                     string   `json:"name"`
+	ForceCN                  bool     `json:"forceCN,omitempty"`
+	ChallengePassword        string   `json:"challenge,omitempty"`
+	DisableChallengePassword bool     `json:"disableChallengePassword,omitempty"`
+	Capabilities             []string `json:"capabilities,omitempty"`
 
 	// IncludeRoot makes the provisioner return the CA root in addition to the
 	// intermediate in the GetCACerts response
@@ -459,6 +460,9 @@ func (s *SCEP) GetContentEncryptionAlgorithm() int {
 func (s *SCEP) ValidateChallenge(ctx context.Context, csr *x509.CertificateRequest, challenge, transactionID string) ([]SignCSROption, error) {
 	if s.challengeValidationController == nil {
 		return nil, fmt.Errorf("provisioner %q wasn't initialized", s.Name)
+	}
+	if s.DisableChallengePassword {
+		return []SignCSROption{}, nil
 	}
 	switch s.selectValidationMethod() {
 	case validationMethodWebhook:
