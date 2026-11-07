@@ -49,6 +49,27 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
   account and the EAB key it was created with, is sent to webhooks as
   `attestation` and given to templates as `.Attestation`. The challenge can be
   configured in `ca.json` only for now.
+- An `azure-tdx` format for `remote-attest-01`, for Azure confidential VMs with
+  Intel TDX, whose guests cannot get a TDX quote themselves. The evidence
+  (`application/vnd.smallstep.azure-tdx+json`) is the quote of the paravisor's
+  TD report and the runtime claims document its report data commits to; the
+  binding and the relying party's nonce are the 64 bytes of `user-data` in
+  those claims. The quote's MRTD measures Azure's paravisor, so the format is
+  accepted only when listed in `formats`, and the runtime claims (the vTPM's
+  `HCLAkPub` key and the VM configuration) are given to webhooks and templates
+  as `.Attestation.azureRuntime`.
+- An `ita` format for `remote-attest-01`: tokens Intel Trust Authority issues
+  for Intel TDX trust domains, including Azure confidential VMs, sent as
+  `application/eat+jwt` and told from Confidential Space tokens by their
+  issuer. step-ca verifies the token with the signing key its `kid` names,
+  fetched from Intel Trust Authority's key set, whose certificate chain must
+  verify to Intel Trust Authority's root, which step-ca embeds; the binding
+  and the relying party's nonce are the 64 bytes of `attester_user_data`, and
+  the runtime data the TD quote committed to must be SHA-512 of the verifier
+  nonce, if any, and that user data. Debuggable trust domains are refused. The
+  token's claims, including the vTPM PCRs Intel Trust Authority appraised on
+  Azure, are given to webhooks and templates as `.Attestation.ita`. It is
+  configured by `remoteAttestation.ita`.
 - The `attestation` package and its subpackages, which verify TDX quotes,
   SEV-SNP reports and Confidential Space tokens, and parse CMW records and
   configfs-tsm reports. The `device-attest-01` formats' verifiers (`apple`,

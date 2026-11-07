@@ -15,6 +15,7 @@ import (
 	"github.com/smallstep/certificates/attestation/cmw"
 	"github.com/smallstep/certificates/attestation/collateral"
 	"github.com/smallstep/certificates/attestation/confidentialspace"
+	"github.com/smallstep/certificates/attestation/ita"
 	"github.com/smallstep/certificates/attestation/sevsnp"
 	"github.com/smallstep/certificates/attestation/tdx"
 	"github.com/smallstep/certificates/attestation/tsm"
@@ -43,9 +44,10 @@ type ACMERemoteAttestation struct {
 	// Require adds a remote-attestation identifier to every order that does
 	// not have one, so that every certificate needs attestation.
 	Require bool `json:"require,omitempty"`
-	// Formats are the evidence formats accepted: tdx, sev-snp and
-	// confidential-space. It defaults to tdx and sev-snp, and to
-	// confidential-space too if ConfidentialSpace is set.
+	// Formats are the evidence formats accepted: tdx, sev-snp,
+	// confidential-space, azure-tdx and ita. It defaults to tdx and sev-snp,
+	// and to confidential-space and ita too if ConfidentialSpace or ITA is
+	// set. azure-tdx is only accepted when listed.
 	Formats []attestation.Format `json:"formats,omitempty"`
 	// ClaimsHint is sent to clients as the challenge's attestClaimsHint.
 	ClaimsHint []string `json:"claimsHint,omitempty"`
@@ -56,6 +58,21 @@ type ACMERemoteAttestation struct {
 	SEVSNPRoots []byte `json:"sevSnpRoots,omitempty"`
 	// ConfidentialSpace configures the confidential-space format.
 	ConfidentialSpace *ACMEConfidentialSpace `json:"confidentialSpace,omitempty"`
+	// ITA configures the ita format.
+	ITA *ACMEITA `json:"ita,omitempty"`
+}
+
+// ACMEITA configures the ita format of the remote-attest-01 challenge, which
+// accepts the tokens Intel Trust Authority issues for Intel TDX trust domains.
+type ACMEITA struct {
+	// Roots is a PEM bundle that replaces Intel Trust Authority's root, which
+	// step-ca embeds.
+	Roots []byte `json:"roots,omitempty"`
+	// JWKSURL is where the token signing keys are fetched from. It defaults
+	// to Intel Trust Authority's.
+	JWKSURL string `json:"jwksUrl,omitempty"`
+	// MaxTokenAge is the maximum age of the token. It defaults to 5 minutes.
+	MaxTokenAge *Duration `json:"maxTokenAge,omitempty"`
 }
 
 // ACMEConfidentialSpace configures the confidential-space format of the
@@ -98,6 +115,9 @@ type remoteAttestationVerifier struct {
 	csAudience  string
 	csMaxAge    time.Duration
 	csExpecting *confidentialspace.Expectations
+	itaKeys     *ita.KeySet
+	itaRoots    *x509.CertPool
+	itaMaxAge   time.Duration
 	now         func() time.Time
 }
 
@@ -139,6 +159,9 @@ func (p *ACME) initializeRemoteAttestation() error {
 		if o.ConfidentialSpace != nil {
 			v.formats = append(v.formats, attestation.FormatConfidentialSpace)
 		}
+		if o.ITA != nil {
+			v.formats = append(v.formats, attestation.FormatITA)
+		}
 	}
 
 	getter := collateral.New(p.ctl.GetHTTPClient())
@@ -148,12 +171,17 @@ func (p *ACME) initializeRemoteAttestation() error {
 		}
 		var err error
 		switch f {
-		case attestation.FormatTDX:
-			v.tdx, err = tdx.New(o.TDXRoots, collateral.TDX{Getter: getter})
+		case attestation.FormatTDX, attestation.FormatAzureTDX:
+			// Both formats verify a TDX quote, and share one verifier.
+			if v.tdx == nil {
+				v.tdx, err = tdx.New(o.TDXRoots, collateral.TDX{Getter: getter})
+			}
 		case attestation.FormatSEVSNP:
 			v.sevsnp, err = sevsnp.New(o.SEVSNPRoots, collateral.SEVSNP{Getter: getter})
 		case attestation.FormatConfidentialSpace:
 			err = v.initializeConfidentialSpace(o.ConfidentialSpace)
+		case attestation.FormatITA:
+			err = v.initializeITA(o.ITA, p.ctl.GetHTTPClient())
 		}
 		if err != nil {
 			return fmt.Errorf("error initializing the %s format: %w", f, err)
@@ -189,6 +217,27 @@ func (v *remoteAttestationVerifier) initializeConfidentialSpace(o *ACMEConfident
 	return nil
 }
 
+func (v *remoteAttestationVerifier) initializeITA(o *ACMEITA, client HTTPClient) error {
+	if o == nil {
+		o = &ACMEITA{}
+	}
+	v.itaRoots = ita.Roots()
+	if len(o.Roots) > 0 {
+		v.itaRoots = x509.NewCertPool()
+		if !v.itaRoots.AppendCertsFromPEM(o.Roots) {
+			return errors.New("no certificates found in ita.roots")
+		}
+	}
+	if o.MaxTokenAge != nil {
+		if o.MaxTokenAge.Duration <= 0 {
+			return errors.New("ita.maxTokenAge must be greater than 0")
+		}
+		v.itaMaxAge = o.MaxTokenAge.Duration
+	}
+	v.itaKeys = ita.NewKeySet(o.JWKSURL, client)
+	return nil
+}
+
 // GetRemoteAttestation returns the remote attestation options.
 func (p *ACME) GetRemoteAttestation() *ACMERemoteAttestation {
 	return p.RemoteAttestation
@@ -208,11 +257,18 @@ func (p *ACME) IsEABRequired() bool {
 //   - For a TDX quote or an SEV-SNP report, sent as a configfs-tsm report
 //     (application/vnd.veraison.tsm-report+json or +cbor), its 64 bytes of
 //     report data.
+//   - For the evidence of an Azure confidential VM with Intel TDX
+//     (application/vnd.smallstep.azure-tdx+json), the 64 bytes of user data
+//     in the runtime claims its paravisor's quote commits to.
 //   - For a Confidential Space token (application/eat+jwt or application/jwt),
 //     its first eat_nonce value, the base64url encoding, without padding, of 32
 //     bytes. Its other nonces are the relying party's and stay in the claims.
 //     The token must have been requested for the configured audience, or else
 //     for the given default audience.
+//   - For an Intel Trust Authority token (application/eat+jwt or
+//     application/jwt, issued by Intel Trust Authority), its 64 bytes of
+//     attester_user_data, which the runtime data its TD quote committed to
+//     hashes.
 //
 // The caller checks what the binding must be. Errors of the evidence match
 // attestation.ErrInvalidEvidence.
@@ -233,6 +289,12 @@ func (p *ACME) VerifyRemoteAttestation(ctx context.Context, r *cmw.Record, defau
 	switch {
 	case tsm.IsMediaType(r.MediaType):
 		res, bound, err = v.verifyTSMReport(ctx, r)
+		size = RemoteAttestationBindingSize + RemoteAttestationClaimNonceSize
+	case tdx.IsAzureMediaType(r.MediaType):
+		res, bound, err = v.verifyAzureTDX(ctx, r)
+		size = RemoteAttestationBindingSize + RemoteAttestationClaimNonceSize
+	case isJWTMediaType(r.MediaType) && ita.IsToken(string(r.Value)):
+		res, bound, err = v.verifyITA(ctx, r)
 		size = RemoteAttestationBindingSize + RemoteAttestationClaimNonceSize
 	case isJWTMediaType(r.MediaType):
 		res, bound, err = v.verifyConfidentialSpace(r, defaultAudience)
@@ -292,6 +354,53 @@ func (v *remoteAttestationVerifier) verifyTSMReport(ctx context.Context, r *cmw.
 	default:
 		return nil, nil, attestation.Invalidf("tsm report provider %q is not supported", report.Provider)
 	}
+}
+
+// verifyAzureTDX verifies the evidence of an Azure confidential VM with Intel
+// TDX. Its guest cannot get a TDX quote itself, so it writes the binding and
+// the relying party's nonce as the user data of the runtime claims its
+// paravisor's quote commits to.
+func (v *remoteAttestationVerifier) verifyAzureTDX(ctx context.Context, r *cmw.Record) (*attestation.Result, []byte, error) {
+	if err := v.enabled(attestation.FormatAzureTDX); err != nil {
+		return nil, nil, err
+	}
+	if r.Indicator != 0 && !r.Indicator.Has(cmw.Evidence) {
+		return nil, nil, attestation.Invalidf("azure tdx evidence must be indicated as evidence")
+	}
+	e, err := tdx.ParseAzureEvidence(r.Value)
+	if err != nil {
+		return nil, nil, err
+	}
+	res, reportData, err := v.tdx.Verify(ctx, e.Quote)
+	if err != nil {
+		return nil, nil, err
+	}
+	runtime, userData, err := e.Claims(reportData)
+	if err != nil {
+		return nil, nil, err
+	}
+	return &attestation.Result{Format: attestation.FormatAzureTDX, TDX: res, AzureRuntime: runtime}, userData, nil
+}
+
+// verifyITA verifies an Intel Trust Authority token. The binding and the
+// relying party's nonce are its user data.
+func (v *remoteAttestationVerifier) verifyITA(ctx context.Context, r *cmw.Record) (*attestation.Result, []byte, error) {
+	if err := v.enabled(attestation.FormatITA); err != nil {
+		return nil, nil, err
+	}
+	if r.Indicator != 0 && !r.Indicator.Has(cmw.AttestationResults) {
+		return nil, nil, attestation.Invalidf("an attestation token must be indicated as an attestation result")
+	}
+	tok, err := ita.Verify(ctx, string(r.Value), ita.Options{
+		Keys:        v.itaKeys,
+		Roots:       v.itaRoots,
+		MaxTokenAge: v.itaMaxAge,
+		Now:         v.now(),
+	})
+	if err != nil {
+		return nil, nil, err
+	}
+	return &attestation.Result{Format: attestation.FormatITA, ITA: tok.Result()}, tok.UserData, nil
 }
 
 func (v *remoteAttestationVerifier) verifyConfidentialSpace(r *cmw.Record, defaultAudience string) (*attestation.Result, []byte, error) {

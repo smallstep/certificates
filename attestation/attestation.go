@@ -27,12 +27,19 @@ const (
 	// FormatConfidentialSpace is a Google Cloud Attestation token for a
 	// Confidential Space workload.
 	FormatConfidentialSpace Format = "confidential-space"
+	// FormatAzureTDX is an Intel TDX quote from an Azure confidential VM
+	// whose paravisor reports for the guest, with the runtime claims the
+	// quote commits to.
+	FormatAzureTDX Format = "azure-tdx"
+	// FormatITA is an Intel Trust Authority token for an Intel TDX trust
+	// domain.
+	FormatITA Format = "ita"
 )
 
 // Validate returns an error if the format is not supported.
 func (f Format) Validate() error {
 	switch f {
-	case FormatTDX, FormatSEVSNP, FormatConfidentialSpace:
+	case FormatTDX, FormatSEVSNP, FormatConfidentialSpace, FormatAzureTDX, FormatITA:
 		return nil
 	default:
 		return fmt.Errorf("attestation format %q is not supported", f)
@@ -40,7 +47,8 @@ func (f Format) Validate() error {
 }
 
 // Result is verified attestation evidence. Binary values are hex encoded.
-// Exactly one of TDX, SEVSNP and ConfidentialSpace is set, as Format says.
+// Exactly one of TDX, SEVSNP, ConfidentialSpace and ITA is set, as Format says;
+// for FormatAzureTDX, TDX and AzureRuntime are both set.
 type Result struct {
 	// Format is the format of the evidence.
 	Format Format `json:"format"`
@@ -52,6 +60,32 @@ type Result struct {
 	TDX               *TDX               `json:"tdx,omitempty"`
 	SEVSNP            *SEVSNP            `json:"sevSnp,omitempty"`
 	ConfidentialSpace *ConfidentialSpace `json:"confidentialSpace,omitempty"`
+	AzureRuntime      *AzureRuntime      `json:"azureRuntime,omitempty"`
+	ITA               *ITA               `json:"ita,omitempty"`
+}
+
+// ITA holds the claims of a verified Intel Trust Authority token. On an Azure
+// confidential VM they include the vTPM's PCRs, which Intel Trust Authority
+// appraised, under tpm.pcrs.
+type ITA struct {
+	// Claims are all the claims of the token.
+	Claims map[string]any `json:"claims"`
+	// SignerSerialNumber is the serial number of the certificate of the key
+	// that signed the token.
+	SignerSerialNumber string `json:"signerSerialNumber,omitempty"`
+}
+
+// AzureRuntime holds the runtime claims of an Azure confidential VM, which the
+// report data of its paravisor's TDX quote commits to. On these VMs the quote's
+// MRTD measures the paravisor and its RTMRs are zero: the guest is measured in
+// the vTPM's PCRs, and HCLAkPub signs quotes of them.
+type AzureRuntime struct {
+	// Keys are the vTPM's keys as JWKs, identified by kid: HCLAkPub, its
+	// attestation key, and HCLEkPub.
+	Keys []map[string]any `json:"keys"`
+	// VMConfiguration is the VM's configuration, for example secure-boot,
+	// console-enabled and vmUniqueId.
+	VMConfiguration map[string]any `json:"vmConfiguration"`
 }
 
 // TDX holds the measurements and attributes of a verified Intel TDX quote.
