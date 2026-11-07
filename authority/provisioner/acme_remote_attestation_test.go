@@ -5,6 +5,8 @@ import (
 	"context"
 	"crypto/sha256"
 	"encoding/base64"
+	"encoding/hex"
+	"encoding/json"
 	"errors"
 	"io"
 	"net/http"
@@ -19,6 +21,7 @@ import (
 	"github.com/smallstep/certificates/attestation/cmw"
 	"github.com/smallstep/certificates/attestation/confidentialspace"
 	cstest "github.com/smallstep/certificates/attestation/confidentialspace/confidentialspacetest"
+	"github.com/smallstep/certificates/attestation/tdx"
 	"github.com/smallstep/certificates/authority/policy"
 	"github.com/smallstep/certificates/webhook"
 )
@@ -100,6 +103,12 @@ func TestACME_Init_remoteAttestation(t *testing.T) {
 			&ACMERemoteAttestation{ClaimsHint: []string{"hwmodel", ""}}, nil, "claimsHint cannot contain empty values"},
 		{"fail tdx roots", []ACMEChallenge{REMOTE_ATTEST_01},
 			&ACMERemoteAttestation{TDXRoots: []byte("not pem")}, nil, "error initializing the tdx format"},
+		{"ok azure-tdx", []ACMEChallenge{REMOTE_ATTEST_01},
+			&ACMERemoteAttestation{Formats: []attestation.Format{attestation.FormatAzureTDX}},
+			[]attestation.Format{attestation.FormatAzureTDX}, ""},
+		{"fail azure-tdx roots", []ACMEChallenge{REMOTE_ATTEST_01},
+			&ACMERemoteAttestation{Formats: []attestation.Format{attestation.FormatAzureTDX}, TDXRoots: []byte("not pem")}, nil,
+			"error initializing the azure-tdx format"},
 		{"fail sev-snp roots", []ACMEChallenge{REMOTE_ATTEST_01},
 			&ACMERemoteAttestation{SEVSNPRoots: pki.RootPEM()}, nil, "error initializing the sev-snp format"},
 		// Google's root is pinned, so the format needs no configuration.
@@ -379,6 +388,81 @@ func TestACME_VerifyRemoteAttestation_tdx(t *testing.T) {
 			p := newRemoteAttestationACME(t, nil, staticHTTPClient{})
 			p.remoteAttestation.tdx = tt.fake
 			_, _, err := p.VerifyRemoteAttestation(context.Background(), jsonCMW(mediaType, value, 0), "")
+			assert.ErrorContains(t, err, tt.wantErr)
+			assert.Equal(t, tt.wantInvalid, errors.Is(err, attestation.ErrInvalidEvidence))
+		})
+	}
+}
+
+// azureEvidence returns the evidence of an Azure confidential VM whose runtime
+// claims carry userData, and the report data that commits to them.
+func azureEvidence(t *testing.T, userData []byte) ([]byte, []byte) {
+	t.Helper()
+	runtime := []byte(`{"keys":[{"kid":"HCLAkPub","kty":"RSA"}],"vm-configuration":{"secure-boot":true},"user-data":"` +
+		hex.EncodeToString(userData) + `"}`)
+	value, err := json.Marshal(map[string][]byte{"quote": {0, 1, 2}, "runtimeData": runtime})
+	require.NoError(t, err)
+	reportData := make([]byte, 64)
+	sum := sha256.Sum256(runtime)
+	copy(reportData, sum[:])
+	return value, reportData
+}
+
+func TestACME_VerifyRemoteAttestation_azureTDX(t *testing.T) {
+	bound := testBound()
+	value, reportData := azureEvidence(t, bound)
+	azure := &ACMERemoteAttestation{Formats: []attestation.Format{attestation.FormatAzureTDX}}
+
+	t.Run("ok", func(t *testing.T) {
+		p := newRemoteAttestationACME(t, azure, staticHTTPClient{})
+		fake := &fakeTDXVerifier{result: &attestation.TDX{MRTD: "aa", TCBStatus: "UpToDate"}, bound: reportData}
+		p.remoteAttestation.tdx = fake
+		got, gotBound, err := p.VerifyRemoteAttestation(context.Background(), jsonCMW(tdx.AzureMediaType, value, cmw.Evidence), "")
+		require.NoError(t, err)
+		assert.Equal(t, []byte{0, 1, 2}, fake.quote)
+		// The binding and the claim nonce come from the runtime claims'
+		// user data, not from the quote's report data.
+		assert.Equal(t, bound, gotBound)
+		assert.Equal(t, attestation.FormatAzureTDX, got.Format)
+		assert.Equal(t, fake.result, got.TDX)
+		require.NotNil(t, got.AzureRuntime)
+		assert.Equal(t, "HCLAkPub", got.AzureRuntime.Keys[0]["kid"])
+		assert.Equal(t, true, got.AzureRuntime.VMConfiguration["secure-boot"])
+		assert.Equal(t, value, got.Evidence)
+	})
+
+	otherReportData := append([]byte(nil), reportData...)
+	otherReportData[0] ^= 1
+	tests := []struct {
+		name        string
+		o           *ACMERemoteAttestation
+		fake        *fakeTDXVerifier
+		record      *cmw.Record
+		wantErr     string
+		wantInvalid bool
+	}{
+		// Like configfs-tsm reports, an Azure quote is evidence only when
+		// listed, since its MRTD measures Azure's paravisor, not the guest.
+		{"fail not enabled", nil, &fakeTDXVerifier{result: &attestation.TDX{}, bound: reportData},
+			jsonCMW(tdx.AzureMediaType, value, 0), "attestation format azure-tdx is not enabled", true},
+		{"fail indicator", azure, &fakeTDXVerifier{result: &attestation.TDX{}, bound: reportData},
+			jsonCMW(tdx.AzureMediaType, value, cmw.AttestationResults), "must be indicated as evidence", true},
+		{"fail evidence", azure, &fakeTDXVerifier{result: &attestation.TDX{}, bound: reportData},
+			jsonCMW(tdx.AzureMediaType, []byte(`{}`), 0), "needs a quote and runtime data", true},
+		{"fail invalid quote", azure, &fakeTDXVerifier{err: attestation.Invalidf("tdx quote is from a debug trust domain")},
+			jsonCMW(tdx.AzureMediaType, value, 0), "debug trust domain", true},
+		{"fail collateral", azure, &fakeTDXVerifier{err: errors.New("error fetching tdx collateral")},
+			jsonCMW(tdx.AzureMediaType, value, 0), "error fetching tdx collateral", false},
+		{"fail report data", azure, &fakeTDXVerifier{result: &attestation.TDX{}, bound: otherReportData},
+			jsonCMW(tdx.AzureMediaType, value, 0), "does not commit to the azure runtime data", true},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			p := newRemoteAttestationACME(t, tt.o, staticHTTPClient{})
+			if p.remoteAttestation.tdx != nil {
+				p.remoteAttestation.tdx = tt.fake
+			}
+			_, _, err := p.VerifyRemoteAttestation(context.Background(), tt.record, "")
 			assert.ErrorContains(t, err, tt.wantErr)
 			assert.Equal(t, tt.wantInvalid, errors.Is(err, attestation.ErrInvalidEvidence))
 		})

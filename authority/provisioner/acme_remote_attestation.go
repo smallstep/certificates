@@ -43,9 +43,10 @@ type ACMERemoteAttestation struct {
 	// Require adds a remote-attestation identifier to every order that does
 	// not have one, so that every certificate needs attestation.
 	Require bool `json:"require,omitempty"`
-	// Formats are the evidence formats accepted: tdx, sev-snp and
-	// confidential-space. It defaults to tdx and sev-snp, and to
-	// confidential-space too if ConfidentialSpace is set.
+	// Formats are the evidence formats accepted: tdx, sev-snp,
+	// confidential-space and azure-tdx. It defaults to tdx and sev-snp, and
+	// to confidential-space too if ConfidentialSpace is set. azure-tdx is
+	// only accepted when listed.
 	Formats []attestation.Format `json:"formats,omitempty"`
 	// ClaimsHint is sent to clients as the challenge's attestClaimsHint.
 	ClaimsHint []string `json:"claimsHint,omitempty"`
@@ -148,8 +149,11 @@ func (p *ACME) initializeRemoteAttestation() error {
 		}
 		var err error
 		switch f {
-		case attestation.FormatTDX:
-			v.tdx, err = tdx.New(o.TDXRoots, collateral.TDX{Getter: getter})
+		case attestation.FormatTDX, attestation.FormatAzureTDX:
+			// Both formats verify a TDX quote, and share one verifier.
+			if v.tdx == nil {
+				v.tdx, err = tdx.New(o.TDXRoots, collateral.TDX{Getter: getter})
+			}
 		case attestation.FormatSEVSNP:
 			v.sevsnp, err = sevsnp.New(o.SEVSNPRoots, collateral.SEVSNP{Getter: getter})
 		case attestation.FormatConfidentialSpace:
@@ -208,6 +212,9 @@ func (p *ACME) IsEABRequired() bool {
 //   - For a TDX quote or an SEV-SNP report, sent as a configfs-tsm report
 //     (application/vnd.veraison.tsm-report+json or +cbor), its 64 bytes of
 //     report data.
+//   - For the evidence of an Azure confidential VM with Intel TDX
+//     (application/vnd.smallstep.azure-tdx+json), the 64 bytes of user data
+//     in the runtime claims its paravisor's quote commits to.
 //   - For a Confidential Space token (application/eat+jwt or application/jwt),
 //     its first eat_nonce value, the base64url encoding, without padding, of 32
 //     bytes. Its other nonces are the relying party's and stay in the claims.
@@ -233,6 +240,9 @@ func (p *ACME) VerifyRemoteAttestation(ctx context.Context, r *cmw.Record, defau
 	switch {
 	case tsm.IsMediaType(r.MediaType):
 		res, bound, err = v.verifyTSMReport(ctx, r)
+		size = RemoteAttestationBindingSize + RemoteAttestationClaimNonceSize
+	case tdx.IsAzureMediaType(r.MediaType):
+		res, bound, err = v.verifyAzureTDX(ctx, r)
 		size = RemoteAttestationBindingSize + RemoteAttestationClaimNonceSize
 	case isJWTMediaType(r.MediaType):
 		res, bound, err = v.verifyConfidentialSpace(r, defaultAudience)
@@ -292,6 +302,32 @@ func (v *remoteAttestationVerifier) verifyTSMReport(ctx context.Context, r *cmw.
 	default:
 		return nil, nil, attestation.Invalidf("tsm report provider %q is not supported", report.Provider)
 	}
+}
+
+// verifyAzureTDX verifies the evidence of an Azure confidential VM with Intel
+// TDX. Its guest cannot get a TDX quote itself, so it writes the binding and
+// the relying party's nonce as the user data of the runtime claims its
+// paravisor's quote commits to.
+func (v *remoteAttestationVerifier) verifyAzureTDX(ctx context.Context, r *cmw.Record) (*attestation.Result, []byte, error) {
+	if err := v.enabled(attestation.FormatAzureTDX); err != nil {
+		return nil, nil, err
+	}
+	if r.Indicator != 0 && !r.Indicator.Has(cmw.Evidence) {
+		return nil, nil, attestation.Invalidf("azure tdx evidence must be indicated as evidence")
+	}
+	e, err := tdx.ParseAzureEvidence(r.Value)
+	if err != nil {
+		return nil, nil, err
+	}
+	res, reportData, err := v.tdx.Verify(ctx, e.Quote)
+	if err != nil {
+		return nil, nil, err
+	}
+	runtime, userData, err := e.Claims(reportData)
+	if err != nil {
+		return nil, nil, err
+	}
+	return &attestation.Result{Format: attestation.FormatAzureTDX, TDX: res, AzureRuntime: runtime}, userData, nil
 }
 
 func (v *remoteAttestationVerifier) verifyConfidentialSpace(r *cmw.Record, defaultAudience string) (*attestation.Result, []byte, error) {
