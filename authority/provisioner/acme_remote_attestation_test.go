@@ -4,23 +4,27 @@ import (
 	"bytes"
 	"context"
 	"crypto/sha256"
+	"crypto/sha512"
 	"encoding/base64"
 	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"io"
 	"net/http"
+	"net/http/httptest"
 	"strings"
 	"testing"
 	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"go.step.sm/crypto/jose"
 
 	"github.com/smallstep/certificates/attestation"
 	"github.com/smallstep/certificates/attestation/cmw"
 	"github.com/smallstep/certificates/attestation/confidentialspace"
 	cstest "github.com/smallstep/certificates/attestation/confidentialspace/confidentialspacetest"
+	"github.com/smallstep/certificates/attestation/ita"
 	"github.com/smallstep/certificates/attestation/tdx"
 	"github.com/smallstep/certificates/authority/policy"
 	"github.com/smallstep/certificates/webhook"
@@ -465,6 +469,105 @@ func TestACME_VerifyRemoteAttestation_azureTDX(t *testing.T) {
 			_, _, err := p.VerifyRemoteAttestation(context.Background(), tt.record, "")
 			assert.ErrorContains(t, err, tt.wantErr)
 			assert.Equal(t, tt.wantInvalid, errors.Is(err, attestation.ErrInvalidEvidence))
+		})
+	}
+}
+
+// itaToken mints an Intel Trust Authority token for userData with the PKI's
+// leaf, published under kid.
+func itaToken(t *testing.T, pki *cstest.PKI, kid string, userData []byte, debuggable bool) string {
+	t.Helper()
+	sum := sha512.Sum512(userData)
+	now := time.Now()
+	claims := map[string]any{
+		"iss": ita.Issuer, "iat": now.Unix(), "nbf": now.Unix(), "exp": now.Add(5 * time.Minute).Unix(),
+		"tdx": map[string]any{
+			"tdx_is_debuggable":     debuggable,
+			"attester_user_data":    base64.StdEncoding.EncodeToString(userData),
+			"attester_runtime_data": map[string]any{"user-data": hex.EncodeToString(sum[:])},
+			"attester_tcb_status":   "UpToDate",
+		},
+	}
+	signer, err := jose.NewSigner(jose.SigningKey{Algorithm: jose.PS384, Key: pki.LeafKey},
+		new(jose.SignerOptions).WithType("JWT").WithHeader("kid", kid))
+	require.NoError(t, err)
+	token, err := jose.Signed(signer).Claims(claims).CompactSerialize()
+	require.NoError(t, err)
+	return token
+}
+
+func TestACME_VerifyRemoteAttestation_ita(t *testing.T) {
+	pki := cstest.New(t)
+	keys := jose.JSONWebKeySet{Keys: []jose.JSONWebKey{{
+		Key: pki.Leaf.PublicKey, KeyID: "kid", Algorithm: jose.PS384, Use: "sig", Certificates: pki.Chain(),
+	}}}
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		_ = json.NewEncoder(w).Encode(keys)
+	}))
+	defer srv.Close()
+	o := &ACMERemoteAttestation{ITA: &ACMEITA{Roots: pki.RootPEM(), JWKSURL: srv.URL}}
+	bound := testBound()
+
+	t.Run("ok", func(t *testing.T) {
+		p := newRemoteAttestationACME(t, o, srv.Client())
+		assert.Contains(t, p.remoteAttestation.formats, attestation.FormatITA, "ita is enabled when configured")
+		token := itaToken(t, pki, "kid", bound, false)
+		got, gotBound, err := p.VerifyRemoteAttestation(context.Background(),
+			jsonCMW("application/eat+jwt", []byte(token), cmw.AttestationResults), "")
+		require.NoError(t, err)
+		assert.Equal(t, bound, gotBound)
+		assert.Equal(t, attestation.FormatITA, got.Format)
+		require.NotNil(t, got.ITA)
+		assert.Equal(t, ita.Issuer, got.ITA.Claims["iss"])
+		assert.Nil(t, got.ConfidentialSpace)
+	})
+
+	tests := []struct {
+		name        string
+		o           *ACMERemoteAttestation
+		record      *cmw.Record
+		wantErr     string
+		wantInvalid bool
+	}{
+		{"fail not enabled", nil, jsonCMW("application/eat+jwt", []byte(itaToken(t, pki, "kid", bound, false)), 0),
+			"attestation format ita is not enabled", true},
+		{"fail indicator", o, jsonCMW("application/eat+jwt", []byte(itaToken(t, pki, "kid", bound, false)), cmw.Evidence),
+			"must be indicated as an attestation result", true},
+		{"fail debuggable", o, jsonCMW("application/eat+jwt", []byte(itaToken(t, pki, "kid", bound, true)), 0),
+			"debuggable", true},
+		{"fail binding size", o, jsonCMW("application/eat+jwt", []byte(itaToken(t, pki, "kid", bound[:32], false)), 0),
+			"not the base64 encoding of 64 bytes", true},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			p := newRemoteAttestationACME(t, tt.o, srv.Client())
+			_, _, err := p.VerifyRemoteAttestation(context.Background(), tt.record, "")
+			assert.ErrorContains(t, err, tt.wantErr)
+			assert.Equal(t, tt.wantInvalid, errors.Is(err, attestation.ErrInvalidEvidence))
+		})
+	}
+}
+
+func TestACME_Init_remoteAttestationITA(t *testing.T) {
+	for name, tt := range map[string]struct {
+		o       *ACMEITA
+		wantErr string
+	}{
+		"ok defaults":     {&ACMEITA{}, ""},
+		"fail roots":      {&ACMEITA{Roots: []byte("not pem")}, "no certificates found in ita.roots"},
+		"fail max age":    {&ACMEITA{MaxTokenAge: &Duration{Duration: -time.Second}}, "ita.maxTokenAge must be greater than 0"},
+		"ok listed alone": {nil, ""},
+	} {
+		t.Run(name, func(t *testing.T) {
+			p := &ACME{Type: "ACME", Name: "attested", Challenges: []ACMEChallenge{REMOTE_ATTEST_01},
+				RemoteAttestation: &ACMERemoteAttestation{Formats: []attestation.Format{attestation.FormatITA}, ITA: tt.o}}
+			err := p.Init(Config{Claims: globalProvisionerClaims, HTTPClient: staticHTTPClient{}})
+			if tt.wantErr == "" {
+				require.NoError(t, err)
+				assert.Equal(t, ita.DefaultJWKSURL, p.remoteAttestation.itaKeys.URL())
+			} else {
+				assert.ErrorContains(t, err, tt.wantErr)
+			}
 		})
 	}
 }

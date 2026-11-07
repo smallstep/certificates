@@ -31,12 +31,15 @@ const (
 	// whose paravisor reports for the guest, with the runtime claims the
 	// quote commits to.
 	FormatAzureTDX Format = "azure-tdx"
+	// FormatITA is an Intel Trust Authority token for an Intel TDX trust
+	// domain.
+	FormatITA Format = "ita"
 )
 
 // Validate returns an error if the format is not supported.
 func (f Format) Validate() error {
 	switch f {
-	case FormatTDX, FormatSEVSNP, FormatConfidentialSpace, FormatAzureTDX:
+	case FormatTDX, FormatSEVSNP, FormatConfidentialSpace, FormatAzureTDX, FormatITA:
 		return nil
 	default:
 		return fmt.Errorf("attestation format %q is not supported", f)
@@ -44,7 +47,7 @@ func (f Format) Validate() error {
 }
 
 // Result is verified attestation evidence. Binary values are hex encoded.
-// Exactly one of TDX, SEVSNP and ConfidentialSpace is set, as Format says;
+// Exactly one of TDX, SEVSNP, ConfidentialSpace and ITA is set, as Format says;
 // for FormatAzureTDX, TDX and AzureRuntime are both set.
 type Result struct {
 	// Format is the format of the evidence.
@@ -58,6 +61,18 @@ type Result struct {
 	SEVSNP            *SEVSNP            `json:"sevSnp,omitempty"`
 	ConfidentialSpace *ConfidentialSpace `json:"confidentialSpace,omitempty"`
 	AzureRuntime      *AzureRuntime      `json:"azureRuntime,omitempty"`
+	ITA               *ITA               `json:"ita,omitempty"`
+}
+
+// ITA holds the claims of a verified Intel Trust Authority token. On an Azure
+// confidential VM they include the vTPM's PCRs, which Intel Trust Authority
+// appraised, under tpm.pcrs.
+type ITA struct {
+	// Claims are all the claims of the token.
+	Claims map[string]any `json:"claims"`
+	// SignerSerialNumber is the serial number of the certificate of the key
+	// that signed the token.
+	SignerSerialNumber string `json:"signerSerialNumber,omitempty"`
 }
 
 // AzureRuntime holds the runtime claims of an Azure confidential VM, which the
