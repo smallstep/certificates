@@ -10,6 +10,25 @@ import (
 	"go.step.sm/crypto/kms"
 )
 
+// IssuerValidityLimit controls issuance beyond the selected issuing CA path.
+// The empty value uses truncation without explicitly configuring a backend.
+type IssuerValidityLimit string
+
+const (
+	IssuerValidityLimitTruncate IssuerValidityLimit = "truncate"
+	IssuerValidityLimitReject   IssuerValidityLimit = "reject"
+)
+
+// Validate accepts only the default, truncate, and reject policies.
+func (v IssuerValidityLimit) Validate() error {
+	switch v {
+	case "", IssuerValidityLimitTruncate, IssuerValidityLimitReject:
+		return nil
+	default:
+		return errors.New("issuerValidityLimit must be truncate or reject")
+	}
+}
+
 // Options represents the configuration options used to select and configure the
 // CertificateAuthorityService (CAS) to use.
 type Options struct {
@@ -42,6 +61,13 @@ type Options struct {
 	// bundled certificates to be returned in the chain to consumers. It is used
 	// used in SoftCAS and it is configured in the crt property of the ca.json.
 	CertificateChain []*x509.Certificate `json:"-"`
+
+	// IssuerValidityLimit bounds validity to the selected issuing CA path.
+	IssuerValidityLimit IssuerValidityLimit `json:"issuerValidityLimit,omitempty"`
+
+	// RootCertificates completes the signing path for SoftCAS policy checks.
+	// These roots are not added to the returned certificate chain.
+	RootCertificates []*x509.Certificate `json:"-"`
 
 	// Signer is the private key or a KMS signer for the issuer certificate. It
 	// is used in SoftCAS and it is configured in the key property of the
@@ -97,6 +123,9 @@ func (o *Options) Validate() error {
 	if o == nil {
 		typ = Type(SoftCAS)
 	} else {
+		if err := o.IssuerValidityLimit.Validate(); err != nil {
+			return err
+		}
 		typ = Type(o.Type)
 	}
 	// Check that the type can be loaded.

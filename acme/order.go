@@ -20,6 +20,7 @@ import (
 
 	"github.com/smallstep/certificates/acme/wire"
 	"github.com/smallstep/certificates/authority/provisioner"
+	casapi "github.com/smallstep/certificates/cas/apiv1"
 	"github.com/smallstep/certificates/webhook"
 )
 
@@ -314,6 +315,11 @@ func (o *Order) Finalize(ctx context.Context, db DB, csr *x509.CertificateReques
 				Detail: webhookErr.Message,
 			})
 			return acmeError
+		}
+
+		var validityErr *casapi.IssuerValidityError
+		if errors.As(err, &validityErr) {
+			return NewDetailedError(ErrorBadCSRType, "%s", validityErr.Error())
 		}
 
 		return WrapErrorISE(err, "error signing certificate for order %s", o.ID)

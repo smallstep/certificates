@@ -122,6 +122,8 @@ func generateRootCertificate(t *testing.T) (*x509.Certificate, crypto.Signer) {
 	require.NoError(t, err)
 
 	cert := template.GetCertificate()
+	cert.NotBefore = time.Now().Add(-time.Hour)
+	cert.NotAfter = time.Now().Add(365 * 24 * time.Hour)
 	cert, err = x509util.CreateCertificate(cert, cert, priv.Public(), priv)
 	require.NoError(t, err)
 	return cert, priv
@@ -140,6 +142,8 @@ func generateIntermidiateCertificate(t *testing.T, issuer *x509.Certificate, sig
 	require.NoError(t, err)
 
 	cert := template.GetCertificate()
+	cert.NotBefore = issuer.NotBefore
+	cert.NotAfter = issuer.NotAfter
 	cert, err = x509util.CreateCertificate(cert, issuer, priv.Public(), signer)
 	require.NoError(t, err)
 	return cert, priv
@@ -1118,6 +1122,7 @@ func TestAuthority_Renew(t *testing.T) {
 			_a := testAuthority(t)
 			_a.x509CAService.(*softcas.SoftCAS).CertificateChain = []*x509.Certificate{intCert}
 			_a.x509CAService.(*softcas.SoftCAS).Signer = intSigner
+			require.NoError(t, _a.x509CAService.(*softcas.SoftCAS).SetIssuerValidityLimit("", []*x509.Certificate{rootCert}))
 			return &renewTest{
 				auth: _a,
 				cert: cert,
@@ -1333,6 +1338,7 @@ func TestAuthority_Rekey(t *testing.T) {
 			_a := testAuthority(t)
 			_a.x509CAService.(*softcas.SoftCAS).CertificateChain = []*x509.Certificate{intCert}
 			_a.x509CAService.(*softcas.SoftCAS).Signer = intSigner
+			require.NoError(t, _a.x509CAService.(*softcas.SoftCAS).SetIssuerValidityLimit("", []*x509.Certificate{rootCert}))
 			return &renewTest{
 				auth: _a,
 				cert: cert,
@@ -1911,7 +1917,10 @@ func TestAuthority_constraints(t *testing.T) {
 				t.Fatal(err)
 			}
 
-			_, err = auth.SignWithContext(context.Background(), csr, provisioner.SignOptions{}, templateOption)
+			_, err = auth.SignWithContext(context.Background(), csr, provisioner.SignOptions{}, templateOption, &certificateDurationEnforcer{
+				NotBefore: time.Now().Add(-time.Minute),
+				NotAfter:  time.Now().Add(time.Hour),
+			})
 			if (err != nil) != tt.wantErr {
 				t.Errorf("Authority.SignWithContext() error = %v, wantErr %v", err, tt.wantErr)
 			}

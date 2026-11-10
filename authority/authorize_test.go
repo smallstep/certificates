@@ -1446,10 +1446,25 @@ func TestAuthority_AuthorizeRenewToken(t *testing.T) {
 	}
 
 	generateX5cToken := func(a *Authority, key crypto.Signer, claims jose.Claims, opts ...provisioner.SignOption) (string, *x509.Certificate) {
-		chain, err := a.SignWithContext(ctx, csr, provisioner.SignOptions{}, opts...)
+		// Token authorization must test already-expired credentials. Generate
+		// those fixtures directly instead of asking live issuance to create an
+		// expired leaf, which issuer-validity policy deliberately forbids.
+		template, err := x509util.NewCertificate(csr)
 		if err != nil {
 			t.Fatal(err)
 		}
+		leaf := template.GetCertificate()
+		for _, opt := range opts {
+			if err := opt.(provisioner.CertificateEnforcer).Enforce(leaf); err != nil {
+				t.Fatal(err)
+			}
+		}
+		issuer := getDefaultIssuer(a)
+		cert, err := x509util.CreateCertificate(leaf, issuer, csr.PublicKey, getDefaultSigner(a))
+		if err != nil {
+			t.Fatal(err)
+		}
+		chain := []*x509.Certificate{cert, issuer}
 
 		var x5c []string
 		for _, c := range chain {
