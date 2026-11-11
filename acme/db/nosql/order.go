@@ -131,7 +131,8 @@ func (db *DB) updateAddOrderIDs(ctx context.Context, accID string, includeReadyO
 		if !nosql.IsErrNotFound(err) {
 			return nil, errors.Wrapf(err, "error loading orderIDs for account %s", accID)
 		}
-	} else {
+	} else if len(b) > 0 {
+		// Empty when an earlier release saved a nil list (see #2425).
 		if err := json.Unmarshal(b, &oldOids); err != nil {
 			return nil, errors.Wrapf(err, "error unmarshaling orderIDs for account %s", accID)
 		}
@@ -158,20 +159,15 @@ func (db *DB) updateAddOrderIDs(ctx context.Context, accID string, includeReadyO
 		}
 	}
 	pendOids = append(pendOids, addOids...)
-	var (
-		_old any = oldOids
-		_new any = pendOids
-	)
+	var _old any = oldOids
 	switch {
 	case len(oldOids) == 0 && len(pendOids) == 0:
 		// If list has not changed from empty, then no need to write the DB.
 		return []string{}, nil
-	case len(oldOids) == 0:
+	case len(b) == 0:
 		_old = nil
-	case len(pendOids) == 0:
-		_new = nil
 	}
-	if err = db.save(ctx, accID, _new, _old, "orderIDsByAccountID", ordersByAccountIDTable); err != nil {
+	if err = db.save(ctx, accID, pendOids, _old, "orderIDsByAccountID", ordersByAccountIDTable); err != nil {
 		// Delete all orders that may have been previously stored if orderIDsByAccountID update fails.
 		for _, oid := range addOids {
 			// Ignore error from delete -- we tried our best.
