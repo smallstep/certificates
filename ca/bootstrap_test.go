@@ -471,7 +471,7 @@ func TestBootstrapClientServerRotation(t *testing.T) {
 	}
 
 	// wait for renew
-	time.Sleep(5 * time.Second)
+	time.Sleep(12 * time.Second)
 
 	// Reload with configuration with current and future root
 	ca.opts.configFile = "testdata/rotate-ca-1.json"
@@ -484,7 +484,7 @@ func TestBootstrapClientServerRotation(t *testing.T) {
 	}
 
 	// wait for renew
-	time.Sleep(5 * time.Second)
+	time.Sleep(12 * time.Second)
 
 	// Reload with new and old root
 	ca.opts.configFile = "testdata/rotate-ca-2.json"
@@ -497,7 +497,7 @@ func TestBootstrapClientServerRotation(t *testing.T) {
 	}
 
 	// wait for renew
-	time.Sleep(5 * time.Second)
+	time.Sleep(12 * time.Second)
 
 	// Reload with pnly the new root
 	ca.opts.configFile = "testdata/rotate-ca-3.json"
