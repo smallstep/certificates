@@ -646,6 +646,51 @@ func TestOrder_Finalize(t *testing.T) {
 				}),
 			}
 		},
+		"fail/template-error": func(t *testing.T) test {
+			now := clock.Now()
+			o := &Order{
+				ID:               "oID",
+				AccountID:        "accID",
+				Status:           StatusReady,
+				ExpiresAt:        now.Add(5 * time.Minute),
+				AuthorizationIDs: []string{"a"},
+				Identifiers: []Identifier{
+					{Type: "dns", Value: "foo.internal"},
+				},
+			}
+			csr := &x509.CertificateRequest{
+				Subject: pkix.Name{
+					CommonName: "foo.internal",
+				},
+			}
+			msg := "RSA key too short"
+
+			return test{
+				o:   o,
+				csr: csr,
+				prov: &MockProvisioner{
+					MauthorizeSign: func(ctx context.Context, token string) ([]provisioner.SignOption, error) {
+						return nil, nil
+					},
+					MgetOptions: func() *provisioner.Options {
+						return nil
+					},
+				},
+				ca: &mockSignAuth{
+					signWithContext: func(_ context.Context, _csr *x509.CertificateRequest, signOpts provisioner.SignOptions, extraOpts ...provisioner.SignOption) ([]*x509.Certificate, error) {
+						// Same wrapping as authority.Sign for template `fail` errors.
+						te := &x509util.TemplateError{Message: msg}
+						return nil, errs.BadRequestErr(te, "%s", te.Error())
+					},
+				},
+				db: &MockDB{
+					MockGetAuthorization: func(ctx context.Context, id string) (*Authorization, error) {
+						return &Authorization{ID: id, Status: StatusValid}, nil
+					},
+				},
+				err: NewDetailedError(ErrorBadCSRType, "%s", msg),
+			}
+		},
 		"fail/error-db.CreateCertificate": func(t *testing.T) test {
 			now := clock.Now()
 			o := &Order{
