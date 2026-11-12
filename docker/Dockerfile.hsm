@@ -18,6 +18,7 @@ COPY --from=kms /usr/local/bin/step-kms-plugin /usr/local/bin/step-kms-plugin
 
 USER root
 RUN apt-get update
+RUN apt-get upgrade -y
 RUN apt-get install -y --no-install-recommends opensc opensc-pkcs11 pcscd gnutls-bin libpcsclite1 p11-kit yubihsm-pkcs11
 RUN mkdir -p /run/pcscd
 RUN chown step:step /run/pcscd
