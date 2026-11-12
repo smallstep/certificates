@@ -249,6 +249,11 @@ func (p *K8sSA) AuthorizeRenew(ctx context.Context, cert *x509.Certificate) erro
 	return p.ctl.AuthorizeRenew(ctx, cert)
 }
 
+// NotifyX509Issued sends an issued certificate to the notifying webhooks.
+func (p *K8sSA) NotifyX509Issued(ctx context.Context, csr *x509.CertificateRequest, cert *x509.Certificate) error {
+	return p.ctl.NotifyX509Issued(ctx, csr, cert)
+}
+
 // AuthorizeSSHSign validates an request for an SSH certificate.
 func (p *K8sSA) AuthorizeSSHSign(_ context.Context, token string) ([]SignOption, error) {
 	if !p.ctl.Claimer.IsSSHCAEnabled() {

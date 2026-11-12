@@ -10,10 +10,12 @@ import (
 	"crypto/x509"
 	"crypto/x509/pkix"
 	"encoding/asn1"
+	"encoding/json"
 	"encoding/pem"
 	"errors"
 	"fmt"
 	"net/http"
+	"net/http/httptest"
 	"reflect"
 	"strings"
 	"testing"
@@ -34,6 +36,7 @@ import (
 	"github.com/smallstep/certificates/cas/softcas"
 	"github.com/smallstep/certificates/db"
 	"github.com/smallstep/certificates/errs"
+	"github.com/smallstep/certificates/webhook"
 	"github.com/smallstep/nosql/database"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -2172,5 +2175,126 @@ func TestAuthority_GetX509Signer(t *testing.T) {
 			tt.assertion(t, err)
 			assert.Equal(t, tt.want, got)
 		})
+	}
+}
+
+type mockNotifyingProvisioner struct {
+	provisioner.Interface
+	ctxErr error
+	err    error
+	called bool
+}
+
+func (p *mockNotifyingProvisioner) GetName() string { return "notifying" }
+
+func (p *mockNotifyingProvisioner) NotifyX509Issued(ctx context.Context, _ *x509.CertificateRequest, _ *x509.Certificate) error {
+	p.called, p.ctxErr = true, ctx.Err()
+	return p.err
+}
+
+type notifiedMeter struct {
+	noopMeter
+	calls int
+	err   error
+}
+
+func (m *notifiedMeter) X509WebhookNotified(_ provisioner.Interface, err error) {
+	m.calls, m.err = m.calls+1, err
+}
+
+func TestAuthority_callNotifyingWebhooksX509(t *testing.T) {
+	canceled, cancel := context.WithCancel(context.Background())
+	cancel()
+	errNotify := errors.New("notification failed")
+
+	tests := map[string]struct {
+		prov       provisioner.Interface
+		notifier   *mockNotifyingProvisioner
+		wrap       bool
+		expectErr  error
+		meterCalls int
+	}{
+		"ok/scep notifies on its own": {
+			prov:       &provisioner.SCEP{Name: "scep"},
+			meterCalls: 0,
+		},
+		"ok": {
+			notifier:   &mockNotifyingProvisioner{},
+			meterCalls: 1,
+		},
+		"ok/wrapped": {
+			notifier:   &mockNotifyingProvisioner{},
+			wrap:       true,
+			meterCalls: 1,
+		},
+		"fail": {
+			notifier:   &mockNotifyingProvisioner{err: errNotify},
+			expectErr:  errNotify,
+			meterCalls: 1,
+		},
+	}
+	for name, tt := range tests {
+		t.Run(name, func(t *testing.T) {
+			m := &notifiedMeter{}
+			a := &Authority{meter: m}
+
+			prov := tt.prov
+			if tt.notifier != nil {
+				prov = tt.notifier
+				if tt.wrap {
+					prov = wrapProvisioner(tt.notifier, nil)
+				}
+			}
+
+			err := a.callNotifyingWebhooksX509(canceled, prov, nil, &x509.Certificate{})
+			assert.Equal(t, tt.expectErr, err)
+			assert.Equal(t, tt.meterCalls, m.calls)
+			assert.Equal(t, tt.expectErr, m.err)
+			if tt.notifier != nil {
+				assert.True(t, tt.notifier.called)
+				assert.NoError(t, tt.notifier.ctxErr, "the notification must not be canceled with the request")
+			}
+		})
+	}
+}
+
+func TestAuthority_Renew_notifyingWebhooks(t *testing.T) {
+	notified := make(chan []byte, 1)
+	ts := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		var body webhook.RequestBody
+		require.NoError(t, json.NewDecoder(r.Body).Decode(&body))
+		notified <- body.X509Certificate.Raw
+		require.NoError(t, json.NewEncoder(w).Encode(webhook.ResponseBody{}))
+	}))
+	defer ts.Close()
+
+	a := testAuthority(t, WithWebhookClient(ts.Client()))
+	a.config.AuthorityConfig.Template = &ASN1DN{CommonName: "renew"}
+
+	// Configure a notifying webhook on the provisioner that issued the
+	// certificate.
+	p := a.config.AuthorityConfig.Provisioners[0].(*provisioner.JWK)
+	p.Options = &provisioner.Options{
+		Webhooks: []*provisioner.Webhook{{Name: "people", Kind: "NOTIFYING", URL: ts.URL}},
+	}
+	config, err := a.generateProvisionerConfig(context.Background())
+	require.NoError(t, err)
+	require.NoError(t, p.Init(config))
+
+	now := time.Now().UTC()
+	cert := generateCertificate(t, "renew", []string{"test.smallstep.com"},
+		withNotBeforeNotAfter(now.Add(-time.Minute), now.Add(time.Hour)),
+		withDefaultASN1DN(a.config.AuthorityConfig.Template),
+		withProvisionerOID("Max", p.Key.KeyID),
+		withSigner(getDefaultIssuer(a), getDefaultSigner(a)))
+
+	chain, err := a.Renew(cert)
+	require.NoError(t, err)
+
+	select {
+	case raw := <-notified:
+		assert.Equal(t, chain[0].Raw, raw)
+	case <-time.After(5 * time.Second):
+		t.Fatal("the renewed certificate was not sent to the notifying webhook")
 	}
 }

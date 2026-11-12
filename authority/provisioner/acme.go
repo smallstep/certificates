@@ -461,6 +461,11 @@ func (p *ACME) AuthorizeRenew(ctx context.Context, cert *x509.Certificate) error
 	return p.ctl.AuthorizeRenew(ctx, cert)
 }
 
+// NotifyX509Issued sends an issued certificate to the notifying webhooks.
+func (p *ACME) NotifyX509Issued(ctx context.Context, csr *x509.CertificateRequest, cert *x509.Certificate) error {
+	return p.ctl.NotifyX509Issued(ctx, csr, cert)
+}
+
 // IsChallengeEnabled checks if the given challenge is enabled. By default
 // http-01, dns-01 and tls-alpn-01 are enabled, to disable any of them the
 // Challenge provisioner property should have at least one element.
