@@ -242,6 +242,13 @@ func MustFromContext(ctx context.Context) *Authority {
 
 // ReloadAdminResources reloads admins and provisioners from the DB.
 func (a *Authority) ReloadAdminResources(ctx context.Context) error {
+	a.adminMutex.Lock()
+	defer a.adminMutex.Unlock()
+	return a.reloadAdminResources(ctx)
+}
+
+// reloadAdminResources requires adminMutex to be held by the caller.
+func (a *Authority) reloadAdminResources(ctx context.Context) error {
 	var (
 		provList  provisioner.List
 		adminList []*linkedca.Admin
