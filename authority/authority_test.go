@@ -158,6 +158,31 @@ func TestAuthorityNew(t *testing.T) {
 				err:    errors.New(`error reading "wrong": no such file or directory`),
 			}
 		},
+		"fail config commonName equals issuer CN": func(t *testing.T) *newTest {
+			c, err := LoadConfiguration("../ca/testdata/ca.json")
+			assert.FatalError(t, err)
+			// Intermediate CA in testdata has CN "smallstep Intermediate CA".
+			// Setting Config.CommonName to the same value would make the CA's
+			// own TLS certificate appear self-signed.
+			c.CommonName = "smallstep Intermediate CA"
+			return &newTest{
+				config: c,
+				err: errors.New(`config commonName "smallstep Intermediate CA" must not be equal to the issuing CA certificate's CommonName`),
+			}
+		},
+		"fail template commonName equals issuer CN": func(t *testing.T) *newTest {
+			c, err := LoadConfiguration("../ca/testdata/ca.json")
+			assert.FatalError(t, err)
+			// Setting authority.template.commonName to the intermediate CA's CN
+			// would make every issued leaf certificate appear self-signed.
+			c.AuthorityConfig.Template = &ASN1DN{
+				CommonName: "smallstep Intermediate CA",
+			}
+			return &newTest{
+				config: c,
+				err: errors.New(`authority.template.commonName "smallstep Intermediate CA" must not be equal to the issuing CA certificate's CommonName`),
+			}
+		},
 	}
 
 	for name, genTestCase := range tests {
