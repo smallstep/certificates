@@ -33,7 +33,7 @@
                 },
                 "claims": {
                     "minTLSCertDuration": "1s",
-                    "defaultTLSCertDuration": "5s"
+                    "defaultTLSCertDuration": "15s"
                 }
             }
         ],
