@@ -864,6 +864,7 @@ ZYtQ9Ot36qc=
 					if assert.True(t, ok) {
 						assert.Equal(t, &provisioner.AttestationData{
 							PermanentIdentifier: "1234567890",
+							Format:              "step",
 						}, p.AttestationData())
 					}
 					if assert.Len(t, certs, 2) {
@@ -879,6 +880,7 @@ ZYtQ9Ot36qc=
 				csr:  csr,
 				extraOpts: append(extraOpts, provisioner.AttestationData{
 					PermanentIdentifier: "1234567890",
+					Format:              "step",
 				}),
 				signOpts:        signOpts,
 				notBefore:       signOpts.NotBefore.Time().Truncate(time.Second),

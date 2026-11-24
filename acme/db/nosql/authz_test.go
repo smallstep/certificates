@@ -73,13 +73,14 @@ func TestDB_getDBAuthz(t *testing.T) {
 					Type:  "dns",
 					Value: "test.ca.smallstep.com",
 				},
-				Status:       acme.StatusPending,
-				Token:        "token",
-				CreatedAt:    now,
-				ExpiresAt:    now.Add(5 * time.Minute),
-				Error:        acme.NewErrorISE("The server experienced an internal error"),
-				ChallengeIDs: []string{"foo", "bar"},
-				Wildcard:     true,
+				Status:            acme.StatusPending,
+				Token:             "token",
+				CreatedAt:         now,
+				ExpiresAt:         now.Add(5 * time.Minute),
+				Error:             acme.NewErrorISE("The server experienced an internal error"),
+				ChallengeIDs:      []string{"foo", "bar"},
+				Wildcard:          true,
+				AttestationFormat: "apple",
 			}
 			b, err := json.Marshal(dbaz)
 			assert.FatalError(t, err)
@@ -125,9 +126,24 @@ func TestDB_getDBAuthz(t *testing.T) {
 				assert.Equals(t, dbaz.ExpiresAt, tc.dbaz.ExpiresAt)
 				assert.Equals(t, dbaz.Error.Error(), tc.dbaz.Error.Error())
 				assert.Equals(t, dbaz.Wildcard, tc.dbaz.Wildcard)
+				assert.Equals(t, dbaz.AttestationFormat, tc.dbaz.AttestationFormat)
 			}
 		})
 	}
+}
+
+func TestDB_getDBAuthzLegacyAttestationFormat(t *testing.T) {
+	d := DB{db: &db.MockNoSQLDB{
+		MGet: func(bucket, key []byte) ([]byte, error) {
+			assert.Equals(t, bucket, authzTable)
+			assert.Equals(t, string(key), "azID")
+			return []byte(`{"id":"azID"}`), nil
+		},
+	}}
+
+	dbaz, err := d.getDBAuthz(context.Background(), "azID")
+	assert.FatalError(t, err)
+	assert.Equals(t, dbaz.AttestationFormat, "")
 }
 
 func TestDB_GetAuthorization(t *testing.T) {
@@ -250,13 +266,14 @@ func TestDB_GetAuthorization(t *testing.T) {
 					Type:  "dns",
 					Value: "test.ca.smallstep.com",
 				},
-				Status:       acme.StatusPending,
-				Token:        "token",
-				CreatedAt:    now,
-				ExpiresAt:    now.Add(5 * time.Minute),
-				Error:        acme.NewErrorISE("The server experienced an internal error"),
-				ChallengeIDs: []string{"foo", "bar"},
-				Wildcard:     true,
+				Status:            acme.StatusPending,
+				Token:             "token",
+				CreatedAt:         now,
+				ExpiresAt:         now.Add(5 * time.Minute),
+				Error:             acme.NewErrorISE("The server experienced an internal error"),
+				ChallengeIDs:      []string{"foo", "bar"},
+				Wildcard:          true,
+				AttestationFormat: "android-key",
 			}
 			b, err := json.Marshal(dbaz)
 			assert.FatalError(t, err)
@@ -317,6 +334,7 @@ func TestDB_GetAuthorization(t *testing.T) {
 				assert.Equals(t, az.Token, tc.dbaz.Token)
 				assert.Equals(t, az.Wildcard, tc.dbaz.Wildcard)
 				assert.Equals(t, az.ExpiresAt, tc.dbaz.ExpiresAt)
+				assert.Equals(t, az.AttestationFormat, tc.dbaz.AttestationFormat)
 				assert.Equals(t, az.Challenges, []*acme.Challenge{
 					{ID: "foo"},
 					{ID: "bar"},
@@ -404,8 +422,9 @@ func TestDB_CreateAuthorization(t *testing.T) {
 						{ID: "foo"},
 						{ID: "bar"},
 					},
-					Wildcard: true,
-					Error:    acme.NewErrorISE("force"),
+					Wildcard:          true,
+					AttestationFormat: "step",
+					Error:             acme.NewErrorISE("force"),
 				}
 			)
 			return test{
@@ -428,6 +447,7 @@ func TestDB_CreateAuthorization(t *testing.T) {
 						assert.Equals(t, dbaz.Token, az.Token)
 						assert.Equals(t, dbaz.ChallengeIDs, []string{"foo", "bar"})
 						assert.Equals(t, dbaz.Wildcard, az.Wildcard)
+						assert.Equals(t, dbaz.AttestationFormat, az.AttestationFormat)
 						assert.Equals(t, dbaz.ExpiresAt, az.ExpiresAt)
 						assert.Nil(t, dbaz.Error)
 						assert.True(t, clock.Now().Add(-time.Minute).Before(dbaz.CreatedAt))
@@ -467,13 +487,14 @@ func TestDB_UpdateAuthorization(t *testing.T) {
 			Type:  "dns",
 			Value: "test.ca.smallstep.com",
 		},
-		Status:       acme.StatusPending,
-		Token:        "token",
-		CreatedAt:    now,
-		ExpiresAt:    now.Add(5 * time.Minute),
-		ChallengeIDs: []string{"foo", "bar"},
-		Wildcard:     true,
-		Fingerprint:  "fingerprint",
+		Status:            acme.StatusPending,
+		Token:             "token",
+		CreatedAt:         now,
+		ExpiresAt:         now.Add(5 * time.Minute),
+		ChallengeIDs:      []string{"foo", "bar"},
+		Wildcard:          true,
+		Fingerprint:       "fingerprint",
+		AttestationFormat: "apple",
 	}
 	b, err := json.Marshal(dbaz)
 	assert.FatalError(t, err)
@@ -550,11 +571,12 @@ func TestDB_UpdateAuthorization(t *testing.T) {
 					{ID: "foo"},
 					{ID: "bar"},
 				},
-				Token:       dbaz.Token,
-				Wildcard:    dbaz.Wildcard,
-				ExpiresAt:   dbaz.ExpiresAt,
-				Fingerprint: "fingerprint",
-				Error:       acme.NewError(acme.ErrorMalformedType, "malformed"),
+				Token:             dbaz.Token,
+				Wildcard:          dbaz.Wildcard,
+				ExpiresAt:         dbaz.ExpiresAt,
+				Fingerprint:       "fingerprint",
+				AttestationFormat: "tpm",
+				Error:             acme.NewError(acme.ErrorMalformedType, "malformed"),
 			}
 			return test{
 				az: updAz,
@@ -585,6 +607,7 @@ func TestDB_UpdateAuthorization(t *testing.T) {
 						assert.Equals(t, dbNew.CreatedAt, dbaz.CreatedAt)
 						assert.Equals(t, dbNew.ExpiresAt, dbaz.ExpiresAt)
 						assert.Equals(t, dbNew.Fingerprint, dbaz.Fingerprint)
+						assert.Equals(t, dbNew.AttestationFormat, "tpm")
 						assert.Equals(t, dbNew.Error.Error(), acme.NewError(acme.ErrorMalformedType, "The request message was malformed").Error())
 						return nu, true, nil
 					},
@@ -669,12 +692,13 @@ func TestDB_GetAuthorizationsByAccountID(t *testing.T) {
 					Type:  "dns",
 					Value: "test.ca.smallstep.com",
 				},
-				Status:       acme.StatusValid,
-				Token:        "token",
-				CreatedAt:    now,
-				ExpiresAt:    now.Add(5 * time.Minute),
-				ChallengeIDs: []string{"foo", "bar"},
-				Wildcard:     true,
+				Status:            acme.StatusValid,
+				Token:             "token",
+				CreatedAt:         now,
+				ExpiresAt:         now.Add(5 * time.Minute),
+				ChallengeIDs:      []string{"foo", "bar"},
+				Wildcard:          true,
+				AttestationFormat: "apple",
 			}
 			b, err := json.Marshal(dbaz)
 			assert.FatalError(t, err)
@@ -694,15 +718,16 @@ func TestDB_GetAuthorizationsByAccountID(t *testing.T) {
 				},
 				authzs: []*acme.Authorization{
 					{
-						ID:         dbaz.ID,
-						AccountID:  dbaz.AccountID,
-						Token:      dbaz.Token,
-						Identifier: dbaz.Identifier,
-						Status:     dbaz.Status,
-						Challenges: nil,
-						Wildcard:   dbaz.Wildcard,
-						ExpiresAt:  dbaz.ExpiresAt,
-						Error:      dbaz.Error,
+						ID:                dbaz.ID,
+						AccountID:         dbaz.AccountID,
+						Token:             dbaz.Token,
+						Identifier:        dbaz.Identifier,
+						Status:            dbaz.Status,
+						Challenges:        nil,
+						Wildcard:          dbaz.Wildcard,
+						ExpiresAt:         dbaz.ExpiresAt,
+						Error:             dbaz.Error,
+						AttestationFormat: dbaz.AttestationFormat,
 					},
 				},
 			}
