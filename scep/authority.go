@@ -372,6 +372,10 @@ func (a *Authority) SignCSR(ctx context.Context, csr *x509.CertificateRequest, m
 		return nil, fmt.Errorf("failed selecting signer: %w", err)
 	}
 
+	if p.ShouldUseLegacyRSADigestEncryptionAlgorithm() {
+		signedData.SetEncryptionAlgorithm(pkcs7.OIDEncryptionAlgorithmRSA)
+	}
+
 	// sign the attributes
 	if err := signedData.AddSigner(signerCert, signer, config); err != nil {
 		return nil, err
@@ -424,6 +428,8 @@ func (a *Authority) encrypt(content []byte, recipients []*x509.Certificate, algo
 
 // CreateFailureResponse creates an appropriately signed reply for PKI operations
 func (a *Authority) CreateFailureResponse(ctx context.Context, _ *x509.CertificateRequest, msg *PKIMessage, info FailInfoName, infoText string) (*PKIMessage, error) {
+	p := provisionerFromContext(ctx)
+
 	config := pkcs7.SignerInfoConfig{
 		ExtraSignedAttributes: []pkcs7.Attribute{
 			{
@@ -465,6 +471,10 @@ func (a *Authority) CreateFailureResponse(ctx context.Context, _ *x509.Certifica
 	signerCert, signer, err := a.selectSigner(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("failed selecting signer: %w", err)
+	}
+
+	if p.ShouldUseLegacyRSADigestEncryptionAlgorithm() {
+		signedData.SetEncryptionAlgorithm(pkcs7.OIDEncryptionAlgorithmRSA)
 	}
 
 	// sign the attributes
@@ -510,6 +520,13 @@ func (a *Authority) GetCACaps(ctx context.Context) []string {
 	// not be reported in cacaps operation.
 
 	return caps
+}
+
+// ShouldAllowUnsortedAuthenticatedAttributes indicates whether verification may
+// accept authenticated attributes in their encoded order for the current provisioner.
+func (a *Authority) ShouldAllowUnsortedAuthenticatedAttributes(ctx context.Context) bool {
+	p := provisionerFromContext(ctx)
+	return p.ShouldAllowUnsortedAuthenticatedAttributes()
 }
 
 func (a *Authority) ValidateChallenge(ctx context.Context, csr *x509.CertificateRequest, challenge, transactionID string) ([]provisioner.SignCSROption, error) {
