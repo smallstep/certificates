@@ -17,6 +17,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/google/uuid"
 	"golang.org/x/crypto/ssh"
 
 	"go.step.sm/crypto/jose"
@@ -24,12 +25,13 @@ import (
 	"go.step.sm/crypto/randutil"
 	"go.step.sm/crypto/x509util"
 
-	"github.com/google/uuid"
 	"github.com/smallstep/assert"
 	"github.com/smallstep/certificates/api/render"
 	"github.com/smallstep/certificates/authority/provisioner"
 	"github.com/smallstep/certificates/db"
 	"github.com/smallstep/certificates/errs"
+
+	"github.com/smallstep/certificates/authority/internal/sshtest"
 )
 
 var testAudiences = provisioner.Audiences{
@@ -710,8 +712,7 @@ func TestAuthority_Authorize(t *testing.T) {
 			sshSigner, err := ssh.NewSignerFromSigner(signer)
 			assert.FatalError(t, err)
 
-			cert, _jwk, err := createSSHCert(&ssh.Certificate{CertType: ssh.HostCert}, sshSigner)
-			assert.FatalError(t, err)
+			cert, _jwk := sshtest.CreateCertificate(t, &ssh.Certificate{CertType: ssh.HostCert}, sshSigner)
 
 			p, ok := a.provisioners.Load("sshpop/sshpop")
 			assert.Fatal(t, ok, "sshpop provisioner not found in test authority")
@@ -780,8 +781,7 @@ func TestAuthority_Authorize(t *testing.T) {
 			sshSigner, err := ssh.NewSignerFromSigner(signer)
 			assert.FatalError(t, err)
 
-			cert, _jwk, err := createSSHCert(&ssh.Certificate{CertType: ssh.HostCert}, sshSigner)
-			assert.FatalError(t, err)
+			cert, _jwk := sshtest.CreateCertificate(t, &ssh.Certificate{CertType: ssh.HostCert}, sshSigner)
 
 			p, ok := a.provisioners.Load("sshpop/sshpop")
 			assert.Fatal(t, ok, "sshpop provisioner not found in test authority")
@@ -1011,28 +1011,6 @@ func generateSSHToken(sub, iss, aud string, iat time.Time, sshOpts *provisioner.
 	return jose.Signed(sig).Claims(claims).Serialize()
 }
 
-func createSSHCert(cert *ssh.Certificate, signer ssh.Signer) (*ssh.Certificate, *jose.JSONWebKey, error) {
-	now := time.Now()
-	jwk, err := jose.GenerateJWK("EC", "P-256", "ES256", "sig", "foo", 0)
-	if err != nil {
-		return nil, nil, err
-	}
-	cert.Key, err = ssh.NewPublicKey(jwk.Public().Key)
-	if err != nil {
-		return nil, nil, err
-	}
-	if cert.ValidAfter == 0 {
-		cert.ValidAfter = uint64(now.Unix())
-	}
-	if cert.ValidBefore == 0 {
-		cert.ValidBefore = uint64(now.Add(time.Hour).Unix())
-	}
-	if err := cert.SignCert(rand.Reader, signer); err != nil {
-		return nil, nil, err
-	}
-	return cert, jwk, nil
-}
-
 func TestAuthority_authorizeSSHSign(t *testing.T) {
 	a := testAuthority(t)
 
@@ -1123,8 +1101,7 @@ func TestAuthority_authorizeSSHRenew(t *testing.T) {
 		assert.Fatal(t, ok, "could not cast ssh signing key to crypto signer")
 		sshSigner, err := ssh.NewSignerFromSigner(signer)
 		assert.FatalError(t, err)
-		cert, jwk, err := createSSHCert(&ssh.Certificate{CertType: ssh.HostCert}, sshSigner)
-		assert.FatalError(t, err)
+		cert, jwk := sshtest.CreateCertificate(t, &ssh.Certificate{CertType: ssh.HostCert}, sshSigner)
 		token, err := generateToken("foo", p.GetName(), testAudiences.SSHRenew[0]+"#sshpop/sshpop", []string{"foo.smallstep.com"}, now, jwk, withSSHPOPFile(cert))
 		assert.FatalError(t, err)
 		return cert, token
@@ -1291,8 +1268,7 @@ func TestAuthority_authorizeSSHRevoke(t *testing.T) {
 			sshSigner, err := ssh.NewSignerFromSigner(signer)
 			assert.FatalError(t, err)
 
-			cert, _jwk, err := createSSHCert(&ssh.Certificate{CertType: ssh.HostCert}, sshSigner)
-			assert.FatalError(t, err)
+			cert, _jwk := sshtest.CreateCertificate(t, &ssh.Certificate{CertType: ssh.HostCert}, sshSigner)
 
 			p, ok := a.provisioners.Load("sshpop/sshpop")
 			assert.Fatal(t, ok, "sshpop provisioner not found in test authority")
@@ -1383,8 +1359,7 @@ func TestAuthority_authorizeSSHRekey(t *testing.T) {
 			sshSigner, err := ssh.NewSignerFromSigner(signer)
 			assert.FatalError(t, err)
 
-			cert, _jwk, err := createSSHCert(&ssh.Certificate{CertType: ssh.HostCert}, sshSigner)
-			assert.FatalError(t, err)
+			cert, _jwk := sshtest.CreateCertificate(t, &ssh.Certificate{CertType: ssh.HostCert}, sshSigner)
 
 			p, ok := a.provisioners.Load("sshpop/sshpop")
 			assert.Fatal(t, ok, "sshpop provisioner not found in test authority")
