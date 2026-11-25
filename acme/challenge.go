@@ -418,7 +418,7 @@ func wireOIDC01Validate(ctx context.Context, ch *Challenge, db WireDB, jwk *jose
 
 	var oidcPayload wireOidcPayload
 	if err := json.Unmarshal(payload, &oidcPayload); err != nil {
-		return WrapError(ErrorMalformedType, err, "error unmarshalling Wire OIDC challenge payload")
+		return WrapDetailedError(ErrorMalformedType, err, "error unmarshalling Wire OIDC challenge payload")
 	}
 
 	wireID, err := wire.ParseUserID(ch.Value)
@@ -434,7 +434,7 @@ func wireOIDC01Validate(ctx context.Context, ch *Challenge, db WireDB, jwk *jose
 
 	idToken, err := verifier.Verify(ctx, oidcPayload.IDToken)
 	if err != nil {
-		return storeError(ctx, db, ch, true, WrapError(ErrorRejectedIdentifierType, err,
+		return storeError(ctx, db, ch, true, WrapDetailedError(ErrorRejectedIdentifierType, err,
 			"error verifying ID token signature"))
 	}
 
@@ -447,7 +447,7 @@ func wireOIDC01Validate(ctx context.Context, ch *Challenge, db WireDB, jwk *jose
 		ACMEAudience string `json:"acme_aud,omitempty"`
 	}
 	if err := idToken.Claims(&claims); err != nil {
-		return storeError(ctx, db, ch, true, WrapError(ErrorRejectedIdentifierType, err,
+		return storeError(ctx, db, ch, true, WrapDetailedError(ErrorRejectedIdentifierType, err,
 			"error retrieving claims from ID token"))
 	}
 
@@ -457,20 +457,20 @@ func wireOIDC01Validate(ctx context.Context, ch *Challenge, db WireDB, jwk *jose
 		return WrapErrorISE(err, "error determining key authorization")
 	}
 	if expectedKeyAuth != claims.KeyAuth {
-		return storeError(ctx, db, ch, true, NewError(ErrorRejectedIdentifierType,
+		return storeError(ctx, db, ch, true, NewDetailedError(ErrorRejectedIdentifierType,
 			"keyAuthorization does not match; expected %q, but got %q", expectedKeyAuth, claims.KeyAuth))
 	}
 
 	// audience is the full URL to the challenge
 	acmeAudience := linker.GetLink(ctx, ChallengeLinkType, ch.AuthorizationID, ch.ID)
 	if claims.ACMEAudience != acmeAudience {
-		return storeError(ctx, db, ch, true, NewError(ErrorRejectedIdentifierType,
+		return storeError(ctx, db, ch, true, NewDetailedError(ErrorRejectedIdentifierType,
 			"invalid 'acme_aud' %q", claims.ACMEAudience))
 	}
 
 	transformedIDToken, err := validateWireOIDCClaims(oidcOptions, idToken, wireID)
 	if err != nil {
-		return storeError(ctx, db, ch, true, WrapError(ErrorRejectedIdentifierType, err, "claims in OIDC ID token don't match"))
+		return storeError(ctx, db, ch, true, WrapDetailedError(ErrorRejectedIdentifierType, err, "claims in OIDC ID token don't match"))
 	}
 
 	// Update and store the challenge.
@@ -548,7 +548,7 @@ func wireDPOP01Validate(ctx context.Context, ch *Challenge, db WireDB, accountJW
 
 	var dpopPayload wireDpopPayload
 	if err := json.Unmarshal(payload, &dpopPayload); err != nil {
-		return WrapError(ErrorMalformedType, err, "error unmarshalling Wire DPoP challenge payload")
+		return WrapDetailedError(ErrorMalformedType, err, "error unmarshalling Wire DPoP challenge payload")
 	}
 
 	wireID, err := wire.ParseDeviceID(ch.Value)
@@ -583,7 +583,7 @@ func wireDPOP01Validate(ctx context.Context, ch *Challenge, db WireDB, accountJW
 	}
 	_, dpop, err := parseAndVerifyWireAccessToken(params)
 	if err != nil {
-		return storeError(ctx, db, ch, true, WrapError(ErrorRejectedIdentifierType, err,
+		return storeError(ctx, db, ch, true, WrapDetailedError(ErrorRejectedIdentifierType, err,
 			"failed validating Wire access token"))
 	}
 
