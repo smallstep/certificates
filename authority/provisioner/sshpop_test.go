@@ -3,7 +3,6 @@ package provisioner
 import (
 	"context"
 	"crypto"
-	"crypto/rand"
 	"encoding/base64"
 	"errors"
 	"fmt"
@@ -18,6 +17,8 @@ import (
 
 	"github.com/smallstep/assert"
 	"github.com/smallstep/certificates/api/render"
+
+	"github.com/smallstep/certificates/authority/internal/sshtest"
 )
 
 func TestSSHPOP_Getters(t *testing.T) {
@@ -38,28 +39,6 @@ func TestSSHPOP_Getters(t *testing.T) {
 		t.Errorf("SSHPOP.GetEncryptedKey() = (%v, %v, %v), want (%v, %v, %v)",
 			kid, key, ok, "", "", false)
 	}
-}
-
-func createSSHCert(cert *ssh.Certificate, signer ssh.Signer) (*ssh.Certificate, *jose.JSONWebKey, error) {
-	now := time.Now()
-	jwk, err := jose.GenerateJWK("EC", "P-256", "ES256", "sig", "foo", 0)
-	if err != nil {
-		return nil, nil, err
-	}
-	cert.Key, err = ssh.NewPublicKey(jwk.Public().Key)
-	if err != nil {
-		return nil, nil, err
-	}
-	if cert.ValidAfter == 0 {
-		cert.ValidAfter = uint64(now.Unix())
-	}
-	if cert.ValidBefore == 0 {
-		cert.ValidBefore = uint64(now.Add(time.Hour).Unix())
-	}
-	if err := cert.SignCert(rand.Reader, signer); err != nil {
-		return nil, nil, err
-	}
-	return cert, jwk, nil
 }
 
 func generateSSHPOPToken(p Interface, cert *ssh.Certificate, jwk *jose.JSONWebKey) (string, error) {
@@ -95,11 +74,10 @@ func TestSSHPOP_authorizeToken(t *testing.T) {
 		"fail/cert-not-yet-valid": func(t *testing.T) test {
 			p, err := generateSSHPOP()
 			assert.FatalError(t, err)
-			cert, jwk, err := createSSHCert(&ssh.Certificate{
+			cert, jwk := sshtest.CreateCertificate(t, &ssh.Certificate{
 				CertType:   ssh.UserCert,
 				ValidAfter: uint64(time.Now().Add(time.Minute).Unix()),
 			}, sshSigner)
-			assert.FatalError(t, err)
 			tok, err := generateSSHPOPToken(p, cert, jwk)
 			assert.FatalError(t, err)
 			return test{
@@ -112,11 +90,10 @@ func TestSSHPOP_authorizeToken(t *testing.T) {
 		"fail/cert-past-validity": func(t *testing.T) test {
 			p, err := generateSSHPOP()
 			assert.FatalError(t, err)
-			cert, jwk, err := createSSHCert(&ssh.Certificate{
+			cert, jwk := sshtest.CreateCertificate(t, &ssh.Certificate{
 				CertType:    ssh.UserCert,
 				ValidBefore: uint64(time.Now().Add(-time.Minute).Unix()),
 			}, sshSigner)
-			assert.FatalError(t, err)
 			tok, err := generateSSHPOPToken(p, cert, jwk)
 			assert.FatalError(t, err)
 			return test{
@@ -129,8 +106,7 @@ func TestSSHPOP_authorizeToken(t *testing.T) {
 		"fail/no-signer-found": func(t *testing.T) test {
 			p, err := generateSSHPOP()
 			assert.FatalError(t, err)
-			cert, jwk, err := createSSHCert(&ssh.Certificate{CertType: ssh.HostCert}, sshSigner)
-			assert.FatalError(t, err)
+			cert, jwk := sshtest.CreateCertificate(t, &ssh.Certificate{CertType: ssh.HostCert}, sshSigner)
 			tok, err := generateSSHPOPToken(p, cert, jwk)
 			assert.FatalError(t, err)
 			return test{
@@ -143,8 +119,7 @@ func TestSSHPOP_authorizeToken(t *testing.T) {
 		"fail/error-parsing-claims-bad-sig": func(t *testing.T) test {
 			p, err := generateSSHPOP()
 			assert.FatalError(t, err)
-			cert, _, err := createSSHCert(&ssh.Certificate{CertType: ssh.UserCert}, sshSigner)
-			assert.FatalError(t, err)
+			cert, _ := sshtest.CreateCertificate(t, &ssh.Certificate{CertType: ssh.UserCert}, sshSigner)
 			otherJWK, err := jose.GenerateJWK("EC", "P-256", "ES256", "sig", "", 0)
 			assert.FatalError(t, err)
 			tok, err := generateSSHPOPToken(p, cert, otherJWK)
@@ -159,8 +134,7 @@ func TestSSHPOP_authorizeToken(t *testing.T) {
 		"fail/invalid-claims-issuer": func(t *testing.T) test {
 			p, err := generateSSHPOP()
 			assert.FatalError(t, err)
-			cert, jwk, err := createSSHCert(&ssh.Certificate{CertType: ssh.UserCert}, sshSigner)
-			assert.FatalError(t, err)
+			cert, jwk := sshtest.CreateCertificate(t, &ssh.Certificate{CertType: ssh.UserCert}, sshSigner)
 			tok, err := generateToken("foo", "bar", testAudiences.Sign[0], "",
 				[]string{"test.smallstep.com"}, time.Now(), jwk, withSSHPOPFile(cert))
 			assert.FatalError(t, err)
@@ -174,8 +148,7 @@ func TestSSHPOP_authorizeToken(t *testing.T) {
 		"fail/invalid-audience": func(t *testing.T) test {
 			p, err := generateSSHPOP()
 			assert.FatalError(t, err)
-			cert, jwk, err := createSSHCert(&ssh.Certificate{CertType: ssh.UserCert}, sshSigner)
-			assert.FatalError(t, err)
+			cert, jwk := sshtest.CreateCertificate(t, &ssh.Certificate{CertType: ssh.UserCert}, sshSigner)
 			tok, err := generateToken("foo", p.GetName(), "invalid-aud", "",
 				[]string{"test.smallstep.com"}, time.Now(), jwk, withSSHPOPFile(cert))
 			assert.FatalError(t, err)
@@ -189,8 +162,7 @@ func TestSSHPOP_authorizeToken(t *testing.T) {
 		"fail/empty-subject": func(t *testing.T) test {
 			p, err := generateSSHPOP()
 			assert.FatalError(t, err)
-			cert, jwk, err := createSSHCert(&ssh.Certificate{CertType: ssh.UserCert}, sshSigner)
-			assert.FatalError(t, err)
+			cert, jwk := sshtest.CreateCertificate(t, &ssh.Certificate{CertType: ssh.UserCert}, sshSigner)
 			tok, err := generateToken("", p.GetName(), testAudiences.Sign[0], "",
 				[]string{"test.smallstep.com"}, time.Now(), jwk, withSSHPOPFile(cert))
 			assert.FatalError(t, err)
@@ -204,8 +176,7 @@ func TestSSHPOP_authorizeToken(t *testing.T) {
 		"ok": func(t *testing.T) test {
 			p, err := generateSSHPOP()
 			assert.FatalError(t, err)
-			cert, jwk, err := createSSHCert(&ssh.Certificate{CertType: ssh.UserCert}, sshSigner)
-			assert.FatalError(t, err)
+			cert, jwk := sshtest.CreateCertificate(t, &ssh.Certificate{CertType: ssh.UserCert}, sshSigner)
 			tok, err := generateSSHPOPToken(p, cert, jwk)
 			assert.FatalError(t, err)
 			return test{
@@ -260,8 +231,7 @@ func TestSSHPOP_AuthorizeSSHRevoke(t *testing.T) {
 		"fail/subject-not-equal-serial": func(t *testing.T) test {
 			p, err := generateSSHPOP()
 			assert.FatalError(t, err)
-			cert, jwk, err := createSSHCert(&ssh.Certificate{CertType: ssh.UserCert}, sshSigner)
-			assert.FatalError(t, err)
+			cert, jwk := sshtest.CreateCertificate(t, &ssh.Certificate{CertType: ssh.UserCert}, sshSigner)
 			tok, err := generateToken("foo", p.GetName(), testAudiences.SSHRevoke[0], "",
 				[]string{"test.smallstep.com"}, time.Now(), jwk, withSSHPOPFile(cert))
 			assert.FatalError(t, err)
@@ -275,8 +245,7 @@ func TestSSHPOP_AuthorizeSSHRevoke(t *testing.T) {
 		"ok": func(t *testing.T) test {
 			p, err := generateSSHPOP()
 			assert.FatalError(t, err)
-			cert, jwk, err := createSSHCert(&ssh.Certificate{Serial: 123455, CertType: ssh.UserCert}, sshSigner)
-			assert.FatalError(t, err)
+			cert, jwk := sshtest.CreateCertificate(t, &ssh.Certificate{Serial: 123455, CertType: ssh.UserCert}, sshSigner)
 			tok, err := generateToken("123455", p.GetName(), testAudiences.SSHRevoke[0], "",
 				[]string{"test.smallstep.com"}, time.Now(), jwk, withSSHPOPFile(cert))
 			assert.FatalError(t, err)
@@ -340,8 +309,7 @@ func TestSSHPOP_AuthorizeSSHRenew(t *testing.T) {
 		"fail/not-host-cert": func(t *testing.T) test {
 			p, err := generateSSHPOP()
 			assert.FatalError(t, err)
-			cert, jwk, err := createSSHCert(&ssh.Certificate{CertType: ssh.UserCert}, sshUserSigner)
-			assert.FatalError(t, err)
+			cert, jwk := sshtest.CreateCertificate(t, &ssh.Certificate{CertType: ssh.UserCert}, sshUserSigner)
 			tok, err := generateToken("foo", p.GetName(), testAudiences.SSHRenew[0], "",
 				[]string{"test.smallstep.com"}, time.Now(), jwk, withSSHPOPFile(cert))
 			assert.FatalError(t, err)
@@ -355,8 +323,7 @@ func TestSSHPOP_AuthorizeSSHRenew(t *testing.T) {
 		"ok": func(t *testing.T) test {
 			p, err := generateSSHPOP()
 			assert.FatalError(t, err)
-			cert, jwk, err := createSSHCert(&ssh.Certificate{Serial: 123455, CertType: ssh.HostCert}, sshHostSigner)
-			assert.FatalError(t, err)
+			cert, jwk := sshtest.CreateCertificate(t, &ssh.Certificate{Serial: 123455, CertType: ssh.HostCert}, sshHostSigner)
 			tok, err := generateToken("123455", p.GetName(), testAudiences.SSHRenew[0], "",
 				[]string{"test.smallstep.com"}, time.Now(), jwk, withSSHPOPFile(cert))
 			assert.FatalError(t, err)
@@ -423,8 +390,7 @@ func TestSSHPOP_AuthorizeSSHRekey(t *testing.T) {
 		"fail/not-host-cert": func(t *testing.T) test {
 			p, err := generateSSHPOP()
 			assert.FatalError(t, err)
-			cert, jwk, err := createSSHCert(&ssh.Certificate{CertType: ssh.UserCert}, sshUserSigner)
-			assert.FatalError(t, err)
+			cert, jwk := sshtest.CreateCertificate(t, &ssh.Certificate{CertType: ssh.UserCert}, sshUserSigner)
 			tok, err := generateToken("foo", p.GetName(), testAudiences.SSHRekey[0], "",
 				[]string{"test.smallstep.com"}, time.Now(), jwk, withSSHPOPFile(cert))
 			assert.FatalError(t, err)
@@ -438,8 +404,7 @@ func TestSSHPOP_AuthorizeSSHRekey(t *testing.T) {
 		"ok": func(t *testing.T) test {
 			p, err := generateSSHPOP()
 			assert.FatalError(t, err)
-			cert, jwk, err := createSSHCert(&ssh.Certificate{Serial: 123455, CertType: ssh.HostCert}, sshHostSigner)
-			assert.FatalError(t, err)
+			cert, jwk := sshtest.CreateCertificate(t, &ssh.Certificate{Serial: 123455, CertType: ssh.HostCert}, sshHostSigner)
 			tok, err := generateToken("123455", p.GetName(), testAudiences.SSHRekey[0], "",
 				[]string{"test.smallstep.com"}, time.Now(), jwk, withSSHPOPFile(cert))
 			assert.FatalError(t, err)
@@ -557,9 +522,7 @@ func TestSSHPOP_ExtractSSHPOPCert(t *testing.T) {
 			}
 		},
 		"ok": func(t *testing.T) test {
-			cert, jwk, err := createSSHCert(&ssh.Certificate{Serial: 123455, CertType: ssh.HostCert}, sshHostSigner)
-
-			assert.FatalError(t, err)
+			cert, jwk := sshtest.CreateCertificate(t, &ssh.Certificate{Serial: 123455, CertType: ssh.HostCert}, sshHostSigner)
 			tok, err := generateToken("123455", "sshpop-provisioner", testAudiences.SSHRekey[0], "",
 				[]string{"test.smallstep.com"}, time.Now(), jwk, withSSHPOPFile(cert))
 			assert.FatalError(t, err)
