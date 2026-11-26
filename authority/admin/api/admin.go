@@ -33,6 +33,7 @@ type adminAuthority interface {
 	CreateAuthorityPolicy(ctx context.Context, admin *linkedca.Admin, policy *linkedca.Policy) (*linkedca.Policy, error)
 	UpdateAuthorityPolicy(ctx context.Context, admin *linkedca.Admin, policy *linkedca.Policy) (*linkedca.Policy, error)
 	RemoveAuthorityPolicy(ctx context.Context) error
+	ReloadAdminResources(ctx context.Context) error
 }
 
 // CreateAdminRequest represents the body for a CreateAdmin request.
