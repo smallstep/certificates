@@ -976,6 +976,18 @@ func (a *Authority) IsRevoked(sn string) (bool, error) {
 	return a.db.IsRevoked(sn)
 }
 
+// IsKeyRevoked returns whether or not the public key with the given DER
+// encoded SubjectPublicKeyInfo has been revoked: a certificate with that key
+// was revoked with the reason keyCompromise. A database that doesn't
+// implement db.KeyRevocationDB has no revoked keys.
+func (a *Authority) IsKeyRevoked(rawSubjectPublicKeyInfo []byte) (bool, error) {
+	kdb, ok := a.db.(db.KeyRevocationDB)
+	if !ok || len(rawSubjectPublicKeyInfo) == 0 {
+		return false, nil
+	}
+	return kdb.IsKeyRevoked(db.KeyFingerprint(rawSubjectPublicKeyInfo))
+}
+
 // requiresSCEP iterates over the configured provisioners
 // and determines if at least one of them is a SCEP provisioner.
 func (a *Authority) requiresSCEP() bool {

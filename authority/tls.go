@@ -18,6 +18,7 @@ import (
 	"time"
 
 	"github.com/pkg/errors"
+	"golang.org/x/crypto/ocsp"
 	"golang.org/x/crypto/ssh"
 
 	"go.step.sm/crypto/jose"
@@ -134,6 +135,15 @@ func (a *Authority) signX509(ctx context.Context, csr *x509.CertificateRequest, 
 	if err := csr.CheckSignature(); err != nil {
 		return nil, nil, errs.ApplyOptions(
 			errs.BadRequestErr(err, "invalid certificate request"),
+			opts...,
+		)
+	}
+	switch isKeyRevoked, err := a.IsKeyRevoked(csr.RawSubjectPublicKeyInfo); {
+	case err != nil:
+		return nil, nil, errs.Wrap(http.StatusInternalServerError, err, "authority.Sign", opts...)
+	case isKeyRevoked:
+		return nil, nil, errs.ApplyOptions(
+			errs.Forbidden("authority.Sign: the key in the certificate request has been revoked"),
 			opts...,
 		)
 	}
@@ -389,6 +399,21 @@ func (a *Authority) renewContext(ctx context.Context, oldCert *x509.Certificate,
 	prov, err := a.authorizeRenew(ctx, oldCert)
 	if err != nil {
 		return nil, prov, errs.StatusCodeError(http.StatusInternalServerError, err, opts...)
+	}
+
+	// A rekey must not move to a revoked key either.
+	if isRekey {
+		sn := errs.WithKeyVal("serialNumber", oldCert.SerialNumber.String())
+		der, err := x509.MarshalPKIXPublicKey(pk)
+		if err != nil {
+			return nil, prov, errs.Wrap(http.StatusBadRequest, err, "authority.Rekey; invalid public key", sn)
+		}
+		switch isKeyRevoked, err := a.IsKeyRevoked(der); {
+		case err != nil:
+			return nil, prov, errs.Wrap(http.StatusInternalServerError, err, "authority.Rekey", sn)
+		case isKeyRevoked:
+			return nil, prov, errs.ApplyOptions(errs.Forbidden("authority.Rekey: the new key has been revoked"), sn)
+		}
 	}
 
 	// Durations
@@ -713,12 +738,38 @@ func (a *Authority) Revoke(ctx context.Context, revokeOpts *RevokeOptions) error
 }
 
 func (a *Authority) revoke(crt *x509.Certificate, rci *db.RevokedCertificateInfo) error {
+	var err error
 	if lca, ok := a.adminDB.(interface {
 		Revoke(*x509.Certificate, *db.RevokedCertificateInfo) error
 	}); ok {
-		return lca.Revoke(crt, rci)
+		err = lca.Revoke(crt, rci)
+	} else {
+		err = a.db.Revoke(rci)
 	}
-	return a.db.Revoke(rci)
+	if err != nil {
+		return err
+	}
+	return a.revokeKey(crt, rci)
+}
+
+// revokeKey records the key of a certificate revoked for key compromise as
+// revoked, if the database supports it: no certificate with that key can be
+// renewed, rekeyed or signed afterwards. This covers the certificates renewed
+// from it, whose serial numbers the revoker may not know. Other reasons only
+// revoke the certificate itself, as a certificate is also revoked when it's
+// replaced while its key stays in use.
+func (a *Authority) revokeKey(crt *x509.Certificate, rci *db.RevokedCertificateInfo) error {
+	if rci.ReasonCode != ocsp.KeyCompromise || crt == nil {
+		return nil
+	}
+	kdb, ok := a.db.(db.KeyRevocationDB)
+	if !ok {
+		return nil
+	}
+	if err := kdb.RevokeKey(db.KeyFingerprint(crt.RawSubjectPublicKeyInfo), rci); err != nil && !errors.Is(err, db.ErrAlreadyExists) {
+		return errors.Wrap(err, "error revoking certificate key")
+	}
+	return nil
 }
 
 func (a *Authority) revokeSSH(crt *ssh.Certificate, rci *db.RevokedCertificateInfo) error {

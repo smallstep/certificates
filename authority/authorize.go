@@ -314,6 +314,15 @@ func (a *Authority) authorizeRenew(ctx context.Context, cert *x509.Certificate) 
 	if isRevoked {
 		return nil, errs.Unauthorized("authority.authorizeRenew: certificate has been revoked", opts...)
 	}
+	// A renewal keeps the key of the certificate it renews, so a revoked key
+	// blocks the renewal of every certificate with it, valid or expired.
+	isKeyRevoked, err := a.IsKeyRevoked(cert.RawSubjectPublicKeyInfo)
+	if err != nil {
+		return nil, errs.Wrap(http.StatusInternalServerError, err, "authority.authorizeRenew", opts...)
+	}
+	if isKeyRevoked {
+		return nil, errs.Unauthorized("authority.authorizeRenew: certificate key has been revoked", opts...)
+	}
 	p, err := a.LoadProvisionerByCertificate(cert)
 	if err != nil {
 		var ok bool
