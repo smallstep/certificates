@@ -8,6 +8,8 @@ import (
 	"fmt"
 	"net"
 	"net/http"
+	"net/url"
+	"slices"
 	"strings"
 	"sync/atomic"
 	"time"
@@ -16,6 +18,7 @@ import (
 	"golang.org/x/sync/singleflight"
 
 	"github.com/smallstep/linkedca"
+	"go.step.sm/crypto/x509util"
 
 	"github.com/smallstep/certificates/acme/wire"
 )
@@ -37,6 +40,8 @@ const (
 	WIREOIDC_01 ACMEChallenge = "wire-oidc-01"
 	// WIREDPOP_01 is the Wire DPoP challenge.
 	WIREDPOP_01 ACMEChallenge = "wire-dpop-01"
+	// DNS_PERSIST_01 is the dns-persist-01 ACME challenge.
+	DNS_PERSIST_01 ACMEChallenge = "dns-persist-01"
 )
 
 // String returns a normalized version of the challenge.
@@ -47,7 +52,7 @@ func (c ACMEChallenge) String() string {
 // Validate returns an error if the acme challenge is not a valid one.
 func (c ACMEChallenge) Validate() error {
 	switch ACMEChallenge(c.String()) {
-	case HTTP_01, DNS_01, TLS_ALPN_01, DEVICE_ATTEST_01, WIREOIDC_01, WIREDPOP_01:
+	case HTTP_01, DNS_01, TLS_ALPN_01, DEVICE_ATTEST_01, WIREOIDC_01, WIREDPOP_01, DNS_PERSIST_01:
 		return nil
 	default:
 		return fmt.Errorf("acme challenge %q is not supported", c)
@@ -116,9 +121,21 @@ type ACME struct {
 	RequireEAB bool `json:"requireEAB,omitempty"`
 	// Challenges contains the enabled challenges for this provisioner. If this
 	// value is not set the default http-01, dns-01 and tls-alpn-01 challenges
-	// will be enabled, device-attest-01, wire-oidc-01 and wire-dpop-01 will be
-	// disabled.
+	// will be enabled, device-attest-01, wire-oidc-01, wire-dpop-01 and
+	// dns-persist-01 will be disabled.
 	Challenges []ACMEChallenge `json:"challenges,omitempty"`
+	// IssuerDomainNames is an array of domain names that the ACME server
+	// identifies itself with in dns-persist-01 validation records. They must
+	// be lowercase A-labels without a trailing dot and, if CaaIdentities is
+	// set, they must be included in it. Between 1 and 10 names are required
+	// if dns-persist-01 is enabled.
+	IssuerDomainNames []string `json:"issuerDomainNames,omitempty"`
+	// AccountHashPrefix is the URL prefix used to build the hashed account
+	// URIs in dns-persist-01 validation records, e.g.
+	// https://ca.example.com/acme/account-hash/. Validation records are
+	// bound to this value, so it must not change once records have been
+	// provisioned. It is required if dns-persist-01 is enabled.
+	AccountHashPrefix string `json:"accountHashPrefix,omitempty"`
 	// AttestationFormats contains the enabled attestation formats for this
 	// provisioner. If this value is not set the default apple, step and tpm
 	// will be used.
@@ -250,6 +267,10 @@ func (p *ACME) Init(config Config) (err error) {
 		return fmt.Errorf("failed initializing Wire options: %w", err)
 	}
 
+	if err := p.validateDNSPersistOptions(); err != nil {
+		return fmt.Errorf("failed validating dns-persist-01 options: %w", err)
+	}
+
 	p.androidCRL = &androidCRLCache{}
 
 	p.ctl, err = NewController(p, p.Claims, config, p.Options)
@@ -369,6 +390,86 @@ func (p *ACME) initializeWireOptions() error {
 	return nil
 }
 
+// maxIssuerDomainNames is the maximum number of issuer domain names that can be
+// sent in a dns-persist-01 challenge.
+const maxIssuerDomainNames = 10
+
+// validateDNSPersistOptions validates the properties required by the
+// dns-persist-01 challenge. It'll return early if the challenge is not
+// enabled.
+func (p *ACME) validateDNSPersistOptions() error {
+	hasDNSPersistChallenge := false
+	for _, c := range p.Challenges {
+		if ACMEChallenge(c.String()) == DNS_PERSIST_01 {
+			hasDNSPersistChallenge = true
+			break
+		}
+	}
+	if !hasDNSPersistChallenge {
+		return nil
+	}
+
+	switch n := len(p.IssuerDomainNames); {
+	case n == 0:
+		return errors.New("issuerDomainNames cannot be empty")
+	case n > maxIssuerDomainNames:
+		return fmt.Errorf("issuerDomainNames cannot have more than %d names", maxIssuerDomainNames)
+	}
+
+	// If the provisioner advertises CAA identities, the issuer domain names
+	// must be a subset of them. CAA identities are compared after applying
+	// the same normalization.
+	var caaIdentities []string
+	for _, id := range p.CaaIdentities {
+		if name, err := normalizeIssuerDomainName(id); err == nil {
+			caaIdentities = append(caaIdentities, name)
+		}
+	}
+
+	for _, name := range p.IssuerDomainNames {
+		normalized, err := normalizeIssuerDomainName(name)
+		if err != nil {
+			return fmt.Errorf("issuerDomainNames %q is not valid: %w", name, err)
+		}
+		if name != normalized {
+			return fmt.Errorf("issuerDomainNames %q must be a lowercase A-label without a trailing dot; use %q instead", name, normalized)
+		}
+		if len(p.CaaIdentities) > 0 && !slices.Contains(caaIdentities, name) {
+			return fmt.Errorf("issuerDomainNames %q must be included in caaIdentities", name)
+		}
+	}
+
+	if p.AccountHashPrefix == "" {
+		return errors.New("accountHashPrefix cannot be empty")
+	}
+	// The hashed account URI is a parameter value in the validation record,
+	// so the prefix cannot contain whitespace, semicolons or non-ASCII
+	// characters, see RFC 8659, section 4.2.
+	for _, c := range []byte(p.AccountHashPrefix) {
+		if c < 0x21 || c > 0x7e || c == ';' {
+			return fmt.Errorf("accountHashPrefix %q contains invalid characters", p.AccountHashPrefix)
+		}
+	}
+	if u, err := url.Parse(p.AccountHashPrefix + "sha-256/"); err != nil || !u.IsAbs() {
+		return fmt.Errorf("accountHashPrefix %q is not a valid absolute URL prefix", p.AccountHashPrefix)
+	}
+
+	return nil
+}
+
+// normalizeIssuerDomainName returns the given domain name as a lowercase
+// A-label without a trailing dot.
+func normalizeIssuerDomainName(name string) (string, error) {
+	normalized, err := x509util.SanitizeName(strings.TrimSuffix(name, "."))
+	if err != nil {
+		return "", err
+	}
+	if len(normalized) > 253 {
+		return "", errors.New("domain name cannot be longer than 253 octets")
+	}
+	return normalized, nil
+}
+
 // ACMEIdentifierType encodes ACME Identifier types
 type ACMEIdentifierType string
 
@@ -477,6 +578,18 @@ func (p *ACME) IsChallengeEnabled(_ context.Context, challenge ACMEChallenge) bo
 		}
 	}
 	return false
+}
+
+// GetIssuerDomainNames returns the issuer domain names used in dns-persist-01
+// challenges.
+func (p *ACME) GetIssuerDomainNames() []string {
+	return p.IssuerDomainNames
+}
+
+// GetAccountHashPrefix returns the URL prefix used in the hashed account URIs
+// of dns-persist-01 validation records.
+func (p *ACME) GetAccountHashPrefix() string {
+	return p.AccountHashPrefix
 }
 
 // IsAttestationFormatEnabled checks if the given attestation format is enabled.

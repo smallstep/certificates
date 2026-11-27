@@ -501,9 +501,10 @@ func TestDB_UpdateAuthorization(t *testing.T) {
 		},
 		"fail/db.CmpAndSwap-error": func(t *testing.T) test {
 			updAz := &acme.Authorization{
-				ID:     azID,
-				Status: acme.StatusValid,
-				Error:  acme.NewError(acme.ErrorMalformedType, "malformed"),
+				ID:        azID,
+				Status:    acme.StatusValid,
+				ExpiresAt: now.Add(time.Minute),
+				Error:     acme.NewError(acme.ErrorMalformedType, "malformed"),
 			}
 			return test{
 				az: updAz,
@@ -532,7 +533,7 @@ func TestDB_UpdateAuthorization(t *testing.T) {
 						assert.Equals(t, dbNew.ChallengeIDs, dbaz.ChallengeIDs)
 						assert.Equals(t, dbNew.Wildcard, dbaz.Wildcard)
 						assert.Equals(t, dbNew.CreatedAt, dbaz.CreatedAt)
-						assert.Equals(t, dbNew.ExpiresAt, dbaz.ExpiresAt)
+						assert.Equals(t, dbNew.ExpiresAt, updAz.ExpiresAt)
 						assert.Equals(t, dbNew.Error.Error(), acme.NewError(acme.ErrorMalformedType, "The request message was malformed").Error())
 						return nil, false, errors.New("force")
 					},

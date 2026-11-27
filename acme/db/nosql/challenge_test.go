@@ -200,6 +200,45 @@ func TestDB_CreateChallenge(t *testing.T) {
 				_id: idPtr,
 			}
 		},
+		"ok/dns-persist-01": func(t *testing.T) test {
+			var (
+				id    string
+				idPtr = &id
+				ch    = &acme.Challenge{
+					AccountID:         "accountID",
+					Type:              "dns-persist-01",
+					Status:            acme.StatusPending,
+					Value:             "test.ca.smallstep.com",
+					IssuerDomainNames: []string{"ca.example.com", "ca.example.net"},
+				}
+			)
+
+			return test{
+				ch: ch,
+				db: &db.MockNoSQLDB{
+					MCmpAndSwap: func(bucket, key, old, nu []byte) ([]byte, bool, error) {
+						*idPtr = string(key)
+						assert.Equals(t, bucket, challengeTable)
+						assert.Equals(t, string(key), ch.ID)
+						assert.Equals(t, old, nil)
+
+						dbc := new(dbChallenge)
+						assert.FatalError(t, json.Unmarshal(nu, dbc))
+						assert.Equals(t, dbc.ID, string(key))
+						assert.Equals(t, dbc.AccountID, ch.AccountID)
+						assert.Equals(t, dbc.Type, ch.Type)
+						assert.Equals(t, dbc.Status, ch.Status)
+						assert.Equals(t, dbc.Token, "")
+						assert.Equals(t, dbc.Value, ch.Value)
+						assert.Equals(t, dbc.IssuerDomainNames, ch.IssuerDomainNames)
+						assert.True(t, clock.Now().Add(-time.Minute).Before(dbc.CreatedAt))
+						assert.True(t, clock.Now().Add(time.Minute).After(dbc.CreatedAt))
+						return nil, true, nil
+					},
+				},
+				_id: idPtr,
+			}
+		},
 	}
 	for name, run := range tests {
 		tc := run(t)
@@ -280,6 +319,32 @@ func TestDB_GetChallenge(t *testing.T) {
 				dbc: dbc,
 			}
 		},
+		"ok/dns-persist-01": func(t *testing.T) test {
+			dbc := &dbChallenge{
+				ID:                chID,
+				AccountID:         "accountID",
+				Type:              "dns-persist-01",
+				Status:            acme.StatusPending,
+				Value:             "test.ca.smallstep.com",
+				IssuerDomainNames: []string{"ca.example.com", "ca.example.net"},
+				CreatedAt:         clock.Now(),
+				ValidatedAt:       "foobar",
+				Error:             acme.NewErrorISE("The server experienced an internal error"),
+			}
+			b, err := json.Marshal(dbc)
+			assert.FatalError(t, err)
+			return test{
+				db: &db.MockNoSQLDB{
+					MGet: func(bucket, key []byte) ([]byte, error) {
+						assert.Equals(t, bucket, challengeTable)
+						assert.Equals(t, string(key), chID)
+
+						return b, nil
+					},
+				},
+				dbc: dbc,
+			}
+		},
 	}
 	for name, run := range tests {
 		tc := run(t)
@@ -307,6 +372,7 @@ func TestDB_GetChallenge(t *testing.T) {
 				assert.Equals(t, ch.Status, tc.dbc.Status)
 				assert.Equals(t, ch.Token, tc.dbc.Token)
 				assert.Equals(t, ch.Value, tc.dbc.Value)
+				assert.Equals(t, ch.IssuerDomainNames, tc.dbc.IssuerDomainNames)
 				assert.Equals(t, ch.ValidatedAt, tc.dbc.ValidatedAt)
 				assert.Equals(t, ch.Error.Error(), tc.dbc.Error.Error())
 			}

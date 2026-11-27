@@ -588,6 +588,19 @@ MCowBQYDK2VwAyEA5c+4NKZSNQcR1T8qN6SjwgdPZQ0Ge12Ylx/YeGAJ35k=
 			provisioner.WIREDPOP_01,
 		},
 	}
+	dnsPersistProvisioner := &provisioner.ACME{
+		Type: "ACME",
+		Name: "test@acme-<test>provisioner.com",
+		Challenges: []provisioner.ACMEChallenge{
+			provisioner.DNS_01,
+			provisioner.DNS_PERSIST_01,
+		},
+		IssuerDomainNames: []string{"ca.example.com", "ca.example.net"},
+		AccountHashPrefix: "https://ca.example.com/acme/account-hash/",
+	}
+	if err := dnsPersistProvisioner.Init(provisioner.Config{Claims: globalProvisionerClaims}); err != nil {
+		t.Fatal(err)
+	}
 	type test struct {
 		az   *acme.Authorization
 		prov acme.Provisioner
@@ -860,6 +873,106 @@ MCowBQYDK2VwAyEA5c+4NKZSNQcR1T8qN6SjwgdPZQ0Ge12Ylx/YeGAJ35k=
 						})
 						assert.Equals(t, _az.ExpiresAt, az.ExpiresAt)
 						assert.Equals(t, _az.Challenges, []*acme.Challenge{*ch1})
+						assert.Equals(t, _az.Wildcard, true)
+						return nil
+					},
+				},
+				az: az,
+			}
+		},
+		"ok/dns-persist-01": func(t *testing.T) test {
+			az := &acme.Authorization{
+				AccountID: "accID",
+				Identifier: acme.Identifier{
+					Type:  "dns",
+					Value: "zap.internal",
+				},
+				Status:    acme.StatusPending,
+				ExpiresAt: clock.Now(),
+			}
+			count := 0
+			var ch1, ch2 **acme.Challenge
+			return test{
+				prov: dnsPersistProvisioner,
+				db: &acme.MockDB{
+					MockCreateChallenge: func(ctx context.Context, ch *acme.Challenge) error {
+						switch count {
+						case 0:
+							ch.ID = "dns"
+							assert.Equals(t, ch.Type, acme.DNS01)
+							assert.Equals(t, ch.Token, az.Token)
+							assert.Equals(t, len(ch.IssuerDomainNames), 0)
+							ch1 = &ch
+						case 1:
+							ch.ID = "dns-persist"
+							assert.Equals(t, ch.Type, acme.DNSPERSIST01)
+							assert.Equals(t, ch.Token, "")
+							assert.Equals(t, ch.IssuerDomainNames, []string{"ca.example.com", "ca.example.net"})
+							ch2 = &ch
+						default:
+							assert.FatalError(t, errors.New("test logic error"))
+							return errors.New("force")
+						}
+						count++
+						assert.Equals(t, ch.AccountID, az.AccountID)
+						assert.Equals(t, ch.Status, acme.StatusPending)
+						assert.Equals(t, ch.Value, "zap.internal")
+						return nil
+					},
+					MockCreateAuthorization: func(ctx context.Context, _az *acme.Authorization) error {
+						assert.Equals(t, _az.AccountID, az.AccountID)
+						assert.Equals(t, _az.Token, az.Token)
+						assert.Equals(t, _az.Status, acme.StatusPending)
+						assert.Equals(t, _az.Identifier, az.Identifier)
+						assert.Equals(t, _az.ExpiresAt, az.ExpiresAt)
+						assert.Equals(t, _az.Challenges, []*acme.Challenge{*ch1, *ch2})
+						assert.Equals(t, _az.Wildcard, false)
+						return nil
+					},
+				},
+				az: az,
+			}
+		},
+		"ok/dns-persist-01-wildcard": func(t *testing.T) test {
+			az := &acme.Authorization{
+				AccountID: "accID",
+				Identifier: acme.Identifier{
+					Type:  "dns",
+					Value: "*.zap.internal",
+				},
+				Status:    acme.StatusPending,
+				ExpiresAt: clock.Now(),
+			}
+			count := 0
+			var ch1, ch2 **acme.Challenge
+			return test{
+				prov: dnsPersistProvisioner,
+				db: &acme.MockDB{
+					MockCreateChallenge: func(ctx context.Context, ch *acme.Challenge) error {
+						switch count {
+						case 0:
+							ch.ID = "dns"
+							assert.Equals(t, ch.Type, acme.DNS01)
+							ch1 = &ch
+						case 1:
+							ch.ID = "dns-persist"
+							assert.Equals(t, ch.Type, acme.DNSPERSIST01)
+							assert.Equals(t, ch.IssuerDomainNames, []string{"ca.example.com", "ca.example.net"})
+							ch2 = &ch
+						default:
+							assert.FatalError(t, errors.New("test logic error"))
+							return errors.New("force")
+						}
+						count++
+						assert.Equals(t, ch.Value, "zap.internal")
+						return nil
+					},
+					MockCreateAuthorization: func(ctx context.Context, _az *acme.Authorization) error {
+						assert.Equals(t, _az.Identifier, acme.Identifier{
+							Type:  "dns",
+							Value: "zap.internal",
+						})
+						assert.Equals(t, _az.Challenges, []*acme.Challenge{*ch1, *ch2})
 						assert.Equals(t, _az.Wildcard, true)
 						return nil
 					},
@@ -2688,7 +2801,7 @@ func TestHandler_challengeTypes(t *testing.T) {
 					Wildcard:   false,
 				},
 			},
-			want: []acme.ChallengeType{acme.DNS01, acme.HTTP01, acme.TLSALPN01},
+			want: []acme.ChallengeType{acme.DNS01, acme.HTTP01, acme.TLSALPN01, acme.DNSPERSIST01},
 		},
 		{
 			name: "ok/wildcard",
@@ -2698,7 +2811,7 @@ func TestHandler_challengeTypes(t *testing.T) {
 					Wildcard:   true,
 				},
 			},
-			want: []acme.ChallengeType{acme.DNS01},
+			want: []acme.ChallengeType{acme.DNS01, acme.DNSPERSIST01},
 		},
 		{
 			name: "ok/ip",
