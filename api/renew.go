@@ -19,10 +19,10 @@ const (
 // Renew uses the information of certificate in the TLS connection to create a
 // new one.
 func Renew(w http.ResponseWriter, r *http.Request) {
-	ctx := r.Context()
+	ctx, warnings := collectCertificateWarnings(r.Context())
 
 	// Get the leaf certificate from the peer or the token.
-	cert, token, err := getPeerCertificate(r)
+	cert, token, err := getPeerCertificate(r.WithContext(ctx))
 	if err != nil {
 		render.Error(w, r, err)
 		return
@@ -52,6 +52,7 @@ func Renew(w http.ResponseWriter, r *http.Request) {
 		CaPEM:        caPEM,
 		CertChainPEM: certChainPEM,
 		TLSOptions:   a.GetTLSOptions(),
+		Warnings:     *warnings,
 	}, http.StatusCreated)
 }
 

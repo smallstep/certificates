@@ -10,6 +10,7 @@ import (
 	"github.com/smallstep/certificates/api/read"
 	"github.com/smallstep/certificates/api/render"
 	"github.com/smallstep/certificates/authority/provisioner"
+	"github.com/smallstep/certificates/cas/apiv1"
 	"github.com/smallstep/certificates/errs"
 	"github.com/smallstep/certificates/internal/cast"
 )
@@ -31,8 +32,9 @@ func (s *SSHRenewRequest) Validate() error {
 
 // SSHRenewResponse is the response object that returns the SSH certificate.
 type SSHRenewResponse struct {
-	Certificate         SSHCertificate `json:"crt"`
-	IdentityCertificate []Certificate  `json:"identityCrt,omitempty"`
+	Certificate         SSHCertificate             `json:"crt"`
+	IdentityCertificate []Certificate              `json:"identityCrt,omitempty"`
+	Warnings            []apiv1.CertificateWarning `json:"warnings,omitempty"`
 }
 
 // SSHRenew is an HTTP handler that reads an RenewSSHRequest with a one-time-token
@@ -51,7 +53,8 @@ func SSHRenew(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	ctx := provisioner.NewContextWithMethod(r.Context(), provisioner.SSHRenewMethod)
+	ctx, warnings := collectCertificateWarnings(r.Context())
+	ctx = provisioner.NewContextWithMethod(ctx, provisioner.SSHRenewMethod)
 	ctx = provisioner.NewContextWithToken(ctx, body.OTT)
 
 	a := mustAuthority(ctx)
@@ -76,16 +79,17 @@ func SSHRenew(w http.ResponseWriter, r *http.Request) {
 	notBefore := time.Unix(cast.Int64(oldCert.ValidAfter), 0)
 	notAfter := time.Unix(cast.Int64(oldCert.ValidBefore), 0)
 
-	identity, err := renewIdentityCertificate(r, notBefore, notAfter)
+	identity, err := renewIdentityCertificate(r.WithContext(ctx), notBefore, notAfter)
 	if err != nil {
 		render.Error(w, r, errs.ForbiddenErr(err, "error renewing identity certificate"))
 		return
 	}
 
 	LogSSHCertificate(w, newCert)
-	render.JSONStatus(w, r, &SSHSignResponse{
+	render.JSONStatus(w, r, &SSHRenewResponse{
 		Certificate:         SSHCertificate{newCert},
 		IdentityCertificate: identity,
+		Warnings:            *warnings,
 	}, http.StatusCreated)
 }
 
@@ -110,7 +114,7 @@ func renewIdentityCertificate(r *http.Request, notBefore, notAfter time.Time) ([
 		cert.NotAfter = notAfter
 	}
 
-	certChain, err := mustAuthority(r.Context()).Renew(cert)
+	certChain, err := mustAuthority(r.Context()).RenewContext(r.Context(), cert, nil)
 	if err != nil {
 		return nil, err
 	}
