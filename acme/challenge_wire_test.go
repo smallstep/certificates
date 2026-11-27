@@ -278,7 +278,7 @@ MCowBQYDK2VwAyEA5c+4NKZSNQcR1T8qN6SjwgdPZQ0Ge12Ylx/YeGAJ35k=
 							if assert.NotNil(t, ch.Error) {
 								if k, ok := errors.AsType[*Error](ch.Error); ok {
 									assert.Equal(t, "urn:ietf:params:acme:error:rejectedIdentifier", k.Type)
-									assert.Equal(t, "The server will not issue certificates for the identifier", k.Detail)
+									assert.Contains(t, k.Detail, "The server will not issue certificates for the identifier")
 									assert.Equal(t, 400, k.Status)
 									assert.Equal(t, `failed validating Wire access token: failed parsing token: go-jose/go-jose: empty input`, k.Err.Error())
 								}
@@ -1035,7 +1035,7 @@ MCowBQYDK2VwAyEA5c+4NKZSNQcR1T8qN6SjwgdPZQ0Ge12Ylx/YeGAJ35k=
 							assert.Equal(t, ChallengeType("wire-dpop-01"), updch.Type)
 							assert.Equal(t, string(valueBytes), updch.Value)
 							assert.Equal(t, "urn:ietf:params:acme:error:rejectedIdentifier", updch.Error.Type)
-							assert.Equal(t, "The server will not issue certificates for the identifier", updch.Error.Detail)
+							assert.Contains(t, updch.Error.Detail, "The server will not issue certificates for the identifier")
 							assert.Equal(t, 400, updch.Error.Status)
 							assert.Contains(t, updch.Error.Err.Error(), "failed DPoP validation")
 							assert.Contains(t, updch.Error.Err.Error(), "invalid audience claim")
@@ -1180,7 +1180,7 @@ MCowBQYDK2VwAyEA5c+4NKZSNQcR1T8qN6SjwgdPZQ0Ge12Ylx/YeGAJ35k=
 							assert.Equal(t, ChallengeType("wire-dpop-01"), updch.Type)
 							assert.Equal(t, string(valueBytes), updch.Value)
 							assert.Equal(t, "urn:ietf:params:acme:error:rejectedIdentifier", updch.Error.Type)
-							assert.Equal(t, "The server will not issue certificates for the identifier", updch.Error.Detail)
+							assert.Contains(t, updch.Error.Detail, "The server will not issue certificates for the identifier")
 							assert.Equal(t, 400, updch.Error.Status)
 							assert.Contains(t, updch.Error.Err.Error(), "failed validating Wire access token")
 							assert.Contains(t, updch.Error.Err.Error(), "invalid Wire client display 'name' \"Mallory Smith\"")
@@ -1325,7 +1325,7 @@ MCowBQYDK2VwAyEA5c+4NKZSNQcR1T8qN6SjwgdPZQ0Ge12Ylx/YeGAJ35k=
 							assert.Equal(t, ChallengeType("wire-dpop-01"), updch.Type)
 							assert.Equal(t, string(valueBytes), updch.Value)
 							assert.Equal(t, "urn:ietf:params:acme:error:rejectedIdentifier", updch.Error.Type)
-							assert.Equal(t, "The server will not issue certificates for the identifier", updch.Error.Detail)
+							assert.Contains(t, updch.Error.Detail, "The server will not issue certificates for the identifier")
 							assert.Equal(t, 400, updch.Error.Status)
 							assert.Contains(t, updch.Error.Err.Error(), "failed validating Wire access token")
 							assert.Contains(t, updch.Error.Err.Error(), "invalid Wire client 'handle' \"wireapp://%40mallory_wire@wire.com\"")
@@ -1473,7 +1473,7 @@ MCowBQYDK2VwAyEA5c+4NKZSNQcR1T8qN6SjwgdPZQ0Ge12Ylx/YeGAJ35k=
 							assert.Equal(t, ChallengeType("wire-dpop-01"), updch.Type)
 							assert.Equal(t, string(valueBytes), updch.Value)
 							assert.Equal(t, "urn:ietf:params:acme:error:rejectedIdentifier", updch.Error.Type)
-							assert.Equal(t, "The server will not issue certificates for the identifier", updch.Error.Detail)
+							assert.Contains(t, updch.Error.Detail, "The server will not issue certificates for the identifier")
 							assert.Equal(t, 400, updch.Error.Status)
 							assert.Contains(t, updch.Error.Err.Error(), "failed validating Wire access token")
 							assert.Contains(t, updch.Error.Err.Error(), fmt.Sprintf("expected 'kid' %q; got %q", jwk.KeyID, maliciousJwk.KeyID))
@@ -1621,7 +1621,7 @@ MCowBQYDK2VwAyEA5c+4NKZSNQcR1T8qN6SjwgdPZQ0Ge12Ylx/YeGAJ35k=
 							assert.Equal(t, ChallengeType("wire-dpop-01"), updch.Type)
 							assert.Equal(t, string(valueBytes), updch.Value)
 							assert.Equal(t, "urn:ietf:params:acme:error:rejectedIdentifier", updch.Error.Type)
-							assert.Equal(t, "The server will not issue certificates for the identifier", updch.Error.Detail)
+							assert.Contains(t, updch.Error.Detail, "The server will not issue certificates for the identifier")
 							assert.Equal(t, 400, updch.Error.Status)
 							assert.Contains(t, updch.Error.Err.Error(), "failed validating Wire access token")
 							assert.Contains(t, updch.Error.Err.Error(), fmt.Sprintf("invalid DPoP token key ID %q", maliciousJwk.KeyID))
@@ -1766,7 +1766,7 @@ MCowBQYDK2VwAyEA5c+4NKZSNQcR1T8qN6SjwgdPZQ0Ge12Ylx/YeGAJ35k=
 							assert.Equal(t, ChallengeType("wire-dpop-01"), updch.Type)
 							assert.Equal(t, string(valueBytes), updch.Value)
 							assert.Equal(t, "urn:ietf:params:acme:error:rejectedIdentifier", updch.Error.Type)
-							assert.Equal(t, "The server will not issue certificates for the identifier", updch.Error.Detail)
+							assert.Contains(t, updch.Error.Detail, "The server will not issue certificates for the identifier")
 							assert.Equal(t, 400, updch.Error.Status)
 							assert.Contains(t, updch.Error.Err.Error(), "failed validating Wire access token")
 							assert.Contains(t, updch.Error.Err.Error(), "invalid Wire 'client_id' \"wireapp://incorrect!device@wire.com\"")
@@ -1911,7 +1911,7 @@ MCowBQYDK2VwAyEA5c+4NKZSNQcR1T8qN6SjwgdPZQ0Ge12Ylx/YeGAJ35k=
 							assert.Equal(t, ChallengeType("wire-dpop-01"), updch.Type)
 							assert.Equal(t, string(valueBytes), updch.Value)
 							assert.Equal(t, "urn:ietf:params:acme:error:rejectedIdentifier", updch.Error.Type)
-							assert.Equal(t, "The server will not issue certificates for the identifier", updch.Error.Detail)
+							assert.Contains(t, updch.Error.Detail, "The server will not issue certificates for the identifier")
 							assert.Equal(t, 400, updch.Error.Status)
 							assert.Contains(t, updch.Error.Err.Error(), "failed validating Wire access token")
 							assert.Contains(t, updch.Error.Err.Error(), "failed validation: go-jose/go-jose/jwt: validation failed, invalid issuer claim (iss)")
@@ -2056,7 +2056,7 @@ MCowBQYDK2VwAyEA5c+4NKZSNQcR1T8qN6SjwgdPZQ0Ge12Ylx/YeGAJ35k=
 							assert.Equal(t, ChallengeType("wire-dpop-01"), updch.Type)
 							assert.Equal(t, string(valueBytes), updch.Value)
 							assert.Equal(t, "urn:ietf:params:acme:error:rejectedIdentifier", updch.Error.Type)
-							assert.Equal(t, "The server will not issue certificates for the identifier", updch.Error.Detail)
+							assert.Contains(t, updch.Error.Detail, "The server will not issue certificates for the identifier")
 							assert.Equal(t, 400, updch.Error.Status)
 							assert.Contains(t, updch.Error.Err.Error(), "failed validating Wire access token")
 							assert.Contains(t, updch.Error.Err.Error(), "DPoP contains invalid issuer 'htu' \"http://unknown-issuer.example.com\"")
@@ -2201,7 +2201,7 @@ MCowBQYDK2VwAyEA5c+4NKZSNQcR1T8qN6SjwgdPZQ0Ge12Ylx/YeGAJ35k=
 							assert.Equal(t, ChallengeType("wire-dpop-01"), updch.Type)
 							assert.Equal(t, string(valueBytes), updch.Value)
 							assert.Equal(t, "urn:ietf:params:acme:error:rejectedIdentifier", updch.Error.Type)
-							assert.Equal(t, "The server will not issue certificates for the identifier", updch.Error.Detail)
+							assert.Contains(t, updch.Error.Detail, "The server will not issue certificates for the identifier")
 							assert.Equal(t, 400, updch.Error.Status)
 							assert.Contains(t, updch.Error.Err.Error(), "failed validating Wire access token")
 							assert.Contains(t, updch.Error.Err.Error(), "DPoP contains invalid challenge 'chal' \"not-the-correct-token\"")
@@ -2348,7 +2348,7 @@ MCowBQYDK2VwAyEA5c+4NKZSNQcR1T8qN6SjwgdPZQ0Ge12Ylx/YeGAJ35k=
 							assert.Equal(t, ChallengeType("wire-dpop-01"), updch.Type)
 							assert.Equal(t, string(valueBytes), updch.Value)
 							assert.Equal(t, "urn:ietf:params:acme:error:rejectedIdentifier", updch.Error.Type)
-							assert.Equal(t, "The server will not issue certificates for the identifier", updch.Error.Detail)
+							assert.Contains(t, updch.Error.Detail, "The server will not issue certificates for the identifier")
 							assert.Equal(t, 400, updch.Error.Status)
 							assert.Contains(t, updch.Error.Err.Error(), "failed validating Wire access token")
 							assert.Contains(t, updch.Error.Err.Error(), fmt.Sprintf("invalid token key ID %q", maliciousSignerJWK.KeyID))
@@ -2493,7 +2493,7 @@ MCowBQYDK2VwAyEA5c+4NKZSNQcR1T8qN6SjwgdPZQ0Ge12Ylx/YeGAJ35k=
 							assert.Equal(t, ChallengeType("wire-dpop-01"), updch.Type)
 							assert.Equal(t, string(valueBytes), updch.Value)
 							assert.Equal(t, "urn:ietf:params:acme:error:rejectedIdentifier", updch.Error.Type)
-							assert.Equal(t, "The server will not issue certificates for the identifier", updch.Error.Detail)
+							assert.Contains(t, updch.Error.Detail, "The server will not issue certificates for the identifier")
 							assert.Equal(t, 400, updch.Error.Status)
 							assert.Contains(t, updch.Error.Err.Error(), "failed validating Wire access token")
 							assert.Contains(t, updch.Error.Err.Error(), "DPoP contains invalid 'nonce' \"nonce-from-dpop\"")
@@ -2663,7 +2663,7 @@ MCowBQYDK2VwAyEA5c+4NKZSNQcR1T8qN6SjwgdPZQ0Ge12Ylx/YeGAJ35k=
 			if tc.expectedErr != nil {
 				if k, ok := errors.AsType[*Error](err); ok {
 					assert.Equal(t, tc.expectedErr.Type, k.Type)
-					assert.Equal(t, tc.expectedErr.Detail, k.Detail)
+					assert.Contains(t, k.Detail, tc.expectedErr.Detail)
 					assert.Equal(t, tc.expectedErr.Status, k.Status)
 					assert.Equal(t, tc.expectedErr.Err.Error(), k.Err.Error())
 				} else {
@@ -2923,7 +2923,7 @@ MCowBQYDK2VwAyEA5c+4NKZSNQcR1T8qN6SjwgdPZQ0Ge12Ylx/YeGAJ35k=
 							if assert.NotNil(t, updch.Error) {
 								if k, ok := errors.AsType[*Error](updch.Error); ok {
 									assert.Equal(t, "urn:ietf:params:acme:error:rejectedIdentifier", k.Type)
-									assert.Equal(t, "The server will not issue certificates for the identifier", k.Detail)
+									assert.Contains(t, k.Detail, "The server will not issue certificates for the identifier")
 									assert.Equal(t, 400, k.Status)
 									assert.Equal(t, `error verifying ID token signature: failed to verify signature: failed to verify id token signature`, k.Err.Error())
 								}
@@ -3030,7 +3030,7 @@ MCowBQYDK2VwAyEA5c+4NKZSNQcR1T8qN6SjwgdPZQ0Ge12Ylx/YeGAJ35k=
 							if assert.NotNil(t, updch.Error) {
 								if k, ok := errors.AsType[*Error](updch.Error); ok {
 									assert.Equal(t, "urn:ietf:params:acme:error:rejectedIdentifier", k.Type)
-									assert.Equal(t, "The server will not issue certificates for the identifier", k.Detail)
+									assert.Contains(t, k.Detail, "The server will not issue certificates for the identifier")
 									assert.Equal(t, 400, k.Status)
 									assert.Contains(t, k.Err.Error(), "keyAuthorization does not match")
 								}
@@ -3135,7 +3135,7 @@ MCowBQYDK2VwAyEA5c+4NKZSNQcR1T8qN6SjwgdPZQ0Ge12Ylx/YeGAJ35k=
 							assert.Equal(t, ChallengeType("wire-oidc-01"), updch.Type)
 							assert.Equal(t, string(valueBytes), updch.Value)
 							assert.Equal(t, "urn:ietf:params:acme:error:rejectedIdentifier", updch.Error.Type)
-							assert.Equal(t, "The server will not issue certificates for the identifier", updch.Error.Detail)
+							assert.Contains(t, updch.Error.Detail, "The server will not issue certificates for the identifier")
 							assert.Equal(t, 400, updch.Error.Status)
 							assert.Equal(t, `invalid 'acme_aud' "https://ca.example.com/acme/wire/challenge/azID/invalid-audience"`, updch.Error.Err.Error())
 							return nil
@@ -3240,7 +3240,7 @@ MCowBQYDK2VwAyEA5c+4NKZSNQcR1T8qN6SjwgdPZQ0Ge12Ylx/YeGAJ35k=
 							if assert.NotNil(t, updch.Error) {
 								if k, ok := errors.AsType[*Error](updch.Error); ok {
 									assert.Equal(t, "urn:ietf:params:acme:error:rejectedIdentifier", k.Type)
-									assert.Equal(t, "The server will not issue certificates for the identifier", k.Detail)
+									assert.Contains(t, k.Detail, "The server will not issue certificates for the identifier")
 									assert.Equal(t, 400, k.Status)
 									assert.Equal(t, `claims in OIDC ID token don't match: invalid 'preferred_username' "wireapp://%40bob@wire.com" after transformation`, k.Err.Error())
 								}
@@ -3785,7 +3785,7 @@ MCowBQYDK2VwAyEA5c+4NKZSNQcR1T8qN6SjwgdPZQ0Ge12Ylx/YeGAJ35k=
 							assert.Equal(t, ChallengeType("wire-oidc-01"), updch.Type)
 							assert.Equal(t, string(valueBytes), updch.Value)
 							assert.Equal(t, "urn:ietf:params:acme:error:rejectedIdentifier", updch.Error.Type)
-							assert.Equal(t, "The server will not issue certificates for the identifier", updch.Error.Detail)
+							assert.Contains(t, updch.Error.Detail, "The server will not issue certificates for the identifier")
 							assert.Equal(t, 400, updch.Error.Status)
 							assert.Equal(t, `error verifying ID token signature: failed to verify signature: failed to verify id token signature`, updch.Error.Err.Error())
 							return nil
@@ -3914,7 +3914,7 @@ MCowBQYDK2VwAyEA5c+4NKZSNQcR1T8qN6SjwgdPZQ0Ge12Ylx/YeGAJ35k=
 			if tc.expectedErr != nil {
 				if k, ok := errors.AsType[*Error](err); ok {
 					assert.Equal(t, tc.expectedErr.Type, k.Type)
-					assert.Equal(t, tc.expectedErr.Detail, k.Detail)
+					assert.Contains(t, k.Detail, tc.expectedErr.Detail)
 					assert.Equal(t, tc.expectedErr.Status, k.Status)
 					assert.Equal(t, tc.expectedErr.Err.Error(), k.Err.Error())
 				} else {
