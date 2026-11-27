@@ -783,7 +783,7 @@ func TestDB_updateAddOrderIDs(t *testing.T) {
 						case string(ordersByAccountIDTable):
 							assert.Equals(t, key, []byte(accID))
 							assert.Equals(t, old, bOldOids)
-							assert.Equals(t, nu, nil)
+							assert.Equals(t, nu, []byte("[]"))
 							return nil, true, nil
 						default:
 							assert.FatalError(t, errors.Errorf("unexpected bucket %s", string(bucket)))
@@ -792,6 +792,29 @@ func TestDB_updateAddOrderIDs(t *testing.T) {
 					},
 				},
 				res: []string{},
+			}
+		},
+		"ok/empty-old-and-new": func(t *testing.T) test {
+			addOids := []string{"zap"}
+			bAddOids, err := json.Marshal(addOids)
+			assert.FatalError(t, err)
+			return test{
+				db: &db.MockNoSQLDB{
+					MGet: func(bucket, key []byte) ([]byte, error) {
+						assert.Equals(t, bucket, ordersByAccountIDTable)
+						assert.Equals(t, key, []byte(accID))
+						return []byte{}, nil
+					},
+					MCmpAndSwap: func(bucket, key, old, nu []byte) ([]byte, bool, error) {
+						assert.Equals(t, bucket, ordersByAccountIDTable)
+						assert.Equals(t, key, []byte(accID))
+						assert.Equals(t, old, nil)
+						assert.Equals(t, nu, bAddOids)
+						return nil, true, nil
+					},
+				},
+				addOids: addOids,
+				res:     addOids,
 			}
 		},
 		"ok/old-and-new": func(t *testing.T) test {
@@ -1022,4 +1045,28 @@ func TestDB_updateAddOrderIDs(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestDB_updateAddOrderIDs_noPendingOrders(t *testing.T) {
+	ndb, err := nosql.New("badgerv2", t.TempDir())
+	assert.FatalError(t, err)
+	defer ndb.Close()
+	d, err := New(ndb)
+	assert.FatalError(t, err)
+
+	ctx := context.Background()
+	o := &acme.Order{AccountID: "accID", Status: acme.StatusPending, ExpiresAt: clock.Now().Add(time.Hour)}
+	assert.FatalError(t, d.CreateOrder(ctx, o))
+	o.Status = acme.StatusValid
+	assert.FatalError(t, d.UpdateOrder(ctx, o))
+
+	oids, err := d.GetOrdersByAccountID(ctx, "accID")
+	assert.FatalError(t, err)
+	assert.Equals(t, oids, []string{})
+
+	o = &acme.Order{AccountID: "accID", Status: acme.StatusPending, ExpiresAt: clock.Now().Add(time.Hour)}
+	assert.FatalError(t, d.CreateOrder(ctx, o))
+	oids, err = d.GetAllOrdersByAccountID(ctx, "accID")
+	assert.FatalError(t, err)
+	assert.Equals(t, oids, []string{o.ID})
 }
