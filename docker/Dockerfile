@@ -11,6 +11,9 @@ FROM smallstep/step-kms-plugin:cloud AS kms
 
 FROM smallstep/step-cli:latest
 
+USER root
+RUN apk upgrade --no-cache
+
 COPY --from=builder /src/bin/step-ca /usr/local/bin/step-ca
 COPY --from=kms /usr/local/bin/step-kms-plugin /usr/local/bin/step-kms-plugin
 
