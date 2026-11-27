@@ -3,8 +3,10 @@ package provisioner
 import (
 	"context"
 	"crypto/x509"
+	"encoding/json"
 	"fmt"
 	"net/http"
+	"net/http/httptest"
 	"reflect"
 	"testing"
 	"time"
@@ -14,6 +16,7 @@ import (
 	"github.com/smallstep/certificates/webhook"
 	"github.com/smallstep/linkedca"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	"go.step.sm/crypto/pemutil"
 	"go.step.sm/crypto/x509util"
 	"golang.org/x/crypto/ssh"
@@ -538,5 +541,40 @@ func Test_newWebhookController(t *testing.T) {
 		assert.Equal(t, c.webhooks, got.webhooks)
 		assert.Equal(t, tt.args.opts, got.options)
 		assert.Equal(t, tt.args.certType, got.certType)
+	}
+}
+
+func TestController_NotifyX509Issued(t *testing.T) {
+	cert, err := pemutil.ReadCertificate("testdata/certs/x5c-leaf.crt", pemutil.WithFirstBlock())
+	require.NoError(t, err)
+	csr := parseCertificateRequest(t, "testdata/certs/ecdsa.csr")
+
+	tests := map[string]struct {
+		csr *x509.CertificateRequest
+	}{
+		"ok/sign":  {csr: csr},
+		"ok/renew": {csr: nil},
+	}
+	for name, test := range tests {
+		t.Run(name, func(t *testing.T) {
+			var body webhook.RequestBody
+			ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				require.NoError(t, json.NewDecoder(r.Body).Decode(&body))
+				require.NoError(t, json.NewEncoder(w).Encode(webhook.ResponseBody{}))
+			}))
+			defer ts.Close()
+
+			c := &Controller{
+				Interface:     &JWK{Name: "jwk"},
+				webhookClient: http.DefaultClient,
+				webhooks:      []*Webhook{{Name: "people", Kind: "NOTIFYING", URL: ts.URL}},
+			}
+			require.NoError(t, c.NotifyX509Issued(context.Background(), test.csr, cert))
+
+			assert.Equal(t, "jwk", body.ProvisionerName)
+			require.NotNil(t, body.X509Certificate)
+			assert.Equal(t, cert.Raw, body.X509Certificate.Raw)
+			assert.Equal(t, test.csr != nil, body.X509CertificateRequest != nil)
+		})
 	}
 }

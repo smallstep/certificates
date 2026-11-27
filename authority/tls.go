@@ -11,6 +11,7 @@ import (
 	"encoding/json"
 	"encoding/pem"
 	"fmt"
+	"log"
 	"math/big"
 	"net"
 	"net/http"
@@ -322,6 +323,11 @@ func (a *Authority) signX509(ctx context.Context, csr *x509.CertificateRequest, 
 		return nil, prov, errs.Wrap(http.StatusInternalServerError, err, "authority.Sign; error storing certificate in db", opts...)
 	}
 
+	// Send certificate to webhooks for notification
+	if err := a.callNotifyingWebhooksX509(ctx, prov, csr, chain[0]); err != nil {
+		log.Printf("failed notifying webhooks of certificate %s: %v\n", chain[0].SerialNumber, err)
+	}
+
 	return chain, prov, nil
 }
 
@@ -489,6 +495,11 @@ func (a *Authority) renewContext(ctx context.Context, oldCert *x509.Certificate,
 
 	if err = a.storeRenewedCertificate(oldCert, chain); err != nil && !errors.Is(err, db.ErrNotImplemented) {
 		return nil, prov, errs.StatusCodeError(http.StatusInternalServerError, err, opts...)
+	}
+
+	// Send certificate to webhooks for notification
+	if err = a.callNotifyingWebhooksX509(ctx, prov, nil, chain[0]); err != nil {
+		log.Printf("failed notifying webhooks of certificate %s: %v\n", chain[0].SerialNumber, err)
 	}
 
 	return chain, prov, nil
@@ -1083,4 +1094,20 @@ func (a *Authority) callAuthorizingWebhooksX509(ctx context.Context, prov provis
 	}
 
 	return
+}
+
+func (a *Authority) callNotifyingWebhooksX509(ctx context.Context, prov provisioner.Interface, csr *x509.CertificateRequest, cert *x509.Certificate) (err error) {
+	p := prov
+	if wp, ok := p.(*wrappedProvisioner); ok {
+		p = wp.Interface
+	}
+	notifier, ok := p.(notifyingProvisioner)
+	if !ok {
+		return
+	}
+	defer func() { a.meter.X509WebhookNotified(prov, err) }()
+
+	// The certificate has been issued, so the notification must not be
+	// canceled with the request.
+	return notifier.NotifyX509Issued(context.WithoutCancel(ctx), csr, cert)
 }

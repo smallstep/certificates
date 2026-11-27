@@ -437,6 +437,87 @@ func TestWebhookController_Authorize(t *testing.T) {
 	}
 }
 
+func TestWebhookController_Notify(t *testing.T) {
+	type test struct {
+		ctl         *WebhookController
+		ctx         context.Context
+		req         *webhook.RequestBody
+		statusCode  int
+		expectCalls int
+		expectErr   bool
+	}
+	tests := map[string]test{
+		"ok/no notifying webhooks": {
+			ctl: &WebhookController{
+				client:   http.DefaultClient,
+				webhooks: []*Webhook{{Name: "people", Kind: "AUTHORIZING"}},
+			},
+			req:         &webhook.RequestBody{},
+			expectCalls: 0,
+			expectErr:   false,
+		},
+		"ok": {
+			ctl: &WebhookController{
+				client:   http.DefaultClient,
+				webhooks: []*Webhook{{Name: "people", Kind: "NOTIFYING"}},
+			},
+			ctx:         withRequestID(t, context.Background(), "reqID"),
+			req:         &webhook.RequestBody{},
+			expectCalls: 1,
+			expectErr:   false,
+		},
+		"ok/ssh only": {
+			ctl: &WebhookController{
+				client:   http.DefaultClient,
+				webhooks: []*Webhook{{Name: "people", Kind: "NOTIFYING", CertType: linkedca.Webhook_X509.String()}},
+				certType: linkedca.Webhook_SSH,
+			},
+			ctx:         withRequestID(t, context.Background(), "reqID"),
+			req:         &webhook.RequestBody{},
+			expectCalls: 0,
+			expectErr:   false,
+		},
+		"fail": {
+			ctl: &WebhookController{
+				client:   http.DefaultClient,
+				webhooks: []*Webhook{{Name: "people", Kind: "NOTIFYING"}},
+			},
+			ctx:         withRequestID(t, context.Background(), "reqID"),
+			req:         &webhook.RequestBody{},
+			statusCode:  http.StatusBadRequest,
+			expectCalls: 1,
+			expectErr:   true,
+		},
+	}
+	for name, test := range tests {
+		t.Run(name, func(t *testing.T) {
+			var calls int
+			for _, wh := range test.ctl.webhooks {
+				ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+					calls++
+					assert.Equal(t, "reqID", r.Header.Get("X-Request-ID"))
+					if test.statusCode != 0 {
+						w.WriteHeader(test.statusCode)
+						return
+					}
+					// A notifying webhook cannot deny the request.
+					err := json.NewEncoder(w).Encode(webhook.ResponseBody{Allow: false})
+					require.NoError(t, err)
+				}))
+				// nolint: gocritic // defer in loop isn't a memory leak
+				defer ts.Close()
+				wh.URL = ts.URL
+			}
+
+			err := test.ctl.Notify(test.ctx, test.req)
+			if (err != nil) != test.expectErr {
+				t.Fatalf("Got err %v, want %v", err, test.expectErr)
+			}
+			assert.Equal(t, test.expectCalls, calls)
+		})
+	}
+}
+
 func TestWebhook_Do(t *testing.T) {
 	csr := parseCertificateRequest(t, "testdata/certs/ecdsa.csr")
 	type test struct {

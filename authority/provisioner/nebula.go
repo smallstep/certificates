@@ -282,6 +282,11 @@ func (p *Nebula) AuthorizeRenew(ctx context.Context, crt *x509.Certificate) erro
 	return p.ctl.AuthorizeRenew(ctx, crt)
 }
 
+// NotifyX509Issued sends an issued certificate to the notifying webhooks.
+func (p *Nebula) NotifyX509Issued(ctx context.Context, csr *x509.CertificateRequest, cert *x509.Certificate) error {
+	return p.ctl.NotifyX509Issued(ctx, csr, cert)
+}
+
 // AuthorizeRevoke returns an unauthorized error.
 func (p *Nebula) AuthorizeRevoke(context.Context, string) error {
 	return errs.Unauthorized("nebula provisioner does not support revoke")

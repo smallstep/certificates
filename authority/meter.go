@@ -29,6 +29,9 @@ type Meter interface {
 	// X509WebhookEnriched is called whenever an X509 enriching webhook is called.
 	X509WebhookEnriched(provisioner.Interface, error)
 
+	// X509WebhookNotified is called whenever an X509 notifying webhook is called.
+	X509WebhookNotified(provisioner.Interface, error)
+
 	// SSHSigned is called whenever an SSH certificate is signed.
 	SSHSigned(*ssh.Certificate, provisioner.Interface, error)
 
@@ -61,6 +64,7 @@ func (noopMeter) X509Renewed([]*x509.Certificate, provisioner.Interface, error) 
 func (noopMeter) X509Signed([]*x509.Certificate, provisioner.Interface, error)  {}
 func (noopMeter) X509WebhookAuthorized(provisioner.Interface, error)            {}
 func (noopMeter) X509WebhookEnriched(provisioner.Interface, error)              {}
+func (noopMeter) X509WebhookNotified(provisioner.Interface, error)              {}
 func (noopMeter) KMSSigned(error)                                               {}
 
 type instrumentedKeyManager struct {

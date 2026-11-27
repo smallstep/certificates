@@ -128,6 +128,26 @@ func (c *Controller) newWebhookController(templateData WebhookSetter, certType l
 	}
 }
 
+// NotifyX509Issued sends an issued certificate to the notifying webhooks. The
+// certificate request is nil when the certificate was renewed.
+func (c *Controller) NotifyX509Issued(ctx context.Context, csr *x509.CertificateRequest, cert *x509.Certificate) error {
+	opts := []webhook.RequestBodyOption{
+		webhook.WithX509Certificate(nil, cert),
+		webhook.WithProvisionerName(c.Interface),
+	}
+	if csr != nil {
+		opts = append(opts, webhook.WithX509CertificateRequest(csr))
+	}
+
+	req, err := webhook.NewRequestBody(opts...)
+	if err != nil {
+		return err
+	}
+	req.X509Certificate.Raw = cert.Raw // adding the full certificate DER bytes
+
+	return c.newWebhookController(nil, linkedca.Webhook_X509).Notify(ctx, req)
+}
+
 // Identity is the type representing an externally supplied identity that is used
 // by provisioners to populate certificate fields.
 type Identity struct {

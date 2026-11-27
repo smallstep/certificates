@@ -412,6 +412,11 @@ func (p *Azure) AuthorizeRenew(ctx context.Context, cert *x509.Certificate) erro
 	return p.ctl.AuthorizeRenew(ctx, cert)
 }
 
+// NotifyX509Issued sends an issued certificate to the notifying webhooks.
+func (p *Azure) NotifyX509Issued(ctx context.Context, csr *x509.CertificateRequest, cert *x509.Certificate) error {
+	return p.ctl.NotifyX509Issued(ctx, csr, cert)
+}
+
 // AuthorizeSSHSign returns the list of SignOption for a SignSSH request.
 func (p *Azure) AuthorizeSSHSign(_ context.Context, token string) ([]SignOption, error) {
 	if !p.ctl.Claimer.IsSSHCAEnabled() {
