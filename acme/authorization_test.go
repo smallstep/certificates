@@ -124,6 +124,52 @@ func TestAuthorization_UpdateStatus(t *testing.T) {
 				},
 			}
 		},
+		"ok/invalid-challenge": func(t *testing.T) test {
+			now := clock.Now()
+			chErr := NewError(ErrorConnectionType, "force")
+			az := &Authorization{
+				ID:        "azID",
+				AccountID: "accID",
+				Status:    StatusPending,
+				ExpiresAt: now.Add(5 * time.Minute),
+				Challenges: []*Challenge{
+					{Status: StatusPending}, {Status: StatusInvalid, Error: chErr}, {Status: StatusPending},
+				},
+			}
+			return test{
+				az: az,
+				db: &MockDB{
+					MockUpdateAuthorization: func(ctx context.Context, updaz *Authorization) error {
+						assert.Equals(t, updaz.ID, az.ID)
+						assert.Equals(t, updaz.Status, StatusInvalid)
+						assert.Equals(t, updaz.Error, chErr)
+						return nil
+					},
+				},
+			}
+		},
+		"ok/valid-wins-over-invalid": func(t *testing.T) test {
+			now := clock.Now()
+			az := &Authorization{
+				ID:        "azID",
+				AccountID: "accID",
+				Status:    StatusPending,
+				ExpiresAt: now.Add(5 * time.Minute),
+				Challenges: []*Challenge{
+					{Status: StatusInvalid, Error: NewError(ErrorConnectionType, "force")}, {Status: StatusValid},
+				},
+			}
+			return test{
+				az: az,
+				db: &MockDB{
+					MockUpdateAuthorization: func(ctx context.Context, updaz *Authorization) error {
+						assert.Equals(t, updaz.Status, StatusValid)
+						assert.Equals(t, updaz.Error, nil)
+						return nil
+					},
+				},
+			}
+		},
 	}
 	for name, run := range tests {
 		t.Run(name, func(t *testing.T) {
@@ -147,4 +193,29 @@ func TestAuthorization_UpdateStatus(t *testing.T) {
 		})
 
 	}
+}
+
+func TestAuthorizationInvalidAfterFailedChallenge(t *testing.T) {
+	chErr := NewError(ErrorConnectionType, "no such host")
+	az := &Authorization{
+		ID:        "azID",
+		Status:    StatusPending,
+		ExpiresAt: clock.Now().Add(time.Hour),
+		Challenges: []*Challenge{
+			{Type: HTTP01, Status: StatusInvalid, Error: chErr},
+			{Type: DNS01, Status: StatusPending},
+		},
+	}
+	updated := false
+	db := &MockDB{
+		MockUpdateAuthorization: func(context.Context, *Authorization) error {
+			updated = true
+			return nil
+		},
+	}
+
+	assert.FatalError(t, az.UpdateStatus(context.Background(), db))
+	assert.True(t, updated, "authorization must be persisted")
+	assert.Equals(t, az.Status, StatusInvalid)
+	assert.Equals(t, az.Error, chErr)
 }

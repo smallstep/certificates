@@ -46,19 +46,33 @@ func (az *Authorization) UpdateStatus(ctx context.Context, db DB) error {
 			break
 		}
 
-		var isValid = false
+		var (
+			isValid bool
+			invalid *Challenge
+		)
 		for _, ch := range az.Challenges {
 			if ch.Status == StatusValid {
 				isValid = true
 				break
 			}
+			if ch.Status == StatusInvalid && invalid == nil {
+				invalid = ch
+			}
 		}
 
-		if !isValid {
+		switch {
+		case isValid:
+			az.Status = StatusValid
+			az.Error = nil
+		case invalid != nil:
+			// RFC 8555, section 7.1.6: if the client attempts to fulfill a
+			// challenge and fails, the authorization transitions to invalid.
+			// Leaving it pending makes clients poll until it expires.
+			az.Status = StatusInvalid
+			az.Error = invalid.Error
+		default:
 			return nil
 		}
-		az.Status = StatusValid
-		az.Error = nil
 	default:
 		return NewErrorISE("unrecognized authorization status: %s", az.Status)
 	}
